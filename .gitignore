@@ -1,0 +1,27 @@
+# Python & Django junk (The .pyc files you saw earlier)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+
+# Virtual Environment (Never upload your local Python setup)
+.venv/
+venv/
+ENV/
+
+# Environment variables (NEVER upload passwords)
+.env
+.env.local
+
+# IDE & OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Frontend (React/Vite)
+node_modules/
+dist/
