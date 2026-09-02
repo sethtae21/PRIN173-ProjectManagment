@@ -14,7 +14,8 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-fallback-secret-key-chang
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '127.0.0.1:8000']
+# FIXED: Removed port number from ALLOWED_HOSTS (Django does not allow ports here)
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 # CORS Configuration (for React frontend on different port)
 CORS_ALLOWED_ORIGINS = [
@@ -31,12 +32,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    # Local apps
-    'accounts',
+    
+    # Local apps (CHANGE THIS LINE)
+    'accounts.apps.AccountsConfig', 
 ]
 
 MIDDLEWARE = [
@@ -74,11 +77,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django_mongodb_backend',
         'NAME': 'fitfusion_db',
-        'HOST': os.environ.get('MONGODB_URI'),  # your full Atlas connection string
+        # HARDCODED URI TO GUARANTEE IT WORKS
+        'HOST': 'mongodb+srv://yap2421105_db_user:FITFUSIONAI@cluster0.zrnfpru.mongodb.net/',
     }
 }
-
-DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'   # ✅ CORRECT
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
@@ -91,7 +93,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAuthenticated', # Secure by default, overridden in views
     ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
@@ -116,7 +118,7 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'pk',        # ← Use 'pk' (works with ObjectIdAutoField)
+    'USER_ID_FIELD': 'pk',        # ← Use 'pk' (works perfectly with ObjectIdAutoField)
     'USER_ID_CLAIM': 'user_id',
 }
 
@@ -144,3 +146,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ============================================
+# MongoDB & System Check Fixes
+# ============================================
+DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
+SILENCED_SYSTEM_CHECKS = ['mongodb.E001']

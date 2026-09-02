@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FitFusion AI - Seller Upload Test</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        input, button { margin: 5px 0; padding: 10px; width: 100%; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #result { background: #f5f5f5; padding: 15px; margin-top: 10px; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>👕 FitFusion AI - Seller Upload Test</h1>
+    
+    <!-- Registration Section -->
+    <div class="section">
+        <h2>1. Register Seller Account</h2>
+        <form id="registerForm">
+            <input type="text" id="reg_username" placeholder="Username" required value="testseller">
+            <input type="email" id="reg_email" placeholder="Email" required value="seller@test.com">
+            <input type="password" id="reg_password" placeholder="Password" required value="Test123!@#">
+            <input type="text" id="reg_store" placeholder="Store Name" required value="Test Fashion Store">
+            <button type="submit">Register Seller</button>
+        </form>
+        <div id="registerResult"></div>
+    </div>
+
+    <!-- Login Section -->
+    <div class="section">
+        <h2>2. Login (Get Token)</h2>
+        <form id="loginForm">
+            <input type="text" id="login_username" placeholder="Username" required value="testseller">
+            <input type="password" id="login_password" placeholder="Password" required value="Test123!@#">
+            <button type="submit">Login</button>
+        </form>
+        <div id="loginResult"></div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="section">
+        <h2>3. Upload CSV + Images</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label><strong>CSV File:</strong></label>
+            <input type="file" id="csv_file" accept=".csv" required>
+            
+            <label><strong>Images (select all 3):</strong></label>
+            <input type="file" id="images" accept="image/*" multiple required>
+            <small>Select front.jpg, side.jpg, rear.jpg</small>
+            
+            <button type="submit">Upload to Catalog</button>
+        </form>
+        <div id="uploadResult"></div>
+    </div>
+
+    <script>
+        let accessToken = '';
+
+        // Registration
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('registerResult');
+            resultDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await fetch('/auth/register/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('reg_username').value,
+                        email: document.getElementById('reg_email').value,
+                        password: document.getElementById('reg_password').value,
+                        role: 'seller',
+                        store_name: document.getElementById('reg_store').value
+                    })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Registered successfully!<br>User ID: ${data.user.id}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        });
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('loginResult');
+            resultDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await fetch('/auth/login/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('login_username').value,
+                        password: document.getElementById('login_password').value
+                    })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    accessToken = data.access;
+                    resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>Token: ${accessToken.substring(0, 50)}...</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        });
+
+        // Upload
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('uploadResult');
+            
+            if (!accessToken) {
+                resultDiv.innerHTML = '<div class="error"> Please login first to get a token!</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = 'Uploading...';
+            
+            const formData = new FormData();
+            formData.append('csv_file', document.getElementById('csv_file').files[0]);
+            
+            const imageFiles = document.getElementById('images').files;
+            for (let i = 0; i < imageFiles.length; i++) {
+                formData.append('images', imageFiles[i]);
+            }
+            
+            try {
+                const response = await fetch('/catalog/upload/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Upload successful!<br>
+                            <strong>Summary:</strong><br>
+                            Total: ${data.summary.total_processed}<br>
+                            Accepted: ${data.summary.accepted}<br>
+                            Rejected: ${data.summary.rejected}<br><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
