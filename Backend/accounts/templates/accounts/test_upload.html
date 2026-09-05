@@ -1,24 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FitFusion AI - Seller Upload Test</title>
+    <title>FitFusion AI - Seller Upload Test (Part 3)</title>
     <style>
-        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        body { font-family: Arial; max-width: 900px; margin: 50px auto; padding: 20px; }
         .section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-        input, button { margin: 5px 0; padding: 10px; width: 100%; }
+        input, button { margin: 5px 0; padding: 10px; width: 100%; box-sizing: border-box; }
         button { background: #007bff; color: white; border: none; cursor: pointer; }
         button:hover { background: #0056b3; }
-        #result { background: #f5f5f5; padding: 15px; margin-top: 10px; border-radius: 5px; }
-        .error { color: red; }
-        .success { color: green; }
+        .result { background: #f5f5f5; padding: 15px; margin-top: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+        .error { color: red; background: #ffe6e6; }
+        .success { color: green; background: #e6ffe6; }
+        .info { color: blue; background: #e6f3ff; }
+        .batch-status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .processing { background: #fff3cd; }
+        .completed { background: #d4edda; }
+        .failed { background: #f8d7da; }
     </style>
 </head>
 <body>
-    <h1>👕 FitFusion AI - Seller Upload Test</h1>
+    <h1>👕 FitFusion AI - Seller Upload Test (Part 3)</h1>
+    <p><strong>Features:</strong> Batch tracking, background processing, GridFS storage</p>
     
+    <!-- Download Package Section -->
+    <div class="section">
+        <h2>1. Download Upload Package (CSV + Instructions)</h2>
+        <button onclick="downloadPackage()">📥 Download ZIP Package</button>
+        <div id="downloadResult"></div>
+    </div>
+
     <!-- Registration Section -->
     <div class="section">
-        <h2>1. Register Seller Account</h2>
+        <h2>2. Register Seller Account</h2>
         <form id="registerForm">
             <input type="text" id="reg_username" placeholder="Username" required value="testseller">
             <input type="email" id="reg_email" placeholder="Email" required value="seller@test.com">
@@ -31,7 +44,7 @@
 
     <!-- Login Section -->
     <div class="section">
-        <h2>2. Login (Get Token)</h2>
+        <h2>3. Login (Get Token)</h2>
         <form id="loginForm">
             <input type="text" id="login_username" placeholder="Username" required value="testseller">
             <input type="password" id="login_password" placeholder="Password" required value="Test123!@#">
@@ -42,22 +55,37 @@
 
     <!-- Upload Section -->
     <div class="section">
-        <h2>3. Upload CSV + Images</h2>
+        <h2>4. Upload CSV + Images (Background Processing)</h2>
         <form id="uploadForm" enctype="multipart/form-data">
             <label><strong>CSV File:</strong></label>
             <input type="file" id="csv_file" accept=".csv" required>
             
             <label><strong>Images (select all 3):</strong></label>
             <input type="file" id="images" accept="image/*" multiple required>
-            <small>Select front.jpg, side.jpg, rear.jpg</small>
+            <small>Select front.jpg, side.jpg, rear.jpg (min 512x512px)</small>
             
-            <button type="submit">Upload to Catalog</button>
+            <button type="submit">🚀 Upload to Catalog (Background Processing)</button>
         </form>
         <div id="uploadResult"></div>
     </div>
 
+    <!-- Batch Status Section -->
+    <div class="section">
+        <h2>5. Check Batch Status</h2>
+        <input type="text" id="batch_id_input" placeholder="Enter Batch ID (e.g., 6a97e2bbf040e2b93b13c208)">
+        <button onclick="checkBatchStatus()">🔍 Check Status</button>
+        <div id="batchStatusResult"></div>
+    </div>
+
     <script>
         let accessToken = '';
+        let currentBatchId = '';
+
+        // Download Package
+        function downloadPackage() {
+            window.location.href = '/catalog/download-package/';
+            document.getElementById('downloadResult').innerHTML = '<div class="success">✅ Package download started!</div>';
+        }
 
         // Registration
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
@@ -117,17 +145,17 @@
             }
         });
 
-        // Upload
+        // Upload with Background Processing
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const resultDiv = document.getElementById('uploadResult');
             
             if (!accessToken) {
-                resultDiv.innerHTML = '<div class="error"> Please login first to get a token!</div>';
+                resultDiv.innerHTML = '<div class="error">⚠️ Please login first to get a token!</div>';
                 return;
             }
             
-            resultDiv.innerHTML = 'Uploading...';
+            resultDiv.innerHTML = '<div class="info">⏳ Uploading and starting background processing...</div>';
             
             const formData = new FormData();
             formData.append('csv_file', document.getElementById('csv_file').files[0]);
@@ -147,16 +175,72 @@
                 });
                 
                 const data = await response.json();
-                if (response.ok) {
+                
+                if (response.status === 202) {
+                    currentBatchId = data.batch_id;
                     resultDiv.innerHTML = `
                         <div class="success">
-                            ✅ Upload successful!<br>
-                            <strong>Summary:</strong><br>
-                            Total: ${data.summary.total_processed}<br>
-                            Accepted: ${data.summary.accepted}<br>
-                            Rejected: ${data.summary.rejected}<br><br>
-                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                            ✅ Upload accepted!<br>
+                            <strong>Batch ID:</strong> ${data.batch_id}<br>
+                            <strong>Status:</strong> ${data.status}<br>
+                            <strong>Total Items:</strong> ${data.total_items}<br>
+                            <em>Processing in background... Check status below.</em>
                         </div>
+                    `;
+                    // Auto-check status after 5 seconds
+                    setTimeout(() => checkBatchStatus(), 5000);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Upload failed: ${JSON.stringify(data)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        });
+
+        // Check Batch Status
+        async function checkBatchStatus() {
+            const batchId = document.getElementById('batch_id_input').value || currentBatchId;
+            const resultDiv = document.getElementById('batchStatusResult');
+            
+            if (!batchId) {
+                resultDiv.innerHTML = '<div class="error">️ Please enter a batch ID</div>';
+                return;
+            }
+            
+            if (!accessToken) {
+                resultDiv.innerHTML = '<div class="error">⚠️ Please login first</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="info">Loading batch status...</div>';
+            
+            try {
+                // Use query parameter instead of URL path
+                const response = await fetch(`/catalog/batch-report/?batch_id=${batchId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let statusClass = data.status === 'processing' ? 'processing' : 
+                                     data.status === 'completed' ? 'completed' : 'failed';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="batch-status ${statusClass}">
+                            <strong>Batch ID:</strong> ${data.id}<br>
+                            <strong>Status:</strong> ${data.status.toUpperCase()}<br>
+                            <strong>Store:</strong> ${data.store_name}<br>
+                            <strong>Total Items:</strong> ${data.total_items}<br>
+                            <strong>Accepted:</strong> ${data.accepted_count}<br>
+                            <strong>Rejected:</strong> ${data.rejected_count}<br>
+                            <strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}<br>
+                            ${data.completed_at ? `<strong>Completed:</strong> ${new Date(data.completed_at).toLocaleString()}` : ''}
+                        </div>
+                        ${data.rejection_report && Object.keys(data.rejection_report).length > 0 ? 
+                            `<div class="info"><strong>Rejection Report:</strong><br><pre>${JSON.stringify(data.rejection_report, null, 2)}</pre></div>` : ''}
                     `;
                 } else {
                     resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
@@ -164,7 +248,7 @@
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
             }
-        });
+        }
     </script>
 </body>
 </html>

@@ -1,30 +1,22 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # <-- ADD THIS LINE
 
+load_dotenv() 
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Explicitly load the .env file located in the Backend folder
-load_dotenv(BASE_DIR / '.env')
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-fallback-secret-key-change-me-in-production')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fitfusion-dev-secret-key-2026')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# FIXED: Removed port number from ALLOWED_HOSTS (Django does not allow ports here)
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['*']
 
-# CORS Configuration (for React frontend on different port)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite default
-    "http://localhost:3000",  # React default
-    "http://127.0.0.1:5173",
-]
-CORS_ALLOW_CREDENTIALS = True
-
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -36,14 +28,16 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'drf_spectacular',  # Added for API documentation
     
-    # Local apps (CHANGE THIS LINE)
-    'accounts.apps.AccountsConfig', 
+    # Local apps
+    'accounts',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # ← Must be at top
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -73,82 +67,74 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fitfusion.wsgi.application'
 
+# Database
+MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/fitfusion')
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django_mongodb_backend',
-        'NAME': 'fitfusion_db',
-        # HARDCODED URI TO GUARANTEE IT WORKS
-        'HOST': 'mongodb+srv://yap2421105_db_user:FITFUSIONAI@cluster0.zrnfpru.mongodb.net/',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = 'static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
-# ============================================
-# REST Framework Configuration
-# ============================================
+# REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated', # Secure by default, overridden in views
+        'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_RENDERER_CLASSES': (
-        'rest_framework.renderers.JSONRenderer',
-    ),
-    'DEFAULT_PARSER_CLASSES': (
-        'rest_framework.parsers.JSONParser',
-        'rest_framework.parsers.FormParser',
-        'rest_framework.parsers.MultiPartParser',
-    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', # Required for drf-spectacular
 }
 
-# ============================================
-# JWT Settings
-# ============================================
+# Simple JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
-    'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'pk',        # ← Use 'pk' (works perfectly with ObjectIdAutoField)
-    'USER_ID_CLAIM': 'user_id',
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': False,
 }
 
-# ============================================
-# Password Validation (per SRS FR-1.5)
-# ============================================
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 8}},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
+# CORS Settings
+CORS_ALLOW_ALL_ORIGINS = True
 
-# ============================================
-# Internationalization
-# ============================================
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Manila'
-USE_I18N = True
-USE_TZ = True
+# ==========================================
+# Part 3: Batch Upload Configuration
+# ==========================================
+MAX_BATCH_ITEMS = 10
+MAX_WORKERS = 2
+BATCH_PROCESSING_TIMEOUT_MINUTES = 10
 
-# ============================================
-# Static files (CSS, JavaScript, Images)
-# ============================================
-STATIC_URL = 'static/'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-# ============================================
-# MongoDB & System Check Fixes
-# ============================================
-DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
-SILENCED_SYSTEM_CHECKS = ['mongodb.E001']
+# DRF Spectacular Configuration (Swagger Documentation)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'FitFusion AI API',
+    'DESCRIPTION': 'Seller catalog upload and management API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}

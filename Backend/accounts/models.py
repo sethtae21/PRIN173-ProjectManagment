@@ -1,9 +1,78 @@
-from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.core.files.storage import Storage
+from django.utils.deconstruct import deconstructible
+import os
+from bson.objectid import ObjectId
+
+# ==========================================
+# Part 4: GridFS Storage Class (Deconstructible & Lazy)
+# ==========================================
+@deconstructible
+class GridFSStorage(Storage):
+    """Custom storage class to store files in MongoDB GridFS with SQLite fallback"""
+    def __init__(self):
+        # Lazy initialization: Do not connect yet to avoid migration serialization errors
+        self._client = None
+        self._db = None
+        self._fs = None
+        self._use_gridfs = None
+
+    def _setup(self):
+        """Connect to MongoDB only when needed"""
+        if self._fs is None and self._use_gridfs is None:
+            try:
+                from pymongo import MongoClient
+                from gridfs import GridFS
+                
+                mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
+                # Short timeout to fail fast if MongoDB is unreachable
+                self._client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
+                self._client.admin.command('ping') 
+                self._db = self._client.get_database()
+                self._fs = GridFS(self._db)
+                self._use_gridfs = True
+            except Exception:
+                self._use_gridfs = False
+
+    def _save(self, name, content):
+        self._setup()
+        if self._use_gridfs:
+            file_id = self._fs.put(content, filename=name)
+            return str(file_id)
+        else:
+            # Fallback to default storage (e.g., local filesystem for SQLite)
+            from django.core.files.storage import default_storage
+            return default_storage._save(name, content)
+
+    def exists(self, name):
+        self._setup()
+        if self._use_gridfs:
+            return self._fs.exists({'filename': name})
+        from django.core.files.storage import default_storage
+        return default_storage.exists(name)
+
+    def url(self, name):
+        return f'/media/{name}'
+
+    def delete(self, name):
+        self._setup()
+        if self._use_gridfs:
+            try:
+                file = self._fs.find_one({'filename': name})
+                if file:
+                    self._fs.delete(file._id)
+            except:
+                pass
+        else:
+            from django.core.files.storage import default_storage
+            default_storage.delete(name)
+
+# Create the instance (it is now deconstructible and safe for migrations)
+gridfs_storage = GridFSStorage()
+
 
 class User(AbstractUser):
-    # NO manual 'id' field needed here. DEFAULT_AUTO_FIELD handles it globally.
-    
     ROLE_CHOICES = (
         ('user', 'Regular User'),
         ('seller', 'Seller'),
@@ -21,13 +90,42 @@ class User(AbstractUser):
         return self.username
 
 
-class CatalogItem(models.Model):
-    # NO manual 'id' field needed here either.
+class UploadBatch(models.Model):
+    """The ticket/tracking system for batch uploads"""
+    STATUS_CHOICES = (
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+    
+    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='upload_batches')
+    store_name = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    total_items = models.IntegerField(default=0)
+    accepted_count = models.IntegerField(default=0)
+    rejected_count = models.IntegerField(default=0)
+    rejection_report = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        batch_id = str(self.id) if self.id else 'new'
+        return f"Batch {batch_id[:8]} - {self.seller.username}"
+    
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = str(ObjectId())
+        super().save(*args, **kwargs)
 
+
+class CatalogItem(models.Model):
     CATEGORY_CHOICES = [
         ('tops', 'Tops'),
         ('bottoms', 'Bottoms'),
-        ('dresses', 'Dresses/One-Piece Outfits'),
+        ('dresses', 'Dresses'),
         ('outerwear', 'Outerwear'),
         ('footwear', 'Footwear'),
     ]
@@ -35,8 +133,10 @@ class CatalogItem(models.Model):
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('rejected', 'Rejected'),
+        ('processing', 'Processing'),
     ]
     
+    # Basic metadata
     name = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
@@ -46,20 +146,26 @@ class CatalogItem(models.Model):
     color_family = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     
+    # Tags
     style_tags = models.JSONField(default=list, blank=True)
     occasion_tags = models.JSONField(default=list, blank=True)
-    color_palette_tags = models.JSONField(default=list, blank=True)
+    compatible_color_palette_tags = models.JSONField(default=list, blank=True)
     
-    front_image = models.ImageField(upload_to='catalog/front/', blank=True, null=True)
-    side_image = models.ImageField(upload_to='catalog/side/', blank=True, null=True)
-    rear_image = models.ImageField(upload_to='catalog/rear/', blank=True, null=True)
-    
-    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='catalog_items', limit_choices_to={'role': 'seller'})
+    # Seller info
+    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)
     
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    rejection_reason = models.TextField(blank=True, null=True)
+    # Images (Part 4: Using GridFS Storage with automatic fallback)
+    front_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/front/', blank=True, null=True)
+    side_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/side/', blank=True, null=True)
+    rear_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/rear/', blank=True, null=True)
     
+    # Status & Batch tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    rejection_reasons = models.JSONField(default=list, blank=True)
+    batch = models.ForeignKey(UploadBatch, on_delete=models.SET_NULL, null=True, related_name='items')
+    
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -67,7 +173,6 @@ class CatalogItem(models.Model):
         indexes = [
             models.Index(fields=['category', 'status']),
             models.Index(fields=['seller', 'status']),
-            models.Index(fields=['color_family']),
         ]
     
     def __str__(self):

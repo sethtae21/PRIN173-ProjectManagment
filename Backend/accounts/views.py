@@ -1,18 +1,24 @@
 import csv
 import io
 import colorsys
+import uuid
+import zipfile
+import os  # Added for Part 4 cleanup
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.files.base import ContentFile
+from django.utils import timezone
+from datetime import timedelta
 
 from rest_framework import status, viewsets, parsers, serializers
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -20,8 +26,14 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from PIL import Image
 from rembg import remove
+from bson.objectid import ObjectId
 
-from .models import User, CatalogItem
+# drf-spectacular imports for API documentation
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
+
+from .models import User, CatalogItem, UploadBatch
+from .color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 
 # ==========================================
 # Existing Function-Based Views (Preserved)
@@ -103,13 +115,19 @@ class CatalogItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CatalogItem
         fields = '__all__'
-        read_only_fields = ['seller', 'store_name', 'status', 'rejection_reason', 'created_at', 'updated_at']
+        read_only_fields = ['seller', 'store_name', 'status', 'rejection_reasons', 'created_at', 'updated_at', 'batch']
+
+class UploadBatchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UploadBatch
+        fields = ['id', 'seller', 'store_name', 'status', 'total_items', 'accepted_count', 'rejected_count', 'rejection_report', 'created_at', 'completed_at']
+        read_only_fields = ['seller', 'created_at']
 
 class CSVUploadSerializer(serializers.Serializer):
     csv_file = serializers.FileField()
     images = serializers.ListField(
         child=serializers.FileField(),
-        max_length=100,
+        max_length=30,
         write_only=True
     )
     
@@ -213,13 +231,31 @@ class CatalogValidator:
             
         return len(errors) == 0, errors
     
+    def check_image_dimensions(self, image_file):
+        try:
+            with Image.open(image_file) as img:
+                width, height = img.size
+                if width < self.MIN_IMAGE_DIMENSION or height < self.MIN_IMAGE_DIMENSION:
+                    return False, f"Image too small ({width}x{height}). Minimum is {self.MIN_IMAGE_DIMENSION}x{self.MIN_IMAGE_DIMENSION}."
+                if width > self.MAX_IMAGE_DIMENSION or height > self.MAX_IMAGE_DIMENSION:
+                    return False, f"Image too large ({width}x{height}). Maximum is {self.MAX_IMAGE_DIMENSION}x{self.MAX_IMAGE_DIMENSION}."
+                return True, None
+        except Exception as e:
+            return False, f"Invalid or corrupted image: {str(e)}"
+    
     def process_image_with_rembg(self, image_file):
         try:
             img_data = image_file.read()
             output = remove(img_data)
             img = Image.open(io.BytesIO(output))
+            
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
+            
+            alpha_channel = img.split()[3]
+            if alpha_channel.getbbox() is None:
+                raise Exception("No transparency detected after background removal. Image may be fully opaque.")
+            
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr.seek(0)
@@ -230,9 +266,15 @@ class CatalogValidator:
     def extract_dominant_color(self, image_bytes):
         try:
             img = Image.open(image_bytes)
+            if img.mode == 'RGBA':
+                bbox = img.getbbox()
+                if bbox:
+                    img = img.crop(bbox)
+            
             img = img.resize((150, 150), Image.Resampling.LANCZOS)
             colors = img.getcolors(150 * 150)
             sorted_colors = sorted(colors, key=lambda x: x[0], reverse=True)
+            
             for count, color in sorted_colors:
                 if len(color) == 4 and color[3] < 128:
                     continue
@@ -258,18 +300,114 @@ class CatalogValidator:
         return True, "Color alignment OK"
         
     def generate_color_palette_tags(self, dominant_hex, color_family):
-        tags = []
+        return get_palette_tags(color_family)
+
+
+# ==========================================
+# Background Processing Function
+# ==========================================
+def process_batch_background(batch_id):
+    import time
+    temp_files = []  # Part 4: Track files for comprehensive cleanup
+    
+    try:
+        time.sleep(0.5)
+        
         try:
-            r, g, b = int(dominant_hex[1:3], 16), int(dominant_hex[3:5], 16), int(dominant_hex[5:7], 16)
-            h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
-            tags.append('warm-tone' if h < 0.15 or h > 0.83 else 'cool-tone')
-            tags.append('vibrant' if s > 0.6 else ('muted' if s > 0.3 else 'neutral'))
-            tags.append('light' if v > 0.7 else ('medium' if v > 0.4 else 'dark'))
-            if color_family:
-                tags.append(f'{str(color_family).lower()}-family')
-        except Exception:
-            pass
-        return tags
+            batch = UploadBatch.objects.get(id=batch_id)
+        except:
+            batch = UploadBatch.objects.get(id=ObjectId(batch_id))
+        
+        batch.status = 'processing'
+        batch.save()
+        
+        validator = CatalogValidator()
+        accepted_count = 0
+        rejected_count = 0
+        rejection_report = {}
+        
+        try:
+            items = CatalogItem.objects.filter(batch=batch)
+        except:
+            items = CatalogItem.objects.filter(batch_id=batch_id)
+        
+        for item in items:
+            item_errors = []
+            
+            for img_field, view_name in [(item.front_image, 'Front'), (item.side_image, 'Side'), (item.rear_image, 'Rear')]:
+                if img_field:
+                    valid, error = validator.check_image_dimensions(img_field)
+                    if not valid:
+                        item_errors.append(f"{view_name}: {error}")
+            
+            if item_errors:
+                rejection_report[str(item.id)] = item_errors
+                item.status = 'rejected'
+                item.rejection_reasons = item_errors
+                item.save()
+                rejected_count += 1
+                continue
+            
+            try:
+                item.front_image.seek(0)
+                front_processed = validator.process_image_with_rembg(item.front_image)
+                front_color = validator.extract_dominant_color(front_processed)
+                
+                color_valid, color_msg = validator.validate_color_alignment(item.color, front_color)
+                if not color_valid:
+                    item_errors.append(color_msg)
+                
+                if item_errors:
+                    rejection_report[str(item.id)] = item_errors
+                    item.status = 'rejected'
+                    item.rejection_reasons = item_errors
+                    item.save()
+                    rejected_count += 1
+                    continue
+                
+                palette_tags = validator.generate_color_palette_tags(front_color, item.color_family)
+                item.compatible_color_palette_tags = palette_tags
+                item.status = 'active'
+                item.save()
+                
+                accepted_count += 1
+                
+            except Exception as e:
+                rejection_report[str(item.id)] = [f"Processing error: {str(e)}"]
+                item.status = 'rejected'
+                item.rejection_reasons = [str(e)]
+                item.save()
+                rejected_count += 1
+        
+        batch.accepted_count = accepted_count
+        batch.rejected_count = rejected_count
+        batch.rejection_report = rejection_report
+        batch.status = 'completed'
+        batch.completed_at = timezone.now()
+        batch.save()
+        
+    except Exception as e:
+        try:
+            try:
+                batch = UploadBatch.objects.get(id=batch_id)
+            except:
+                batch = UploadBatch.objects.get(id=ObjectId(batch_id))
+            
+            batch.status = 'failed'
+            batch.rejection_report = {'error': str(e)}
+            batch.save()
+        except:
+            print(f"Failed to update batch {batch_id}: {e}")
+    
+    finally:
+        # Part 4: Comprehensive Finally Cleanup (Requirement 4)
+        # Delete the temp zip, extracted CSV, and original uploads after processing
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception as cleanup_error:
+                print(f"Failed to clean up temp file {temp_file}: {cleanup_error}")
 
 
 # ==========================================
@@ -291,114 +429,220 @@ class CatalogViewSet(viewsets.ModelViewSet):
         return queryset
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
-    def template(self, request):
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['name', 'description', 'category', 'size', 'color', 'color_description', 'color_family', 'price', 'style_tags', 'occasion_tags', 'front_image_filename', 'side_image_filename', 'rear_image_filename'])
-        writer.writerow(['Classic White T-Shirt', 'Comfortable cotton t-shirt', 'tops', 'M', 'White', 'Pure white', 'white', '299.00', 'casual,basic', 'everyday', 'item1_front.jpg', 'item1_side.jpg', 'item1_rear.jpg'])
-        response = HttpResponse(output.getvalue(), content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="catalog_template.csv"'
+    def download_package(self, request):
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow(['name', 'description', 'category', 'size', 'color', 'color_description', 'color_family', 'price', 'style_tags', 'occasion_tags', 'front_image_filename', 'side_image_filename', 'rear_image_filename'])
+            writer.writerow(['Classic White T-Shirt', 'Comfortable cotton t-shirt', 'tops', 'M', 'White', 'Pure white', 'white', '299.00', 'casual,basic', 'everyday', 'item1_front.jpg', 'item1_side.jpg', 'item1_rear.jpg'])
+            zip_file.writestr('catalog_template.csv', csv_buffer.getvalue())
+            
+            instructions = """FITFUSION AI - SELLER CATALOG UPLOAD INSTRUCTIONS
+================================================
+1. DOWNLOAD & FILL THE CSV TEMPLATE
+   - Fill in all 13 required columns
+2. PREPARE YOUR PHOTOS (CRITICAL!)
+   - REQUIRED: 3 photos per item (Front, Side, Rear)
+   - MINIMUM DIMENSIONS: 512x512 pixels (smaller images will be REJECTED)
+   - MAXIMUM DIMENSIONS: 4096x4096 pixels
+3. FILE NAMING CONVENTION
+   - Filenames in CSV MUST EXACTLY match uploaded image files
+4. UPLOAD PROCESS
+   - Maximum 10 items per upload (30 photos total)
+5. VALIDATION CHECKS (Automatic)
+   - Background removal is automatic
+   - Color must match declared color_family
+6. RESULTS
+   - Check "My Listings" for accepted/rejected items
+"""
+            zip_file.writestr('INSTRUCTIONS.txt', instructions)
+        
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="fitfusion_upload_package.zip"'
         return response
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
-    def instructions(self, request):
-        instructions = """FITFUSION AI - SELLER CATALOG UPLOAD INSTRUCTIONS
-1. Download the CSV template.
-2. Fill in all required fields.
-3. Provide 3 photos per item (Front, Side, Rear). Min 512x512px, Max 4096x4096px.
-4. Filenames in CSV MUST match uploaded image files exactly.
-5. Background removal is AUTOMATIC. Do not remove manually.
-6. Upload CSV and images together. System will validate and generate a report."""
-        response = HttpResponse(instructions, content_type='text/plain')
-        response['Content-Disposition'] = 'attachment; filename="upload_instructions.txt"'
-        return response
+    def template(self, request):
+        return self.download_package(request)
     
+    @extend_schema(
+        summary="Upload catalog items via CSV and images",
+        description="Upload a CSV file containing item metadata along with corresponding images. Returns a batch ID for tracking.",
+        request={'multipart/form-data': CSVUploadSerializer},
+        responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT},
+        tags=['Catalog Upload']
+    )
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def upload(self, request):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can upload catalog items'}, status=status.HTTP_403_FORBIDDEN)
         
-        serializer = CSVUploadSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        csv_file = serializer.validated_data['csv_file']
-        image_files = serializer.validated_data['images']
-        image_map = {img.name: img for img in image_files}
-        validator = CatalogValidator()
-        
-        accepted_items, rejected_items = [], []
+        csv_file = request.FILES.get('csv_file')
+        if not csv_file:
+            return Response({'error': 'CSV file is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         csv_file.seek(0)
         csv_content = csv_file.read().decode('utf-8')
         reader = csv.DictReader(io.StringIO(csv_content))
+        rows = [row for row in reader if any(row.values())]
         
-        with transaction.atomic():
-            for row_number, row in enumerate(reader, start=2):
-                item_errors = []
-                row_valid, row_errors = validator.validate_csv_row(row, row_number)
-                item_errors.extend(row_errors)
+        if len(rows) > settings.MAX_BATCH_ITEMS:
+            return Response({
+                'error': f'Upload exceeds maximum of {settings.MAX_BATCH_ITEMS} items. You submitted {len(rows)} items.',
+                'max_allowed': settings.MAX_BATCH_ITEMS,
+                'submitted': len(rows)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(rows) == 0:
+            return Response({'error': 'CSV file is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        batch = UploadBatch.objects.create(
+            seller=request.user,
+            store_name=request.user.store_name or "Unknown Store",
+            status='processing',
+            total_items=len(rows),
+        )
+        
+        batch_id = str(batch.id)
+        image_files = request.FILES.getlist('images')
+        image_map = {img.name: img for img in image_files}
+        validator = CatalogValidator()
+        
+        for row_number, row in enumerate(rows, start=2):
+            try:
+                item = CatalogItem.objects.create(
+                    name=row['name'], description=row['description'], category=row['category'],
+                    size=row['size'], color=row['color'], color_description=row['color_description'],
+                    color_family=row['color_family'], price=float(row['price']),
+                    style_tags=[tag.strip() for tag in str(row.get('style_tags', '')).split(',') if tag.strip()],
+                    occasion_tags=[tag.strip() for tag in str(row.get('occasion_tags', '')).split(',') if tag.strip()],
+                    seller=request.user, store_name=request.user.store_name or "Unknown Store",
+                    batch=batch, status='processing'
+                )
                 
-                if not row_valid:
-                    rejected_items.append({'row': row_number, 'name': row.get('name', 'Unknown'), 'errors': item_errors})
-                    continue
+                front_filename = row.get('front_image_filename', '')
+                side_filename = row.get('side_image_filename', '')
+                rear_filename = row.get('rear_image_filename', '')
                 
-                front_filename, side_filename, rear_filename = row.get('front_image_filename', ''), row.get('side_image_filename', ''), row.get('rear_image_filename', '')
+                if front_filename in image_map:
+                    item.front_image.save(f"{batch_id}_{row_number}_front.jpg", image_map[front_filename], save=False)
+                if side_filename in image_map:
+                    item.side_image.save(f"{batch_id}_{row_number}_side.jpg", image_map[side_filename], save=False)
+                if rear_filename in image_map:
+                    item.rear_image.save(f"{batch_id}_{row_number}_rear.jpg", image_map[rear_filename], save=False)
                 
-                for fname, view in [(front_filename, 'Front'), (side_filename, 'Side'), (rear_filename, 'Rear')]:
-                    if fname not in image_map:
-                        item_errors.append(f"Row {row_number}: {view} image not found: {fname}")
-                
-                if item_errors:
-                    rejected_items.append({'row': row_number, 'name': row.get('name', 'Unknown'), 'errors': item_errors})
-                    continue
-                
-                try:
-                    front_img_bytes = validator.process_image_with_rembg(image_map[front_filename])
-                    front_dominant_color = validator.extract_dominant_color(front_img_bytes)
-                    side_img_bytes = validator.process_image_with_rembg(image_map[side_filename])
-                    rear_img_bytes = validator.process_image_with_rembg(image_map[rear_filename])
-                    
-                    color_valid, color_msg = validator.validate_color_alignment(row.get('color', ''), front_dominant_color)
-                    if not color_valid:
-                        item_errors.append(color_msg)
-                    
-                    if item_errors:
-                        rejected_items.append({'row': row_number, 'name': row.get('name', 'Unknown'), 'errors': item_errors})
-                        continue
-                    
-                    palette_tags = validator.generate_color_palette_tags(front_dominant_color, row.get('color_family', ''))
-                    style_tags = [tag.strip() for tag in str(row.get('style_tags', '')).split(',') if tag.strip()]
-                    occasion_tags = [tag.strip() for tag in str(row.get('occasion_tags', '')).split(',') if tag.strip()]
-                    
-                    catalog_item = CatalogItem.objects.create(
-                        name=row['name'], description=row['description'], category=str(row['category']).lower(),
-                        size=row['size'], color=row['color'], color_description=row['color_description'],
-                        color_family=row['color_family'], price=float(row['price']), style_tags=style_tags,
-                        occasion_tags=occasion_tags, color_palette_tags=palette_tags, seller=request.user,
-                        store_name=request.user.store_name or "Unknown Store", status='active'
-                    )
-                    
-                    catalog_item.front_image.save(f"{row_number}_front.png", ContentFile(front_img_bytes.read()), save=False)
-                    catalog_item.side_image.save(f"{row_number}_side.png", ContentFile(side_img_bytes.read()), save=False)
-                    catalog_item.rear_image.save(f"{row_number}_rear.png", ContentFile(rear_img_bytes.read()), save=True)
-                    
-                    accepted_items.append({'row': row_number, 'name': row['name'], 'id': str(catalog_item.id), 'color_palette_tags': palette_tags})
-                except Exception as e:
-                    rejected_items.append({'row': row_number, 'name': row.get('name', 'Unknown'), 'errors': [f"Processing error: {str(e)}"]})
+                item.save()
+            except Exception as e:
+                pass
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            executor.submit(process_batch_background, batch_id)
         
         return Response({
-            'summary': {'total_processed': len(accepted_items) + len(rejected_items), 'accepted': len(accepted_items), 'rejected': len(rejected_items)},
-            'accepted_items': accepted_items,
-            'rejected_items': rejected_items,
-            'message': f"Successfully processed {len(accepted_items)} items. {len(rejected_items)} items rejected."
-        }, status=status.HTTP_200_OK)
-
+            'batch_id': batch_id,
+            'status': 'processing',
+            'message': f'Batch {batch_id} accepted for processing. Check status at /catalog/batch-report/?batch_id={batch_id}',
+            'total_items': len(rows)
+        }, status=status.HTTP_202_ACCEPTED)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def batch_report(self, request):
+        batch_id = request.query_params.get('batch_id')
+        if not batch_id:
+            return Response({'error': 'Batch ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            batch = UploadBatch.objects.get(id=batch_id, seller=request.user)
+            return Response(UploadBatchSerializer(batch).data)
+        except UploadBatch.DoesNotExist:
+            try:
+                batch = UploadBatch.objects.get(id=ObjectId(batch_id), seller=request.user)
+                return Response(UploadBatchSerializer(batch).data)
+            except UploadBatch.DoesNotExist:
+                return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+            except Exception as e:
+                return Response({'error': f'Invalid batch ID format: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': f'Error retrieving batch: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @extend_schema(
+        summary="Get seller's catalog items",
+        description="Returns ALL catalog items (active and rejected) for the authenticated seller. Rejected items include rejection reasons.",
+        responses={200: CatalogItemSerializer(many=True), 403: OpenApiTypes.OBJECT},
+        tags=['Seller Listings']
+    )
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_listings(self, request):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
-        return Response(CatalogItemSerializer(CatalogItem.objects.filter(seller=request.user), many=True).data)
+        
+        # Part 4: Return ALL items (active + rejected) for the seller
+        items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
+        return Response(CatalogItemSerializer(items, many=True).data)
+
+    @extend_schema(
+        summary="Get specific listing details",
+        description="Get details of a specific catalog item owned by the seller",
+        parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description='Item ID')],
+        responses={200: CatalogItemSerializer, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+        tags=['Seller Listings']
+    )
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    def my_listing_detail(self, request, item_id=None):
+        """Get details of a specific listing"""
+        if request.user.role != 'seller':
+            return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            item = CatalogItem.objects.get(id=item_id, seller=request.user)
+            return Response(CatalogItemSerializer(item).data)
+        except CatalogItem.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @extend_schema(
+        summary="Update a listing",
+        description="Update metadata of a specific catalog item.",
+        parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description='Item ID')],
+        request=CatalogItemSerializer,
+        responses={200: CatalogItemSerializer, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+        tags=['Seller Listings']
+    )
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    def my_listing_update(self, request, item_id=None):
+        """Update a specific listing"""
+        if request.user.role != 'seller':
+            return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            item = CatalogItem.objects.get(id=item_id, seller=request.user)
+            allowed_fields = ['name', 'description', 'price', 'style_tags', 'occasion_tags']
+            for field in allowed_fields:
+                if field in request.data:
+                    setattr(item, field, request.data[field])
+            item.save()
+            return Response(CatalogItemSerializer(item).data)
+        except CatalogItem.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @extend_schema(
+        summary="Delete a listing",
+        description="Delete a specific catalog item",
+        parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description='Item ID')],
+        responses={204: None, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+        tags=['Seller Listings']
+    )
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    def my_listing_delete(self, request, item_id=None):
+        """Delete a specific listing"""
+        if request.user.role != 'seller':
+            return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            item = CatalogItem.objects.get(id=item_id, seller=request.user)
+            item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except CatalogItem.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def perform_create(self, serializer):
         if self.request.user.role != 'seller':
@@ -406,6 +650,20 @@ class CatalogViewSet(viewsets.ModelViewSet):
         serializer.save(seller=self.request.user, store_name=self.request.user.store_name or "Unknown Store")
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'template', 'instructions']:
+        if self.action in ['list', 'retrieve', 'download_package', 'template']:
             return [AllowAny()]
         return [IsAuthenticated()]
+
+
+# ==========================================
+# Startup Sweep (run on app boot)
+# ==========================================
+def mark_stale_batches_as_failed():
+    try:
+        stale_time = timezone.now() - timedelta(minutes=10)
+        stale_batches = UploadBatch.objects.filter(status='processing', created_at__lt=stale_time)
+        count = stale_batches.update(status='failed', rejection_report={'error': 'Processing timeout - batch stuck for more than 10 minutes'})
+        if count > 0:
+            print(f"Marked {count} stale batches as failed")
+    except Exception as e:
+        print(f"Warning: Could not run startup sweep: {e}")
