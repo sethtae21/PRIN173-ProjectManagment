@@ -3,7 +3,7 @@ import io
 import colorsys
 import uuid
 import zipfile
-import os  # Added for Part 4 cleanup
+import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from django.shortcuts import render, redirect
@@ -39,8 +39,8 @@ from .color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 # Existing Function-Based Views (Preserved)
 # ==========================================
 def home(request):
-    """Home page"""
-    return render(request, 'accounts/home.html')
+    """Home page - renders test_upload.html"""
+    return render(request, 'accounts/test_upload.html')
 
 def register_view(request):
     """User registration (Function-based fallback)"""
@@ -401,7 +401,6 @@ def process_batch_background(batch_id):
     
     finally:
         # Part 4: Comprehensive Finally Cleanup (Requirement 4)
-        # Delete the temp zip, extracted CSV, and original uploads after processing
         for temp_file in temp_files:
             try:
                 if os.path.exists(temp_file):
@@ -579,7 +578,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
         
-        # Part 4: Return ALL items (active + rejected) for the seller
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
         return Response(CatalogItemSerializer(items, many=True).data)
 
@@ -592,7 +590,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_detail(self, request, item_id=None):
-        """Get details of a specific listing"""
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
         try:
@@ -611,7 +608,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_update(self, request, item_id=None):
-        """Update a specific listing"""
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
         try:
@@ -634,7 +630,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_delete(self, request, item_id=None):
-        """Delete a specific listing"""
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
         try:

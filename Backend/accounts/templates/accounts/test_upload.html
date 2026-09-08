@@ -33,8 +33,8 @@
     <div class="section">
         <h2>2. Register Seller Account</h2>
         <form id="registerForm">
-            <input type="text" id="reg_username" placeholder="Username" required value="testseller">
-            <input type="email" id="reg_email" placeholder="Email" required value="seller@test.com">
+            <input type="text" id="reg_username" placeholder="Username" required value="testseller2">
+            <input type="email" id="reg_email" placeholder="Email" required value="seller2@test.com">
             <input type="password" id="reg_password" placeholder="Password" required value="Test123!@#">
             <input type="text" id="reg_store" placeholder="Store Name" required value="Test Fashion Store">
             <button type="submit">Register Seller</button>
@@ -46,7 +46,7 @@
     <div class="section">
         <h2>3. Login (Get Token)</h2>
         <form id="loginForm">
-            <input type="text" id="login_username" placeholder="Username" required value="testseller">
+            <input type="text" id="login_username" placeholder="Username" required value="testseller2">
             <input type="password" id="login_password" placeholder="Password" required value="Test123!@#">
             <button type="submit">Login</button>
         </form>
@@ -91,7 +91,7 @@
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const resultDiv = document.getElementById('registerResult');
-            resultDiv.innerHTML = 'Loading...';
+            resultDiv.innerHTML = '<div class="info">Loading...</div>';
             
             try {
                 const response = await fetch('/auth/register/', {
@@ -106,14 +106,21 @@
                     })
                 });
                 
-                const data = await response.json();
-                if (response.ok) {
-                    resultDiv.innerHTML = `<div class="success">✅ Registered successfully!<br>User ID: ${data.user.id}</div>`;
+                // Check if response is actually JSON
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await response.json();
+                    if (response.ok) {
+                        resultDiv.innerHTML = `<div class="success">✅ Registered successfully!<br>User ID: ${data.user.id}</div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
+                    }
                 } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                    const text = await response.text();
+                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML instead of JSON (likely a 500 error).<br>Check your VS Code terminal for the red error traceback!<br><br>Preview: ${text.substring(0, 300)}...</div>`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
             }
         });
 
@@ -121,7 +128,7 @@
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const resultDiv = document.getElementById('loginResult');
-            resultDiv.innerHTML = 'Loading...';
+            resultDiv.innerHTML = '<div class="info">Loading...</div>';
             
             try {
                 const response = await fetch('/auth/login/', {
@@ -133,15 +140,21 @@
                     })
                 });
                 
-                const data = await response.json();
-                if (response.ok) {
-                    accessToken = data.access;
-                    resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>Token: ${accessToken.substring(0, 50)}...</div>`;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await response.json();
+                    if (response.ok) {
+                        accessToken = data.access;
+                        resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>Token: ${accessToken.substring(0, 50)}...</div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
+                    }
                 } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                    const text = await response.text();
+                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML. Check terminal for errors.<br>Preview: ${text.substring(0, 300)}...</div>`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
             }
         });
 
@@ -187,10 +200,9 @@
                             <em>Processing in background... Check status below.</em>
                         </div>
                     `;
-                    // Auto-check status after 5 seconds
                     setTimeout(() => checkBatchStatus(), 5000);
                 } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Upload failed: ${JSON.stringify(data)}</div>`;
+                    resultDiv.innerHTML = `<div class="error">❌ Upload failed: ${JSON.stringify(data, null, 2)}</div>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
@@ -203,7 +215,7 @@
             const resultDiv = document.getElementById('batchStatusResult');
             
             if (!batchId) {
-                resultDiv.innerHTML = '<div class="error">️ Please enter a batch ID</div>';
+                resultDiv.innerHTML = '<div class="error">⚠️ Please enter a batch ID</div>';
                 return;
             }
             
@@ -215,7 +227,6 @@
             resultDiv.innerHTML = '<div class="info">Loading batch status...</div>';
             
             try {
-                // Use query parameter instead of URL path
                 const response = await fetch(`/catalog/batch-report/?batch_id=${batchId}`, {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`
@@ -243,7 +254,7 @@
                             `<div class="info"><strong>Rejection Report:</strong><br><pre>${JSON.stringify(data.rejection_report, null, 2)}</pre></div>` : ''}
                     `;
                 } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data)}</div>`;
+                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;

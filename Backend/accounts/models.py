@@ -3,7 +3,6 @@ from django.contrib.auth.models import AbstractUser
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
 import os
-from bson.objectid import ObjectId
 
 # ==========================================
 # Part 4: GridFS Storage Class (Deconstructible & Lazy)
@@ -115,10 +114,9 @@ class UploadBatch(models.Model):
         batch_id = str(self.id) if self.id else 'new'
         return f"Batch {batch_id[:8]} - {self.seller.username}"
     
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.id = str(ObjectId())
-        super().save(*args, **kwargs)
+    # FIXED: Removed ObjectId override. Django's BigAutoField auto-generates
+    # integer primary keys properly. Forcing ObjectId() broke SQLite migrations.
+    # If you ever switch back to MongoDB backend, re-add the ObjectId logic here.
 
 
 class CatalogItem(models.Model):

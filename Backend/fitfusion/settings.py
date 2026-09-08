@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv  # <-- ADD THIS LINE
+from dotenv import load_dotenv
 
 load_dotenv() 
 
@@ -73,7 +73,7 @@ MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/fitfusion
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'db_fresh.sqlite3',
     }
 }
 
@@ -96,6 +96,7 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# FIXED: Use Django's standard BigAutoField for integer primary keys
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
@@ -109,7 +110,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', # Required for drf-spectacular
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Simple JWT Settings
