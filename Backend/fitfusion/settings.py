@@ -3,35 +3,31 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-load_dotenv() 
+load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fitfusion-dev-secret-key-2026')
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-
 ALLOWED_HOSTS = ['*']
 
+# ==========================================
 # Application definition
+# NOTE: token_blacklist is intentionally NOT installed (MongoDB incompatibility).
+# ==========================================
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
+    # MongoDB-compatible configs for built-in apps (ObjectId PKs)
+    'fitfusion.mongo_apps.MongoAdminConfig',
+    'fitfusion.mongo_apps.MongoAuthConfig',
+    'fitfusion.mongo_apps.MongoContentTypesConfig',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    'drf_spectacular',  # Added for API documentation
-    
+    'drf_spectacular',
     # Local apps
     'accounts',
 ]
@@ -67,17 +63,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fitfusion.wsgi.application'
 
-# Database
+# ==========================================
+# Database: MongoDB Atlas (SRS §5.2)
+# ==========================================
 MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/fitfusion')
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db_fresh.sqlite3',
+        'ENGINE': 'django_mongodb_backend',
+        'HOST': MONGODB_URI,
+        'NAME': 'fitfusion',
     }
 }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -85,24 +83,20 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# FIXED: Use Django's standard BigAutoField for integer primary keys
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# MongoDB-native ObjectId primary keys
+DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
 
-# Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
-# REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -113,26 +107,25 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# Simple JWT Settings
+# ==========================================
+# Simple JWT Settings (FR-1.6)
+# Blacklist/rotation DISABLED (token_blacklist app removed for MongoDB compat).
+# Security relies on short token lifetimes + TLS + hashed passwords (SRS §4.2).
+# ==========================================
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': False,
 }
 
-# CORS Settings
 CORS_ALLOW_ALL_ORIGINS = True
 
-# ==========================================
-# Part 3: Batch Upload Configuration
-# ==========================================
 MAX_BATCH_ITEMS = 10
 MAX_WORKERS = 2
 BATCH_PROCESSING_TIMEOUT_MINUTES = 10
 
-# DRF Spectacular Configuration (Swagger Documentation)
 SPECTACULAR_SETTINGS = {
     'TITLE': 'FitFusion AI API',
     'DESCRIPTION': 'Seller catalog upload and management API',

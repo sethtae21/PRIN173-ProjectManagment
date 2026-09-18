@@ -1,15 +1,19 @@
+import os
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
-import os
+
 
 # ==========================================
 # Part 4: GridFS Storage Class (Deconstructible & Lazy)
 # ==========================================
 @deconstructible
 class GridFSStorage(Storage):
-    """Custom storage class to store files in MongoDB GridFS with SQLite fallback"""
+    """
+    Custom storage class to store files in MongoDB GridFS.
+    Falls back to local filesystem if MongoDB is unreachable (e.g., during migrations).
+    """
     def __init__(self):
         # Lazy initialization: Do not connect yet to avoid migration serialization errors
         self._client = None
@@ -34,13 +38,29 @@ class GridFSStorage(Storage):
             except Exception:
                 self._use_gridfs = False
 
+    def _open(self, name, mode='rb'):
+        """Open a file from GridFS for reading"""
+        self._setup()
+        if self._use_gridfs:
+            from django.core.files.base import ContentFile
+            try:
+                from bson.objectid import ObjectId
+                file = self._fs.find_one({'_id': ObjectId(name)})
+            except Exception:
+                file = self._fs.find_one({'filename': name})
+            if file:
+                return ContentFile(file.read())
+            raise FileNotFoundError(f"File {name} not found in GridFS")
+        else:
+            from django.core.files.storage import default_storage
+            return default_storage._open(name, mode)
+
     def _save(self, name, content):
         self._setup()
         if self._use_gridfs:
             file_id = self._fs.put(content, filename=name)
             return str(file_id)
         else:
-            # Fallback to default storage (e.g., local filesystem for SQLite)
             from django.core.files.storage import default_storage
             return default_storage._save(name, content)
 
@@ -61,16 +81,19 @@ class GridFSStorage(Storage):
                 file = self._fs.find_one({'filename': name})
                 if file:
                     self._fs.delete(file._id)
-            except:
+            except Exception:
                 pass
         else:
             from django.core.files.storage import default_storage
             default_storage.delete(name)
 
-# Create the instance (it is now deconstructible and safe for migrations)
+# Create the singleton instance
 gridfs_storage = GridFSStorage()
 
 
+# ==========================================
+# 1. User Model (FR-1.1 / RBAC)
+# ==========================================
 class User(AbstractUser):
     ROLE_CHOICES = (
         ('user', 'Regular User'),
@@ -89,8 +112,10 @@ class User(AbstractUser):
         return self.username
 
 
+# ==========================================
+# 2. Upload Batch (Ticket/Tracking System)
+# ==========================================
 class UploadBatch(models.Model):
-    """The ticket/tracking system for batch uploads"""
     STATUS_CHOICES = (
         ('processing', 'Processing'),
         ('completed', 'Completed'),
@@ -113,12 +138,11 @@ class UploadBatch(models.Model):
     def __str__(self):
         batch_id = str(self.id) if self.id else 'new'
         return f"Batch {batch_id[:8]} - {self.seller.username}"
-    
-    # FIXED: Removed ObjectId override. Django's BigAutoField auto-generates
-    # integer primary keys properly. Forcing ObjectId() broke SQLite migrations.
-    # If you ever switch back to MongoDB backend, re-add the ObjectId logic here.
 
 
+# ==========================================
+# 3. Catalog Item (Seller Listings)
+# ==========================================
 class CatalogItem(models.Model):
     CATEGORY_CHOICES = [
         ('tops', 'Tops'),
@@ -134,7 +158,7 @@ class CatalogItem(models.Model):
         ('processing', 'Processing'),
     ]
     
-    # Basic metadata
+    # Metadata
     name = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
@@ -153,7 +177,7 @@ class CatalogItem(models.Model):
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)
     
-    # Images (Part 4: Using GridFS Storage with automatic fallback)
+    # Images (GridFS Storage)
     front_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/front/', blank=True, null=True)
     side_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/side/', blank=True, null=True)
     rear_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/rear/', blank=True, null=True)
@@ -168,6 +192,7 @@ class CatalogItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
+        # Composite indexes are safe. Single field indexes on FKs are auto-created by Django.
         indexes = [
             models.Index(fields=['category', 'status']),
             models.Index(fields=['seller', 'status']),
@@ -175,3 +200,116 @@ class CatalogItem(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.store_name}"
+
+
+# ==========================================
+# 4. Avatar Presets (WBS 1.3.2 / FR-2.1–2.10)
+# ==========================================
+class AvatarPreset(models.Model):
+    GENDER_CHOICES = [('male', 'Male'), ('female', 'Female')]
+    UNDERTONE_CHOICES = [('warm', 'Warm'), ('cool', 'Cool'), ('neutral', 'Neutral')]
+    SHOULDER_CHOICES = [('narrow', 'Narrow'), ('average', 'Average'), ('broad', 'Broad')]
+    WAIST_CHOICES = [('slim', 'Slim'), ('average', 'Average'), ('curvy', 'Curvy')]
+    HIP_CHOICES = [('slim', 'Slim'), ('average', 'Average'), ('wide', 'Wide')]
+    CUP_CHOICES = [('', 'Not applicable'), ('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')]
+    THIGH_CHOICES = [('slim', 'Slim'), ('average', 'Average'), ('thick', 'Thick')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='avatar_presets')
+    name = models.CharField(max_length=100)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    height = models.IntegerField(help_text='Height in cm')
+    weight = models.IntegerField(help_text='Weight in kg')
+    skin_tone = models.CharField(max_length=32, default='medium')
+    undertone = models.CharField(max_length=10, choices=UNDERTONE_CHOICES, default='neutral')
+    shoulder = models.CharField(max_length=10, choices=SHOULDER_CHOICES, default='average')
+    waist = models.CharField(max_length=10, choices=WAIST_CHOICES, default='average')
+    hip = models.CharField(max_length=10, choices=HIP_CHOICES, default='average')
+    cup_size = models.CharField(max_length=2, choices=CUP_CHOICES, blank=True, default='')
+    thigh = models.CharField(max_length=10, choices=THIGH_CHOICES, default='average')
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # NOTE: No Meta.indexes on 'user' here. Django auto-creates the FK index.
+    # Adding it explicitly causes MongoDB Error 85 (IndexOptionsConflict).
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
+
+# ==========================================
+# 5. Saved Outfits (WBS 1.3.8 / FR-5.4–5.8)
+# ==========================================
+class Outfit(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='outfits')
+    name = models.CharField(max_length=100)
+    items = models.ManyToManyField(CatalogItem, related_name='outfits', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # NOTE: No Meta.indexes on 'user' here.
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
+
+# ==========================================
+# 6. Shopping Cart (WBS 1.3.6 / FR-6.1–6.4)
+# ==========================================
+class Cart(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Cart of {self.user.username}"
+
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
+    item = models.ForeignKey(CatalogItem, on_delete=models.CASCADE, related_name='cart_entries')
+    quantity = models.PositiveIntegerField(default=1)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('cart', 'item')
+        # NOTE: No indexes on 'cart' here.
+
+    def __str__(self):
+        return f"{self.quantity} x {self.item.name}"
+
+
+# ==========================================
+# 7. Orders + Mock Payment (WBS 1.3.6 / FR-6.5–6.9)
+# ==========================================
+class Order(models.Model):
+    STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    shipping_address = models.TextField()
+    payment_method = models.CharField(max_length=32)
+    transaction_ref = models.CharField(max_length=64, blank=True, help_text='Mock gateway reference')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        # Composite index is safe and useful for "User's Order History" queries
+        indexes = [models.Index(fields=['user', 'created_at'])]
+
+    def __str__(self):
+        return f"Order {self.id} - {self.user.username}"
+
+
+class OrderItem(models.Model):
+    """Snapshot of purchased item — keeps store name even if listing is deleted (FR-6.8)."""
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    catalog_item = models.ForeignKey(CatalogItem, on_delete=models.SET_NULL, null=True, blank=True)
+    item_name = models.CharField(max_length=255)
+    store_name = models.CharField(max_length=255)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.quantity} x {self.item_name}"

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FitFusion AI - Seller Upload Test (Part 3)</title>
+    <title>FitFusion AI - Seller Upload Test</title>
     <style>
         body { font-family: Arial; max-width: 900px; margin: 50px auto; padding: 20px; }
         .section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
@@ -19,13 +19,13 @@
     </style>
 </head>
 <body>
-    <h1>👕 FitFusion AI - Seller Upload Test (Part 3)</h1>
-    <p><strong>Features:</strong> Batch tracking, background processing, GridFS storage</p>
+    <h1>👕 FitFusion AI - Seller Upload Test</h1>
+    <p><strong>Features:</strong> Batch tracking, background processing, GridFS storage, CSV Template Download</p>
     
-    <!-- Download Package Section -->
+    <!-- Download Template Section -->
     <div class="section">
-        <h2>1. Download Upload Package (CSV + Instructions)</h2>
-        <button onclick="downloadPackage()">📥 Download ZIP Package</button>
+        <h2>1. Download CSV Template</h2>
+        <button onclick="downloadTemplate()"> Download CSV Template</button>
         <div id="downloadResult"></div>
     </div>
 
@@ -61,8 +61,8 @@
             <input type="file" id="csv_file" accept=".csv" required>
             
             <label><strong>Images (select all 3):</strong></label>
-            <input type="file" id="images" accept="image/*" multiple required>
-            <small>Select front.jpg, side.jpg, rear.jpg (min 512x512px)</small>
+            <input type="file" id="images" accept="image/jpeg, image/jpg, image/png, image/webp" multiple required>
+            <small>Select front, side, and rear view images (JPG, PNG, WEBP only - no GIFs)</small>
             
             <button type="submit">🚀 Upload to Catalog (Background Processing)</button>
         </form>
@@ -72,7 +72,7 @@
     <!-- Batch Status Section -->
     <div class="section">
         <h2>5. Check Batch Status</h2>
-        <input type="text" id="batch_id_input" placeholder="Enter Batch ID (e.g., 6a97e2bbf040e2b93b13c208)">
+        <input type="text" id="batch_id_input" placeholder="Enter Batch ID (e.g., 1)">
         <button onclick="checkBatchStatus()">🔍 Check Status</button>
         <div id="batchStatusResult"></div>
     </div>
@@ -81,10 +81,10 @@
         let accessToken = '';
         let currentBatchId = '';
 
-        // Download Package
-        function downloadPackage() {
-            window.location.href = '/catalog/download-package/';
-            document.getElementById('downloadResult').innerHTML = '<div class="success">✅ Package download started!</div>';
+        // Download CSV Template
+        function downloadTemplate() {
+            window.location.href = '/catalog/download-template/';
+            document.getElementById('downloadResult').innerHTML = '<div class="success">✅ CSV Template download started!</div>';
         }
 
         // Registration
@@ -106,7 +106,6 @@
                     })
                 });
                 
-                // Check if response is actually JSON
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const data = await response.json();
@@ -117,7 +116,7 @@
                     }
                 } else {
                     const text = await response.text();
-                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML instead of JSON (likely a 500 error).<br>Check your VS Code terminal for the red error traceback!<br><br>Preview: ${text.substring(0, 300)}...</div>`;
+                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML instead of JSON.<br>Preview: ${text.substring(0, 300)}...</div>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
@@ -151,7 +150,7 @@
                     }
                 } else {
                     const text = await response.text();
-                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML. Check terminal for errors.<br>Preview: ${text.substring(0, 300)}...</div>`;
+                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML.<br>Preview: ${text.substring(0, 300)}...</div>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
@@ -164,7 +163,7 @@
             const resultDiv = document.getElementById('uploadResult');
             
             if (!accessToken) {
-                resultDiv.innerHTML = '<div class="error">⚠️ Please login first to get a token!</div>';
+                resultDiv.innerHTML = '<div class="error">️ Please login first to get a token!</div>';
                 return;
             }
             
@@ -200,6 +199,7 @@
                             <em>Processing in background... Check status below.</em>
                         </div>
                     `;
+                    document.getElementById('batch_id_input').value = data.batch_id;
                     setTimeout(() => checkBatchStatus(), 5000);
                 } else {
                     resultDiv.innerHTML = `<div class="error">❌ Upload failed: ${JSON.stringify(data, null, 2)}</div>`;
@@ -221,7 +221,7 @@
             
             if (!accessToken) {
                 resultDiv.innerHTML = '<div class="error">⚠️ Please login first</div>';
-                return;
+                return; 
             }
             
             resultDiv.innerHTML = '<div class="info">Loading batch status...</div>';

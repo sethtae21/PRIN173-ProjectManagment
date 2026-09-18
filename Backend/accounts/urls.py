@@ -23,8 +23,8 @@ urlpatterns = [
     path('auth/token/refresh/', CustomTokenRefreshView.as_view(), name='auth-token-refresh'),
     path('profile/', ProfileView.as_view(), name='user-profile'),
     
-    # Explicit download-package URL (MUST be before router.urls)
-    path('catalog/download-package/', CatalogViewSet.as_view({'get': 'download_package'}), name='catalog-download-package'),
+    # Explicit download-template URL (MUST be before router.urls)
+    path('catalog/download-template/', CatalogViewSet.as_view({'get': 'download_template'}), name='catalog-download-template'),
     
     # Catalog URLs (includes upload, batch-report, my-listings, etc.)
     path('', include(router.urls)),
