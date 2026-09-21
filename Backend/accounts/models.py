@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
 
-
 # ==========================================
 # Part 4: GridFS Storage Class (Deconstructible & Lazy)
 # ==========================================
@@ -12,7 +11,6 @@ from django.utils.deconstruct import deconstructible
 class GridFSStorage(Storage):
     """
     Custom storage class to store files in MongoDB GridFS.
-    Falls back to local filesystem if MongoDB is unreachable (e.g., during migrations).
     """
     def __init__(self):
         # Lazy initialization: Do not connect yet to avoid migration serialization errors
@@ -27,7 +25,6 @@ class GridFSStorage(Storage):
             try:
                 from pymongo import MongoClient
                 from gridfs import GridFS
-                
                 mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
                 # Short timeout to fail fast if MongoDB is unreachable
                 self._client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
@@ -51,25 +48,20 @@ class GridFSStorage(Storage):
             if file:
                 return ContentFile(file.read())
             raise FileNotFoundError(f"File {name} not found in GridFS")
-        else:
-            from django.core.files.storage import default_storage
-            return default_storage._open(name, mode)
+        raise FileNotFoundError(f"GridFS not available and file {name} not found")
 
     def _save(self, name, content):
         self._setup()
         if self._use_gridfs:
             file_id = self._fs.put(content, filename=name)
             return str(file_id)
-        else:
-            from django.core.files.storage import default_storage
-            return default_storage._save(name, content)
+        raise Exception("GridFS not available - cannot save file")
 
     def exists(self, name):
         self._setup()
         if self._use_gridfs:
             return self._fs.exists({'filename': name})
-        from django.core.files.storage import default_storage
-        return default_storage.exists(name)
+        return False
 
     def url(self, name):
         return f'/media/{name}'
@@ -83,13 +75,9 @@ class GridFSStorage(Storage):
                     self._fs.delete(file._id)
             except Exception:
                 pass
-        else:
-            from django.core.files.storage import default_storage
-            default_storage.delete(name)
 
 # Create the singleton instance
 gridfs_storage = GridFSStorage()
-
 
 # ==========================================
 # 1. User Model (FR-1.1 / RBAC)
@@ -100,17 +88,15 @@ class User(AbstractUser):
         ('seller', 'Seller'),
         ('guest', 'Guest'),
     )
-    
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user')
     store_name = models.CharField(max_length=255, blank=True, null=True)
     skin_tone = models.CharField(max_length=7, blank=True, null=True)
     height = models.IntegerField(blank=True, null=True)
     weight = models.IntegerField(blank=True, null=True)
     body_proportions = models.CharField(max_length=255, blank=True, null=True)
-    
+
     def __str__(self):
         return self.username
-
 
 # ==========================================
 # 2. Upload Batch (Ticket/Tracking System)
@@ -121,7 +107,6 @@ class UploadBatch(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     )
-    
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='upload_batches')
     store_name = models.CharField(max_length=255)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
@@ -131,14 +116,13 @@ class UploadBatch(models.Model):
     rejection_report = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         ordering = ['-created_at']
-    
+
     def __str__(self):
         batch_id = str(self.id) if self.id else 'new'
         return f"Batch {batch_id[:8]} - {self.seller.username}"
-
 
 # ==========================================
 # 3. Catalog Item (Seller Listings)
@@ -151,13 +135,11 @@ class CatalogItem(models.Model):
         ('outerwear', 'Outerwear'),
         ('footwear', 'Footwear'),
     ]
-    
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('rejected', 'Rejected'),
         ('processing', 'Processing'),
     ]
-    
     # Metadata
     name = models.CharField(max_length=255)
     description = models.TextField()
@@ -167,40 +149,39 @@ class CatalogItem(models.Model):
     color_description = models.TextField()
     color_family = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     # Tags
     style_tags = models.JSONField(default=list, blank=True)
     occasion_tags = models.JSONField(default=list, blank=True)
     compatible_color_palette_tags = models.JSONField(default=list, blank=True)
-    
+
     # Seller info
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)
-    
+
     # Images (GridFS Storage)
     front_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/front/', blank=True, null=True)
     side_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/side/', blank=True, null=True)
     rear_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/rear/', blank=True, null=True)
-    
+
     # Status & Batch tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     rejection_reasons = models.JSONField(default=list, blank=True)
     batch = models.ForeignKey(UploadBatch, on_delete=models.SET_NULL, null=True, related_name='items')
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         # Composite indexes are safe. Single field indexes on FKs are auto-created by Django.
         indexes = [
             models.Index(fields=['category', 'status']),
             models.Index(fields=['seller', 'status']),
         ]
-    
+
     def __str__(self):
         return f"{self.name} - {self.store_name}"
-
 
 # ==========================================
 # 4. Avatar Presets (WBS 1.3.2 / FR-2.1–2.10)
@@ -236,7 +217,6 @@ class AvatarPreset(models.Model):
     def __str__(self):
         return f"{self.name} ({self.user.username})"
 
-
 # ==========================================
 # 5. Saved Outfits (WBS 1.3.8 / FR-5.4–5.8)
 # ==========================================
@@ -252,7 +232,6 @@ class Outfit(models.Model):
     def __str__(self):
         return f"{self.name} ({self.user.username})"
 
-
 # ==========================================
 # 6. Shopping Cart (WBS 1.3.6 / FR-6.1–6.4)
 # ==========================================
@@ -263,7 +242,6 @@ class Cart(models.Model):
 
     def __str__(self):
         return f"Cart of {self.user.username}"
-
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
@@ -278,13 +256,11 @@ class CartItem(models.Model):
     def __str__(self):
         return f"{self.quantity} x {self.item.name}"
 
-
 # ==========================================
 # 7. Orders + Mock Payment (WBS 1.3.6 / FR-6.5–6.9)
 # ==========================================
 class Order(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
-
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     shipping_address = models.TextField()
@@ -300,7 +276,6 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order {self.id} - {self.user.username}"
-
 
 class OrderItem(models.Model):
     """Snapshot of purchased item — keeps store name even if listing is deleted (FR-6.8)."""

@@ -3,6 +3,8 @@ import io
 import colorsys
 import uuid
 import os
+import logging
+import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from django.shortcuts import render, redirect
@@ -22,9 +24,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from PIL import Image
 from rembg import remove
 from bson.objectid import ObjectId
+from pymongo import MongoClient
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -32,10 +36,42 @@ from drf_spectacular.types import OpenApiTypes
 from .models import User, CatalogItem, UploadBatch
 from .color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 
+# HIGH PRIORITY FIX: Setup Python logging module
+logger = logging.getLogger(__name__)
+
+# ==========================================
+# MongoDB Token Blacklist (Option B from Code Review)
+# Bypasses Django ORM to avoid SimpleJWT admin autodiscover crashes.
+# ==========================================
+try:
+    _mongo_client = MongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=2000)
+    _db = _mongo_client.get_database()
+    token_blacklist_collection = _db['token_blacklist']
+    # Create TTL index so expired tokens are automatically deleted by MongoDB
+    token_blacklist_collection.create_index("expires_at", expireAfterSeconds=0)
+except Exception as e:
+    logger.warning(f"Could not connect to MongoDB for token blacklist: {e}")
+    token_blacklist_collection = None
+
+def _mongo_blacklist(self):
+    """Custom blacklist method injected into SimpleJWT's RefreshToken"""
+    if token_blacklist_collection is None:
+        logger.warning("Token blacklist collection unavailable.")
+        return
+    jti = self['jti']
+    exp = self['exp']
+    token_blacklist_collection.update_one(
+        {'jti': jti},
+        {'$set': {'expires_at': datetime.datetime.fromtimestamp(exp, tz=datetime.timezone.utc)}},
+        upsert=True
+    )
+
+# Monkey-patch SimpleJWT so BLACKLIST_AFTER_ROTATION = True works without the official app
+RefreshToken.blacklist = _mongo_blacklist
+
 # ==========================================
 # Existing Function-Based Views (Preserved)
 # ==========================================
-
 def home(request):
     return render(request, 'accounts/test_upload.html')
 
@@ -67,7 +103,6 @@ def logout_view(request):
 # ==========================================
 # DRF Serializers
 # ==========================================
-
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     
@@ -103,19 +138,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 class CatalogItemSerializer(serializers.ModelSerializer):
-    # FIXED: MongoDB ObjectIds must serialize as strings, not integers.
-    # Without these, DRF maps AutoField -> IntegerField and int(ObjectId) crashes.
     id = serializers.CharField(read_only=True)
     seller = serializers.CharField(read_only=True, source='seller_id')
     batch = serializers.CharField(read_only=True, source='batch_id', allow_null=True)
 
     class Meta:
         model = CatalogItem
-        fields = 'all'
+        fields = '__all__'
         read_only_fields = ['seller', 'store_name', 'status', 'rejection_reasons', 'created_at', 'updated_at', 'batch']
 
 class UploadBatchSerializer(serializers.ModelSerializer):
-    # FIXED: ObjectId-safe string representation for id and seller FK
     id = serializers.CharField(read_only=True)
     seller = serializers.CharField(read_only=True, source='seller_id')
 
@@ -140,7 +172,6 @@ class CSVUploadSerializer(serializers.Serializer):
 # ==========================================
 # DRF Views
 # ==========================================
-
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
@@ -162,17 +193,37 @@ class LoginView(TokenObtainPairView):
     pass
 
 class CustomTokenRefreshView(TokenRefreshView):
-    pass
+    """
+    Overrides default token refresh to check our raw MongoDB blacklist.
+    """
+    def post(self, request, *args, **kwargs):
+        refresh_token_str = request.data.get('refresh')
+        if refresh_token_str and token_blacklist_collection is not None:
+            try:
+                token = RefreshToken(refresh_token_str)
+                jti = token['jti']
+                if token_blacklist_collection.find_one({'jti': jti}):
+                    raise InvalidToken('Token is blacklisted or has been rotated.')
+            except TokenError:
+                raise InvalidToken('Token is invalid or expired.')
+        
+        return super().post(request, *args, **kwargs)
 
 class LogoutView(APIView):
     """
-    Token blacklist disabled (token_blacklist app removed for MongoDB
-    ObjectId compatibility). Client discards tokens; security relies on
-    short lifetimes (access 1 day / refresh 7 days) + TLS + server RBAC.
+    Secure logout using raw PyMongo collection (Option B from Code Review).
+    Bypasses SimpleJWT's incompatible ORM blacklist to satisfy RA 10173.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        try:
+            refresh_token_str = request.data.get("refresh")
+            if refresh_token_str:
+                token = RefreshToken(refresh_token_str)
+                token.blacklist() # Calls our monkey-patched _mongo_blacklist
+        except Exception as e:
+            logger.warning(f"Logout token blacklist error: {e}")
         return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
 
 class ProfileView(APIView):
@@ -200,7 +251,6 @@ class ProfileView(APIView):
 # ==========================================
 # Catalog Validator Logic
 # ==========================================
-
 class CatalogValidator:
     MIN_IMAGE_DIMENSION = 512
     MAX_IMAGE_DIMENSION = 4096
@@ -326,16 +376,21 @@ class CatalogValidator:
 # ==========================================
 # Background Processing Function
 # ==========================================
-
 def process_batch_background(batch_id):
     import time
     temp_files = []
     try:
         time.sleep(0.5)
+        
+        # FIX: Replaced bare except with specific exceptions
         try:
             batch = UploadBatch.objects.get(id=batch_id)
-        except:
-            batch = UploadBatch.objects.get(id=ObjectId(batch_id))
+        except (UploadBatch.DoesNotExist, ValueError, TypeError):
+            try:
+                batch = UploadBatch.objects.get(id=ObjectId(batch_id))
+            except Exception as e:
+                logger.error(f"Batch {batch_id} not found: {e}")
+                return
         
         batch.status = 'processing'
         batch.save()
@@ -347,7 +402,7 @@ def process_batch_background(batch_id):
         
         try:
             items = CatalogItem.objects.filter(batch=batch)
-        except:
+        except Exception:
             items = CatalogItem.objects.filter(batch_id=batch_id)
         
         for item in items:
@@ -409,28 +464,31 @@ def process_batch_background(batch_id):
         batch.completed_at = timezone.now()
         batch.save()
     except Exception as e:
+        # FIX: Replaced bare except and print with logger
         try:
             try:
                 batch = UploadBatch.objects.get(id=batch_id)
-            except:
+            except (UploadBatch.DoesNotExist, ValueError, TypeError):
                 batch = UploadBatch.objects.get(id=ObjectId(batch_id))
             batch.status = 'failed'
             batch.rejection_report = {'error': str(e)}
             batch.save()
-        except:
-            print(f"Failed to update batch {batch_id}: {e}")
+        except UploadBatch.DoesNotExist:
+            logger.error(f"Batch {batch_id} not found when trying to mark as failed")
+        except Exception as update_error:
+            logger.error(f"Failed to update batch {batch_id}: {update_error}")
     finally:
         for temp_file in temp_files:
             try:
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
             except Exception as cleanup_error:
-                print(f"Failed to clean up temp file {temp_file}: {cleanup_error}")
+                # FIX: Replaced print with logger.warning
+                logger.warning(f"Failed to clean up temp file {temp_file}: {cleanup_error}")
 
 # ==========================================
 # Catalog ViewSet
 # ==========================================
-
 class CatalogViewSet(viewsets.ModelViewSet):
     queryset = CatalogItem.objects.filter(status='active')
     serializer_class = CatalogItemSerializer
@@ -556,7 +614,8 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
                 item.save()
             except Exception as e:
-                print(f"Error processing row {row_number}: {e}")
+                # FIX: Replaced print with logger.error
+                logger.error(f"Error processing row {row_number}: {e}", exc_info=True)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             executor.submit(process_batch_background, batch_id)
@@ -676,13 +735,14 @@ class CatalogViewSet(viewsets.ModelViewSet):
 # ==========================================
 # Startup Sweep (run on app boot)
 # ==========================================
-
 def mark_stale_batches_as_failed():
     try:
         stale_time = timezone.now() - timedelta(minutes=10)
         stale_batches = UploadBatch.objects.filter(status='processing', created_at__lt=stale_time)
         count = stale_batches.update(status='failed', rejection_report={'error': 'Processing timeout - batch stuck for more than 10 minutes'})
         if count > 0:
-            print(f"Marked {count} stale batches as failed")
+            # FIX: Replaced print with logger.info
+            logger.info(f"Marked {count} stale batches as failed")
     except Exception as e:
-        print(f"Warning: Could not run startup sweep: {e}")
+        # FIX: Replaced print with logger.warning
+        logger.warning(f"Could not run startup sweep: {e}")
