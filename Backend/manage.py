@@ -21,15 +21,7 @@ def main():
             "forget to activate a virtual environment?"
         ) from exc
     
-    # Step 4: Run startup sweep before executing command
-    # Mark stale batches as failed
-    if 'runserver' in sys.argv or 'migrate' in sys.argv:
-        try:
-            from accounts.views import mark_stale_batches_as_failed
-            mark_stale_batches_as_failed()
-        except Exception as e:
-            print(f"Warning: Could not run startup sweep: {e}")
-    
+    # Execute command (Startup sweep is now safely handled in apps.py)
     execute_from_command_line(sys.argv)
 
 
