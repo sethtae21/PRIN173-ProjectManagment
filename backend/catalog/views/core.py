@@ -36,7 +36,7 @@ from drf_spectacular.types import OpenApiTypes
 from accounts.views.auth_views import RegisterView, LoginView, LogoutView, ProfileView, CustomTokenRefreshView
 from accounts.models import User
 from catalog.models import CatalogItem, UploadBatch
-from accounts.color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
+from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from accounts.serializers.auth_serializers import UserRegistrationSerializer
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
 
