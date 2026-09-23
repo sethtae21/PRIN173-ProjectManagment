@@ -16,7 +16,7 @@ class AccountsConfig(AppConfig):
         # 2. Run the startup sweep in a background thread so it doesn't block server boot
         def run_sweep():
             try:
-                from .views import mark_stale_batches_as_failed
+                from catalog.views import mark_stale_batches_as_failed
                 mark_stale_batches_as_failed()
             except Exception as e:
                 print(f"Startup sweep skipped: {e}")

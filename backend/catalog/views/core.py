@@ -33,11 +33,11 @@ from pymongo import MongoClient
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
-from .auth_views import RegisterView, LoginView, LogoutView, ProfileView, CustomTokenRefreshView
+from accounts.views.auth_views import RegisterView, LoginView, LogoutView, ProfileView, CustomTokenRefreshView
 from accounts.models import User
 from catalog.models import CatalogItem, UploadBatch
-from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
-from ..serializers.auth_serializers import UserRegistrationSerializer
+from accounts.color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
+from accounts.serializers.auth_serializers import UserRegistrationSerializer
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
 
 # HIGH PRIORITY FIX: Setup Python logging module

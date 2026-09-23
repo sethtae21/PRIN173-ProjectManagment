@@ -8,8 +8,9 @@ urlpatterns = [
     # Django Admin
     path('admin/', admin.site.urls),
 
-    # Accounts app (HTML views + all catalog/auth APIs)
+    # Accounts and catalog routes retain their original root prefixes.
     path('', include('accounts.urls')),
+    path('', include('catalog.urls')),
 
     # Swagger API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

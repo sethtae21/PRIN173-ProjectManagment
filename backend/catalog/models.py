@@ -1,7 +1,7 @@
+from django.conf import settings
 from django.db import models
 
-from ..storage import gridfs_storage
-from .user import User
+from accounts.storage import gridfs_storage
 
 
 class UploadBatch(models.Model):
@@ -10,7 +10,7 @@ class UploadBatch(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     )
-    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='upload_batches')
+    seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='upload_batches')
     store_name = models.CharField(max_length=255)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     total_items = models.IntegerField(default=0)
@@ -21,6 +21,7 @@ class UploadBatch(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = 'accounts_uploadbatch'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -41,7 +42,6 @@ class CatalogItem(models.Model):
         ('rejected', 'Rejected'),
         ('processing', 'Processing'),
     ]
-    # Metadata
     name = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
@@ -50,32 +50,22 @@ class CatalogItem(models.Model):
     color_description = models.TextField()
     color_family = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    # Tags
     style_tags = models.JSONField(default=list, blank=True)
     occasion_tags = models.JSONField(default=list, blank=True)
     compatible_color_palette_tags = models.JSONField(default=list, blank=True)
-
-    # Seller info
-    seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='catalog_items')
+    seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)
-
-    # Images (GridFS Storage)
     front_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/front/', blank=True, null=True)
     side_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/side/', blank=True, null=True)
     rear_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/rear/', blank=True, null=True)
-
-    # Status & Batch tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     rejection_reasons = models.JSONField(default=list, blank=True)
-    batch = models.ForeignKey(UploadBatch, on_delete=models.SET_NULL, null=True, related_name='items')
-
-    # Timestamps
+    batch = models.ForeignKey('catalog.UploadBatch', on_delete=models.SET_NULL, null=True, related_name='items')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        # Composite indexes are safe. Single field indexes on FKs are auto-created by Django.
+        db_table = 'accounts_catalogitem'
         indexes = [
             models.Index(fields=['category', 'status']),
             models.Index(fields=['seller', 'status']),

@@ -1,7 +1,5 @@
+from django.conf import settings
 from django.db import models
-
-from .catalog import CatalogItem
-from .user import User
 
 
 class AvatarPreset(models.Model):
@@ -13,7 +11,7 @@ class AvatarPreset(models.Model):
     CUP_CHOICES = [('', 'Not applicable'), ('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')]
     THIGH_CHOICES = [('slim', 'Slim'), ('average', 'Average'), ('thick', 'Thick')]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='avatar_presets')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='avatar_presets')
     name = models.CharField(max_length=100)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     height = models.IntegerField(help_text='Height in cm')
@@ -29,21 +27,22 @@ class AvatarPreset(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # NOTE: No Meta.indexes on 'user' here. Django auto-creates the FK index.
-    # Adding it explicitly causes MongoDB Error 85 (IndexOptionsConflict).
+    class Meta:
+        db_table = 'accounts_avatarpreset'
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
 
 
 class Outfit(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='outfits')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='outfits')
     name = models.CharField(max_length=100)
-    items = models.ManyToManyField(CatalogItem, related_name='outfits', blank=True)
+    items = models.ManyToManyField('catalog.CatalogItem', related_name='outfits', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # NOTE: No Meta.indexes on 'user' here.
+    class Meta:
+        db_table = 'accounts_outfit'
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
