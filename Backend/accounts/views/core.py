@@ -33,8 +33,8 @@ from pymongo import MongoClient
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
-from .models import User, CatalogItem, UploadBatch
-from .color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
+from ..models import User, CatalogItem, UploadBatch
+from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 
 # HIGH PRIORITY FIX: Setup Python logging module
 logger = logging.getLogger(__name__)
