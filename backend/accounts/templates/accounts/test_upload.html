@@ -1,264 +1,397 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FitFusion AI - Seller Upload Test</title>
+    <title>FitFusion AI - Full Feature Test Suite</title>
     <style>
-        body { font-family: Arial; max-width: 900px; margin: 50px auto; padding: 20px; }
-        .section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-        input, button { margin: 5px 0; padding: 10px; width: 100%; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        body { font-family: Arial; max-width: 950px; margin: 40px auto; padding: 20px; background: #fafafa; }
+        .section { margin: 25px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white; }
+        input, select, button { margin: 5px 0; padding: 10px; width: 100%; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
         button:hover { background: #0056b3; }
-        .result { background: #f5f5f5; padding: 15px; margin-top: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
-        .error { color: red; background: #ffe6e6; }
-        .success { color: green; background: #e6ffe6; }
-        .info { color: blue; background: #e6f3ff; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #a71d2a; }
+        button.success { background: #28a745; }
+        .error { color: #a71d2a; background: #ffe6e6; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+        .success { color: #155724; background: #e6ffe6; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+        .info { color: #004085; background: #e6f3ff; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
         .batch-status { padding: 10px; margin: 10px 0; border-radius: 5px; }
         .processing { background: #fff3cd; }
         .completed { background: #d4edda; }
         .failed { background: #f8d7da; }
+        .status-bar { position: sticky; top: 0; z-index: 100; background: #dc3545; color: white;
+                      padding: 10px 15px; border-radius: 6px; display: flex; justify-content: space-between; }
+        .status-bar.logged-in { background: #28a745; }
+        .badge { display: inline-block; background: #6c757d; color: white; font-size: 11px;
+                 padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 4px; max-height: 250px; overflow: auto; }
+        small { color: #666; display: block; margin: 5px 0; }
+        a { color: #007bff; }
     </style>
 </head>
 <body>
-    <h1>👕 FitFusion AI - Seller Upload Test</h1>
-    <p><strong>Features:</strong> Batch tracking, background processing, GridFS storage, CSV Template Download</p>
-    
-    <!-- Download Template Section -->
+    <h1>🧪 FitFusion AI — Full Feature Test Suite</h1>
+    <p>Covers: Auth + Token Blacklist • <strong>KAN-104</strong> Catalog Filters • <strong>KAN-58</strong> Preset CRUD • <strong>KAN-56</strong> Account Management</p>
+
+    <div id="statusBar" class="status-bar">
+        <span id="statusText">🔒 Not logged in</span>
+        <span id="statusUser"></span>
+    </div>
+
+    <!-- 1 -->
     <div class="section">
         <h2>1. Download CSV Template</h2>
-        <button onclick="downloadTemplate()"> Download CSV Template</button>
+        <button onclick="downloadTemplate()">📥 Download CSV Template</button>
         <div id="downloadResult"></div>
     </div>
 
-    <!-- Registration Section -->
+    <!-- 2 -->
     <div class="section">
-        <h2>2. Register Seller Account</h2>
-        <form id="registerForm">
-            <input type="text" id="reg_username" placeholder="Username" required value="testseller2">
-            <input type="email" id="reg_email" placeholder="Email" required value="seller2@test.com">
-            <input type="password" id="reg_password" placeholder="Password" required value="Test123!@#">
-            <input type="text" id="reg_store" placeholder="Store Name" required value="Test Fashion Store">
-            <button type="submit">Register Seller</button>
-        </form>
+        <h2>2. Register Seller Account <span class="badge">FR-1.1 / FR-1.5</span></h2>
+        <input type="text" id="reg_username" placeholder="Username" value="testseller2">
+        <input type="email" id="reg_email" placeholder="Email" value="seller2@test.com">
+        <input type="password" id="reg_password" placeholder="Password (8+, A-z, 0-9, !@#)" value="Test123!@#">
+        <input type="text" id="reg_store" placeholder="Store Name" value="Test Fashion Store">
+        <button onclick="registerUser()">Register Seller</button>
         <div id="registerResult"></div>
     </div>
 
-    <!-- Login Section -->
+    <!-- 3 -->
     <div class="section">
-        <h2>3. Login (Get Token)</h2>
-        <form id="loginForm">
-            <input type="text" id="login_username" placeholder="Username" required value="testseller2">
-            <input type="password" id="login_password" placeholder="Password" required value="Test123!@#">
-            <button type="submit">Login</button>
-        </form>
+        <h2>3. Login / Logout <span class="badge">Token blacklist</span></h2>
+        <input type="text" id="login_username" placeholder="Username or Email" value="testseller2">
+        <input type="password" id="login_password" placeholder="Password" value="Test123!@#">
+        <button class="success" onclick="doLogin()">🔑 Login</button>
+        <button class="danger" onclick="doLogout()">🚪 Logout (blacklists refresh token)</button>
         <div id="loginResult"></div>
     </div>
 
-    <!-- Upload Section -->
+    <!-- 4 -->
     <div class="section">
-        <h2>4. Upload CSV + Images (Background Processing)</h2>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <label><strong>CSV File:</strong></label>
-            <input type="file" id="csv_file" accept=".csv" required>
-            
-            <label><strong>Images (select all 3):</strong></label>
-            <input type="file" id="images" accept="image/jpeg, image/jpg, image/png, image/webp" multiple required>
-            <small>Select front, side, and rear view images (JPG, PNG, WEBP only - no GIFs)</small>
-            
-            <button type="submit">🚀 Upload to Catalog (Background Processing)</button>
-        </form>
+        <h2>4. Upload CSV + Images <span class="badge">Seller only</span></h2>
+        <input type="file" id="csv_file" accept=".csv">
+        <input type="file" id="images" accept="image/jpeg, image/png, image/webp" multiple>
+        <small>Front, side, rear images (no GIFs)</small>
+        <button onclick="uploadCatalog()">🚀 Upload to Catalog</button>
         <div id="uploadResult"></div>
     </div>
 
-    <!-- Batch Status Section -->
+    <!-- 5 -->
     <div class="section">
         <h2>5. Check Batch Status</h2>
-        <input type="text" id="batch_id_input" placeholder="Enter Batch ID (e.g., 1)">
+        <input type="text" id="batch_id_input" placeholder="Batch ID (auto-filled after upload)">
         <button onclick="checkBatchStatus()">🔍 Check Status</button>
         <div id="batchStatusResult"></div>
     </div>
 
-    <script>
-        let accessToken = '';
-        let currentBatchId = '';
+    <!-- 6 -->
+    <div class="section">
+        <h2>6. Catalog Filters <span class="badge">KAN-104 • Guest-readable</span></h2>
+        <p>
+            <a href="/catalog/?format=json" target="_blank">📦 All</a> |
+            <a href="/catalog/?store=Test Fashion Store&format=json" target="_blank">🏪 Store</a> |
+            <a href="/catalog/?style=casual&format=json" target="_blank">🎨 Style</a> |
+            <a href="/catalog/?category=tops&format=json" target="_blank">👕 Category</a> |
+            <a href="/catalog/?color=white&format=json" target="_blank">⚪ Color</a>
+        </p>
+        <input type="text" id="f_store" placeholder="Store (e.g., Test Fashion Store)">
+        <input type="text" id="f_style" placeholder="Style tag (e.g., casual)">
+        <input type="text" id="f_category" placeholder="Category (tops/bottoms/...)">
+        <button onclick="openFilteredCatalog()">🔍 Open Filtered Catalog</button>
+        <div id="filterResult"></div>
+    </div>
 
-        // Download CSV Template
+    <!-- 7 -->
+    <div class="section">
+        <h2>7. Avatar Preset CRUD <span class="badge">KAN-58 • Owner-only</span></h2>
+        <input type="text" id="preset_name" placeholder="Preset name" value="My Daily Preset">
+        <select id="preset_gender"><option value="female">female</option><option value="male">male</option></select>
+        <input type="number" id="preset_height" placeholder="Height cm" value="165">
+        <input type="number" id="preset_weight" placeholder="Weight kg" value="55">
+        <input type="text" id="preset_skin" placeholder="Skin tone" value="medium">
+        <button class="success" onclick="createPreset()">➕ Create</button>
+        <button onclick="listPresets()">📋 List Mine</button>
+        <input type="text" id="preset_id_input" placeholder="Preset ID">
+        <input type="text" id="preset_new_name" placeholder="New name for update">
+        <button onclick="updatePreset()">✏️ Update</button>
+        <button class="danger" onclick="deletePreset()">🗑️ Delete</button>
+        <div id="presetResult"></div>
+    </div>
+
+    <!-- 8 -->
+    <div class="section">
+        <h2>8. Account Management <span class="badge">KAN-56 • FR-1.2–1.4 / RA 10173</span></h2>
+        <button onclick="getProfile()">👤 View Profile</button>
+        <input type="text" id="prof_skin" placeholder="New skin tone" value="deep">
+        <input type="number" id="prof_height" placeholder="New height cm" value="170">
+        <button onclick="updateProfile()">✏️ Update Profile</button>
+        <hr>
+        <input type="password" id="pw_current" placeholder="Current password">
+        <input type="password" id="pw_new" placeholder="New password (8+, A-z, 0-9, !@#)">
+        <button onclick="changePassword()">🔁 Change Password</button>
+        <hr>
+        <small>⚠️ Deletes the logged-in account AND all its data (presets, outfits, cart). Use a throwaway account!</small>
+        <button class="danger" onclick="deleteAccount()">☠️ Delete My Account (RA 10173 erasure)</button>
+        <div id="accountResult"></div>
+    </div>
+
+    <!-- 9 -->
+    <div class="section">
+        <h2>9. Token Security Tests <span class="badge">Rotation + Blacklist</span></h2>
+        <button onclick="testRotation()">🔄 Rotate refresh → then replay OLD refresh (expect 401)</button>
+        <div id="securityResult"></div>
+    </div>
+
+    <script>
+        let accessToken = '', refreshToken = '', currentUser = null;
+
+        function updateStatus() {
+            const bar = document.getElementById('statusBar');
+            if (accessToken && currentUser) {
+                bar.className = 'status-bar logged-in';
+                document.getElementById('statusText').textContent = '✅ Logged in';
+                document.getElementById('statusUser').textContent =
+                    `${currentUser.username} (${currentUser.role}) — ${currentUser.store_name || 'N/A'}`;
+            } else {
+                bar.className = 'status-bar';
+                document.getElementById('statusText').textContent = '🔒 Not logged in';
+                document.getElementById('statusUser').textContent = '';
+            }
+        }
+        function authHeaders(json) {
+            const h = { 'Authorization': 'Bearer ' + accessToken };
+            if (json) h['Content-Type'] = 'application/json';
+            return h;
+        }
+        function show(id, ok, html) {
+            document.getElementById(id).innerHTML =
+                `<div class="${ok ? 'success' : 'error'}">${html}</div>`;
+        }
+        function val(id) { return document.getElementById(id).value.trim(); }
+
+        // 1
         function downloadTemplate() {
             window.location.href = '/catalog/download-template/';
-            document.getElementById('downloadResult').innerHTML = '<div class="success">✅ CSV Template download started!</div>';
+            show('downloadResult', true, '✅ Download started');
         }
 
-        // Registration
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resultDiv = document.getElementById('registerResult');
-            resultDiv.innerHTML = '<div class="info">Loading...</div>';
-            
-            try {
-                const response = await fetch('/auth/register/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: document.getElementById('reg_username').value,
-                        email: document.getElementById('reg_email').value,
-                        password: document.getElementById('reg_password').value,
-                        role: 'seller',
-                        store_name: document.getElementById('reg_store').value
-                    })
-                });
-                
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await response.json();
-                    if (response.ok) {
-                        resultDiv.innerHTML = `<div class="success">✅ Registered successfully!<br>User ID: ${data.user.id}</div>`;
-                    } else {
-                        resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
-                    }
-                } else {
-                    const text = await response.text();
-                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML instead of JSON.<br>Preview: ${text.substring(0, 300)}...</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
-            }
-        });
+        // 2
+        async function registerUser() {
+            const out = 'registerResult';
+            const res = await fetch('/auth/register/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: val('reg_username'), email: val('reg_email'),
+                    password: val('reg_password'), role: 'seller', store_name: val('reg_store')
+                })
+            });
+            const data = await res.json();
+            res.ok ? show(out, true, `✅ Registered! ID: ${data.user.id}\nYou can login below.`)
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
 
-        // Login
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resultDiv = document.getElementById('loginResult');
-            resultDiv.innerHTML = '<div class="info">Loading...</div>';
-            
-            try {
-                const response = await fetch('/auth/login/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: document.getElementById('login_username').value,
-                        password: document.getElementById('login_password').value
-                    })
-                });
-                
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await response.json();
-                    if (response.ok) {
-                        accessToken = data.access;
-                        resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>Token: ${accessToken.substring(0, 50)}...</div>`;
-                    } else {
-                        resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
-                    }
-                } else {
-                    const text = await response.text();
-                    resultDiv.innerHTML = `<div class="error">❌ Server returned HTML.<br>Preview: ${text.substring(0, 300)}...</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+        // 3
+        async function doLogin() {
+            const out = 'loginResult';
+            const res = await fetch('/auth/login/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: val('login_username'), password: val('login_password') })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                accessToken = data.access || (data.tokens || {}).access || '';
+                refreshToken = data.refresh || (data.tokens || {}).refresh || '';
+                currentUser = data.user || null;
+                updateStatus();
+                show(out, true, `✅ Login OK!\nAccess: ${String(accessToken).substring(0, 40)}...\nRefresh saved for logout/rotation tests.`);
+            } else {
+                show(out, false, '❌ ' + JSON.stringify(data, null, 2));
             }
-        });
+        }
+        async function doLogout() {
+            const out = 'loginResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/auth/logout/', {
+                method: 'POST', headers: authHeaders(true),
+                body: JSON.stringify({ refresh: refreshToken })
+            });
+            const data = await res.json().catch(() => ({}));
+            accessToken = ''; refreshToken = ''; currentUser = null; updateStatus();
+            show(out, res.ok, res.ok
+                ? '✅ Logged out. Refresh token blacklisted server-side.\nTry "Rotate/replay" in section 9 with the old refresh → 401.'
+                : '❌ ' + JSON.stringify(data, null, 2));
+        }
 
-        // Upload with Background Processing
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resultDiv = document.getElementById('uploadResult');
-            
-            if (!accessToken) {
-                resultDiv.innerHTML = '<div class="error">️ Please login first to get a token!</div>';
-                return;
-            }
-            
-            resultDiv.innerHTML = '<div class="info">⏳ Uploading and starting background processing...</div>';
-            
-            const formData = new FormData();
-            formData.append('csv_file', document.getElementById('csv_file').files[0]);
-            
-            const imageFiles = document.getElementById('images').files;
-            for (let i = 0; i < imageFiles.length; i++) {
-                formData.append('images', imageFiles[i]);
-            }
-            
-            try {
-                const response = await fetch('/catalog/upload/', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.status === 202) {
-                    currentBatchId = data.batch_id;
-                    resultDiv.innerHTML = `
-                        <div class="success">
-                            ✅ Upload accepted!<br>
-                            <strong>Batch ID:</strong> ${data.batch_id}<br>
-                            <strong>Status:</strong> ${data.status}<br>
-                            <strong>Total Items:</strong> ${data.total_items}<br>
-                            <em>Processing in background... Check status below.</em>
-                        </div>
-                    `;
-                    document.getElementById('batch_id_input').value = data.batch_id;
-                    setTimeout(() => checkBatchStatus(), 5000);
-                } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Upload failed: ${JSON.stringify(data, null, 2)}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
-            }
-        });
+        // 4
+        async function uploadCatalog() {
+            const out = 'uploadResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const fd = new FormData();
+            fd.append('csv_file', document.getElementById('csv_file').files[0]);
+            [...document.getElementById('images').files].forEach(f => fd.append('images', f));
+            const res = await fetch('/catalog/upload/', { method: 'POST', headers: authHeaders(false), body: fd });
+            const data = await res.json();
+            if (res.status === 202) {
+                document.getElementById('batch_id_input').value = data.batch_id;
+                show(out, true, `✅ Accepted! Batch: ${data.batch_id}\nItems: ${data.total_items}`);
+                setTimeout(checkBatchStatus, 5000);
+            } else show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
 
-        // Check Batch Status
+        // 5
         async function checkBatchStatus() {
-            const batchId = document.getElementById('batch_id_input').value || currentBatchId;
-            const resultDiv = document.getElementById('batchStatusResult');
+            const out = 'batchStatusResult';
+            const id = val('batch_id_input');
+            if (!id || !accessToken) return show(out, false, '⚠️ Need batch ID + login');
+            const res = await fetch(`/catalog/batch-report/?batch_id=${id}`, { headers: authHeaders(false) });
+            const data = await res.json();
+            res.ok ? show(out, true, `Status: ${data.status.toUpperCase()}\nStore: ${data.store_name}\nAccepted: ${data.accepted_count} / Rejected: ${data.rejected_count}\nReport: ${JSON.stringify(data.rejection_report || {})}`)
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+
+        // 6
+        function openFilteredCatalog() {
+            const p = new URLSearchParams();
+            ['store','style','category'].forEach(k => {
+                const v = val('f_' + k); if (v) p.set(k, v);
+            });
+            p.set('format', 'json');
+            const url = '/catalog/?' + p.toString();
+            show('filterResult', true, 'Opening: ' + url);
+            window.open(url, '_blank');
+        }
+
+        // 7 — KAN-58
+        async function createPreset() {
+            const out = 'presetResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const g = val('preset_gender');
+            const res = await fetch('/presets/', {
+                method: 'POST', headers: authHeaders(true),
+                body: JSON.stringify({
+                    name: val('preset_name'), gender: g,
+                    height: parseFloat(val('preset_height')), weight: parseFloat(val('preset_weight')),
+                    skin_tone: val('preset_skin'), shoulder: 'average', waist: 'average',
+                    hip: 'average', thigh: 'average', cup_size: g === 'female' ? 'B' : null
+                })
+            });
+            const data = await res.json();
+            if (res.status === 201) {
+                document.getElementById('preset_id_input').value = data.id;
+                show(out, true, `✅ Created! ID: ${data.id}`);
+            } else show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function listPresets() {
+            const out = 'presetResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/presets/', { headers: authHeaders(false) });
+            const data = await res.json();
+            res.ok ? show(out, true, `Your presets (${data.length}):\n` + JSON.stringify(data, null, 2))
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function updatePreset() {
+            const out = 'presetResult';
+            const id = val('preset_id_input');
+            if (!accessToken || !id) return show(out, false, '⚠️ Login + preset ID required');
+
+            // FIX: Read the actual values from the form inputs
+            const g = val('preset_gender');
+            const payload = {
+                name: val('preset_new_name') || val('preset_name'),
+                gender: g,
+                height: parseFloat(val('preset_height')),
+                weight: parseFloat(val('preset_weight')),
+                skin_tone: val('preset_skin'),
+                // CRITICAL: If changing to male, cup_size MUST be null to pass backend validation
+                cup_size: g === 'female' ? 'B' : null 
+            };
+
+            const res = await fetch(`/presets/${id}/`, {
+                method: 'PATCH', 
+                headers: authHeaders(true),
+                body: JSON.stringify(payload)
+            });
             
-            if (!batchId) {
-                resultDiv.innerHTML = '<div class="error">⚠️ Please enter a batch ID</div>';
-                return;
+            const data = await res.json().catch(() => ({}));
+            res.ok ? show(out, true, '✅ Updated successfully!\n' + JSON.stringify(data, null, 2))
+                   : show(out, false, `❌ ${res.status} Update failed:\n` + JSON.stringify(data, null, 2));
+        }
+        async function deletePreset() {
+            const out = 'presetResult';
+            const id = val('preset_id_input');
+            if (!accessToken || !id) return show(out, false, '⚠️ Login + preset ID required');
+            const res = await fetch(`/presets/${id}/`, { method: 'DELETE', headers: authHeaders(false) });
+            res.status === 204 ? show(out, true, '✅ Preset deleted (204)')
+                               : show(out, false, `❌ ${res.status} (404 = owner-only enforcement working)`);
+        }
+
+        // 8 — KAN-56
+        async function getProfile() {
+            const out = 'accountResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/profile/', { headers: authHeaders(false) });
+            const data = await res.json();
+            res.ok ? show(out, true, '👤 ' + JSON.stringify(data.user, null, 2))
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function updateProfile() {
+            const out = 'accountResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/profile/', {
+                method: 'PATCH', headers: authHeaders(true),
+                body: JSON.stringify({ skin_tone: val('prof_skin'), height: parseFloat(val('prof_height')) })
+            });
+            const data = await res.json();
+            res.ok ? show(out, true, '✅ Profile updated:\n' + JSON.stringify(data.user, null, 2))
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function changePassword() {
+            const out = 'accountResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/profile/password/', {
+                method: 'POST', headers: authHeaders(true),
+                body: JSON.stringify({ current_password: val('pw_current'), new_password: val('pw_new') })
+            });
+            const data = await res.json();
+            res.ok ? show(out, true, '✅ Password changed. Logout and login with the NEW password.')
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function deleteAccount() {
+            const out = 'accountResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            if (!confirm('Permanently delete this account and ALL its data?')) return;
+            const res = await fetch('/profile/', {
+                method: 'DELETE', headers: authHeaders(true),
+                body: JSON.stringify({ refresh: refreshToken })
+            });
+            if (res.status === 204) {
+                accessToken = ''; refreshToken = ''; currentUser = null; updateStatus();
+                show(out, true, '☠️ Account deleted (204). All presets/outfits/cart cascaded. Refresh token blacklisted.\nLogin with it again → should fail.');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                show(out, false, '❌ ' + res.status + ' ' + JSON.stringify(data, null, 2));
             }
-            
-            if (!accessToken) {
-                resultDiv.innerHTML = '<div class="error">⚠️ Please login first</div>';
-                return; 
-            }
-            
-            resultDiv.innerHTML = '<div class="info">Loading batch status...</div>';
-            
-            try {
-                const response = await fetch(`/catalog/batch-report/?batch_id=${batchId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    let statusClass = data.status === 'processing' ? 'processing' : 
-                                     data.status === 'completed' ? 'completed' : 'failed';
-                    
-                    resultDiv.innerHTML = `
-                        <div class="batch-status ${statusClass}">
-                            <strong>Batch ID:</strong> ${data.id}<br>
-                            <strong>Status:</strong> ${data.status.toUpperCase()}<br>
-                            <strong>Store:</strong> ${data.store_name}<br>
-                            <strong>Total Items:</strong> ${data.total_items}<br>
-                            <strong>Accepted:</strong> ${data.accepted_count}<br>
-                            <strong>Rejected:</strong> ${data.rejected_count}<br>
-                            <strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}<br>
-                            ${data.completed_at ? `<strong>Completed:</strong> ${new Date(data.completed_at).toLocaleString()}` : ''}
-                        </div>
-                        ${data.rejection_report && Object.keys(data.rejection_report).length > 0 ? 
-                            `<div class="info"><strong>Rejection Report:</strong><br><pre>${JSON.stringify(data.rejection_report, null, 2)}</pre></div>` : ''}
-                    `;
-                } else {
-                    resultDiv.innerHTML = `<div class="error">❌ Error: ${JSON.stringify(data, null, 2)}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
-            }
+        }
+
+        // 9 — security
+        async function testRotation() {
+            const out = 'securityResult';
+            if (!refreshToken) return show(out, false, '⚠️ Login first (need a refresh token)');
+            const oldRefresh = refreshToken;
+            const r1 = await fetch('/auth/token/refresh/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh: oldRefresh })
+            });
+            const d1 = await r1.json();
+            if (!r1.ok) return show(out, false, '❌ Rotation failed: ' + JSON.stringify(d1, null, 2));
+            accessToken = d1.access || accessToken;
+            if (d1.refresh) refreshToken = d1.refresh;
+            const r2 = await fetch('/auth/token/refresh/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh: oldRefresh })
+            });
+            const d2 = await r2.json().catch(() => ({}));
+            show(out, r2.status === 401,
+                `Step 1 rotation: ${r1.status} (new tokens issued)\nStep 2 replay OLD refresh: ${r2.status} ${JSON.stringify(d2)}\n${r2.status === 401 ? '✅ BLACKLIST ENFORCED — rotated token cannot be reused.' : '❌ Expected 401!'}`);
         }
     </script>
 </body>

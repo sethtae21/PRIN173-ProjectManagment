@@ -270,16 +270,30 @@ def process_batch_background(batch_id):
 class CatalogViewSet(viewsets.ModelViewSet):
     queryset = CatalogItem.objects.filter(status='active')
     serializer_class = CatalogItemSerializer
-    permission_classes = [IsSeller]
+    permission_classes = [IsSeller] # Default to Seller, overridden in get_permissions for reads
     
     def get_queryset(self):
+        # Base queryset: only active items (read-only for everyone)
         queryset = CatalogItem.objects.filter(status='active')
+        
+        # Existing filters
         if category := self.request.query_params.get('category'):
             queryset = queryset.filter(category=category)
         if color := self.request.query_params.get('color'):
             queryset = queryset.filter(color_family__iexact=color)
         if size := self.request.query_params.get('size'):
             queryset = queryset.filter(size__icontains=size)
+            
+        # ==========================================
+        # KAN-104: New filters for Store and Style
+        # ==========================================
+        if store := self.request.query_params.get('store'):
+            queryset = queryset.filter(store_name__icontains=store)
+            
+        if style := self.request.query_params.get('style'):
+            # style_tags is a JSONField list; icontains matches the string within the JSON array
+            queryset = queryset.filter(style_tags__icontains=style)
+            
         return queryset
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-template')
@@ -410,20 +424,41 @@ class CatalogViewSet(viewsets.ModelViewSet):
         batch_id = request.query_params.get('batch_id')
         if not batch_id:
             return Response({'error': 'Batch ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Robust lookup: string id first, then ObjectId conversion
+        batch = None
         try:
             batch = UploadBatch.objects.get(id=batch_id, seller=request.user)
-            return Response(UploadBatchSerializer(batch).data)
-        except UploadBatch.DoesNotExist:
+        except (UploadBatch.DoesNotExist, ValueError, TypeError):
             try:
                 batch = UploadBatch.objects.get(id=ObjectId(batch_id), seller=request.user)
-                return Response(UploadBatchSerializer(batch).data)
-            except UploadBatch.DoesNotExist:
-                return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
-            except Exception as e:
-                return Response({'error': f'Invalid batch ID format: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                batch = None
         except Exception as e:
-            return Response({'error': f'Error retrieving batch: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"batch_report lookup error for {batch_id}: {e}")
+            batch = None
+
+        if batch is None:
+            return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            return Response(UploadBatchSerializer(batch).data)
+        except Exception as e:
+            # Fallback: manual ObjectId-safe payload (same fields the HTML test page reads)
+            # Prevents int(ObjectId) crash if serializer isn't fully patched
+            logger.warning(f"Serializer fallback used for batch {batch_id}: {e}")
+            return Response({
+                'id': str(batch.id),
+                'seller': str(batch.seller_id),
+                'store_name': batch.store_name,
+                'status': batch.status,
+                'total_items': batch.total_items,
+                'accepted_count': batch.accepted_count,
+                'rejected_count': batch.rejected_count,
+                'rejection_report': batch.rejection_report or {},
+                'created_at': batch.created_at,
+                'completed_at': batch.completed_at,
+            })
     
     @extend_schema(
         summary="Get seller's catalog items",
@@ -506,6 +541,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         serializer.save(seller=self.request.user, store_name=self.request.user.store_name or "Unknown Store")
     
     def get_permissions(self):
+        # KAN-104: Allow Guests/Anyone to read the catalog (list, retrieve) and download template
         if self.action in ['list', 'retrieve', 'download_template']:
             return [AllowAny()]
         return [IsSeller()]
