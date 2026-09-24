@@ -1,0 +1,451 @@
+.shopper-dashboard {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at right center,
+      rgba(181, 126, 32, 0.23),
+      transparent 42%
+    ),
+    linear-gradient(
+      135deg,
+      #f2efe8,
+      #fffdf9 52%,
+      #eee8de
+    );
+  color: #17130f;
+}
+
+.shopper-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  padding: 18px;
+  background: linear-gradient(
+    180deg,
+    #f6e7b7,
+    #d7af4b 52%,
+    #b57e20
+  );
+}
+
+.shopper-sidebar-logo {
+  display: grid;
+  min-height: 90px;
+  place-items: center;
+  margin-bottom: 15px;
+}
+
+.shopper-sidebar-logo img {
+  width: 140px;
+  height: 76px;
+  object-fit: contain;
+}
+
+.shopper-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.shopper-nav-link {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 10px;
+  background: rgba(255, 253, 249, 0.57);
+  border: 1px solid #e2c978;
+  border-radius: 9px;
+  color: #29251f;
+  font-size: 13px;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.shopper-nav-link:hover {
+  background: rgba(255, 253, 249, 0.85);
+  transform: translateX(2px);
+}
+
+.shopper-nav-link.active {
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
+  border-color: #e2c978;
+  color: #fffdf9;
+  font-weight: 700;
+}
+
+.shopper-logout-button {
+  min-height: 48px;
+  margin-top: auto;
+  background: #fffdf9;
+  border: 1.2px solid #b57e20;
+  border-radius: 9px;
+  color: #8e641f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shopper-logout-button:hover {
+  background: #17130f;
+  color: #fffdf9;
+}
+
+.shopper-content {
+  min-width: 0;
+}
+
+.shopper-header {
+  display: flex;
+  min-height: 123px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+  background: rgba(255, 253, 249, 0.97);
+  border-bottom: 1px solid #e2d8c7;
+}
+
+.shopper-page-code {
+  margin: 0 0 14px;
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.shopper-page-description {
+  margin: 0;
+  color: #5c554c;
+  font-size: 13px;
+}
+
+.shopper-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.shopper-cart-button {
+  position: relative;
+  display: flex;
+  min-width: 112px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  background: #f8f5ef;
+  border: 1px solid #d2be91;
+  border-radius: 9px;
+  color: #29251f;
+  cursor: pointer;
+}
+
+.shopper-cart-button:hover {
+  background: #fff9e8;
+}
+
+.shopper-cart-button svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shopper-cart-button span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shopper-role-badge {
+  display: grid;
+  min-width: 125px;
+  min-height: 48px;
+  place-items: center;
+  padding: 10px 15px;
+  background: #17130f;
+  border-radius: 9px;
+  color: #f6e7b7;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.shopper-dashboard-body {
+  width: min(1170px, calc(100% - 60px));
+  margin: 0 auto;
+  padding: 48px 0 70px;
+}
+
+.shopper-welcome {
+  margin-bottom: 30px;
+}
+
+.shopper-welcome > p {
+  margin: 0 0 13px;
+  color: #9a6a1d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.shopper-welcome h1 {
+  margin: 0 0 14px;
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.2;
+}
+
+.shopper-welcome span {
+  color: #5c554c;
+  font-size: 13px;
+}
+
+.shopper-onboarding-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2.15fr)
+    minmax(260px, 0.95fr);
+  gap: 30px;
+  margin-bottom: 45px;
+}
+
+.shopper-start-card {
+  min-height: 285px;
+  padding: 40px;
+  background: #fffdf9;
+  border: 1px solid #e2d8c7;
+  border-radius: 16px;
+}
+
+.shopper-card-label {
+  margin: 0 0 18px;
+  color: #b57e20;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shopper-start-card h2 {
+  margin: 0 0 22px;
+  font-size: 30px;
+  line-height: 1.25;
+}
+
+.shopper-start-card > p:not(.shopper-card-label) {
+  max-width: 650px;
+  margin: 0;
+  color: #5c554c;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.shopper-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 32px;
+}
+
+.shopper-primary-button,
+.shopper-secondary-button {
+  min-height: 50px;
+  padding: 12px 24px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shopper-primary-button {
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
+  border: 1.2px solid #b57e20;
+  color: #fffdf9;
+}
+
+.shopper-secondary-button {
+  background: #fffdf9;
+  border: 1.2px solid #b57e20;
+  color: #8e641f;
+}
+
+.shopper-primary-button:hover,
+.shopper-secondary-button:hover {
+  box-shadow: 0 7px 18px
+    rgba(142, 100, 31, 0.2);
+  transform: translateY(-1px);
+}
+
+.shopper-guide-card {
+  min-height: 285px;
+  padding: 40px 34px;
+  background: #17130f;
+  border: 1px solid #17130f;
+  border-radius: 16px;
+  color: #fffdf9;
+}
+
+.shopper-guide-card > p {
+  margin: 0 0 28px;
+  color: #d7af4b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shopper-guide-card ol {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shopper-guide-card li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  font-size: 14px;
+}
+
+.shopper-guide-card li span {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #d7af4b;
+  border-radius: 50%;
+  color: #d7af4b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.shopper-account-status {
+  padding: 28px 30px;
+  background: #fffdf9;
+  border: 1px solid #e2d8c7;
+  border-radius: 16px;
+}
+
+.shopper-account-status h2 {
+  margin: 0 0 22px;
+  font-size: 17px;
+}
+
+.shopper-status-row {
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 5px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #e2d8c7;
+  color: #29251f;
+  font: inherit;
+  cursor: pointer;
+}
+
+.shopper-status-row:hover {
+  background: #fff9e8;
+}
+
+.shopper-status-row strong {
+  font-size: 13px;
+}
+
+.shopper-status-row span {
+  color: #5c554c;
+  font-size: 12px;
+  text-align: right;
+}
+
+@media (max-width: 980px) {
+  .shopper-dashboard {
+    grid-template-columns:
+      155px
+      minmax(0, 1fr);
+  }
+
+  .shopper-sidebar {
+    padding: 12px;
+  }
+
+  .shopper-onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shopper-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .shopper-dashboard-body {
+    width: min(100% - 35px, 1170px);
+  }
+}
+
+@media (max-width: 700px) {
+  .shopper-dashboard {
+    display: block;
+  }
+
+  .shopper-sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .shopper-sidebar-logo {
+    min-height: 70px;
+  }
+
+  .shopper-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .shopper-logout-button {
+    margin-top: 18px;
+  }
+
+  .shopper-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .shopper-start-card,
+  .shopper-guide-card {
+    padding: 28px 22px;
+  }
+
+  .shopper-card-actions {
+    flex-direction: column;
+  }
+
+  .shopper-primary-button,
+  .shopper-secondary-button {
+    width: 100%;
+  }
+}

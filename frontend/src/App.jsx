@@ -1,122 +1,223 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import {
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
 
-function App() {
-  const [count, setCount] = useState(0)
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import ShopperDashboard from "./pages/ShopperDashboard";
+import GuestPage from "./pages/GuestPage";
+import CatalogPage from "./pages/CatalogPage";
 
+import "./App.css";
+
+function TemporaryPage({
+  title,
+  message,
+  returnTo = "/login",
+  returnLabel = "Return to Login",
+}) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-             <h1 className="...">Welcome to FitFusion</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main className="temporary-page">
+      <div>
+        <h1>{title}</h1>
 
-      <div className="ticks"></div>
+        <p>{message}</p>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        <a href={returnTo}>
+          {returnLabel}
+        </a>
+      </div>
+    </main>
+  );
 }
 
-export default App 
+function App() {
+  return (
+    <Routes>
+      {/* Default page */}
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
+      />
+
+      {/* Authentication */}
+      <Route
+        path="/login"
+        element={<LoginPage />}
+      />
+
+      <Route
+        path="/signup"
+        element={<SignupPage />}
+      />
+
+      <Route
+        path="/forgot-password"
+        element={
+          <TemporaryPage
+            title="Forgot Password"
+            message="Password recovery will be added next."
+          />
+        }
+      />
+
+      {/* Guest pages */}
+      <Route
+        path="/guest"
+        element={<GuestPage />}
+      />
+
+      <Route
+        path="/guest/fitting-studio"
+        element={
+          <TemporaryPage
+            title="Guest Fitting Studio"
+            message="Avatar customization is temporarily available during this guest session."
+            returnTo="/guest"
+            returnLabel="Return to Guest Dashboard"
+          />
+        }
+      />
+
+      <Route
+        path="/guest/avatar-presets"
+        element={
+          <TemporaryPage
+            title="Guest Avatar Presets"
+            message="One premade avatar is available for temporary use."
+            returnTo="/guest"
+            returnLabel="Return to Guest Dashboard"
+          />
+        }
+      />
+
+      <Route
+        path="/guest/catalog"
+        element={
+          <TemporaryPage
+            title="Guest Catalog"
+            message="You may browse products and recommendations, but saving and purchasing are locked."
+            returnTo="/guest"
+            returnLabel="Return to Guest Dashboard"
+          />
+        }
+      />
+
+      {/* Registered shopper pages */}
+      <Route
+        path="/shopper/dashboard"
+        element={<ShopperDashboard />}
+      />
+
+      <Route
+        path="/shopper/fitting-studio"
+        element={
+          <TemporaryPage
+            title="Fitting Studio"
+            message="Male and Female avatar customization will be added here."
+            returnTo="/shopper/dashboard"
+            returnLabel="Return to Shopper Dashboard"
+          />
+        }
+      />
+
+      <Route
+        path="/shopper/avatar-presets"
+        element={
+          <TemporaryPage
+            title="Avatar Presets"
+            message="One premade avatar preset is available."
+            returnTo="/shopper/dashboard"
+            returnLabel="Return to Shopper Dashboard"
+          />
+        }
+      />
+
+      {/* Functional registered shopper catalog */}
+      <Route
+        path="/shopper/catalog"
+        element={<CatalogPage />}
+      />
+
+      {/* Temporary destination when View Details is clicked */}
+      <Route
+        path="/shopper/products/:productId"
+        element={
+          <TemporaryPage
+            title="Product Details"
+            message="The complete product information, seller details, ratings, reviews, sizes, and purchasing options will appear here."
+            returnTo="/shopper/catalog"
+            returnLabel="Return to Catalog"
+          />
+        }
+      />
+
+      <Route
+        path="/shopper/saved-outfits"
+        element={
+          <TemporaryPage
+            title="Saved Outfits"
+            message="You have no saved outfits yet."
+            returnTo="/shopper/dashboard"
+            returnLabel="Return to Shopper Dashboard"
+          />
+        }
+      />
+
+      <Route
+        path="/shopper/cart"
+        element={
+          <TemporaryPage
+            title="Shopping Cart"
+            message="Your shopping cart is currently empty."
+            returnTo="/shopper/catalog"
+            returnLabel="Continue Shopping"
+          />
+        }
+      />
+
+      <Route
+        path="/shopper/account"
+        element={
+          <TemporaryPage
+            title="Account Management"
+            message="Your account management options will appear here."
+            returnTo="/shopper/dashboard"
+            returnLabel="Return to Shopper Dashboard"
+          />
+        }
+      />
+
+      {/* Seller pages */}
+      <Route
+        path="/seller/dashboard"
+        element={
+          <TemporaryPage
+            title="Seller Dashboard"
+            message="Seller management tools will be added here."
+          />
+        }
+      />
+
+      {/* Unknown URLs return to login */}
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
+      />
+    </Routes>
+  );
+}
+
+export default App;
