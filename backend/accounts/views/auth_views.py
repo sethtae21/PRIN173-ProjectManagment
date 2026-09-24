@@ -4,6 +4,7 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.db import transaction
 from django.shortcuts import redirect, render
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,6 +17,8 @@ from pymongo import MongoClient
 
 from ..models import User
 from ..serializers.auth_serializers import UserRegistrationSerializer
+from commerce.models import Cart, Order
+from outfits.models import Outfit
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +142,12 @@ class ProfileView(APIView):
             user.store_name = request.data.get('store_name', user.store_name)
         user.save()
         return Response({'detail': 'Profile updated successfully'})
+
+    def delete(self, request):
+        user = request.user
+        with transaction.atomic():
+            Cart.objects.filter(user=user).delete()
+            Order.objects.filter(user=user).delete()
+            Outfit.objects.filter(user=user).delete()
+            user.delete()
+        return Response({'detail': 'Account deleted successfully'}, status=status.HTTP_204_NO_CONTENT)

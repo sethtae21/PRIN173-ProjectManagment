@@ -35,3 +35,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             role=role,
             store_name=validated_data.get('store_name', '')
         )
+
+    def validate_email(self, value):
+        """Check if email already exists in the database."""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value

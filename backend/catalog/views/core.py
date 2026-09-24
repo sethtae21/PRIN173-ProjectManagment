@@ -1,187 +1,30 @@
 import csv
 import io
-import colorsys
-import uuid
 import os
 import logging
-import datetime
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.db import transaction
-from django.conf import settings
-from django.http import HttpResponse, JsonResponse
-from django.core.files.base import ContentFile
-from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
+from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status, viewsets, parsers, serializers
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework.permissions import AllowAny
+from accounts.permissions import IsSeller
 from PIL import Image
 from rembg import remove
 from bson.objectid import ObjectId
-from pymongo import MongoClient
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
-from accounts.views.auth_views import RegisterView, LoginView, LogoutView, ProfileView, CustomTokenRefreshView
-from accounts.models import User
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
-from accounts.serializers.auth_serializers import UserRegistrationSerializer
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
 
 # HIGH PRIORITY FIX: Setup Python logging module
 logger = logging.getLogger(__name__)
-
-# ==========================================
-# MongoDB Token Blacklist (Option B from Code Review)
-# Bypasses Django ORM to avoid SimpleJWT admin autodiscover crashes.
-# ==========================================
-try:
-    _mongo_client = MongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=2000)
-    _db = _mongo_client.get_database()
-    token_blacklist_collection = _db['token_blacklist']
-    # Create TTL index so expired tokens are automatically deleted by MongoDB
-    token_blacklist_collection.create_index("expires_at", expireAfterSeconds=0)
-except Exception as e:
-    logger.warning(f"Could not connect to MongoDB for token blacklist: {e}")
-    token_blacklist_collection = None
-
-def _mongo_blacklist(self):
-    """Custom blacklist method injected into SimpleJWT's RefreshToken"""
-    if token_blacklist_collection is None:
-        logger.warning("Token blacklist collection unavailable.")
-        return
-    jti = self['jti']
-    exp = self['exp']
-    token_blacklist_collection.update_one(
-        {'jti': jti},
-        {'$set': {'expires_at': datetime.datetime.fromtimestamp(exp, tz=datetime.timezone.utc)}},
-        upsert=True
-    )
-
-# Monkey-patch SimpleJWT so BLACKLIST_AFTER_ROTATION = True works without the official app
-RefreshToken.blacklist = _mongo_blacklist
-
-# ==========================================
-# Existing Function-Based Views (Preserved)
-# ==========================================
-def home(request):
-    return render(request, 'accounts/test_upload.html')
-
-def register_view(request):
-    if request.method == 'POST':
-        pass
-    return render(request, 'accounts/register.html')
-
-def login_view(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            return redirect('/')
-        else:
-            messages.error(request, 'Invalid username or password')
-    return render(request, 'accounts/login.html')
-
-@login_required
-def seller_dashboard(request):
-    return render(request, 'accounts/seller_dashboard.html')
-
-def logout_view(request):
-    logout(request)
-    return redirect('/')
-
-# ==========================================
-# DRF Views
-# ==========================================
-class RegisterView(APIView):
-    permission_classes = [AllowAny]
-    def post(self, request):
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'user': {
-                    'id': str(user.id), 'username': user.username, 'email': user.email,
-                    'role': user.role, 'store_name': user.store_name
-                },
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class LoginView(TokenObtainPairView):
-    pass
-
-class CustomTokenRefreshView(TokenRefreshView):
-    """
-    Overrides default token refresh to check our raw MongoDB blacklist.
-    """
-    def post(self, request, *args, **kwargs):
-        refresh_token_str = request.data.get('refresh')
-        if refresh_token_str and token_blacklist_collection is not None:
-            try:
-                token = RefreshToken(refresh_token_str)
-                jti = token['jti']
-                if token_blacklist_collection.find_one({'jti': jti}):
-                    raise InvalidToken('Token is blacklisted or has been rotated.')
-            except TokenError:
-                raise InvalidToken('Token is invalid or expired.')
-        
-        return super().post(request, *args, **kwargs)
-
-class LogoutView(APIView):
-    """
-    Secure logout using raw PyMongo collection (Option B from Code Review).
-    Bypasses SimpleJWT's incompatible ORM blacklist to satisfy RA 10173.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        try:
-            refresh_token_str = request.data.get("refresh")
-            if refresh_token_str:
-                token = RefreshToken(refresh_token_str)
-                token.blacklist() # Calls our monkey-patched _mongo_blacklist
-        except Exception as e:
-            logger.warning(f"Logout token blacklist error: {e}")
-        return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
-
-class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-    def get(self, request):
-        user = request.user
-        return Response({
-            'id': str(user.id), 'username': user.username, 'email': user.email,
-            'role': user.role, 'store_name': user.store_name,
-            'skin_tone': user.skin_tone, 'height': user.height,
-            'weight': user.weight, 'body_proportions': user.body_proportions
-        })
-    
-    def put(self, request):
-        user = request.user
-        user.skin_tone = request.data.get('skin_tone', user.skin_tone)
-        user.height = request.data.get('height', user.height)
-        user.weight = request.data.get('weight', user.weight)
-        user.body_proportions = request.data.get('body_proportions', user.body_proportions)
-        if user.role == 'seller':
-            user.store_name = request.data.get('store_name', user.store_name)
-        user.save()
-        return Response({'detail': 'Profile updated successfully'})
 
 # ==========================================
 # Catalog Validator Logic
@@ -427,7 +270,7 @@ def process_batch_background(batch_id):
 class CatalogViewSet(viewsets.ModelViewSet):
     queryset = CatalogItem.objects.filter(status='active')
     serializer_class = CatalogItemSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsSeller]
     
     def get_queryset(self):
         queryset = CatalogItem.objects.filter(status='active')
@@ -459,7 +302,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT},
         tags=['Catalog Upload']
     )
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    @action(detail=False, methods=['post'], permission_classes=[IsSeller], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def upload(self, request):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can upload catalog items'}, status=status.HTTP_403_FORBIDDEN)
@@ -562,7 +405,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
             'total_items': len(rows)
         }, status=status.HTTP_202_ACCEPTED)
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='batch-report')
+    @action(detail=False, methods=['get'], permission_classes=[IsSeller], url_path='batch-report')
     def batch_report(self, request):
         batch_id = request.query_params.get('batch_id')
         if not batch_id:
@@ -588,7 +431,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         responses={200: CatalogItemSerializer(many=True), 403: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get'], permission_classes=[IsSeller])
     def my_listings(self, request):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
@@ -603,7 +446,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         responses={200: CatalogItemSerializer, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    @action(detail=False, methods=['get'], permission_classes=[IsSeller], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_detail(self, request, item_id=None):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
@@ -622,7 +465,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         responses={200: CatalogItemSerializer, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
-    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsSeller], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_update(self, request, item_id=None):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
@@ -645,7 +488,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         responses={204: None, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
-    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated], url_path='my-listings/(?P<item_id>[^/.]+)')
+    @action(detail=False, methods=['delete'], permission_classes=[IsSeller], url_path='my-listings/(?P<item_id>[^/.]+)')
     def my_listing_delete(self, request, item_id=None):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
@@ -665,7 +508,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'download_template']:
             return [AllowAny()]
-        return [IsAuthenticated()]
+        return [IsSeller()]
 
 # ==========================================
 # Startup Sweep (run on app boot)
