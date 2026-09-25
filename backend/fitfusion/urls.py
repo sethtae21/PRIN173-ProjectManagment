@@ -11,6 +11,9 @@ urlpatterns = [
     # Accounts and catalog routes retain their original root prefixes.
     path('', include('accounts.urls')),
     path('', include('catalog.urls')),
+    
+    # KAN-101: In-app rating endpoints
+    path('ratings/', include('ratings.urls')),
 
     # Swagger API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

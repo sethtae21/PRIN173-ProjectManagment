@@ -184,6 +184,14 @@ def process_batch_background(batch_id):
             items = CatalogItem.objects.filter(batch_id=batch_id)
         
         for item in items:
+            # FIX: skip items already rejected at upload (preserve clear reasons,
+            # stop the cryptic "no file associated" crash from overwriting them)
+            if item.status == 'rejected':
+                rejected_count += 1
+                rejection_report[str(item.id)] = item.rejection_reasons or \
+                    ['Rejected at upload: missing image file(s)']
+                continue
+
             item_errors = []
             
             for img_field, view_name in [(item.front_image, 'Front'), (item.side_image, 'Side'), (item.rear_image, 'Rear')]:
@@ -359,6 +367,24 @@ class CatalogViewSet(viewsets.ModelViewSet):
         batch_id = str(batch.id)
         image_files = request.FILES.getlist('images')
         image_map = {img.name: img for img in image_files}
+        # FIX: stem(index without extension)+lowercase map so front.jpeg in the CSV
+        # binds to front.jpg on disk (kills the .jpeg/.jpg + case mismatch class of bug)
+        stem_map = {}
+        for img in image_files:
+            stem_map[os.path.splitext(img.name)[0].lower()] = img
+
+        def _resolve(csv_name, view_label):
+            """Return (uploaded_file_or_None, error_or_None)."""
+            csv_name = (csv_name or '').strip()
+            if not csv_name:
+                return None, f"{view_label}: CSV filename column is empty"
+            if csv_name in image_map:
+                return image_map[csv_name], None
+            stem = os.path.splitext(csv_name)[0].lower()
+            if stem in stem_map:
+                return stem_map[stem], None
+            return None, (f"{view_label}: '{csv_name}' not found among uploaded images "
+                          f"{[i.name for i in image_files]}")
 
         # Category mapping: CSV value → model choice
         category_map = {
@@ -393,17 +419,23 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     status='processing'
                 )
 
-                front_filename = row.get('front_image_filename', '').strip()
-                side_filename = row.get('side_image_filename', '').strip()
-                rear_filename = row.get('rear_image_filename', '').strip()
+                # FIX: attach via stem matcher; collect explicit missing reasons
+                missing_files = []
+                for field_name, csv_col, label in [
+                    ('front_image', 'front_image_filename', 'Front'),
+                    ('side_image',  'side_image_filename',  'Side'),
+                    ('rear_image',  'rear_image_filename',  'Rear'),
+                ]:
+                    fobj, err = _resolve(row.get(csv_col, ''), label)
+                    if err:
+                        missing_files.append(err)
+                        continue
+                    getattr(item, field_name).save(
+                        f"{batch_id}_{row_number}_{field_name}.jpg", fobj, save=False)
 
-                if front_filename in image_map:
-                    item.front_image.save(f"{batch_id}_{row_number}_front.jpg", image_map[front_filename], save=False)
-                if side_filename in image_map:
-                    item.side_image.save(f"{batch_id}_{row_number}_side.jpg", image_map[side_filename], save=False)
-                if rear_filename in image_map:
-                    item.rear_image.save(f"{batch_id}_{row_number}_rear.jpg", image_map[rear_filename], save=False)
-
+                if missing_files:
+                    item.status = 'rejected'
+                    item.rejection_reasons = missing_files
                 item.save()
             except Exception as e:
                 # FIX: Replaced print with logger.error
@@ -424,7 +456,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         batch_id = request.query_params.get('batch_id')
         if not batch_id:
             return Response({'error': 'Batch ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-
+        
         # Robust lookup: string id first, then ObjectId conversion
         batch = None
         try:
@@ -445,7 +477,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
             return Response(UploadBatchSerializer(batch).data)
         except Exception as e:
             # Fallback: manual ObjectId-safe payload (same fields the HTML test page reads)
-            # Prevents int(ObjectId) crash if serializer isn't fully patched
             logger.warning(f"Serializer fallback used for batch {batch_id}: {e}")
             return Response({
                 'id': str(batch.id),

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'outfits',
     'commerce',
     'recommendations',
+    'ratings',  # KAN-101: In-app rating endpoints
 ]
 
 MIDDLEWARE = [
@@ -158,4 +159,15 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Seller catalog upload and management API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# ==========================================
+# Cache Configuration (KAN-101: Guest session rating aggregates)
+# Uses local memory cache; in production, swap to Redis/Memcached
+# ==========================================
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'fitfusion-ratings',
+    }
 }
