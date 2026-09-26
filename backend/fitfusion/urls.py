@@ -11,6 +11,7 @@ urlpatterns = [
     # Accounts and catalog routes retain their original root prefixes.
     path('', include('accounts.urls')),
     path('', include('catalog.urls')),
+    path('', include('outfits.urls')),  # KAN-69 backend half (FR-5.4-5.8) -> /outfits/
     
     # KAN-101: In-app rating endpoints
     path('ratings/', include('ratings.urls')),
