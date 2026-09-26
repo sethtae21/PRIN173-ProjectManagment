@@ -80,9 +80,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fitfusion.wsgi.application'
 
-# ==========================================
-# Database: MongoDB Atlas (SRS §5.2)
-# ==========================================
+# KAN-93: the localhost default is DEV-ONLY. A missing .env MONGODB_URI makes the
+# app silently talk to localhost; db_ping and /health REFUSE to report a green
+# ping against local (see accounts/health_utils.resolve_target). Live/demo must
+# set MONGODB_URI to the +srv URI from .env.example (with the hardening params).
 MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/fitfusion')
 DATABASES = {
     'default': {
