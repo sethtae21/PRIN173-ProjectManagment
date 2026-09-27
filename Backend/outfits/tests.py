@@ -148,13 +148,24 @@ class OutfitAPITests(TestCase):
         self.assertEqual(got.status_code, 200)               # row survived server-side
         self.assertEqual(got.data['name'], 'S')
 
-    # ---- FR-1.4 / RA-10173 cascade (KAN-56 erasure reaches outfits) ---------
+      # ---- FR-1.4 / RA-10173 cascade (KAN-56 erasure reaches outfits) ---------
     def test_account_deletion_cascades_outfits(self):
         x = self._make_item(self.alice)
         self.c.force_authenticate(self.alice)
-        self.c.post('/outfits/', {'name': 'C', 'items': [str(x.pk)]}, format='json')
-        self.assertEqual(Outfit.objects.filter(user=self.alice).count(), 1)
+        res = self.c.post('/outfits/', {'name': 'C', 'items': [str(x.pk)]}, format='json')
+        
+        # 1. Capture IDs as STRINGS before delete
+        uid = str(self.alice.pk)
+        oid = str(res.data['id'])
+        
+        self.assertEqual(Outfit.objects.filter(user__pk=uid).count(), 1)
+        
+        # 2. Delete the user (triggers CASCADE)
         self.alice.delete()
-        self.assertEqual(Outfit.objects.filter(user=self.alice).count(), 0)
-        x.refresh_from_db()
-        self.assertEqual(x.outfits.count(), 0)               # join rows gone too
+        
+        # 3. Assert via those string IDs (avoiding the dead in-memory self.alice object)
+        self.assertEqual(Outfit.objects.filter(id=oid).count(), 0)
+        
+        # 4. Verify the M2M through-table has zero orphan rows for that outfit
+        OutfitItemThrough = Outfit.items.through
+        self.assertEqual(OutfitItemThrough.objects.filter(outfit_id=oid).count(), 0)
