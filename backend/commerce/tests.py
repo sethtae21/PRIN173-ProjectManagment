@@ -54,6 +54,11 @@ class CommerceAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['item_count'], 2)
         self.assertEqual(Decimal(response.data['total_amount']), Decimal('99.90'))
+        cart_item = response.data['items'][0]
+        self.assertEqual(cart_item['name'], 'Blue Jacket')
+        self.assertEqual(cart_item['store_name'], 'Test Store')
+        self.assertEqual(cart_item['quantity'], 2)
+        self.assertEqual(Decimal(cart_item['price']), Decimal('49.95'))
 
         response = self.client.patch(
             '/cart/update_quantity/',
@@ -78,13 +83,21 @@ class CommerceAPITests(TestCase):
 
     def test_guest_rejected_from_cart_and_checkout(self):
         self.client.force_authenticate(None)
-        self.assertIn(self.client.get('/cart/').status_code, (401, 403))
-        response = self.client.post(
-            '/checkout/',
-            {'shipping_address': '1 Test Street', 'payment_method': 'card'},
-            format='json',
+        payload = {'catalog_item': str(self.item.pk), 'quantity': 1}
+        requests = (
+            self.client.get('/cart/'),
+            self.client.post('/cart/add_item/', payload, format='json'),
+            self.client.patch('/cart/update_quantity/', payload, format='json'),
+            self.client.delete('/cart/remove_item/', payload, format='json'),
+            self.client.delete('/cart/clear/', {}, format='json'),
+            self.client.post(
+                '/checkout/',
+                {'shipping_address': '1 Test Street', 'payment_method': 'card'},
+                format='json',
+            ),
         )
-        self.assertIn(response.status_code, (401, 403))
+        for response in requests:
+            self.assertIn(response.status_code, (401, 403))
 
     def test_checkout_approval_snapshots_and_clears_cart(self):
         CartItem.objects.create(
