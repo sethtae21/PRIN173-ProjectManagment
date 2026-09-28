@@ -328,6 +328,8 @@ class TestSuiteNonVacuous(unittest.TestCase):
 # --- integration (needs DB; tolerant of empty catalog) ----------------------
 from django.test import TestCase  # noqa: E402
 from rest_framework.test import APIClient  # noqa: E402
+from accounts.models import User  # noqa: E402
+from catalog.models import CatalogItem  # noqa: E402
 
 
 class TestEndpointSmoke(TestCase):
@@ -343,3 +345,42 @@ class TestEndpointSmoke(TestCase):
         self.assertEqual(res.data["weights_version"], WEIGHTS_VERSION)
         self.assertEqual(set(res.data["weights"].keys()), set(RULE_ORDER))
         self.assertIsInstance(res.data["recommendations"], list)
+
+
+class TestActiveItemFilter(TestCase):
+    def test_only_active_catalog_items_are_recommended(self):
+        seller = User.objects.create_user(
+            username="kan111-seller", password="Test123!@#", role="seller"
+        )
+        item_fields = {
+            "description": "Recommendation filter regression fixture.",
+            "category": "tops",
+            "size": "M",
+            "color": "Red",
+            "color_description": "Dark red",
+            "color_family": "red",
+            "price": "19.99",
+            "seller": seller,
+            "store_name": "KAN-111 Test Store",
+        }
+        names_by_status = {
+            "active": "KAN-111 active item",
+            "rejected": "KAN-111 rejected item",
+            "processing": "KAN-111 processing item",
+        }
+        for item_status, item_name in names_by_status.items():
+            CatalogItem.objects.create(
+                **item_fields, name=item_name, status=item_status
+            )
+
+        response = APIClient().get(
+            "/api/recommendations/", {"height_cm": 170, "limit": 50}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        recommendations = response.data["recommendations"]
+        self.assertIsInstance(recommendations, list)
+        recommended_names = {entry["item"] for entry in recommendations}
+        self.assertIn(names_by_status["active"], recommended_names)
+        self.assertNotIn(names_by_status["rejected"], recommended_names)
+        self.assertNotIn(names_by_status["processing"], recommended_names)

@@ -55,9 +55,7 @@ class RecommendationListView(APIView):
             occasion_tags=_as_tuple(request.query_params.get("occasions", "")),
         )
         limit = int(_as_float(request.query_params.get("limit"), 10))
-        # TODO(Carlos): restrict to published items using the real status field
-        # in catalog/models.py, e.g. CatalogItem.objects.filter(status="active")
-        items = [_item_profile(i) for i in CatalogItem.objects.all()]
+        items = [_item_profile(i) for i in CatalogItem.objects.filter(status="active")]
         ranked = rank_items(avatar, items, limit=limit)
         return Response({
             "weights_version": WEIGHTS_VERSION,
