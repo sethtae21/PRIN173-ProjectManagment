@@ -2,18 +2,30 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
 
 # FIX: Corrected typo from `file` to `__file__`
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fitfusion-dev-secret-key-2026')
+# DEBUG defaults to False; local development must opt in explicitly.
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# CRITICAL FIX: DEBUG defaults to False in production to prevent sensitive error exposure
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if SECRET_KEY in ('', 'change-me-in-real-env'):
+    if DEBUG:
+        SECRET_KEY = 'fitfusion-local-development-only-key'
+    else:
+        raise ImproperlyConfigured('Set DJANGO_SECRET_KEY to a unique secret outside DEBUG mode.')
 
-ALLOWED_HOSTS = ['*'] # Note: Restrict to specific domains in production deployment
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        'DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver'
+    ).split(',')
+    if host.strip()
+]
 
 # ==========================================
 # MongoDB Compatibility Layer
@@ -84,7 +96,14 @@ WSGI_APPLICATION = 'fitfusion.wsgi.application'
 # app silently talk to localhost; db_ping and /health REFUSE to report a green
 # ping against local (see accounts/health_utils.resolve_target). Live/demo must
 # set MONGODB_URI to the +srv URI from .env.example (with the hardening params).
-MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/fitfusion')
+MONGODB_URI = os.environ.get('MONGODB_URI', '')
+if not MONGODB_URI:
+    if DEBUG:
+        MONGODB_URI = 'mongodb://localhost:27017/fitfusion'
+    else:
+        raise ImproperlyConfigured('Set MONGODB_URI to the Atlas connection URI outside DEBUG mode.')
+if not DEBUG and not MONGODB_URI.lower().startswith('mongodb+srv://'):
+    raise ImproperlyConfigured('Staging must use an Atlas mongodb+srv URI so TLS is enabled.')
 DATABASES = {
     'default': {
         'ENGINE': 'django_mongodb_backend',
@@ -142,18 +161,34 @@ SIMPLE_JWT = {
 # ==========================================
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',  # Vite dev server
-    'http://localhost:3000',  # React dev server
-    'https://your-production-domain.com',  # TODO: Add actual production domain before deploy
+    origin.strip()
+    for origin in os.environ.get(
+        'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000'
+    ).split(',')
+    if origin.strip()
 ]
 
 # Allow all origins only in local development
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 
+SECURE_SSL_REDIRECT = os.environ.get(
+    'SECURE_SSL_REDIRECT', 'False' if DEBUG else 'True'
+).lower() in ('true', '1', 'yes')
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = int(os.environ.get('GUEST_SESSION_TTL', '3600'))
+GUEST_SESSION_TTL = SESSION_COOKIE_AGE
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
+if os.environ.get('TRUST_PROXY_SSL_HEADER', 'False').lower() in ('true', '1', 'yes'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 MAX_BATCH_ITEMS = 10
 MAX_WORKERS = 2
 BATCH_PROCESSING_TIMEOUT_MINUTES = 10
+REMBG_MODEL = os.environ.get('REMBG_MODEL', 'u2netp')
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'FitFusion AI API',

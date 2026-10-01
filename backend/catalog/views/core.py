@@ -1,10 +1,13 @@
 import csv
+import colorsys
 import io
 import os
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
+from zipfile import ZIP_DEFLATED, ZipFile
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
@@ -15,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from accounts.permissions import IsSeller
 from PIL import Image
-from rembg import remove
+from rembg import new_session, remove
 from bson.objectid import ObjectId
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -26,6 +29,27 @@ from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
 
 logger = logging.getLogger(__name__)
+UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
+IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS * 3)
+
+CATALOG_TEMPLATE_CSV = (
+    '"INSTRUCTIONS: Fill out the columns below. Type your photo filenames in the last 3 columns.",,,,,,,,,,,,\n'
+    ',,,,,,,,,,,,\n'
+    'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
+    'Classic White Shirt,"A comfortable shirt.",tops,M,White,Pure White,Neutral,15.99,"casual, minimalist","everyday, summer",front.jpeg,side.jpeg,rear.jpeg\n'
+)
+SELLER_IMAGE_GUIDELINES = (
+    'FitFusion AI Seller Catalog Upload Guidelines\n\n'
+    'Upload exactly three clear garment photographs per item: Front, Side, and Rear. '
+    'Photograph the garment laid flat or on a mannequin against a plain, contrasting background.\n'
+    'Each image must be at least 800 x 800 pixels and no larger than 5 MB. '
+    'Use static JPG, PNG, or WEBP images; animated images are not accepted.\n'
+    'Enter each uploaded filename in the matching CSV view column. The spelling must match; '
+    'the file extension may differ when the base filename is the same.\n'
+    'Declare the garment color accurately. The backend removes the background and checks '
+    'the front image color automatically; you do not need to remove the background yourself.\n'
+    'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
+)
 
 # ==========================================
 # Catalog Validator Logic
@@ -47,59 +71,64 @@ class CatalogValidator:
             if field not in row or not str(row[field]).strip():
                 errors.append(f"Row {row_number}: Missing required field '{field}'")
         
-        if 'price' in row:
+        if row.get('price'):
             try:
-                if float(row['price']) <= 0:
+                price = Decimal(str(row['price']))
+                if not price.is_finite() or price <= 0:
                     errors.append(f"Row {row_number}: Price must be positive")
-            except ValueError:
+            except (InvalidOperation, ValueError):
                 errors.append(f"Row {row_number}: Invalid price format")
         
         valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear', 'footwear']
-        if 'category' in row and str(row['category']).lower() not in valid_categories:
+        category = str(row.get('category', '')).strip().lower()
+        if category == 'dresses/one-piece':
+            category = 'dresses'
+        if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
         
         return len(errors) == 0, errors
     
     def validate_image_format(self, image_file):
         try:
-            img = Image.open(image_file)
-            format_upper = img.format.upper() if img.format else ''
-            if format_upper == 'GIF':
-                return False, "GIF files are not allowed. Please use static images only."
-            if format_upper not in self.ALLOWED_FORMATS:
-                return False, f"Unsupported format: {format_upper}. Only JPG, PNG, and WEBP are allowed."
-            if format_upper in ['PNG', 'WEBP']:
-                try:
-                    img.seek(1)
-                    return False, f"Animated {format_upper} files are not allowed."
-                except EOFError:
-                    pass
+            image_file.seek(0)
+            with Image.open(image_file) as img:
+                format_upper = img.format.upper() if img.format else ''
+                if format_upper == 'GIF':
+                    return False, "GIF files are not allowed. Please use static images only."
+                if format_upper not in self.ALLOWED_FORMATS:
+                    return False, f"Unsupported format: {format_upper}. Only JPG, PNG, and WEBP are allowed."
+                if format_upper in ['PNG', 'WEBP']:
+                    try:
+                        img.seek(1)
+                        return False, f"Animated {format_upper} files are not allowed."
+                    except EOFError:
+                        pass
             return True, None
         except Exception as e:
             return False, f"Invalid or corrupted image: {str(e)}"
 
     def check_image_dimensions(self, image_file):
         try:
+            image_file.seek(0)
             with Image.open(image_file) as img:
                 width, height = img.size
                 if width < self.MIN_IMAGE_DIMENSION or height < self.MIN_IMAGE_DIMENSION:
                     return False, f"Image too small ({width}x{height}). Minimum is {self.MIN_IMAGE_DIMENSION}x{self.MIN_IMAGE_DIMENSION}."
-                if width > self.MAX_IMAGE_DIMENSION or height > self.MAX_IMAGE_DIMENSION:
-                    return False, f"Image too large ({width}x{height}). Maximum is {self.MAX_IMAGE_DIMENSION}x{self.MAX_IMAGE_DIMENSION}."
                 return True, None
         except Exception as e:
             return False, f"Invalid or corrupted image: {str(e)}"
     
-    def process_image_with_rembg(self, image_file):
+    def process_image_with_rembg(self, image_file, session=None):
         try:
             img_data = image_file.read()
-            output = remove(img_data)
+            output = remove(img_data, session=session) if session else remove(img_data)
             img = Image.open(io.BytesIO(output))
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
             alpha_channel = img.split()[3]
-            if alpha_channel.getbbox() is None:
-                raise Exception("No transparency detected after background removal.")
+            alpha_min, alpha_max = alpha_channel.getextrema()
+            if alpha_min == 255 or alpha_max == 0:
+                raise ValueError("Background removal did not produce a valid transparent image.")
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr.seek(0)
@@ -129,17 +158,28 @@ class CatalogValidator:
     
     def validate_color_alignment(self, declared_color, dominant_hex):
         color_map = {
-            'red': ['#ff', '#dc', '#e0'], 'blue': ['#00', '#1e', '#41'],
-            'green': ['#00', '#22', '#2e'], 'black': ['#00', '#1a', '#2f'],
-            'white': ['#ff', '#fa', '#f0', '#f5', '#f8', '#ed', '#ee', '#ef', '#dc', '#d3'], 
-            'gray': ['#80', '#a9', '#c0', '#69', '#77', '#70', '#80', '#88', '#8b', '#99', '#a0', '#a8', '#aa', '#b0', '#b8', '#c0', '#c8', '#d0', '#d3', '#d8', '#dc', '#e0', '#e5', '#e8', '#ea', '#ed', '#ee', '#f0', '#f5'],
-            'brown': ['#65', '#8b', '#a0'],
+            'red': lambda h, s, v: (h <= 0.06 or h >= 0.94) and s >= 0.35,
+            'blue': lambda h, s, v: 0.54 <= h <= 0.75 and s >= 0.3,
+            'green': lambda h, s, v: 0.2 <= h <= 0.46 and s >= 0.25,
+            'black': lambda h, s, v: v <= 0.22,
+            'white': lambda h, s, v: v >= 0.78 and s <= 0.2,
+            'gray': lambda h, s, v: s <= 0.2 and 0.2 < v < 0.85,
+            'brown': lambda h, s, v: 0.035 <= h <= 0.13 and s >= 0.25 and 0.12 < v < 0.62,
         }
         declared_lower = str(declared_color).lower()
-        for color_name, hex_prefixes in color_map.items():
-            if color_name in declared_lower:
-                if not any(dominant_hex.startswith(prefix) for prefix in hex_prefixes):
-                    return False, f"Color mismatch: declared '{declared_color}' but image appears to be different color ({dominant_hex})"
+        declared_colors = [name for name in color_map if name in declared_lower]
+        if not declared_colors:
+            return True, 'Color alignment OK'
+        try:
+            red, green, blue = (
+                int(dominant_hex[index:index + 2], 16) / 255
+                for index in (1, 3, 5)
+            )
+            hsv = colorsys.rgb_to_hsv(red, green, blue)
+        except (ValueError, TypeError):
+            return False, f"Invalid dominant color value: {dominant_hex}"
+        if not any(color_map[name](*hsv) for name in declared_colors):
+            return False, f"Color mismatch: declared '{declared_color}' but image appears to be different color ({dominant_hex})"
         return True, "Color alignment OK"
     
     def generate_color_palette_tags(self, dominant_hex, color_family):
@@ -164,6 +204,7 @@ def process_batch_background(batch_id):
         batch.save()
         
         validator = CatalogValidator()
+        rembg_session = None
         accepted_count = 0
         rejected_count = 0
         rejection_report = {}
@@ -182,27 +223,43 @@ def process_batch_background(batch_id):
 
             item_errors = []
             front_color = "#000000"
-            
-            # Process ALL THREE views with rembg and save the transparent PNGs
+            image_jobs = {}
             for field_name, view_label in [('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear')]:
                 img_field = getattr(item, field_name, None)
                 if img_field:
-                    try:
-                        img_field.seek(0)
-                        processed_bytes = validator.process_image_with_rembg(img_field)
-                        # Save the processed transparent PNG back to the model field
-                        processed_file = ContentFile(processed_bytes.read(), name=f"{item.id}_{field_name}.png")
-                        getattr(item, field_name).save(processed_file.name, processed_file, save=False)
-                        
-                        # Extract color from front image only for alignment check
-                        if field_name == 'front_image':
-                            processed_bytes.seek(0)
-                            front_color = validator.extract_dominant_color(processed_bytes)
-                            color_valid, color_msg = validator.validate_color_alignment(item.color, front_color)
-                            if not color_valid:
-                                item_errors.append(color_msg)
-                    except Exception as e:
-                        item_errors.append(f"{view_label} processing failed: {str(e)}")
+                    img_field.seek(0)
+                    if rembg_session is None:
+                            rembg_session = new_session(settings.REMBG_MODEL)
+                    image_jobs[field_name] = (
+                        view_label,
+                        img_field.name,
+                        IMAGE_PROCESS_EXECUTOR.submit(
+                            validator.process_image_with_rembg, img_field, rembg_session
+                        ),
+                    )
+
+            # The same initialized model session is safe to reuse for concurrent view inference.
+            for field_name, (view_label, original_name, future) in image_jobs.items():
+                try:
+                    processed_bytes = future.result()
+                    processed_file = ContentFile(
+                        processed_bytes.read(), name=f"{item.id}_{field_name}.png"
+                    )
+                    image_field = getattr(item, field_name)
+                    image_field.save(processed_file.name, processed_file, save=False)
+                    if original_name:
+                        image_field.storage.delete(original_name)
+
+                    if field_name == 'front_image':
+                        processed_bytes.seek(0)
+                        front_color = validator.extract_dominant_color(processed_bytes)
+                        color_valid, color_msg = validator.validate_color_alignment(
+                            item.color, front_color
+                        )
+                        if not color_valid:
+                            item_errors.append(color_msg)
+                except Exception as e:
+                    item_errors.append(f"{view_label} processing failed: {str(e)}")
             
             if item_errors:
                 rejection_report[str(item.id)] = item_errors
@@ -267,19 +324,29 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if store := self.request.query_params.get('store'):
             queryset = queryset.filter(store_name__icontains=store)
         if style := self.request.query_params.get('style'):
-            queryset = queryset.filter(style_tags__icontains=style)
+            style_query = style.strip().casefold()
+            queryset = [
+                item for item in queryset
+                if isinstance(item.style_tags, list)
+                and any(style_query in str(tag).casefold() for tag in item.style_tags)
+            ]
         return queryset
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-template')
     def download_template(self, request):
-        csv_content = (
-            '"INSTRUCTIONS: Fill out the columns below. Type your photo filenames in the last 3 columns.",,,,,,,,,,,,\n'
-            ',,,,,,,,,,,,\n'
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
-            'Classic White Shirt,"A comfortable shirt.",tops,M,White,Pure White,Neutral,15.99,"casual, minimalist","everyday, summer",front.jpeg,side.jpeg,rear.jpeg\n'
-        )
+        csv_content = CATALOG_TEMPLATE_CSV
         response = HttpResponse(csv_content, content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="fitfusion_catalog_template.csv"'
+        return response
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-package')
+    def download_package(self, request):
+        archive = io.BytesIO()
+        with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as package:
+            package.writestr('fitfusion_catalog_template.csv', CATALOG_TEMPLATE_CSV)
+            package.writestr('seller_image_guidelines.txt', SELLER_IMAGE_GUIDELINES)
+        response = HttpResponse(archive.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="fitfusion_seller_upload_package.zip"'
         return response
 
     @extend_schema(
@@ -306,11 +373,15 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
         csv_content = csv_file.read().decode('utf-8')
         lines = csv_content.splitlines()
-        header_index = 0
+        header_index = None
         for i, line in enumerate(lines):
-            if 'name' in line or 'item_name' in line:
+            columns = {value.strip().lower() for value in next(csv.reader([line]), [])}
+            if {'category', 'front_image_filename', 'side_image_filename', 'rear_image_filename'} <= columns:
                 header_index = i
                 break
+
+        if header_index is None:
+            return Response({'error': 'CSV header row is missing required columns.'}, status=status.HTTP_400_BAD_REQUEST)
 
         data_lines = lines[header_index:]
         reader = csv.DictReader(data_lines)
@@ -352,6 +423,27 @@ class CatalogViewSet(viewsets.ModelViewSet):
             try:
                 item_name = row.get('name', row.get('item_name', '')).strip()
                 raw_category = str(row.get('category', '')).strip().lower()
+                _, item_errors = CatalogValidator().validate_csv_row(row, row_number)
+                resolved_images = {}
+                for field_name, csv_col, label in [('front_image', 'front_image_filename', 'Front'), ('side_image', 'side_image_filename', 'Side'), ('rear_image', 'rear_image_filename', 'Rear')]:
+                    image_file, error = _resolve(row.get(csv_col, ''), label)
+                    if error:
+                        item_errors.append(error)
+                        continue
+                    format_valid, format_error = CatalogValidator().validate_image_format(image_file)
+                    dimensions_valid, dimensions_error = CatalogValidator().check_image_dimensions(image_file)
+                    if not format_valid:
+                        item_errors.append(f"{label}: {format_error}")
+                    if not dimensions_valid:
+                        item_errors.append(f"{label}: {dimensions_error}")
+                    resolved_images[field_name] = image_file
+
+                try:
+                    price = Decimal(str(row.get('price', '0')))
+                    if not price.is_finite():
+                        price = Decimal('0.00')
+                except (InvalidOperation, ValueError):
+                    price = Decimal('0.00')
                 
                 item = CatalogItem.objects.create(
                     name=item_name, description=row.get('description', ''),
@@ -359,30 +451,23 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     size=row.get('size', ''), color=row.get('color', ''),
                     color_description=row.get('color_description', ''),
                     color_family=row.get('color_family', ''),
-                    price=float(row.get('price', 0)),
+                    price=price,
                     style_tags=[tag.strip() for tag in str(row.get('style_tags', '')).split(',') if tag.strip()],
                     occasion_tags=[tag.strip() for tag in str(row.get('occasion_tags', '')).split(',') if tag.strip()],
                     seller=request.user, store_name=request.user.store_name or "Unknown Store",
-                    batch=batch, status='processing'
+                    batch=batch, status='rejected' if item_errors else 'processing',
+                    rejection_reasons=item_errors
                 )
 
-                missing_files = []
-                for field_name, csv_col, label in [('front_image', 'front_image_filename', 'Front'), ('side_image', 'side_image_filename', 'Side'), ('rear_image', 'rear_image_filename', 'Rear')]:
-                    fobj, err = _resolve(row.get(csv_col, ''), label)
-                    if err:
-                        missing_files.append(err)
-                        continue
-                    getattr(item, field_name).save(f"{batch_id}_{row_number}_{field_name}.jpg", fobj, save=False)
-
-                if missing_files:
-                    item.status = 'rejected'
-                    item.rejection_reasons = missing_files
+                if not item_errors:
+                    for field_name, image_file in resolved_images.items():
+                        image_file.seek(0)
+                        getattr(item, field_name).save(f"{batch_id}_{row_number}_{field_name}.jpg", image_file, save=False)
                 item.save()
             except Exception as e:
                 logger.error(f"Error processing row {row_number}: {e}", exc_info=True)
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(process_batch_background, batch_id)
+        UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
 
         return Response({
             'batch_id': batch_id, 'status': 'processing',
@@ -431,19 +516,81 @@ class CatalogViewSet(viewsets.ModelViewSet):
             return Response(CatalogItemSerializer(item).data)
         
         elif request.method in ['PUT', 'PATCH']:
-            allowed_fields = ['name', 'description', 'price', 'style_tags', 'occasion_tags']
-            for field in allowed_fields:
-                if field in request.data:
-                    setattr(item, field, request.data[field])
-            item.save()
+            image_fields = ('front_image', 'side_image', 'rear_image')
+            payload = request.data.copy()
+            replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
+            for field in image_fields:
+                payload.pop(field, None)
+
+            serializer = CatalogItemSerializer(
+                item, data=payload, partial=request.method == 'PATCH'
+            )
+            serializer.is_valid(raise_exception=True)
+            validator = CatalogValidator()
+            processed_images = {}
+            for field, image_file in replacement_images.items():
+                if image_file.size > validator.MAX_FILE_SIZE_BYTES:
+                    return Response({field: 'Image must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+                format_valid, format_error = validator.validate_image_format(image_file)
+                dimensions_valid, dimensions_error = validator.check_image_dimensions(image_file)
+                if not format_valid or not dimensions_valid:
+                    return Response({field: format_error or dimensions_error}, status=status.HTTP_400_BAD_REQUEST)
+                image_file.seek(0)
+                try:
+                    processed_images[field] = validator.process_image_with_rembg(image_file)
+                except Exception as error:
+                    return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+            needs_palette_update = (
+                'color_family' in serializer.validated_data
+                or 'color' in serializer.validated_data
+                or 'front_image' in processed_images
+            )
+            front_color = None
+            if needs_palette_update:
+                front_image = processed_images.get('front_image') or item.front_image
+                if front_image:
+                    front_image.seek(0)
+                    front_color = validator.extract_dominant_color(front_image)
+                    declared_color = serializer.validated_data.get('color', item.color)
+                    if 'front_image' in processed_images or 'color' in serializer.validated_data:
+                        color_valid, color_message = validator.validate_color_alignment(
+                            declared_color, front_color
+                        )
+                        if not color_valid:
+                            return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
+
+            updated = serializer.save()
+            old_image_names = {
+                field: getattr(item, field).name for field in processed_images
+            }
+            for field, processed_bytes in processed_images.items():
+                processed_bytes.seek(0)
+                getattr(updated, field).save(
+                    f"{updated.id}_{field}.png",
+                    ContentFile(processed_bytes.read()),
+                    save=False,
+                )
+                old_name = old_image_names.get(field)
+                if old_name:
+                    getattr(updated, field).storage.delete(old_name)
+            if needs_palette_update and front_color is not None:
+                updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
+                    front_color, updated.color_family
+                )
+            updated.save()
             return Response(CatalogItemSerializer(item).data)
         
         elif request.method == 'DELETE':
+            for field in ('front_image', 'side_image', 'rear_image'):
+                image = getattr(item, field)
+                if image:
+                    image.delete(save=False)
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
     
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'download_template']:
+        if self.action in ['list', 'retrieve', 'download_template', 'download_package']:
             return [AllowAny()]
         return [IsSeller()]
 

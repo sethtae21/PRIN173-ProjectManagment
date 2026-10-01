@@ -1,4 +1,6 @@
 from django.test import TestCase
+from django.contrib.sessions.models import Session
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from accounts.models import User
@@ -57,7 +59,22 @@ class RatingAPITests(TestCase):
         self.assertFalse(res.data['persisted'])
         self.assertEqual(res.data['prompt'], 'signup_login')
         self.assertEqual(Rating.objects.count(), 0)
+        self.assertEqual(Session.objects.count(), 0)
         self.assertEqual(res.data['session_aggregate']['like_count'], 1)
+
+    def test_guest_session_clear_discards_cached_aggregates(self):
+        self.client.post('/ratings/', {**self.t, 'vote': 'like'}, format='json')
+        session_key = self.client.session.session_key
+        guest_key = f"guest_rating:{session_key}:item:{self.t['target_id']}"
+        self.assertIsNotNone(cache.get(guest_key))
+
+        clear_response = self.client.post('/ratings/guest-session/clear/')
+
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertTrue(clear_response.data['cleared'])
+        self.assertIsNone(cache.get(guest_key))
+        self.assertEqual(Rating.objects.count(), 0)
+        self.assertEqual(Session.objects.count(), 0)
 
     def test_owner_only_update_delete(self):
         self.client.force_authenticate(self.user)

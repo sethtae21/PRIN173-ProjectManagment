@@ -12,16 +12,30 @@ from .serializers import RatingSerializer, RatingSummarySerializer
 
 logger = logging.getLogger(__name__)
 
-GUEST_TTL = getattr(settings, 'SESSION_COOKIE_AGE', 1209600)
-_MISSING = object()
+GUEST_TTL = getattr(settings, 'GUEST_SESSION_TTL', 3600)
 
 
-def _guest_key(request, target_type, target_id):
+def _guest_index_key(session_key):
+    return f'guest_rating_keys:{session_key}'
+
+
+def _guest_key(request, target_type, target_id, create=True):
     key = request.session.session_key
     if not key:
+        if not create:
+            return None
         request.session.create()
         key = request.session.session_key
     return f"guest_rating:{key}:{target_type}:{target_id}"
+
+
+def _track_guest_key(request, guest_key):
+    session_key = request.session.session_key
+    index_key = _guest_index_key(session_key)
+    guest_keys = cache.get(index_key) or []
+    if guest_key not in guest_keys:
+        guest_keys.append(guest_key)
+    cache.set(index_key, guest_keys, GUEST_TTL)
 
 
 def _empty_session_agg():
@@ -50,6 +64,7 @@ class RatingSubmitView(APIView):
         # ---------- GUEST PATH ----------
         if not request.user.is_authenticated:
             key = _guest_key(request, target_type, target_id)
+            _track_guest_key(request, key)
             agg = cache.get(key) or _empty_session_agg()
             if score is not None:
                 agg['score_count'] += 1
@@ -115,7 +130,8 @@ class RatingSummaryView(APIView):
         g_score_count = g_avg = 0.0
         g_like = g_dislike = 0
         if not request.user.is_authenticated:
-            agg = cache.get(_guest_key(request, target_type, target_id))
+            key = _guest_key(request, target_type, target_id, create=False)
+            agg = cache.get(key) if key else None
             if agg:
                 g_score_count = agg['score_count']
                 g_avg = round(agg['score_sum'] / g_score_count, 2) if g_score_count else 0.0
@@ -134,7 +150,23 @@ class RatingSummaryView(APIView):
             'guest_session_like_count': g_like,
             'guest_session_dislike_count': g_dislike,
         }
-        return Response(RatingSummarySerializer(data=data).data)
+        return Response(RatingSummarySerializer(data).data)
+
+
+class GuestSessionClearView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            return Response({'cleared': False}, status=status.HTTP_200_OK)
+
+        session_key = request.session.session_key
+        if session_key:
+            index_key = _guest_index_key(session_key)
+            guest_keys = cache.get(index_key) or []
+            cache.delete_many([*guest_keys, index_key])
+            request.session.flush()
+        return Response({'cleared': True}, status=status.HTTP_200_OK)
 
 
 class MyRatingsView(APIView):

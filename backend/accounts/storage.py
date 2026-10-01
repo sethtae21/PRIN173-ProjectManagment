@@ -66,7 +66,10 @@ class GridFSStorage(Storage):
         self._setup()
         if self._use_gridfs:
             try:
-                file = self._fs.find_one({'filename': name})
+                from bson.objectid import ObjectId
+                file = self._fs.find_one({'_id': ObjectId(name)}) if ObjectId.is_valid(name) else None
+                if file is None:
+                    file = self._fs.find_one({'filename': name})
                 if file:
                     self._fs.delete(file._id)
             except Exception:

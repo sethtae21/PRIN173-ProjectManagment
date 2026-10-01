@@ -30,7 +30,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
     def get_cart(self):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
-        return cart
+        return Cart.objects.prefetch_related('items__item').get(pk=cart.pk)
 
     @extend_schema(responses=CartSerializer)
     def list(self, request):
@@ -52,7 +52,7 @@ class CartViewSet(viewsets.GenericViewSet):
         if not created:
             cart_item.quantity += quantity
             cart_item.save(update_fields=('quantity',))
-        return Response(self.get_serializer(cart).data, status=status.HTTP_200_OK)
+        return Response(self.get_serializer(self.get_cart()).data, status=status.HTTP_200_OK)
 
     @extend_schema(request=UpdateCartItemSerializer, responses=CartSerializer)
     @action(detail=False, methods=('patch', 'put'), url_path='update_quantity')
@@ -65,7 +65,7 @@ class CartViewSet(viewsets.GenericViewSet):
         cart_item = get_object_or_404(CartItem, cart=cart, item=item)
         cart_item.quantity = input_serializer.validated_data['quantity']
         cart_item.save(update_fields=('quantity',))
-        return Response(self.get_serializer(cart).data)
+        return Response(self.get_serializer(self.get_cart()).data)
 
     @extend_schema(request=AddToCartSerializer, responses=CartSerializer)
     @action(detail=False, methods=('delete', 'post'), url_path='remove_item')
@@ -79,7 +79,7 @@ class CartViewSet(viewsets.GenericViewSet):
         CartItem.objects.filter(
             cart=cart, item=input_serializer.validated_data['catalog_item']
         ).delete()
-        return Response(self.get_serializer(cart).data)
+        return Response(self.get_serializer(self.get_cart()).data)
 
     @extend_schema(request=None, responses=CartSerializer)
     @action(detail=False, methods=('delete', 'post'), url_path='clear')
@@ -87,7 +87,7 @@ class CartViewSet(viewsets.GenericViewSet):
         """Remove every item from the current user's cart."""
         cart = self.get_cart()
         cart.items.all().delete()
-        return Response(self.get_serializer(cart).data)
+        return Response(self.get_serializer(self.get_cart()).data)
 
 
 class CheckoutView(APIView):
@@ -165,4 +165,4 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Never expose another user's orders, even by direct ID lookup."""
-        return self.request.user.orders.all()
+        return self.request.user.orders.all().prefetch_related('items')

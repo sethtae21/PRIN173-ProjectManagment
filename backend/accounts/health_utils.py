@@ -162,7 +162,8 @@ def ping(allow_local: bool = False, timeouts: dict | None = None) -> dict:
             version = info.get("version", "?")
         except Exception:
             version = "?"
-        return {"ok": True, "latency_ms": latency_ms, "server_version": version, **target}
+        safe_target = {key: value for key, value in target.items() if key != 'uri'}
+        return {"ok": True, "latency_ms": latency_ms, "server_version": version, **safe_target}
     except PyMongoError as e:
         return {"ok": False, "stage": "connect", "error": f"{type(e).__name__}: {e}",
                 "hint": classify(e), **{k: target[k] for k in ("cluster", "database", "atlas", "tls")}}

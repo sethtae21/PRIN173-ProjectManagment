@@ -42,7 +42,8 @@ class Command(BaseCommand):
         res = ping(allow_local=allow_local, timeouts=PING_TIMEOUTS)
 
         if as_json:
-            print(json.dumps(res, indent=2, default=str))
+            safe_res = {key: value for key, value in res.items() if key != 'uri'}
+            print(json.dumps(safe_res, indent=2, default=str))
         else:
             self.stdout.write(f"target cluster : {target['cluster']}")
             self.stdout.write(f"target database: {target['database']}")
