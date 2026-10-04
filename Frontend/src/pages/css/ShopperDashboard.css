@@ -2,6 +2,7 @@
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
   min-height: 100vh;
+  color: #17130f;
   background:
     radial-gradient(
       circle at right center,
@@ -14,7 +15,6 @@
       #fffdf9 52%,
       #eee8de
     );
-  color: #17130f;
 }
 
 .shopper-sidebar {
@@ -26,22 +26,23 @@
   padding: 18px;
   background: linear-gradient(
     180deg,
-    #f6e7b7,
+    #f6e7b7 0%,
     #d7af4b 52%,
-    #b57e20
+    #b57e20 100%
   );
 }
 
 .shopper-sidebar-logo {
   display: grid;
-  min-height: 90px;
+  min-height: 100px;
   place-items: center;
   margin-bottom: 15px;
+  text-decoration: none;
 }
 
 .shopper-sidebar-logo img {
   width: 140px;
-  height: 76px;
+  height: 82px;
   object-fit: contain;
 }
 
@@ -57,10 +58,10 @@
   align-items: center;
   justify-content: center;
   padding: 12px 10px;
-  background: rgba(255, 253, 249, 0.57);
   border: 1px solid #e2c978;
   border-radius: 9px;
   color: #29251f;
+  background: rgba(255, 253, 249, 0.76);
   font-size: 13px;
   text-align: center;
   text-decoration: none;
@@ -71,29 +72,29 @@
 }
 
 .shopper-nav-link:hover {
-  background: rgba(255, 253, 249, 0.85);
+  background: rgba(255, 253, 249, 0.95);
   transform: translateX(2px);
 }
 
 .shopper-nav-link.active {
-  background: linear-gradient(
-    135deg,
-    #17130f,
-    #8e641f 55%,
-    #d7af4b
-  );
   border-color: #e2c978;
   color: #fffdf9;
+  background: linear-gradient(
+    135deg,
+    #17130f 0%,
+    #8e641f 55%,
+    #d7af4b 100%
+  );
   font-weight: 700;
 }
 
 .shopper-logout-button {
   min-height: 48px;
   margin-top: auto;
-  background: #fffdf9;
   border: 1.2px solid #b57e20;
   border-radius: 9px;
   color: #8e641f;
+  background: #fffdf9;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -101,8 +102,8 @@
 }
 
 .shopper-logout-button:hover {
-  background: #17130f;
   color: #fffdf9;
+  background: #17130f;
 }
 
 .shopper-content {
@@ -116,8 +117,8 @@
   justify-content: space-between;
   gap: 24px;
   padding: 24px 32px;
-  background: rgba(255, 253, 249, 0.97);
   border-bottom: 1px solid #e2d8c7;
+  background: rgba(255, 253, 249, 0.97);
 }
 
 .shopper-page-code {
@@ -139,17 +140,16 @@
 }
 
 .shopper-cart-button {
-  position: relative;
   display: flex;
   min-width: 112px;
   min-height: 48px;
   align-items: center;
   justify-content: center;
   gap: 15px;
-  background: #f8f5ef;
   border: 1px solid #d2be91;
   border-radius: 9px;
   color: #29251f;
+  background: #f8f5ef;
   cursor: pointer;
 }
 
@@ -178,9 +178,9 @@
   min-height: 48px;
   place-items: center;
   padding: 10px 15px;
-  background: #17130f;
   border-radius: 9px;
   color: #f6e7b7;
+  background: #17130f;
   font-size: 10px;
   font-weight: 700;
   text-align: center;
@@ -227,9 +227,9 @@
 .shopper-start-card {
   min-height: 285px;
   padding: 40px;
-  background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 16px;
+  background: #fffdf9;
 }
 
 .shopper-card-label {
@@ -245,7 +245,8 @@
   line-height: 1.25;
 }
 
-.shopper-start-card > p:not(.shopper-card-label) {
+.shopper-start-card
+  > p:not(.shopper-card-label) {
   max-width: 650px;
   margin: 0;
   color: #5c554c;
@@ -269,23 +270,26 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .shopper-primary-button {
+  border: 1.2px solid #b57e20;
+  color: #fffdf9;
   background: linear-gradient(
     135deg,
     #17130f,
     #8e641f 55%,
     #d7af4b
   );
-  border: 1.2px solid #b57e20;
-  color: #fffdf9;
 }
 
 .shopper-secondary-button {
-  background: #fffdf9;
   border: 1.2px solid #b57e20;
   color: #8e641f;
+  background: #fffdf9;
 }
 
 .shopper-primary-button:hover,
@@ -298,10 +302,10 @@
 .shopper-guide-card {
   min-height: 285px;
   padding: 40px 34px;
-  background: #17130f;
   border: 1px solid #17130f;
   border-radius: 16px;
   color: #fffdf9;
+  background: #17130f;
 }
 
 .shopper-guide-card > p {
@@ -342,9 +346,9 @@
 
 .shopper-account-status {
   padding: 28px 30px;
-  background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 16px;
+  background: #fffdf9;
 }
 
 .shopper-account-status h2 {
@@ -360,10 +364,10 @@
   justify-content: space-between;
   gap: 20px;
   padding: 15px 5px;
-  background: transparent;
   border: 0;
   border-top: 1px solid #e2d8c7;
   color: #29251f;
+  background: transparent;
   font: inherit;
   cursor: pointer;
 }
@@ -380,6 +384,13 @@
   color: #5c554c;
   font-size: 12px;
   text-align: right;
+}
+
+.shopper-dashboard button:focus-visible,
+.shopper-dashboard a:focus-visible {
+  outline: 3px solid
+    rgba(181, 126, 32, 0.4);
+  outline-offset: 3px;
 }
 
 @media (max-width: 980px) {
@@ -403,7 +414,10 @@
   }
 
   .shopper-dashboard-body {
-    width: min(100% - 35px, 1170px);
+    width: min(
+      calc(100% - 35px),
+      1170px
+    );
   }
 }
 

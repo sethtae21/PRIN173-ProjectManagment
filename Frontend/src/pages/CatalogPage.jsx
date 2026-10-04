@@ -1,498 +1,1092 @@
-import { useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import logo from "../assets/fitfusion-logo.svg";
-import "./CatalogPage.css";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-const products = [
+import {
+  useNavigate,
+  useOutletContext,
+} from "react-router-dom";
+
+import "./css/CatalogPage.css";
+
+const PRODUCTS = [
   {
-    id: 1,
-    name: "Camel Linen Shirt",
-    store: "Maison Aurelia",
-    price: 750,
-    rating: 4.8,
-    reviews: 124,
+    id: "product-001",
+    name: "Classic Linen Blouse",
     category: "Tops",
-    sizes: ["S", "M", "L", "XL", "2XL"],
-    colors: ["Camel", "Cream"],
-    style: "Classic",
-    art: "shirt",
-    productColor: "#c59758",
+    gender: "Women",
+    price: 899,
+    originalPrice: 1099,
+    rating: 4.8,
+    reviews: 128,
+    sellerId: "seller-001",
+    sellerName: "Aurelia Studio",
+    location: "Makati City",
+    symbol: "👚",
+    color: "Ivory",
+    sizes: ["S", "M", "L", "XL"],
+    stock: 24,
+    matchScore: "6/7",
+    featured: true,
   },
   {
-    id: 2,
-    name: "Straight Pants",
-    store: "Northline",
-    price: 1100,
-    rating: 4.7,
-    reviews: 89,
+    id: "product-002",
+    name: "Tailored Wide-Leg Trousers",
     category: "Bottoms",
+    gender: "Women",
+    price: 1299,
+    originalPrice: 1499,
+    rating: 4.7,
+    reviews: 96,
+    sellerId: "seller-001",
+    sellerName: "Aurelia Studio",
+    location: "Makati City",
+    symbol: "👖",
+    color: "Black",
     sizes: ["S", "M", "L", "XL"],
-    colors: ["Black", "Brown"],
-    style: "Minimal",
-    art: "pants",
-    productColor: "#332f2c",
+    stock: 18,
+    matchScore: "6/7",
+    featured: false,
   },
   {
-    id: 3,
-    name: "Soft Gold Dress",
-    store: "Atelier Sol",
-    price: 1400,
-    rating: 4.9,
-    reviews: 156,
-    category: "Dresses",
-    sizes: ["S", "M", "L", "XL", "2XL"],
-    colors: ["Gold", "Cream"],
-    style: "Elegant",
-    art: "dress",
-    productColor: "#c7952b",
-  },
-  {
-    id: 4,
-    name: "Ivory Coat",
-    store: "Maison Aurelia",
-    price: 900,
-    rating: 4.6,
-    reviews: 67,
+    id: "product-003",
+    name: "Modern Structured Blazer",
     category: "Outerwear",
-    sizes: ["M", "L", "XL", "2XL"],
-    colors: ["Cream", "White"],
-    style: "Classic",
-    art: "coat",
-    productColor: "#e6dbc6",
+    gender: "Unisex",
+    price: 1899,
+    originalPrice: 2299,
+    rating: 4.9,
+    reviews: 212,
+    sellerId: "seller-002",
+    sellerName: "Maison Moderne",
+    location: "Quezon City",
+    symbol: "🧥",
+    color: "Beige",
+    sizes: [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+    ],
+    stock: 12,
+    matchScore: "7/7",
+    featured: true,
   },
   {
-    id: 5,
-    name: "Black Sneakers",
-    store: "Urban Form",
-    price: 1500,
-    rating: 4.8,
-    reviews: 211,
-    category: "Footwear",
-    sizes: ["S", "M", "L", "XL"],
-    colors: ["Black", "White"],
-    style: "Casual",
-    art: "shoes",
-    productColor: "#292522",
-  },
-  {
-    id: 6,
-    name: "Cream Top",
-    store: "Atelier Sol",
-    price: 680,
-    rating: 4.5,
-    reviews: 42,
+    id: "product-004",
+    name: "Premium Cotton Polo",
     category: "Tops",
-    sizes: ["S", "M", "L", "XL"],
-    colors: ["Cream", "White"],
-    style: "Minimal",
-    art: "shirt",
-    productColor: "#eee1c9",
+    gender: "Men",
+    price: 799,
+    originalPrice: 999,
+    rating: 4.6,
+    reviews: 75,
+    sellerId: "seller-003",
+    sellerName: "North & Thread",
+    location: "Pasig City",
+    symbol: "👕",
+    color: "Navy Blue",
+    sizes: [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+    ],
+    stock: 31,
+    matchScore: "6/7",
+    featured: false,
+  },
+  {
+    id: "product-005",
+    name: "Pleated Midi Dress",
+    category: "Dresses",
+    gender: "Women",
+    price: 1499,
+    originalPrice: 1799,
+    rating: 4.8,
+    reviews: 164,
+    sellerId: "seller-004",
+    sellerName: "Élan Collective",
+    location: "Taguig City",
+    symbol: "👗",
+    color: "Champagne",
+    sizes: [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+    ],
+    stock: 16,
+    matchScore: "7/7",
+    featured: true,
+  },
+  {
+    id: "product-006",
+    name: "Relaxed Utility Jacket",
+    category: "Outerwear",
+    gender: "Unisex",
+    price: 1599,
+    originalPrice: 1899,
+    rating: 4.5,
+    reviews: 68,
+    sellerId: "seller-003",
+    sellerName: "North & Thread",
+    location: "Pasig City",
+    symbol: "🥼",
+    color: "Olive",
+    sizes: ["M", "L", "XL", "2XL"],
+    stock: 20,
+    matchScore: "5/7",
+    featured: false,
+  },
+  {
+    id: "product-007",
+    name: "High-Waist A-Line Skirt",
+    category: "Bottoms",
+    gender: "Women",
+    price: 999,
+    originalPrice: 1199,
+    rating: 4.7,
+    reviews: 84,
+    sellerId: "seller-004",
+    sellerName: "Élan Collective",
+    location: "Taguig City",
+    symbol: "👗",
+    color: "Mocha",
+    sizes: ["XS", "S", "M", "L"],
+    stock: 14,
+    matchScore: "6/7",
+    featured: false,
+  },
+  {
+    id: "product-008",
+    name: "Straight-Cut Denim Jeans",
+    category: "Bottoms",
+    gender: "Unisex",
+    price: 1199,
+    originalPrice: 1399,
+    rating: 4.6,
+    reviews: 143,
+    sellerId: "seller-005",
+    sellerName: "Streetform Manila",
+    location: "Manila",
+    symbol: "👖",
+    color: "Dark Blue",
+    sizes: [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+    ],
+    stock: 27,
+    matchScore: "6/7",
+    featured: false,
   },
 ];
 
-const emptyFilters = {
-  category: "",
-  size: "",
-  color: "",
-  style: "",
-};
+const CATEGORIES = [
+  "All",
+  "Tops",
+  "Bottoms",
+  "Dresses",
+  "Outerwear",
+];
 
-function CatalogPage() {
+const GENDERS = [
+  "All",
+  "Women",
+  "Men",
+  "Unisex",
+];
+
+const SIZES = [
+  "All",
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "2XL",
+];
+
+function readStorageArray(key) {
+  try {
+    const storedValue =
+      localStorage.getItem(key);
+
+    const parsedValue = storedValue
+      ? JSON.parse(storedValue)
+      : [];
+
+    return Array.isArray(parsedValue)
+      ? parsedValue
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatPrice(price) {
+  return new Intl.NumberFormat(
+    "en-PH",
+    {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 0,
+    }
+  ).format(price);
+}
+
+function CatalogPage({
+  isGuest = false,
+}) {
   const navigate = useNavigate();
 
-  const [draftFilters, setDraftFilters] = useState(emptyFilters);
-  const [activeFilters, setActiveFilters] = useState(emptyFilters);
+  const outletContext =
+    useOutletContext();
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesCategory =
-        !activeFilters.category ||
-        product.category === activeFilters.category;
+  const guestMode =
+    isGuest ||
+    outletContext?.isGuest === true;
 
-      const matchesSize =
-        !activeFilters.size ||
-        product.sizes.includes(activeFilters.size);
+  const basePath = guestMode
+    ? "/guest"
+    : "/shopper";
 
-      const matchesColor =
-        !activeFilters.color ||
-        product.colors.includes(activeFilters.color);
+  const [searchTerm, setSearchTerm] =
+    useState("");
 
-      const matchesStyle =
-        !activeFilters.style ||
-        product.style === activeFilters.style;
+  const [category, setCategory] =
+    useState("All");
 
-      return (
-        matchesCategory &&
-        matchesSize &&
-        matchesColor &&
-        matchesStyle
-      );
+  const [gender, setGender] =
+    useState("All");
+
+  const [size, setSize] =
+    useState("All");
+
+  const [seller, setSeller] =
+    useState("All");
+
+  const [
+    maximumPrice,
+    setMaximumPrice,
+  ] = useState(2500);
+
+  const [sortBy, setSortBy] =
+    useState("recommended");
+
+  const [showFilters, setShowFilters] =
+    useState(false);
+
+  const [
+    toastMessage,
+    setToastMessage,
+  ] = useState("");
+
+  const [cartCount, setCartCount] =
+    useState(0);
+
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
     });
-  }, [activeFilters]);
 
-  function handleFilterChange(event) {
-    const { name, value } = event.target;
+    updateCartCount();
+  }, []);
 
-    setDraftFilters((currentFilters) => ({
-      ...currentFilters,
-      [name]: value,
-    }));
-  }
+  useEffect(() => {
+    if (!toastMessage) {
+      return undefined;
+    }
 
-  function applyFilters(event) {
-    event.preventDefault();
-    setActiveFilters(draftFilters);
-  }
+    const timer =
+      window.setTimeout(() => {
+        setToastMessage("");
+      }, 2500);
 
-  function resetFilters() {
-    setDraftFilters(emptyFilters);
-    setActiveFilters(emptyFilters);
-  }
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [toastMessage]);
 
-  function handleLogout() {
-    const shouldLogout = window.confirm(
-      "Are you sure you want to log out?"
+  const sellerNames = useMemo(() => {
+    return [
+      "All",
+      ...new Set(
+        PRODUCTS.map(
+          (product) =>
+            product.sellerName
+        )
+      ),
+    ];
+  }, []);
+
+  const filteredProducts =
+    useMemo(() => {
+      const normalizedSearch =
+        searchTerm
+          .trim()
+          .toLowerCase();
+
+      const results =
+        PRODUCTS.filter(
+          (product) => {
+            const matchesSearch =
+              !normalizedSearch ||
+              product.name
+                .toLowerCase()
+                .includes(
+                  normalizedSearch
+                ) ||
+              product.sellerName
+                .toLowerCase()
+                .includes(
+                  normalizedSearch
+                ) ||
+              product.category
+                .toLowerCase()
+                .includes(
+                  normalizedSearch
+                ) ||
+              product.color
+                .toLowerCase()
+                .includes(
+                  normalizedSearch
+                );
+
+            const matchesCategory =
+              category === "All" ||
+              product.category ===
+                category;
+
+            const matchesGender =
+              gender === "All" ||
+              product.gender ===
+                gender;
+
+            const matchesSize =
+              size === "All" ||
+              product.sizes.includes(
+                size
+              );
+
+            const matchesSeller =
+              seller === "All" ||
+              product.sellerName ===
+                seller;
+
+            const matchesPrice =
+              product.price <=
+              maximumPrice;
+
+            return (
+              matchesSearch &&
+              matchesCategory &&
+              matchesGender &&
+              matchesSize &&
+              matchesSeller &&
+              matchesPrice
+            );
+          }
+        );
+
+      return [...results].sort(
+        (
+          firstProduct,
+          secondProduct
+        ) => {
+          if (
+            sortBy === "price-low"
+          ) {
+            return (
+              firstProduct.price -
+              secondProduct.price
+            );
+          }
+
+          if (
+            sortBy === "price-high"
+          ) {
+            return (
+              secondProduct.price -
+              firstProduct.price
+            );
+          }
+
+          if (sortBy === "rating") {
+            return (
+              secondProduct.rating -
+              firstProduct.rating
+            );
+          }
+
+          if (sortBy === "newest") {
+            return secondProduct.id.localeCompare(
+              firstProduct.id
+            );
+          }
+
+          return (
+            Number(
+              secondProduct.featured
+            ) -
+              Number(
+                firstProduct.featured
+              ) ||
+            secondProduct.rating -
+              firstProduct.rating
+          );
+        }
+      );
+    }, [
+      category,
+      gender,
+      maximumPrice,
+      searchTerm,
+      seller,
+      size,
+      sortBy,
+    ]);
+
+  const activeFilterCount = [
+    category !== "All",
+    gender !== "All",
+    size !== "All",
+    seller !== "All",
+    maximumPrice < 2500,
+  ].filter(Boolean).length;
+
+  function updateCartCount() {
+    const cartItems =
+      readStorageArray(
+        "fitfusion-cart-items"
+      );
+
+    const count = cartItems.reduce(
+      (total, item) =>
+        total +
+        (Number(item.quantity) || 1),
+      0
     );
 
-    if (shouldLogout) {
-      navigate("/login");
+    setCartCount(count);
+  }
+
+  function showGuestRestriction(
+    feature
+  ) {
+    if (
+      outletContext
+        ?.openGuestRestriction
+    ) {
+      outletContext.openGuestRestriction(
+        feature
+      );
     }
   }
 
+  function viewProduct(product) {
+    localStorage.setItem(
+      "fitfusion-selected-product",
+      JSON.stringify(product)
+    );
+
+    navigate(
+      `${basePath}/products/${product.id}`
+    );
+  }
+
+  function viewSeller(product) {
+    localStorage.setItem(
+      "fitfusion-selected-seller",
+      JSON.stringify({
+        id: product.sellerId,
+        name: product.sellerName,
+        location: product.location,
+      })
+    );
+
+    navigate(
+      `${basePath}/sellers/${product.sellerId}`
+    );
+  }
+
+  function tryProduct(product) {
+    const selectedItem = {
+      ...product,
+      quantity: 1,
+      selectedSize: null,
+      selectedAt:
+        new Date().toISOString(),
+    };
+
+    localStorage.setItem(
+      "fitfusion-selected-product",
+      JSON.stringify(product)
+    );
+
+    localStorage.setItem(
+      "fitfusion-selected-items",
+      JSON.stringify([
+        selectedItem,
+      ])
+    );
+
+    setToastMessage(
+      `${product.name} was sent to the Fitting Studio.`
+    );
+
+    window.setTimeout(() => {
+      navigate(
+        `${basePath}/fitting-studio/customize`
+      );
+    }, 600);
+  }
+
+  function openCart() {
+    if (guestMode) {
+      showGuestRestriction(
+        "use the shopping cart"
+      );
+
+      return;
+    }
+
+    navigate("/shopper/cart");
+  }
+
+  function resetFilters() {
+    setSearchTerm("");
+    setCategory("All");
+    setGender("All");
+    setSize("All");
+    setSeller("All");
+    setMaximumPrice(2500);
+    setSortBy("recommended");
+  }
+
   return (
-    <div className="catalog-shell">
-      <aside className="catalog-sidebar">
-        <div className="catalog-logo-container">
-          <img
-            src={logo}
-            alt="FitFusion AI"
-            className="catalog-logo"
-          />
+    <main className="catalog-page">
+      <header className="catalog-header">
+        <div>
+          <p className="catalog-page-code">
+            09 — PRODUCT CATALOG
+          </p>
+
+          <p className="catalog-page-description">
+            Browse products from verified
+            FitFusion sellers
+          </p>
         </div>
 
-        <nav className="catalog-navigation" aria-label="Shopper navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
+        <div className="catalog-header-actions">
+          <button
+            type="button"
+            className={
+              guestMode
+                ? "catalog-cart-button locked"
+                : "catalog-cart-button"
+            }
+            onClick={openCart}
+            aria-label={
+              guestMode
+                ? "Shopping cart is locked for guests"
+                : `Open cart with ${cartCount} items`
             }
           >
-            Dashboard
-          </NavLink>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
 
-          <NavLink
-            to="/shopper/fitting-studio"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
-            }
-          >
-            Fitting Studio
-          </NavLink>
+              <circle
+                cx="10"
+                cy="20"
+                r="1"
+              />
 
-          <NavLink
-            to="/shopper/avatar-presets"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
-            }
-          >
-            Avatar Presets
-          </NavLink>
+              <circle
+                cx="18"
+                cy="20"
+                r="1"
+              />
+            </svg>
 
-          <NavLink
-            to="/shopper/catalog"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
-            }
-          >
-            Catalog
-          </NavLink>
+            <span>
+              {guestMode
+                ? "LOCKED"
+                : cartCount}
+            </span>
+          </button>
 
-          <NavLink
-            to="/shopper/saved-outfits"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
-            }
-          >
-            Saved Outfits
-          </NavLink>
+          <div className="catalog-role-badge">
+            {guestMode
+              ? "GUEST SESSION"
+              : "REGISTERED SHOPPER"}
+          </div>
+        </div>
+      </header>
 
-          <NavLink
-            to="/shopper/account"
-            className={({ isActive }) =>
-              `catalog-nav-link ${isActive ? "active" : ""}`
-            }
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="catalog-logout-button"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
-
-      <main className="catalog-main">
-        <header className="catalog-header">
+      <div className="catalog-body">
+        <section className="catalog-introduction">
           <div>
-            <p className="catalog-page-number">12 — CATALOG</p>
-
-            <p className="catalog-header-description">
-              Seller-managed products with category, size, color, and
-              style filters
+            <p>
+              EXPLORE YOUR STYLE
             </p>
+
+            <h1>
+              Find your next favorite
+              outfit
+            </h1>
+
+            <span>
+              Open a product to view
+              its seller, ratings,
+              available sizes, and
+              purchasing options.
+            </span>
           </div>
 
-          <div className="catalog-header-actions">
-            <button
-              type="button"
-              className="catalog-cart-button"
-              onClick={() => navigate("/shopper/cart")}
+          <div className="catalog-result-summary">
+            <strong>
+              {filteredProducts.length}
+            </strong>
+
+            <span>
+              {filteredProducts.length ===
+              1
+                ? "product"
+                : "products"}
+            </span>
+          </div>
+        </section>
+
+        <section className="catalog-search-section">
+          <div className="catalog-search-box">
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <span aria-hidden="true">🛒</span>
-              Cart
-              <span className="catalog-cart-count">4</span>
-            </button>
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
+              />
 
-            <div className="catalog-account-badge">
-              <div className="catalog-avatar">KS</div>
+              <path d="m20 20-4-4" />
+            </svg>
 
-              <div>
-                <span>REGISTERED SHOPPER</span>
-                <strong>Karol Shopper</strong>
-              </div>
-            </div>
-          </div>
-        </header>
+            <input
+              type="search"
+              value={searchTerm}
+              placeholder="Search products, stores, colors, or categories..."
+              onChange={(event) =>
+                setSearchTerm(
+                  event.target.value
+                )
+              }
+            />
 
-        <section className="catalog-content">
-          <div className="catalog-title-row">
-            <div>
-              <p className="catalog-eyebrow">DISCOVER YOUR STYLE</p>
-              <h1>Browse the catalog</h1>
-              <p className="catalog-introduction">
-                Explore products uploaded by verified FitFusion sellers.
-                Open a product to view its seller, rating, reviews, and
-                available sizes.
-              </p>
-            </div>
-
-            <p className="catalog-result-count">
-              {filteredProducts.length}{" "}
-              {filteredProducts.length === 1 ? "product" : "products"}
-            </p>
-          </div>
-
-          <div className="catalog-workspace">
-            <form
-              className="catalog-filter-panel"
-              onSubmit={applyFilters}
-            >
-              <div className="catalog-filter-heading">
-                <div>
-                  <p>FILTER CATALOG</p>
-                  <span>Refine the products shown</span>
-                </div>
-              </div>
-
-              <label className="catalog-filter-field">
-                <span>Category</span>
-
-                <select
-                  name="category"
-                  value={draftFilters.category}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">All categories</option>
-                  <option value="Tops">Tops</option>
-                  <option value="Bottoms">Bottoms</option>
-                  <option value="Dresses">Dresses</option>
-                  <option value="Outerwear">Outerwear</option>
-                  <option value="Footwear">Footwear</option>
-                </select>
-              </label>
-
-              <label className="catalog-filter-field">
-                <span>Size</span>
-
-                <select
-                  name="size"
-                  value={draftFilters.size}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">All sizes</option>
-                  <option value="S">S</option>
-                  <option value="M">M</option>
-                  <option value="L">L</option>
-                  <option value="XL">XL</option>
-                  <option value="2XL">2XL</option>
-                </select>
-              </label>
-
-              <label className="catalog-filter-field">
-                <span>Color</span>
-
-                <select
-                  name="color"
-                  value={draftFilters.color}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">All colors</option>
-                  <option value="Black">Black</option>
-                  <option value="Brown">Brown</option>
-                  <option value="Camel">Camel</option>
-                  <option value="Cream">Cream</option>
-                  <option value="Gold">Gold</option>
-                  <option value="White">White</option>
-                </select>
-              </label>
-
-              <label className="catalog-filter-field">
-                <span>Style</span>
-
-                <select
-                  name="style"
-                  value={draftFilters.style}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">All styles</option>
-                  <option value="Casual">Casual</option>
-                  <option value="Classic">Classic</option>
-                  <option value="Elegant">Elegant</option>
-                  <option value="Minimal">Minimal</option>
-                </select>
-              </label>
-
+            {searchTerm && (
               <button
-                type="submit"
-                className="catalog-apply-button"
+                type="button"
+                onClick={() =>
+                  setSearchTerm("")
+                }
+                aria-label="Clear search"
               >
-                Apply Filters
+                ×
               </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className={
+              showFilters
+                ? "catalog-filter-toggle active"
+                : "catalog-filter-toggle"
+            }
+            onClick={() =>
+              setShowFilters(
+                (currentValue) =>
+                  !currentValue
+              )
+            }
+          >
+            Filters
+
+            {activeFilterCount >
+              0 && (
+              <span>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <select
+            className="catalog-sort-select"
+            value={sortBy}
+            onChange={(event) =>
+              setSortBy(
+                event.target.value
+              )
+            }
+            aria-label="Sort products"
+          >
+            <option value="recommended">
+              Recommended
+            </option>
+
+            <option value="price-low">
+              Price: Low to High
+            </option>
+
+            <option value="price-high">
+              Price: High to Low
+            </option>
+
+            <option value="rating">
+              Highest Rated
+            </option>
+
+            <option value="newest">
+              Newest
+            </option>
+          </select>
+        </section>
+
+        <div className="catalog-category-tabs">
+          {CATEGORIES.map(
+            (categoryOption) => (
+              <button
+                key={categoryOption}
+                type="button"
+                className={
+                  category ===
+                  categoryOption
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setCategory(
+                    categoryOption
+                  )
+                }
+              >
+                {categoryOption}
+              </button>
+            )
+          )}
+        </div>
+
+        {showFilters && (
+          <section className="catalog-filter-panel">
+            <div className="catalog-filter-heading">
+              <div>
+                <p>
+                  REFINE RESULTS
+                </p>
+
+                <h2>
+                  Product filters
+                </h2>
+              </div>
 
               <button
                 type="button"
-                className="catalog-reset-button"
                 onClick={resetFilters}
               >
-                Reset
+                Reset all
               </button>
+            </div>
 
-              <div className="catalog-category-note">
-                <strong>Categories</strong>
-                <span>Tops • Bottoms • Dresses</span>
-                <span>Outerwear • Footwear</span>
+            <div className="catalog-filter-grid">
+              <FilterSelect
+                label="Gender"
+                value={gender}
+                options={GENDERS}
+                onChange={setGender}
+              />
+
+              <FilterSelect
+                label="Size"
+                value={size}
+                options={SIZES}
+                onChange={setSize}
+              />
+
+              <FilterSelect
+                label="Seller"
+                value={seller}
+                options={sellerNames}
+                onChange={setSeller}
+              />
+
+              <div className="catalog-price-filter">
+                <div>
+                  <label htmlFor="maximum-price">
+                    Maximum price
+                  </label>
+
+                  <strong>
+                    {formatPrice(
+                      maximumPrice
+                    )}
+                  </strong>
+                </div>
+
+                <input
+                  id="maximum-price"
+                  type="range"
+                  min="500"
+                  max="2500"
+                  step="100"
+                  value={maximumPrice}
+                  onChange={(event) =>
+                    setMaximumPrice(
+                      Number(
+                        event.target
+                          .value
+                      )
+                    )
+                  }
+                />
+
+                <div className="catalog-price-limits">
+                  <span>₱500</span>
+                  <span>₱2,500</span>
+                </div>
               </div>
-            </form>
+            </div>
+          </section>
+        )}
 
-            <section className="catalog-products-section">
-              {filteredProducts.length > 0 ? (
-                <div className="catalog-product-grid">
-                  {filteredProducts.map((product) => (
-                    <article
-                      className="catalog-product-card"
-                      key={product.id}
+        {filteredProducts.length >
+        0 ? (
+          <section className="catalog-product-grid">
+            {filteredProducts.map(
+              (product) => (
+                <article
+                  key={product.id}
+                  className="catalog-product-card"
+                >
+                  <button
+                    type="button"
+                    className="catalog-product-image"
+                    onClick={() =>
+                      viewProduct(
+                        product
+                      )
+                    }
+                  >
+                    {product.featured && (
+                      <span className="catalog-featured-label">
+                        FEATURED
+                      </span>
+                    )}
+
+                    <div className="catalog-product-symbol">
+                      {product.symbol}
+                    </div>
+
+                    <span className="catalog-match-score">
+                      Match score:{" "}
+                      {
+                        product.matchScore
+                      }
+                    </span>
+                  </button>
+
+                  <div className="catalog-product-information">
+                    <button
+                      type="button"
+                      className="catalog-seller-link"
+                      onClick={() =>
+                        viewSeller(
+                          product
+                        )
+                      }
                     >
+                      {
+                        product.sellerName
+                      }
+                    </button>
+
+                    <button
+                      type="button"
+                      className="catalog-product-name"
+                      onClick={() =>
+                        viewProduct(
+                          product
+                        )
+                      }
+                    >
+                      {product.name}
+                    </button>
+
+                    <div className="catalog-product-details">
+                      <span>
+                        {
+                          product.category
+                        }
+                      </span>
+
+                      <span>•</span>
+
+                      <span>
+                        {product.color}
+                      </span>
+                    </div>
+
+                    <div className="catalog-rating">
+                      <span>★</span>
+
+                      <strong>
+                        {product.rating}
+                      </strong>
+
+                      <small>
+                        (
+                        {
+                          product.reviews
+                        }
+                        )
+                      </small>
+                    </div>
+
+                    <div className="catalog-product-price">
+                      <strong>
+                        {formatPrice(
+                          product.price
+                        )}
+                      </strong>
+
+                      <del>
+                        {formatPrice(
+                          product.originalPrice
+                        )}
+                      </del>
+                    </div>
+
+                    <div className="catalog-product-sizes">
+                      <span>
+                        Available sizes:
+                      </span>
+
+                      <strong>
+                        {product.sizes.join(
+                          ", "
+                        )}
+                      </strong>
+                    </div>
+
+                    <div className="catalog-product-actions">
                       <button
                         type="button"
-                        className="catalog-product-image-button"
+                        className="catalog-view-button"
                         onClick={() =>
-                          navigate(`/shopper/products/${product.id}`)
+                          viewProduct(
+                            product
+                          )
                         }
-                        aria-label={`View ${product.name}`}
                       >
-                        <div
-                          className="catalog-product-art"
-                          style={{
-                            "--product-color": product.productColor,
-                          }}
-                        >
-                          <div
-                            className={`catalog-garment catalog-garment-${product.art}`}
-                          />
-
-                          <span>{product.category}</span>
-                        </div>
+                        View Details
                       </button>
 
-                      <div className="catalog-product-information">
-                        <p className="catalog-store-name">
-                          {product.store}
-                        </p>
+                      <button
+                        type="button"
+                        className="catalog-try-button"
+                        onClick={() =>
+                          tryProduct(
+                            product
+                          )
+                        }
+                      >
+                        Try On
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              )
+            )}
+          </section>
+        ) : (
+          <section className="catalog-empty-state">
+            <div>⌕</div>
 
-                        <h2>{product.name}</h2>
+            <h2>
+              No products found
+            </h2>
 
-                        <div className="catalog-rating-row">
-                          <span className="catalog-stars">
-                            ★★★★★
-                          </span>
+            <p>
+              No products match your
+              current search and filters.
+              Try changing the category,
+              size, seller, or maximum
+              price.
+            </p>
 
-                          <span>
-                            {product.rating} ({product.reviews})
-                          </span>
-                        </div>
+            <button
+              type="button"
+              onClick={resetFilters}
+            >
+              Clear All Filters
+            </button>
+          </section>
+        )}
+      </div>
 
-                        <p className="catalog-product-price">
-                          ₱{product.price.toLocaleString()}
-                        </p>
+      {toastMessage && (
+        <div
+          className="catalog-toast"
+          role="status"
+        >
+          {toastMessage}
+        </div>
+      )}
+    </main>
+  );
+}
 
-                        <p className="catalog-product-options">
-                          {product.colors.join(" • ")} · {product.style}
-                        </p>
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}) {
+  return (
+    <label className="catalog-filter-field">
+      <span>{label}</span>
 
-                        <div className="catalog-product-buttons">
-                          <button
-                            type="button"
-                            className="catalog-details-button"
-                            onClick={() =>
-                              navigate(
-                                `/shopper/products/${product.id}`
-                              )
-                            }
-                          >
-                            View Details
-                          </button>
-
-                          <button
-                            type="button"
-                            className="catalog-try-button"
-                            onClick={() =>
-                              navigate("/shopper/fitting-studio", {
-                                state: {
-                                  selectedProductId: product.id,
-                                  selectedProduct: product.name,
-                                },
-                              })
-                            }
-                          >
-                            Try On
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="catalog-empty-state">
-                  <div aria-hidden="true">◇</div>
-                  <h2>No products found</h2>
-                  <p>
-                    Try changing or resetting your catalog filters.
-                  </p>
-
-                  <button type="button" onClick={resetFilters}>
-                    Reset Filters
-                  </button>
-                </div>
-              )}
-            </section>
-          </div>
-        </section>
-      </main>
-    </div>
+      <select
+        value={value}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+      >
+        {options.map((option) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

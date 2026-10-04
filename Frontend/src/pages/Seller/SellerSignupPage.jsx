@@ -4,26 +4,30 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import "./css/SignupPage.css";
+import fitFusionLogo from "../../assets/fitfusion-logo.svg";
+import "../css/SellerSignupPage.css";
 
-const initialForm = {
+const initialSellerForm = {
+  ownerName: "",
   username: "",
   email: "",
   phone: "",
-  street: "",
-  barangayCity: "",
-  province: "",
-  postalCode: "",
+  storeName: "",
+  storeAddress: "",
+  storeDescription: "",
   password: "",
   confirmPassword: "",
 };
 
-function SignupPage() {
+function SellerSignupPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(initialForm);
+
+  const [form, setForm] = useState(
+    initialSellerForm
+  );
+
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] =
     useState(false);
@@ -63,9 +67,14 @@ function SignupPage() {
   function validateStepOne() {
     const nextErrors = {};
 
+    if (!form.ownerName.trim()) {
+      nextErrors.ownerName =
+        "Please enter the account owner's name.";
+    }
+
     if (!form.username.trim()) {
       nextErrors.username =
-        "Please enter your username.";
+        "Please create a username.";
     }
 
     if (!form.email.trim()) {
@@ -99,24 +108,21 @@ function SignupPage() {
   function validateStepTwo() {
     const nextErrors = {};
 
-    if (!form.street.trim()) {
-      nextErrors.street =
-        "Please enter your house number and street.";
+    if (!form.storeName.trim()) {
+      nextErrors.storeName =
+        "Store Name is required for seller accounts.";
     }
 
-    if (!form.barangayCity.trim()) {
-      nextErrors.barangayCity =
-        "Please enter your barangay and city.";
+    if (!form.storeAddress.trim()) {
+      nextErrors.storeAddress =
+        "Please enter your store or business address.";
     }
 
-    if (!form.province.trim()) {
-      nextErrors.province =
-        "Please enter your province.";
-    }
-
-    if (!/^\d{4}$/.test(form.postalCode)) {
-      nextErrors.postalCode =
-        "The postal code must contain four numbers.";
+    if (
+      form.storeDescription.trim().length > 300
+    ) {
+      nextErrors.storeDescription =
+        "The store description must not exceed 300 characters.";
     }
 
     setErrors(nextErrors);
@@ -169,26 +175,26 @@ function SignupPage() {
       return;
     }
 
-    let shopperAccounts = [];
+    let sellerAccounts = [];
 
     try {
       const storedAccounts = JSON.parse(
         localStorage.getItem(
-          "fitfusion-shopper-accounts"
+          "fitfusion-seller-accounts"
         ) || "[]"
       );
 
-      shopperAccounts = Array.isArray(
+      sellerAccounts = Array.isArray(
         storedAccounts
       )
         ? storedAccounts
         : [];
     } catch {
-      shopperAccounts = [];
+      sellerAccounts = [];
     }
 
     const duplicateAccount =
-      shopperAccounts.some(
+      sellerAccounts.some(
         (account) =>
           account.email?.toLowerCase() ===
             form.email.trim().toLowerCase() ||
@@ -199,134 +205,125 @@ function SignupPage() {
     if (duplicateAccount) {
       setErrors({
         general:
-          "An account with this email or username already exists.",
+          "A seller account with this email or username already exists.",
       });
 
       setStep(1);
       return;
     }
 
-    const newAccount = {
-      id: `shopper-${Date.now()}`,
-      role: "shopper",
+    const newSeller = {
+      id: `seller-${Date.now()}`,
+      role: "seller",
+      ownerName: form.ownerName.trim(),
       username: form.username.trim(),
       email: form.email.trim().toLowerCase(),
       phone: form.phone.trim(),
-      address: {
-        street: form.street.trim(),
-        barangayCity:
-          form.barangayCity.trim(),
-        province: form.province.trim(),
-        postalCode: form.postalCode.trim(),
-      },
+      storeName: form.storeName.trim(),
+      storeAddress: form.storeAddress.trim(),
+      storeDescription:
+        form.storeDescription.trim(),
       password: form.password,
       createdAt: new Date().toISOString(),
     };
 
     localStorage.setItem(
-      "fitfusion-shopper-accounts",
+      "fitfusion-seller-accounts",
       JSON.stringify([
-        ...shopperAccounts,
-        newAccount,
+        ...sellerAccounts,
+        newSeller,
       ])
     );
 
     localStorage.setItem(
       "fitfusion-current-user",
-      JSON.stringify(newAccount)
+      JSON.stringify(newSeller)
     );
 
     sessionStorage.setItem(
       "userRole",
-      "shopper"
+      "seller"
     );
 
     sessionStorage.setItem(
       "userEmail",
-      newAccount.email
+      newSeller.email
     );
 
-    sessionStorage.setItem(
-      "registeredAccount",
-      JSON.stringify(newAccount)
-    );
-
-    navigate("/shopper/dashboard", {
+    navigate("/seller/dashboard", {
       replace: true,
     });
   }
 
   return (
-    <main className="signup-page">
-      <header className="signup-header">
-        <Link to="/" aria-label="Return home">
+    <main className="seller-signup-page">
+      <header className="seller-signup-header">
+        <Link to="/">
           <img
             src={fitFusionLogo}
             alt="FitFusion AI"
-            className="signup-logo"
+            className="seller-signup-logo"
           />
         </Link>
 
         <Link
           to="/login"
-          className="signup-login-link"
+          className="seller-signup-login"
         >
           Already registered? Log in
         </Link>
       </header>
 
-      <section className="signup-container">
-        <aside className="signup-introduction">
+      <section className="seller-signup-container">
+        <aside className="seller-signup-introduction">
           <div>
-            <p className="signup-eyebrow">
-              SHOPPER REGISTRATION
+            <p className="seller-signup-eyebrow">
+              SELLER REGISTRATION
             </p>
 
             <h1>
-              Create your
-              <span> fitting profile.</span>
+              Open your
+              <span> FitFusion store.</span>
             </h1>
 
             <p>
-              Create your account to customize an
-              avatar, try clothing, save outfits,
-              manage your cart, and view orders.
+              Create a seller account to manage
+              product listings, upload catalog items,
+              review validation results, and process
+              customer orders.
             </p>
           </div>
 
-          <ol className="signup-step-list">
-            <li className={step === 1 ? "active" : ""}>
-              <span>1</span>
-              <div>
-                <strong>Account & Contact</strong>
-                <small>Basic account information</small>
-              </div>
-            </li>
+          <ol className="seller-signup-steps">
+            <SellerStep
+              number="1"
+              title="Account & Contact"
+              description="Owner information"
+              active={step === 1}
+            />
 
-            <li className={step === 2 ? "active" : ""}>
-              <span>2</span>
-              <div>
-                <strong>Delivery Address</strong>
-                <small>Shipping information</small>
-              </div>
-            </li>
+            <SellerStep
+              number="2"
+              title="Store Information"
+              description="Required seller details"
+              active={step === 2}
+            />
 
-            <li className={step === 3 ? "active" : ""}>
-              <span>3</span>
-              <div>
-                <strong>Account Security</strong>
-                <small>Create a secure password</small>
-              </div>
-            </li>
+            <SellerStep
+              number="3"
+              title="Account Security"
+              description="Create a secure password"
+              active={step === 3}
+            />
           </ol>
         </aside>
 
-        <section className="signup-form-panel">
-          <div className="signup-progress">
+        <section className="seller-signup-form-panel">
+          <div className="seller-signup-progress">
             <span>Step {step} of 3</span>
 
-            <div className="signup-progress-track">
-              <div
+            <div>
+              <span
                 style={{
                   width: `${(step / 3) * 100}%`,
                 }}
@@ -335,47 +332,54 @@ function SignupPage() {
           </div>
 
           <form
-            className="signup-form"
+            className="seller-signup-form"
             onSubmit={handleSubmit}
           >
             {errors.general && (
-              <div className="signup-general-error">
+              <div className="seller-signup-general-error">
                 {errors.general}
               </div>
             )}
 
             {step === 1 && (
               <>
-                <div className="signup-form-heading">
-                  <h2>Account & Contact</h2>
-                  <p>
-                    Enter your basic account
-                    information.
-                  </p>
-                </div>
+                <SellerHeading
+                  title="Account & Contact"
+                  description="Enter the seller account owner's information."
+                />
 
-                <SignupField
+                <SellerField
+                  label="Owner's Full Name"
+                  name="ownerName"
+                  value={form.ownerName}
+                  onChange={handleChange}
+                  placeholder="Enter your full name"
+                  error={errors.ownerName}
+                  autoComplete="name"
+                />
+
+                <SellerField
                   label="Username"
                   name="username"
                   value={form.username}
                   onChange={handleChange}
-                  placeholder="Choose a username"
+                  placeholder="Create a username"
                   error={errors.username}
                   autoComplete="username"
                 />
 
-                <SignupField
+                <SellerField
                   label="Email Address"
                   name="email"
                   type="email"
                   value={form.email}
                   onChange={handleChange}
-                  placeholder="name@example.com"
+                  placeholder="seller@example.com"
                   error={errors.email}
                   autoComplete="email"
                 />
 
-                <SignupField
+                <SellerField
                   label="Phone Number"
                   name="phone"
                   value={form.phone}
@@ -389,78 +393,84 @@ function SignupPage() {
 
             {step === 2 && (
               <>
-                <div className="signup-form-heading">
-                  <h2>Delivery Address</h2>
-                  <p>
-                    This address will be used during
-                    checkout.
-                  </p>
+                <SellerHeading
+                  title="Store Information"
+                  description="Store Name is required for every seller account."
+                />
+
+                <SellerField
+                  label="Store Name"
+                  name="storeName"
+                  value={form.storeName}
+                  onChange={handleChange}
+                  placeholder="Enter your store name"
+                  error={errors.storeName}
+                />
+
+                <SellerField
+                  label="Store or Business Address"
+                  name="storeAddress"
+                  value={form.storeAddress}
+                  onChange={handleChange}
+                  placeholder="Enter the complete address"
+                  error={errors.storeAddress}
+                />
+
+                <div className="seller-signup-field">
+                  <label htmlFor="storeDescription">
+                    Store Description
+                    <span> Optional</span>
+                  </label>
+
+                  <textarea
+                    id="storeDescription"
+                    name="storeDescription"
+                    value={form.storeDescription}
+                    onChange={handleChange}
+                    placeholder="Briefly describe the products sold by your store."
+                    maxLength={300}
+                  />
+
+                  <div className="seller-description-count">
+                    {form.storeDescription.length}/300
+                  </div>
+
+                  {errors.storeDescription && (
+                    <small>
+                      {errors.storeDescription}
+                    </small>
+                  )}
                 </div>
 
-                <SignupField
-                  label="House Number and Street"
-                  name="street"
-                  value={form.street}
-                  onChange={handleChange}
-                  placeholder="123 Sample Street"
-                  error={errors.street}
-                  autoComplete="street-address"
-                />
+                <div className="seller-restriction-note">
+                  <strong>
+                    Seller account reminder
+                  </strong>
 
-                <SignupField
-                  label="Barangay and City"
-                  name="barangayCity"
-                  value={form.barangayCity}
-                  onChange={handleChange}
-                  placeholder="Barangay San Antonio, Makati"
-                  error={errors.barangayCity}
-                  autoComplete="address-level2"
-                />
-
-                <div className="signup-two-columns">
-                  <SignupField
-                    label="Province"
-                    name="province"
-                    value={form.province}
-                    onChange={handleChange}
-                    placeholder="Metro Manila"
-                    error={errors.province}
-                    autoComplete="address-level1"
-                  />
-
-                  <SignupField
-                    label="Postal Code"
-                    name="postalCode"
-                    value={form.postalCode}
-                    onChange={handleChange}
-                    placeholder="1203"
-                    error={errors.postalCode}
-                    inputMode="numeric"
-                    maxLength={4}
-                    autoComplete="postal-code"
-                  />
+                  <p>
+                    Products must pass catalog
+                    validation before appearing to
+                    shoppers.
+                  </p>
                 </div>
               </>
             )}
 
             {step === 3 && (
               <>
-                <div className="signup-form-heading">
-                  <h2>Account Security</h2>
-                  <p>
-                    Create a password that meets all
-                    requirements.
-                  </p>
-                </div>
+                <SellerHeading
+                  title="Account Security"
+                  description="Create a password that satisfies all requirements."
+                />
 
-                <div className="signup-field">
-                  <label htmlFor="shopper-password">
+                <div className="seller-signup-field">
+                  <label htmlFor="seller-password">
                     Password
                   </label>
 
-                  <div className="signup-password-control">
+                  <div className="seller-password-control">
                     <input
-                      id="shopper-password"
+                      id="seller-password"
                       name="password"
                       type={
                         showPassword
@@ -486,40 +496,38 @@ function SignupPage() {
                   </div>
 
                   {errors.password && (
-                    <small className="signup-error">
-                      {errors.password}
-                    </small>
+                    <small>{errors.password}</small>
                   )}
                 </div>
 
-                <ul className="password-requirements">
-                  <PasswordRule
+                <ul className="seller-password-rules">
+                  <SellerPasswordRule
                     passed={passwordRules.length}
                     text="At least 8 characters"
                   />
 
-                  <PasswordRule
+                  <SellerPasswordRule
                     passed={passwordRules.uppercase}
                     text="One uppercase letter"
                   />
 
-                  <PasswordRule
+                  <SellerPasswordRule
                     passed={passwordRules.lowercase}
                     text="One lowercase letter"
                   />
 
-                  <PasswordRule
+                  <SellerPasswordRule
                     passed={passwordRules.number}
                     text="One number"
                   />
 
-                  <PasswordRule
+                  <SellerPasswordRule
                     passed={passwordRules.special}
                     text="One special character"
                   />
                 </ul>
 
-                <SignupField
+                <SellerField
                   label="Confirm Password"
                   name="confirmPassword"
                   type="password"
@@ -532,11 +540,11 @@ function SignupPage() {
               </>
             )}
 
-            <div className="signup-actions">
+            <div className="seller-signup-actions">
               {step > 1 && (
                 <button
                   type="button"
-                  className="signup-back-button"
+                  className="seller-back-button"
                   onClick={handleBack}
                 >
                   Back
@@ -546,7 +554,7 @@ function SignupPage() {
               {step < 3 ? (
                 <button
                   type="button"
-                  className="signup-primary-button"
+                  className="seller-primary-button"
                   onClick={handleNext}
                 >
                   Save and Continue
@@ -554,14 +562,14 @@ function SignupPage() {
               ) : (
                 <button
                   type="submit"
-                  className="signup-primary-button"
+                  className="seller-primary-button"
                   disabled={
                     !validPassword ||
                     form.password !==
                       form.confirmPassword
                   }
                 >
-                  Create Shopper Account
+                  Create Seller Account
                 </button>
               )}
             </div>
@@ -572,14 +580,41 @@ function SignupPage() {
   );
 }
 
-function SignupField({
+function SellerStep({
+  number,
+  title,
+  description,
+  active,
+}) {
+  return (
+    <li className={active ? "active" : ""}>
+      <span>{number}</span>
+
+      <div>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </div>
+    </li>
+  );
+}
+
+function SellerHeading({ title, description }) {
+  return (
+    <div className="seller-signup-form-heading">
+      <h2>{title}</h2>
+      <p>{description}</p>
+    </div>
+  );
+}
+
+function SellerField({
   label,
   error,
   type = "text",
   ...inputProperties
 }) {
   return (
-    <div className="signup-field">
+    <div className="seller-signup-field">
       <label htmlFor={inputProperties.name}>
         {label}
       </label>
@@ -590,16 +625,12 @@ function SignupField({
         {...inputProperties}
       />
 
-      {error && (
-        <small className="signup-error">
-          {error}
-        </small>
-      )}
+      {error && <small>{error}</small>}
     </div>
   );
 }
 
-function PasswordRule({ passed, text }) {
+function SellerPasswordRule({ passed, text }) {
   return (
     <li className={passed ? "passed" : ""}>
       <span>{passed ? "✓" : "○"}</span>
@@ -608,4 +639,4 @@ function PasswordRule({ passed, text }) {
   );
 }
 
-export default SignupPage;
+export default SellerSignupPage;

@@ -1,375 +1,240 @@
-import { useState } from "react";
 import {
-  NavLink,
   useNavigate,
+  useOutletContext,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import "./GuestPage.css";
+import "./css/GuestPage.css";
 
 function GuestPage() {
   const navigate = useNavigate();
-  const [showRegisterModal, setShowRegisterModal] =
-    useState(false);
-  const [restrictedFeature, setRestrictedFeature] =
-    useState("");
 
-  function openRegisterModal(feature) {
-    setRestrictedFeature(feature);
-    setShowRegisterModal(true);
-  }
+  const guestContext =
+    useOutletContext();
 
-  function closeRegisterModal() {
-    setShowRegisterModal(false);
-    setRestrictedFeature("");
-  }
-
-  function exitGuest() {
-    sessionStorage.removeItem("userRole");
-    navigate("/login");
+  function openRestriction(feature) {
+    if (
+      guestContext?.openGuestRestriction
+    ) {
+      guestContext.openGuestRestriction(
+        feature
+      );
+    }
   }
 
   return (
-    <main className="guest-dashboard">
-      <aside className="guest-sidebar">
-        <div className="guest-logo-container">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-            className="guest-logo"
-          />
+    <main className="guest-home-page">
+      <header className="guest-home-header">
+        <div>
+          <h1>
+            07 — GUEST DASHBOARD
+          </h1>
+
+          <p>
+            Temporary visualization access
+          </p>
         </div>
 
-        <nav className="guest-navigation">
-          <NavLink
-            to="/guest"
-            end
-            className={({ isActive }) =>
-              isActive
-                ? "guest-nav-link active"
-                : "guest-nav-link"
-            }
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/guest/fitting-studio"
-            className={({ isActive }) =>
-              isActive
-                ? "guest-nav-link active"
-                : "guest-nav-link"
-            }
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/guest/avatar-presets"
-            className={({ isActive }) =>
-              isActive
-                ? "guest-nav-link active"
-                : "guest-nav-link"
-            }
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/guest/catalog"
-            className={({ isActive }) =>
-              isActive
-                ? "guest-nav-link active"
-                : "guest-nav-link"
-            }
-          >
-            Catalog
-          </NavLink>
-
+        <div className="guest-home-header-actions">
           <button
             type="button"
-            className="guest-nav-link guest-locked-link"
+            className="guest-home-cart-button"
             onClick={() =>
-              openRegisterModal("Saved Outfits")
+              openRestriction(
+                "use the shopping cart"
+              )
             }
+            aria-label="Shopping cart is locked"
           >
-            Saved Outfits
-            <span>Locked</span>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+              <circle
+                cx="10"
+                cy="20"
+                r="1"
+              />
+              <circle
+                cx="18"
+                cy="20"
+                r="1"
+              />
+            </svg>
+
+            <span>LOCKED</span>
           </button>
-        </nav>
 
-        <div className="guest-sidebar-register">
-          <strong>REGISTER TO SAVE OR BUY</strong>
-
-          <div>
-            <button
-              type="button"
-              onClick={() => navigate("/signup")}
-            >
-              Sign up
-            </button>
-
-            <span>•</span>
-
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-            >
-              Log in
-            </button>
+          <div className="guest-home-session-badge">
+            GUEST SESSION
           </div>
         </div>
+      </header>
 
-        <button
-          type="button"
-          className="guest-exit-button"
-          onClick={exitGuest}
-        >
-          Exit Guest
-        </button>
-      </aside>
+      <div className="guest-home-body">
+        <section className="guest-home-welcome">
+          <p>GUEST SESSION</p>
 
-      <section className="guest-content">
-        <header className="guest-header">
-          <div>
-            <h1>07 — GUEST DASHBOARD</h1>
-            <p>Temporary visualization access</p>
-          </div>
+          <h2>
+            Try the core experience
+            immediately
+          </h2>
 
-          <div className="guest-header-actions">
-            <button
-              type="button"
-              className="guest-cart-button"
+          <span>
+            Your temporary progress is
+            erased when this browser
+            session ends.
+          </span>
+        </section>
+
+        <section className="guest-home-feature-grid">
+          {/* Available features */}
+
+          <article className="guest-home-feature-card">
+            <h3>AVAILABLE</h3>
+
+            <FeatureRow
+              label="Avatar creation"
+              status="Available"
               onClick={() =>
-                openRegisterModal("Shopping Cart")
+                navigate(
+                  "/guest/fitting-studio"
+                )
               }
-              aria-label="Shopping cart is locked"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
-              </svg>
+            />
 
-              <span>LOCKED</span>
-            </button>
+            <FeatureRow
+              label="Premade preset"
+              status="Available"
+              onClick={() =>
+                navigate(
+                  "/guest/avatar-presets"
+                )
+              }
+            />
 
-            <div className="guest-session-badge">
-              GUEST SESSION
-            </div>
-          </div>
-        </header>
+            <FeatureRow
+              label="Catalog browsing"
+              status="Available"
+              onClick={() =>
+                navigate(
+                  "/guest/catalog"
+                )
+              }
+            />
 
-        <div className="guest-dashboard-body">
-          <section className="guest-welcome">
-            <p>GUEST SESSION</p>
+            <FeatureRow
+              label="Recommendations"
+              status="Available"
+              onClick={() =>
+                navigate(
+                  "/guest/catalog"
+                )
+              }
+            />
+          </article>
 
-            <h2>
-              Try the core experience immediately
-            </h2>
+          {/* Restricted features */}
 
-            <span>
-              Your temporary progress is erased when
-              this browser session ends.
-            </span>
-          </section>
+          <article className="guest-home-feature-card">
+            <h3>RESTRICTED</h3>
 
-          <section className="guest-feature-grid">
-            <article className="guest-feature-card">
-              <h3>AVAILABLE</h3>
+            <FeatureRow
+              label="Save avatar preset"
+              status="Locked"
+              locked
+              onClick={() =>
+                openRestriction(
+                  "save avatar presets"
+                )
+              }
+            />
 
-              <FeatureRow
-                label="Avatar creation"
-                status="Available"
-                onClick={() =>
-                  navigate("/guest/fitting-studio")
-                }
-              />
+            <FeatureRow
+              label="Save outfit"
+              status="Locked"
+              locked
+              onClick={() =>
+                openRestriction(
+                  "save outfits"
+                )
+              }
+            />
 
-              <FeatureRow
-                label="Premade preset"
-                status="Available"
-                onClick={() =>
-                  navigate("/guest/avatar-presets")
-                }
-              />
+            <FeatureRow
+              label="Shopping cart"
+              status="Locked"
+              locked
+              onClick={() =>
+                openRestriction(
+                  "add products to the shopping cart"
+                )
+              }
+            />
 
-              <FeatureRow
-                label="Catalog browsing"
-                status="Available"
-                onClick={() =>
-                  navigate("/guest/catalog")
-                }
-              />
+            <FeatureRow
+              label="Checkout and orders"
+              status="Locked"
+              locked
+              onClick={() =>
+                openRestriction(
+                  "check out and place orders"
+                )
+              }
+            />
+          </article>
 
-              <FeatureRow
-                label="Recommendations"
-                status="Available"
-                onClick={() =>
-                  navigate("/guest/catalog")
-                }
-              />
-            </article>
+          {/* Registration prompt */}
 
-            <article className="guest-feature-card">
-              <h3>RESTRICTED</h3>
-
-              <FeatureRow
-                label="Save avatar preset"
-                status="Locked"
-                locked
-                onClick={() =>
-                  openRegisterModal(
-                    "Save Avatar Preset"
-                  )
-                }
-              />
-
-              <FeatureRow
-                label="Save outfit"
-                status="Locked"
-                locked
-                onClick={() =>
-                  openRegisterModal("Save Outfit")
-                }
-              />
-
-              <FeatureRow
-                label="Shopping cart"
-                status="Locked"
-                locked
-                onClick={() =>
-                  openRegisterModal("Shopping Cart")
-                }
-              />
-
-              <FeatureRow
-                label="Checkout and orders"
-                status="Locked"
-                locked
-                onClick={() =>
-                  openRegisterModal(
-                    "Checkout and Orders"
-                  )
-                }
-              />
-            </article>
-
-            <article className="guest-register-card">
-              <p>KEEP YOUR PROGRESS</p>
-
-              <h3>Register to save or buy</h3>
-
-              <span>
-                Create a shopper account to keep avatar
-                presets, outfits, carts, and orders.
-              </span>
-
-              <div className="guest-register-actions">
-                <button
-                  type="button"
-                  className="guest-signup-button"
-                  onClick={() => navigate("/signup")}
-                >
-                  Sign Up
-                </button>
-
-                <button
-                  type="button"
-                  className="guest-login-button"
-                  onClick={() => navigate("/login")}
-                >
-                  Log In
-                </button>
-              </div>
-            </article>
-          </section>
-
-          <section className="guest-route-card">
-            <p>GUEST USER FLOW</p>
+          <article className="guest-home-register-card">
+            <p>
+              KEEP YOUR PROGRESS
+            </p>
 
             <h3>
-              Dashboard → Avatar → Fitting Studio →
-              Catalog → Register prompt
+              Register to save or buy
             </h3>
-          </section>
-        </div>
-      </section>
 
-      {showRegisterModal && (
-        <div
-          className="guest-modal-overlay"
-          onMouseDown={closeRegisterModal}
-          role="presentation"
-        >
-          <section
-            className="guest-register-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="guest-modal-title"
-            onMouseDown={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <button
-              type="button"
-              className="guest-modal-close"
-              onClick={closeRegisterModal}
-              aria-label="Close popup"
-            >
-              ×
-            </button>
+            <span>
+              Create a shopper account to
+              keep avatar presets, outfits,
+              carts, and orders.
+            </span>
 
-            <div className="guest-modal-lock">
-              <span>🔒</span>
-            </div>
-
-            <p className="guest-modal-label">
-              GUEST RESTRICTION
-            </p>
-
-            <h2 id="guest-modal-title">
-              Register to continue
-            </h2>
-
-            <p>
-              <strong>{restrictedFeature}</strong> is
-              only available to registered shoppers.
-              Create an account or log in to save your
-              progress and make purchases.
-            </p>
-
-            <div className="guest-modal-actions">
+            <div className="guest-home-register-actions">
               <button
                 type="button"
-                className="guest-modal-signup"
-                onClick={() => navigate("/signup")}
+                className="guest-home-signup-button"
+                onClick={() =>
+                  navigate("/signup")
+                }
               >
-                Create Account
+                Sign Up
               </button>
 
               <button
                 type="button"
-                className="guest-modal-login"
-                onClick={() => navigate("/login")}
+                className="guest-home-login-button"
+                onClick={() =>
+                  navigate("/login")
+                }
               >
                 Log In
               </button>
             </div>
+          </article>
+        </section>
 
-            <button
-              type="button"
-              className="guest-continue-button"
-              onClick={closeRegisterModal}
-            >
-              Continue Browsing as Guest
-            </button>
-          </section>
-        </div>
-      )}
+        <section className="guest-home-route-card">
+          <p>GUEST USER FLOW</p>
+
+          <h3>
+            Dashboard → Avatar → Fitting
+            Studio → Catalog → Register
+            Prompt
+          </h3>
+        </section>
+      </div>
     </main>
   );
 }
@@ -383,7 +248,7 @@ function FeatureRow({
   return (
     <button
       type="button"
-      className={`guest-feature-row ${
+      className={`guest-home-feature-row ${
         locked ? "locked" : ""
       }`}
       onClick={onClick}
@@ -393,7 +258,7 @@ function FeatureRow({
       <span>
         {locked && (
           <span
-            className="guest-small-lock"
+            className="guest-home-small-lock"
             aria-hidden="true"
           >
             🔒

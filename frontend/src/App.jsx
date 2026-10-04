@@ -1,22 +1,91 @@
+import { useEffect } from "react";
+
 import {
+  Link,
   Navigate,
   Route,
   Routes,
+  useLocation,
 } from "react-router-dom";
 
+/* Layouts */
+import ShopperLayout from "./layouts/ShopperLayout";
+import GuestLayout from "./layouts/GuestLayout";
+import SellerLayout from "./layouts/SellerLayout";
+
+/* Shared Pages */
+import LandingPage from "./pages/Shared Pages/LandingPage";
+import ChooseRegistrationRolePage from "./pages/Shared Pages/ChooseRegistrationRolePage";
+
+/* Authentication Pages */
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
-import ShopperDashboard from "./pages/ShopperDashboard";
 import GuestPage from "./pages/GuestPage";
+
+/* Shopper Pages */
+import ShopperDashboard from "./pages/ShopperDashboard";
+import ChooseAvatarGenderPage from "./pages/ChooseAvatarGenderPage";
+import FittingStudioPage from "./pages/FittingStudioPage";
+import CartSelectedItems from "./pages/CartSelectedItems";
+
+import AvatarPresetPage from "./pages/AvatarPresetPage";
+import EditAvatarPresetPage from "./pages/EditAvatarPresetPage";
+
 import CatalogPage from "./pages/CatalogPage";
+import ProductDetailsPage from "./pages/ProductDetailsPage";
+import SellerStorePage from "./pages/SellerStorePage";
+
+import SavedOutfitsPage from "./pages/SavedOutfitsPage";
+import EditSavedOutfitPage from "./pages/EditSavedOutfitPage";
+
+import ShoppingCartPage from "./pages/ShoppingCartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+
+import OrderConfirmationPage from "./pages/OrderConfirmationPage";
+import OrderHistoryPage from "./pages/OrderHistoryPage";
+import OrderDetailsPage from "./pages/OrderDetailsPage";
+
+import AccountManagementPage from "./pages/AccountManagementPage";
+import EditAccountPage from "./pages/EditAccountPage";
+
+/* Seller Pages */
+import SellerSignupPage from "./pages/Seller/SellerSignupPage";
+import SellerDashboardPage from "./pages/Seller/SellerDashboardPage";
+import SellerCatalogUploadPage from "./pages/Seller/SellerCatalogUploadPage";
+import SellerCsvTemplatePage from "./pages/Seller/SellerCsvTemplatePage";
+import SellerProductListingsPage from "./pages/Seller/SellerProductListingsPage";
+import SellerItemDetailsPage from "./pages/Seller/SellerItemDetailsPage";
+import EditSellerListingPage from "./pages/Seller/EditSellerListingPage";
+import SellerValidationReportPage from "./pages/Seller/SellerValidationReportPage";
+import SellerStoreProfilePage from "./pages/Seller/SellerStoreProfilePage";
 
 import "./App.css";
 
+/*
+ * Scrolls to the top whenever the route changes.
+ */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+  }, [pathname]);
+
+  return null;
+}
+
+/*
+ * Used for unfinished pages.
+ */
 function TemporaryPage({
   title,
   message,
-  returnTo = "/login",
-  returnLabel = "Return to Login",
+  returnTo = "/",
+  returnLabel = "Return to Home",
 }) {
   return (
     <main className="temporary-page">
@@ -25,9 +94,9 @@ function TemporaryPage({
 
         <p>{message}</p>
 
-        <a href={returnTo}>
+        <Link to={returnTo}>
           {returnLabel}
-        </a>
+        </Link>
       </div>
     </main>
   );
@@ -35,188 +104,375 @@ function TemporaryPage({
 
 function App() {
   return (
-    <Routes>
-      {/* Default page */}
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to="/login"
-            replace
+    <>
+      <ScrollToTop />
+
+      <Routes>
+        {/* ======================================== */}
+        {/* LANDING PAGE                             */}
+        {/* ======================================== */}
+
+        <Route
+          path="/"
+          element={<LandingPage />}
+        />
+
+        {/* ======================================== */}
+        {/* AUTHENTICATION                           */}
+        {/* ======================================== */}
+
+        <Route
+          path="/login"
+          element={<LoginPage />}
+        />
+
+        <Route
+          path="/signup"
+          element={
+            <ChooseRegistrationRolePage />
+          }
+        />
+
+        <Route
+          path="/signup/shopper"
+          element={<SignupPage />}
+        />
+
+        <Route
+          path="/seller/signup"
+          element={<SellerSignupPage />}
+        />
+
+        <Route
+          path="/forgot-password"
+          element={
+            <TemporaryPage
+              title="Forgot Password"
+              message="Password recovery will be added next."
+              returnTo="/login"
+              returnLabel="Return to Login"
+            />
+          }
+        />
+
+        {/* ======================================== */}
+        {/* GUEST PAGES                              */}
+        {/* ======================================== */}
+
+        <Route
+          path="/guest"
+          element={<GuestLayout />}
+        >
+          {/* Guest Dashboard */}
+          <Route
+            index
+            element={<GuestPage />}
           />
-        }
-      />
 
-      {/* Authentication */}
-      <Route
-        path="/login"
-        element={<LoginPage />}
-      />
-
-      <Route
-        path="/signup"
-        element={<SignupPage />}
-      />
-
-      <Route
-        path="/forgot-password"
-        element={
-          <TemporaryPage
-            title="Forgot Password"
-            message="Password recovery will be added next."
+          {/* Guest Catalog */}
+          <Route
+            path="catalog"
+            element={<CatalogPage isGuest />}
           />
-        }
-      />
 
-      {/* Guest pages */}
-      <Route
-        path="/guest"
-        element={<GuestPage />}
-      />
-
-      <Route
-        path="/guest/fitting-studio"
-        element={
-          <TemporaryPage
-            title="Guest Fitting Studio"
-            message="Avatar customization is temporarily available during this guest session."
-            returnTo="/guest"
-            returnLabel="Return to Guest Dashboard"
+          {/* Guest Product Details */}
+          <Route
+            path="products/:productId"
+            element={
+              <ProductDetailsPage isGuest />
+            }
           />
-        }
-      />
 
-      <Route
-        path="/guest/avatar-presets"
-        element={
-          <TemporaryPage
-            title="Guest Avatar Presets"
-            message="One premade avatar is available for temporary use."
-            returnTo="/guest"
-            returnLabel="Return to Guest Dashboard"
+          {/* Guest Seller Store */}
+          <Route
+            path="sellers/:sellerId"
+            element={
+              <SellerStorePage isGuest />
+            }
           />
-        }
-      />
 
-      <Route
-        path="/guest/catalog"
-        element={
-          <TemporaryPage
-            title="Guest Catalog"
-            message="You may browse products and recommendations, but saving and purchasing are locked."
-            returnTo="/guest"
-            returnLabel="Return to Guest Dashboard"
+          <Route
+            path="store/:sellerId"
+            element={
+              <SellerStorePage isGuest />
+            }
           />
-        }
-      />
 
-      {/* Registered shopper pages */}
-      <Route
-        path="/shopper/dashboard"
-        element={<ShopperDashboard />}
-      />
-
-      <Route
-        path="/shopper/fitting-studio"
-        element={
-          <TemporaryPage
-            title="Fitting Studio"
-            message="Male and Female avatar customization will be added here."
-            returnTo="/shopper/dashboard"
-            returnLabel="Return to Shopper Dashboard"
+          {/* Guest Fitting Studio */}
+          <Route
+            path="fitting-studio"
+            element={
+              <ChooseAvatarGenderPage
+                isGuest
+              />
+            }
           />
-        }
-      />
 
-      <Route
-        path="/shopper/avatar-presets"
-        element={
-          <TemporaryPage
-            title="Avatar Presets"
-            message="One premade avatar preset is available."
-            returnTo="/shopper/dashboard"
-            returnLabel="Return to Shopper Dashboard"
+          <Route
+            path="fitting-studio/customize"
+            element={
+              <FittingStudioPage isGuest />
+            }
           />
-        }
-      />
 
-      {/* Functional registered shopper catalog */}
-      <Route
-        path="/shopper/catalog"
-        element={<CatalogPage />}
-      />
-
-      {/* Temporary destination when View Details is clicked */}
-      <Route
-        path="/shopper/products/:productId"
-        element={
-          <TemporaryPage
-            title="Product Details"
-            message="The complete product information, seller details, ratings, reviews, sizes, and purchasing options will appear here."
-            returnTo="/shopper/catalog"
-            returnLabel="Return to Catalog"
+          {/* Guest Avatar Presets */}
+          <Route
+            path="avatar-presets"
+            element={
+              <AvatarPresetPage isGuest />
+            }
           />
-        }
-      />
+        </Route>
 
-      <Route
-        path="/shopper/saved-outfits"
-        element={
-          <TemporaryPage
-            title="Saved Outfits"
-            message="You have no saved outfits yet."
-            returnTo="/shopper/dashboard"
-            returnLabel="Return to Shopper Dashboard"
-          />
-        }
-      />
+        {/* ======================================== */}
+        {/* REGISTERED SHOPPER PAGES                 */}
+        {/* ======================================== */}
 
-      <Route
-        path="/shopper/cart"
-        element={
-          <TemporaryPage
-            title="Shopping Cart"
-            message="Your shopping cart is currently empty."
-            returnTo="/shopper/catalog"
-            returnLabel="Continue Shopping"
+        <Route
+          path="/shopper"
+          element={<ShopperLayout />}
+        >
+          <Route
+            index
+            element={
+              <Navigate
+                to="dashboard"
+                replace
+              />
+            }
           />
-        }
-      />
 
-      <Route
-        path="/shopper/account"
-        element={
-          <TemporaryPage
-            title="Account Management"
-            message="Your account management options will appear here."
-            returnTo="/shopper/dashboard"
-            returnLabel="Return to Shopper Dashboard"
+          {/* Shopper Dashboard */}
+          <Route
+            path="dashboard"
+            element={<ShopperDashboard />}
           />
-        }
-      />
 
-      {/* Seller pages */}
-      <Route
-        path="/seller/dashboard"
-        element={
-          <TemporaryPage
-            title="Seller Dashboard"
-            message="Seller management tools will be added here."
+          {/* Fitting Studio */}
+          <Route
+            path="fitting-studio"
+            element={
+              <ChooseAvatarGenderPage />
+            }
           />
-        }
-      />
 
-      {/* Unknown URLs return to login */}
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to="/login"
-            replace
+          <Route
+            path="fitting-studio/customize"
+            element={
+              <FittingStudioPage />
+            }
           />
-        }
-      />
-    </Routes>
+
+          <Route
+            path="fitting-studio/select-items"
+            element={
+              <CartSelectedItems />
+            }
+          />
+
+          {/* Avatar Presets */}
+          <Route
+            path="avatar-presets"
+            element={<AvatarPresetPage />}
+          />
+
+          <Route
+            path="avatar-presets/:presetId/edit"
+            element={
+              <EditAvatarPresetPage />
+            }
+          />
+
+          {/* Catalog */}
+          <Route
+            path="catalog"
+            element={<CatalogPage />}
+          />
+
+          {/* Product Details */}
+          <Route
+            path="products/:productId"
+            element={
+              <ProductDetailsPage />
+            }
+          />
+
+          {/* Seller Store */}
+          <Route
+            path="sellers/:sellerId"
+            element={<SellerStorePage />}
+          />
+
+          <Route
+            path="store/:sellerId"
+            element={<SellerStorePage />}
+          />
+
+          {/* Saved Outfits */}
+          <Route
+            path="saved-outfits"
+            element={
+              <SavedOutfitsPage />
+            }
+          />
+
+          <Route
+            path="saved-outfits/:outfitId/edit"
+            element={
+              <EditSavedOutfitPage />
+            }
+          />
+
+          {/* Shopping Cart */}
+          <Route
+            path="cart"
+            element={
+              <ShoppingCartPage />
+            }
+          />
+
+          {/* Checkout */}
+          <Route
+            path="checkout"
+            element={<CheckoutPage />}
+          />
+
+          {/* Order Confirmation */}
+          <Route
+            path="order-confirmation"
+            element={
+              <OrderConfirmationPage />
+            }
+          />
+
+          {/* Order History */}
+          <Route
+            path="orders"
+            element={
+              <OrderHistoryPage />
+            }
+          />
+
+          {/* Order Details */}
+          <Route
+            path="orders/:orderId"
+            element={
+              <OrderDetailsPage />
+            }
+          />
+
+          {/* Account Management */}
+          <Route
+            path="account"
+            element={
+              <AccountManagementPage />
+            }
+          />
+
+          <Route
+            path="account/edit"
+            element={<EditAccountPage />}
+          />
+        </Route>
+
+        {/* ======================================== */}
+        {/* SELLER PAGES                             */}
+        {/* ======================================== */}
+
+        <Route
+          path="/seller"
+          element={<SellerLayout />}
+        >
+          <Route
+            index
+            element={
+              <Navigate
+                to="dashboard"
+                replace
+              />
+            }
+          />
+
+          {/* Seller Dashboard */}
+          <Route
+            path="dashboard"
+            element={
+              <SellerDashboardPage />
+            }
+          />
+
+          {/* Upload Catalog */}
+          <Route
+            path="products/upload"
+            element={
+              <SellerCatalogUploadPage />
+            }
+          />
+
+          {/* CSV Template */}
+          <Route
+            path="products/upload/template"
+            element={
+              <SellerCsvTemplatePage />
+            }
+          />
+
+          {/* Product Listings */}
+          <Route
+            path="products"
+            element={
+              <SellerProductListingsPage />
+            }
+          />
+
+          {/* Seller Item Details */}
+          <Route
+            path="products/:productId"
+            element={
+              <SellerItemDetailsPage />
+            }
+          />
+
+          {/* Edit Seller Listing */}
+          <Route
+            path="products/:productId/edit"
+            element={
+              <EditSellerListingPage />
+            }
+          />
+
+          {/* Validation Report */}
+          <Route
+            path="validation-report"
+            element={
+              <SellerValidationReportPage />
+            }
+          />
+
+          {/* Seller Store Profile */}
+          <Route
+            path="account"
+            element={
+              <SellerStoreProfilePage />
+            }
+          />
+        </Route>
+
+        {/* ======================================== */}
+        {/* UNKNOWN URL                              */}
+        {/* ======================================== */}
+
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to="/"
+              replace
+            />
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

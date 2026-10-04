@@ -1,24 +1,70 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import {
+  NavLink,
+  useNavigate,
+} from "react-router-dom";
+
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import "./ShopperDashboard.css";
+import "./css/ShopperDashboard.css";
+
+function readStoredArray(key) {
+  try {
+    const storedValue = JSON.parse(
+      localStorage.getItem(key) || "[]"
+    );
+
+    return Array.isArray(storedValue)
+      ? storedValue
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function getRegisteredUsername() {
+  const savedAccount =
+    sessionStorage.getItem(
+      "registeredAccount"
+    );
+
+  if (!savedAccount) {
+    return "Shopper";
+  }
+
+  try {
+    const account = JSON.parse(savedAccount);
+
+    return account.username || "Shopper";
+  } catch {
+    return "Shopper";
+  }
+}
 
 function ShopperDashboard() {
   const navigate = useNavigate();
 
-  const savedAccount = sessionStorage.getItem(
-    "registeredAccount"
+  const username = getRegisteredUsername();
+
+  const cartItems = readStoredArray(
+    "fitfusion-cart-items"
   );
 
-  let username = "Shopper";
+  const savedOutfits = readStoredArray(
+    "fitfusion-saved-outfits"
+  );
 
-  if (savedAccount) {
-    try {
-      const account = JSON.parse(savedAccount);
-      username = account.username || "Shopper";
-    } catch {
-      username = "Shopper";
-    }
-  }
+  const orderHistory = readStoredArray(
+    "fitfusion-order-history"
+  );
+
+  const avatarPresets = readStoredArray(
+    "fitfusion-avatar-presets"
+  );
+
+  const cartCount = cartItems.reduce(
+    (total, item) =>
+      total + Number(item.quantity || 1),
+    0
+  );
 
   function handleLogout() {
     const confirmed = window.confirm(
@@ -31,6 +77,9 @@ function ShopperDashboard() {
 
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
+    localStorage.removeItem(
+      "fitfusion-current-user"
+    );
 
     navigate("/login");
   }
@@ -38,15 +87,23 @@ function ShopperDashboard() {
   return (
     <main className="shopper-dashboard">
       <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
+        <NavLink
+          className="shopper-sidebar-logo"
+          to="/shopper/dashboard"
+          aria-label="FitFusion dashboard"
+        >
           <img
             src={fitFusionLogo}
             alt="FitFusion AI"
           />
-        </div>
+        </NavLink>
 
-        <nav className="shopper-navigation">
+        <nav
+          className="shopper-navigation"
+          aria-label="Registered shopper navigation"
+        >
           <NavLink
+            end
             to="/shopper/dashboard"
             className={({ isActive }) =>
               isActive
@@ -102,6 +159,17 @@ function ShopperDashboard() {
           </NavLink>
 
           <NavLink
+            to="/shopper/orders"
+            className={({ isActive }) =>
+              isActive
+                ? "shopper-nav-link active"
+                : "shopper-nav-link"
+            }
+          >
+            Order History
+          </NavLink>
+
+          <NavLink
             to="/shopper/account"
             className={({ isActive }) =>
               isActive
@@ -141,18 +209,26 @@ function ShopperDashboard() {
               onClick={() =>
                 navigate("/shopper/cart")
               }
-              aria-label="Open cart with 0 items"
+              aria-label={`Open cart with ${cartCount} items`}
             >
               <svg
                 viewBox="0 0 24 24"
                 aria-hidden="true"
               >
                 <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
+                <circle
+                  cx="10"
+                  cy="20"
+                  r="1"
+                />
+                <circle
+                  cx="18"
+                  cy="20"
+                  r="1"
+                />
               </svg>
 
-              <span>0</span>
+              <span>{cartCount}</span>
             </button>
 
             <div className="shopper-role-badge">
@@ -163,9 +239,13 @@ function ShopperDashboard() {
 
         <div className="shopper-dashboard-body">
           <section className="shopper-welcome">
-            <p>WELCOME, {username.toUpperCase()}</p>
+            <p>
+              WELCOME, {username.toUpperCase()}
+            </p>
 
-            <h1>Start your first fitting session</h1>
+            <h1>
+              Start your first fitting session
+            </h1>
 
             <span>
               Choose the premade avatar or create a
@@ -179,12 +259,15 @@ function ShopperDashboard() {
                 START HERE
               </p>
 
-              <h2>Your fitting profile is empty</h2>
+              <h2>
+                Your fitting profile is empty
+              </h2>
 
               <p>
-                Use the one premade avatar immediately,
-                or customize height, weight, skin tone,
-                and body proportions.
+                Use the one premade avatar
+                immediately, or customize height,
+                weight, skin tone, and body
+                proportions.
               </p>
 
               <div className="shopper-card-actions">
@@ -246,25 +329,53 @@ function ShopperDashboard() {
 
             <StatusRow
               label="Avatar presets"
-              value="0 custom • 1 premade"
+              value={
+                avatarPresets.length > 0
+                  ? `${avatarPresets.length} saved preset${
+                      avatarPresets.length === 1
+                        ? ""
+                        : "s"
+                    }`
+                  : "0 custom • 1 premade"
+              }
               onClick={() =>
-                navigate("/shopper/avatar-presets")
+                navigate(
+                  "/shopper/avatar-presets"
+                )
               }
             />
 
             <StatusRow
               label="Saved outfits"
-              value="No saved outfits"
+              value={
+                savedOutfits.length > 0
+                  ? `${savedOutfits.length} saved outfit${
+                      savedOutfits.length === 1
+                        ? ""
+                        : "s"
+                    }`
+                  : "No saved outfits"
+              }
               onClick={() =>
-                navigate("/shopper/saved-outfits")
+                navigate(
+                  "/shopper/saved-outfits"
+                )
               }
             />
 
             <StatusRow
               label="Orders"
-              value="No orders yet"
+              value={
+                orderHistory.length > 0
+                  ? `${orderHistory.length} order${
+                      orderHistory.length === 1
+                        ? ""
+                        : "s"
+                    }`
+                  : "No orders yet"
+              }
               onClick={() =>
-                navigate("/shopper/account")
+                navigate("/shopper/orders")
               }
             />
           </section>
@@ -274,7 +385,11 @@ function ShopperDashboard() {
   );
 }
 
-function StatusRow({ label, value, onClick }) {
+function StatusRow({
+  label,
+  value,
+  onClick,
+}) {
   return (
     <button
       type="button"
@@ -282,6 +397,7 @@ function StatusRow({ label, value, onClick }) {
       onClick={onClick}
     >
       <strong>{label}</strong>
+
       <span>{value}</span>
     </button>
   );
