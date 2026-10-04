@@ -1,7 +1,10 @@
 from django.test import TestCase
+from django.test import SimpleTestCase
+from unittest.mock import Mock, patch
 from rest_framework.test import APIClient
 from accounts.models import User
 from outfits.models import AvatarPreset
+from accounts.storage import GridFSStorage
 
 
 class AvatarPresetCRUDTests(TestCase):
@@ -128,3 +131,60 @@ class AccountManagementTests(TestCase):
         login = self.client.post('/auth/login/',
                                  {'username': 'acctuser', 'password': 'OldPass123!@#'}, format='json')
         self.assertEqual(login.status_code, 400)
+
+
+class GridFSStorageDeletionTests(SimpleTestCase):
+    def test_delete_finds_object_id_backed_image_fields(self):
+        from bson import ObjectId
+
+        file_id = ObjectId('507f1f77bcf86cd799439011')
+        stored_file = Mock(_id=file_id)
+        gridfs = Mock()
+        gridfs.find_one.return_value = stored_file
+        storage = GridFSStorage()
+        storage._fs = gridfs
+        storage._use_gridfs = True
+
+        storage.delete(str(file_id))
+
+        gridfs.find_one.assert_called_once_with({'_id': file_id})
+        gridfs.delete.assert_called_once_with(file_id)
+
+    def test_delete_falls_back_to_filename_for_non_object_id_keys(self):
+        stored_file = Mock(_id='legacy-id')
+        gridfs = Mock()
+        gridfs.find_one.return_value = stored_file
+        storage = GridFSStorage()
+        storage._fs = gridfs
+        storage._use_gridfs = True
+
+        storage.delete('legacy-name.png')
+
+        gridfs.find_one.assert_called_once_with({'filename': 'legacy-name.png'})
+        gridfs.delete.assert_called_once_with('legacy-id')
+
+
+class DatabasePingRedactionTests(SimpleTestCase):
+    def test_ping_result_never_contains_the_connection_uri(self):
+        from accounts.health_utils import ping
+
+        target = {
+            'uri': 'mongodb+srv://user:secret@example.mongodb.net/fitfusion',
+            'is_srv': True,
+            'cluster': 'example.mongodb.net',
+            'database': 'fitfusion',
+            'atlas': True,
+            'local': False,
+            'tls': 'implied-by-srv',
+            'tls_disabled_warning': False,
+        }
+        client = Mock()
+        client.server_info.return_value = {'version': '8.0'}
+
+        with patch('accounts.health_utils.resolve_target', return_value=target), \
+             patch('pymongo.MongoClient', return_value=client):
+            result = ping()
+
+        self.assertTrue(result['ok'])
+        self.assertNotIn('uri', result)
+        self.assertNotIn('secret', str(result))

@@ -6,8 +6,9 @@ from .views import (
     register_view, login_view, logout_view,
     AvatarPresetViewSet,
 )
+from .views.health import health_check  # KAN-93: /health/ (reused by KAN-94)
 
-# KAN-58: Preset CRUD routes → /presets/
+# KAN-58: Preset CRUD routes -> /presets/
 router = SimpleRouter()
 router.register('presets', AvatarPresetViewSet, basename='presets')
 
@@ -22,6 +23,7 @@ urlpatterns = [
     path('profile/', ProfileView.as_view(), name='user-profile'),
     # KAN-56 ADDED: Password change endpoint
     path('profile/password/', PasswordChangeView.as_view(), name='password-change'),
+    path('health/', health_check, name='health'),  # KAN-93  (INSIDE the brackets)
 ]
 
 urlpatterns += router.urls

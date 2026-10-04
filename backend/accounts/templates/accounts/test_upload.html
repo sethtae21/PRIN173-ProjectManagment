@@ -30,7 +30,7 @@
 </head>
 <body>
     <h1>🧪 FitFusion AI — Full Feature Test Suite</h1>
-    <p>Covers: Auth + Token Blacklist • <strong>KAN-104</strong> Catalog Filters • <strong>KAN-58</strong> Preset CRUD • <strong>KAN-56</strong> Account Management</p>
+    <p>Covers: Auth + Token Blacklist • <strong>KAN-104</strong> Catalog Filters • <strong>KAN-58</strong> Preset CRUD • <strong>KAN-56</strong> Account Management • <strong>KAN-101</strong> Ratings</p>
 
     <div id="statusBar" class="status-bar">
         <span id="statusText">🔒 Not logged in</span>
@@ -139,6 +139,27 @@
         <h2>9. Token Security Tests <span class="badge">Rotation + Blacklist</span></h2>
         <button onclick="testRotation()">🔄 Rotate refresh → then replay OLD refresh (expect 401)</button>
         <div id="securityResult"></div>
+    </div>
+
+    <!-- 10 KAN-101 -->
+    <div class="section">
+        <h2>10. In-App Ratings <span class="badge">KAN-101 • FR-7.5</span></h2>
+        <input type="text" id="rate_target_id" placeholder="Target ID (item or fit)" value="6ab52dc83c8d812f8b7ee414">
+        <select id="rate_target_type">
+            <option value="item">item (recommended product)</option>
+            <option value="fit">fit (fit visualization)</option>
+        </select>
+        <select id="rate_score">
+            <option value="5">5 ★</option><option value="4">4 ★</option>
+            <option value="3">3 ★</option><option value="2">2 ★</option>
+            <option value="1">1 ★</option>
+        </select>
+        <button class="success" onclick="submitRating()">⭐ Submit Rating</button>
+        <button onclick="submitRating('like')">👍 Like</button>
+        <button onclick="submitRating('dislike')">👎 Dislike</button>
+        <button onclick="getRatingSummary()">📊 Summary</button>
+        <button onclick="getMyRatings()">📋 My Ratings</button>
+        <div id="ratingResult"></div>
     </div>
 
     <script>
@@ -392,6 +413,45 @@
             const d2 = await r2.json().catch(() => ({}));
             show(out, r2.status === 401,
                 `Step 1 rotation: ${r1.status} (new tokens issued)\nStep 2 replay OLD refresh: ${r2.status} ${JSON.stringify(d2)}\n${r2.status === 401 ? '✅ BLACKLIST ENFORCED — rotated token cannot be reused.' : '❌ Expected 401!'}`);
+        }
+
+        // 10 — KAN-101 Ratings
+        async function submitRating(vote) {
+            const out = 'ratingResult';
+            const body = { target_type: val('rate_target_type'), target_id: val('rate_target_id') };
+            if (vote) body.vote = vote; else body.score = parseInt(val('rate_score'), 10);
+
+            const res = await fetch('/ratings/', {
+                method: 'POST',
+                headers: accessToken ? authHeaders(true) : { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (res.ok && data.persisted === false) {
+                document.getElementById(out).innerHTML =
+                    `<div class="info">🔒 Guest rating counted for THIS SESSION only (discarded later).\nPrompt: ${data.prompt} — ${data.message}</div>`;
+            } else if (res.ok) {
+                show(out, true, '✅ Rating persisted!\n' + JSON.stringify(data.rating, null, 2));
+            } else {
+                show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+            }
+        }
+        async function getRatingSummary() {
+            const out = 'ratingResult';
+            const url = `/ratings/summary/?target_type=${val('rate_target_type')}&target_id=${val('rate_target_id')}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            res.ok ? show(out, true, '📊 ' + JSON.stringify(data, null, 2))
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
+        }
+        async function getMyRatings() {
+            const out = 'ratingResult';
+            if (!accessToken) return show(out, false, '⚠️ Login first');
+            const res = await fetch('/ratings/mine/', { headers: authHeaders(false) });
+            const data = await res.json();
+            res.ok ? show(out, true, '📋 ' + JSON.stringify(data, null, 2))
+                   : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
         }
     </script>
 </body>

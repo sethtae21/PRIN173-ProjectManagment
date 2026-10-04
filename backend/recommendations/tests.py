@@ -1,4 +1,5 @@
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 from .knowledge_table import WEIGHTS, height_band, infer_contrast, infer_shade
 from .scoring import AvatarProfile, ItemProfile, rank_items, score_item
@@ -106,4 +107,56 @@ class RankingTests(TestCase):
                 w[rule_id] = max(0, w[rule_id] + delta)
                 ranked = rank_items(WARM_PETITE, self.ITEMS, weights=w)
                 self.assertEqual(ranked[0].item_name, "perfect",
-                                 f"top-1 flipped with {rule_id}{delta:+d}")     
+                                 f"top-1 flipped with {rule_id}{delta:+d}")
+
+
+class RecommendationQueryValidationTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_valid_query_parameters_are_accepted(self):
+        response = self.client.get('/api/recommendations/', {
+            'undertone': 'warm', 'height_cm': '170', 'body_shape': 'balanced',
+            'styles': 'casual, minimalist', 'occasions': 'everyday', 'limit': '50',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['avatar_profile']['style_tags'], ['casual', 'minimalist'])
+
+    def test_invalid_enums_are_rejected(self):
+        for params in (
+            {'undertone': 'warmmm'},
+            {'body_shape': 'topheavy'},
+        ):
+            with self.subTest(params=params):
+                self.assertEqual(
+                    self.client.get('/api/recommendations/', params).status_code, 400
+                )
+
+    def test_invalid_height_is_rejected(self):
+        for height in ('not-a-number', '49', '251', 'NaN', 'inf'):
+            with self.subTest(height=height):
+                self.assertEqual(
+                    self.client.get('/api/recommendations/', {'height_cm': height}).status_code,
+                    400,
+                )
+
+    def test_invalid_limit_is_rejected(self):
+        for limit in ('0', '-1', '51', '1.5', '1000000'):
+            with self.subTest(limit=limit):
+                self.assertEqual(
+                    self.client.get('/api/recommendations/', {'limit': limit}).status_code,
+                    400,
+                )
+
+    def test_style_and_occasion_inputs_are_bounded(self):
+        too_many_styles = ','.join(f'style{i}' for i in range(21))
+        too_long_tag = 'x' * 41
+        for params in (
+            {'styles': too_many_styles},
+            {'occasions': too_long_tag},
+            {'styles': 'x' * 501},
+        ):
+            with self.subTest(params=list(params)):
+                self.assertEqual(
+                    self.client.get('/api/recommendations/', params).status_code, 400
+                )
