@@ -215,41 +215,19 @@ const SIZES = [
   "2XL",
 ];
 
-function readStorageArray(key) {
-  try {
-    const storedValue =
-      localStorage.getItem(key);
-
-    const parsedValue = storedValue
-      ? JSON.parse(storedValue)
-      : [];
-
-    return Array.isArray(parsedValue)
-      ? parsedValue
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 function formatPrice(price) {
-  return new Intl.NumberFormat(
-    "en-PH",
-    {
-      style: "currency",
-      currency: "PHP",
-      minimumFractionDigits: 0,
-    }
-  ).format(price);
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+  }).format(price);
 }
 
 function CatalogPage({
   isGuest = false,
 }) {
   const navigate = useNavigate();
-
-  const outletContext =
-    useOutletContext();
+  const outletContext = useOutletContext();
 
   const guestMode =
     isGuest ||
@@ -258,6 +236,10 @@ function CatalogPage({
   const basePath = guestMode
     ? "/guest"
     : "/shopper";
+
+  const storage = guestMode
+    ? sessionStorage
+    : localStorage;
 
   const [searchTerm, setSearchTerm] =
     useState("");
@@ -290,17 +272,12 @@ function CatalogPage({
     setToastMessage,
   ] = useState("");
 
-  const [cartCount, setCartCount] =
-    useState(0);
-
   useEffect(() => {
     window.scrollTo({
       top: 0,
       left: 0,
       behavior: "auto",
     });
-
-    updateCartCount();
   }, []);
 
   useEffect(() => {
@@ -308,18 +285,17 @@ function CatalogPage({
       return undefined;
     }
 
-    const timer =
-      window.setTimeout(() => {
-        setToastMessage("");
-      }, 2500);
+    const timer = window.setTimeout(() => {
+      setToastMessage("");
+    }, 2500);
 
     return () => {
       window.clearTimeout(timer);
     };
   }, [toastMessage]);
 
-  const sellerNames = useMemo(() => {
-    return [
+  const sellerNames = useMemo(
+    () => [
       "All",
       ...new Set(
         PRODUCTS.map(
@@ -327,135 +303,111 @@ function CatalogPage({
             product.sellerName
         )
       ),
-    ];
-  }, []);
+    ],
+    []
+  );
 
-  const filteredProducts =
-    useMemo(() => {
-      const normalizedSearch =
-        searchTerm
-          .trim()
-          .toLowerCase();
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch =
+      searchTerm.trim().toLowerCase();
 
-      const results =
-        PRODUCTS.filter(
-          (product) => {
-            const matchesSearch =
-              !normalizedSearch ||
-              product.name
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                ) ||
-              product.sellerName
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                ) ||
-              product.category
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                ) ||
-              product.color
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                );
+    const results = PRODUCTS.filter(
+      (product) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          product.name
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          product.sellerName
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          product.category
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          product.color
+            .toLowerCase()
+            .includes(normalizedSearch);
 
-            const matchesCategory =
-              category === "All" ||
-              product.category ===
-                category;
+        const matchesCategory =
+          category === "All" ||
+          product.category === category;
 
-            const matchesGender =
-              gender === "All" ||
-              product.gender ===
-                gender;
+        const matchesGender =
+          gender === "All" ||
+          product.gender === gender;
 
-            const matchesSize =
-              size === "All" ||
-              product.sizes.includes(
-                size
-              );
+        const matchesSize =
+          size === "All" ||
+          product.sizes.includes(size);
 
-            const matchesSeller =
-              seller === "All" ||
-              product.sellerName ===
-                seller;
+        const matchesSeller =
+          seller === "All" ||
+          product.sellerName === seller;
 
-            const matchesPrice =
-              product.price <=
-              maximumPrice;
+        const matchesPrice =
+          product.price <= maximumPrice;
 
-            return (
-              matchesSearch &&
-              matchesCategory &&
-              matchesGender &&
-              matchesSize &&
-              matchesSeller &&
-              matchesPrice
-            );
-          }
+        return (
+          matchesSearch &&
+          matchesCategory &&
+          matchesGender &&
+          matchesSize &&
+          matchesSeller &&
+          matchesPrice
         );
+      }
+    );
 
-      return [...results].sort(
-        (
-          firstProduct,
-          secondProduct
-        ) => {
-          if (
-            sortBy === "price-low"
-          ) {
-            return (
-              firstProduct.price -
-              secondProduct.price
-            );
-          }
-
-          if (
-            sortBy === "price-high"
-          ) {
-            return (
-              secondProduct.price -
-              firstProduct.price
-            );
-          }
-
-          if (sortBy === "rating") {
-            return (
-              secondProduct.rating -
-              firstProduct.rating
-            );
-          }
-
-          if (sortBy === "newest") {
-            return secondProduct.id.localeCompare(
-              firstProduct.id
-            );
-          }
-
+    return [...results].sort(
+      (firstProduct, secondProduct) => {
+        if (sortBy === "price-low") {
           return (
-            Number(
-              secondProduct.featured
-            ) -
-              Number(
-                firstProduct.featured
-              ) ||
-            secondProduct.rating -
-              firstProduct.rating
+            firstProduct.price -
+            secondProduct.price
           );
         }
-      );
-    }, [
-      category,
-      gender,
-      maximumPrice,
-      searchTerm,
-      seller,
-      size,
-      sortBy,
-    ]);
+
+        if (sortBy === "price-high") {
+          return (
+            secondProduct.price -
+            firstProduct.price
+          );
+        }
+
+        if (sortBy === "rating") {
+          return (
+            secondProduct.rating -
+            firstProduct.rating
+          );
+        }
+
+        if (sortBy === "newest") {
+          return secondProduct.id.localeCompare(
+            firstProduct.id
+          );
+        }
+
+        return (
+          Number(
+            secondProduct.featured
+          ) -
+            Number(
+              firstProduct.featured
+            ) ||
+          secondProduct.rating -
+            firstProduct.rating
+        );
+      }
+    );
+  }, [
+    category,
+    gender,
+    maximumPrice,
+    searchTerm,
+    seller,
+    size,
+    sortBy,
+  ]);
 
   const activeFilterCount = [
     category !== "All",
@@ -465,37 +417,8 @@ function CatalogPage({
     maximumPrice < 2500,
   ].filter(Boolean).length;
 
-  function updateCartCount() {
-    const cartItems =
-      readStorageArray(
-        "fitfusion-cart-items"
-      );
-
-    const count = cartItems.reduce(
-      (total, item) =>
-        total +
-        (Number(item.quantity) || 1),
-      0
-    );
-
-    setCartCount(count);
-  }
-
-  function showGuestRestriction(
-    feature
-  ) {
-    if (
-      outletContext
-        ?.openGuestRestriction
-    ) {
-      outletContext.openGuestRestriction(
-        feature
-      );
-    }
-  }
-
   function viewProduct(product) {
-    localStorage.setItem(
+    storage.setItem(
       "fitfusion-selected-product",
       JSON.stringify(product)
     );
@@ -506,7 +429,7 @@ function CatalogPage({
   }
 
   function viewSeller(product) {
-    localStorage.setItem(
+    storage.setItem(
       "fitfusion-selected-seller",
       JSON.stringify({
         id: product.sellerId,
@@ -529,16 +452,14 @@ function CatalogPage({
         new Date().toISOString(),
     };
 
-    localStorage.setItem(
+    storage.setItem(
       "fitfusion-selected-product",
       JSON.stringify(product)
     );
 
-    localStorage.setItem(
+    storage.setItem(
       "fitfusion-selected-items",
-      JSON.stringify([
-        selectedItem,
-      ])
+      JSON.stringify([selectedItem])
     );
 
     setToastMessage(
@@ -550,18 +471,6 @@ function CatalogPage({
         `${basePath}/fitting-studio/customize`
       );
     }, 600);
-  }
-
-  function openCart() {
-    if (guestMode) {
-      showGuestRestriction(
-        "use the shopping cart"
-      );
-
-      return;
-    }
-
-    navigate("/shopper/cart");
   }
 
   function resetFilters() {
@@ -576,84 +485,19 @@ function CatalogPage({
 
   return (
     <main className="catalog-page">
-      <header className="catalog-header">
-        <div>
-          <p className="catalog-page-code">
-            09 — PRODUCT CATALOG
-          </p>
-
-          <p className="catalog-page-description">
-            Browse products from verified
-            FitFusion sellers
-          </p>
-        </div>
-
-        <div className="catalog-header-actions">
-          <button
-            type="button"
-            className={
-              guestMode
-                ? "catalog-cart-button locked"
-                : "catalog-cart-button"
-            }
-            onClick={openCart}
-            aria-label={
-              guestMode
-                ? "Shopping cart is locked for guests"
-                : `Open cart with ${cartCount} items`
-            }
-          >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-
-              <circle
-                cx="10"
-                cy="20"
-                r="1"
-              />
-
-              <circle
-                cx="18"
-                cy="20"
-                r="1"
-              />
-            </svg>
-
-            <span>
-              {guestMode
-                ? "LOCKED"
-                : cartCount}
-            </span>
-          </button>
-
-          <div className="catalog-role-badge">
-            {guestMode
-              ? "GUEST SESSION"
-              : "REGISTERED SHOPPER"}
-          </div>
-        </div>
-      </header>
-
       <div className="catalog-body">
         <section className="catalog-introduction">
           <div>
-            <p>
-              EXPLORE YOUR STYLE
-            </p>
+            <p>EXPLORE YOUR STYLE</p>
 
             <h1>
-              Find your next favorite
-              outfit
+              Find your next favorite outfit
             </h1>
 
             <span>
-              Open a product to view
-              its seller, ratings,
-              available sizes, and
-              purchasing options.
+              Open a product to view its
+              seller, ratings, available
+              sizes, and purchasing options.
             </span>
           </div>
 
@@ -663,8 +507,7 @@ function CatalogPage({
             </strong>
 
             <span>
-              {filteredProducts.length ===
-              1
+              {filteredProducts.length === 1
                 ? "product"
                 : "products"}
             </span>
@@ -726,8 +569,7 @@ function CatalogPage({
           >
             Filters
 
-            {activeFilterCount >
-              0 && (
+            {activeFilterCount > 0 && (
               <span>
                 {activeFilterCount}
               </span>
@@ -794,13 +636,8 @@ function CatalogPage({
           <section className="catalog-filter-panel">
             <div className="catalog-filter-heading">
               <div>
-                <p>
-                  REFINE RESULTS
-                </p>
-
-                <h2>
-                  Product filters
-                </h2>
+                <p>REFINE RESULTS</p>
+                <h2>Product filters</h2>
               </div>
 
               <button
@@ -856,8 +693,7 @@ function CatalogPage({
                   onChange={(event) =>
                     setMaximumPrice(
                       Number(
-                        event.target
-                          .value
+                        event.target.value
                       )
                     )
                   }
@@ -872,8 +708,7 @@ function CatalogPage({
           </section>
         )}
 
-        {filteredProducts.length >
-        0 ? (
+        {filteredProducts.length > 0 ? (
           <section className="catalog-product-grid">
             {filteredProducts.map(
               (product) => (
@@ -885,9 +720,7 @@ function CatalogPage({
                     type="button"
                     className="catalog-product-image"
                     onClick={() =>
-                      viewProduct(
-                        product
-                      )
+                      viewProduct(product)
                     }
                   >
                     {product.featured && (
@@ -902,9 +735,7 @@ function CatalogPage({
 
                     <span className="catalog-match-score">
                       Match score:{" "}
-                      {
-                        product.matchScore
-                      }
+                      {product.matchScore}
                     </span>
                   </button>
 
@@ -913,23 +744,17 @@ function CatalogPage({
                       type="button"
                       className="catalog-seller-link"
                       onClick={() =>
-                        viewSeller(
-                          product
-                        )
+                        viewSeller(product)
                       }
                     >
-                      {
-                        product.sellerName
-                      }
+                      {product.sellerName}
                     </button>
 
                     <button
                       type="button"
                       className="catalog-product-name"
                       onClick={() =>
-                        viewProduct(
-                          product
-                        )
+                        viewProduct(product)
                       }
                     >
                       {product.name}
@@ -937,9 +762,7 @@ function CatalogPage({
 
                     <div className="catalog-product-details">
                       <span>
-                        {
-                          product.category
-                        }
+                        {product.category}
                       </span>
 
                       <span>•</span>
@@ -957,11 +780,7 @@ function CatalogPage({
                       </strong>
 
                       <small>
-                        (
-                        {
-                          product.reviews
-                        }
-                        )
+                        ({product.reviews})
                       </small>
                     </div>
 
@@ -996,9 +815,7 @@ function CatalogPage({
                         type="button"
                         className="catalog-view-button"
                         onClick={() =>
-                          viewProduct(
-                            product
-                          )
+                          viewProduct(product)
                         }
                       >
                         View Details
@@ -1008,9 +825,7 @@ function CatalogPage({
                         type="button"
                         className="catalog-try-button"
                         onClick={() =>
-                          tryProduct(
-                            product
-                          )
+                          tryProduct(product)
                         }
                       >
                         Try On
@@ -1025,16 +840,13 @@ function CatalogPage({
           <section className="catalog-empty-state">
             <div>⌕</div>
 
-            <h2>
-              No products found
-            </h2>
+            <h2>No products found</h2>
 
             <p>
-              No products match your
-              current search and filters.
-              Try changing the category,
-              size, seller, or maximum
-              price.
+              No products match your current
+              search and filters. Try changing
+              the category, size, seller, or
+              maximum price.
             </p>
 
             <button
@@ -1072,9 +884,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) =>
-          onChange(
-            event.target.value
-          )
+          onChange(event.target.value)
         }
       >
         {options.map((option) => (

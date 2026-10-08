@@ -1,273 +1,152 @@
-import {
-  NavLink,
-  useNavigate,
-} from "react-router-dom";
-
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { useNavigate } from "react-router-dom";
 import "./css/ShopperDashboard.css";
 
-function readStoredArray(key) {
-  try {
-    const storedValue = JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
+function readStoredArray(...keys) {
+  for (const key of keys) {
+    try {
+      const savedValue = localStorage.getItem(key);
 
-    return Array.isArray(storedValue)
-      ? storedValue
-      : [];
-  } catch {
-    return [];
+      if (savedValue) {
+        const parsedValue = JSON.parse(savedValue);
+
+        if (Array.isArray(parsedValue)) {
+          return parsedValue;
+        }
+      }
+    } catch {
+      // Continue checking the other storage keys.
+    }
   }
+
+  return [];
 }
 
-function getRegisteredUsername() {
-  const savedAccount =
-    sessionStorage.getItem(
-      "registeredAccount"
-    );
+function getCurrentShopper() {
+  const possibleKeys = [
+    {
+      storage: localStorage,
+      key: "fitfusion-current-user",
+    },
+    {
+      storage: sessionStorage,
+      key: "registeredAccount",
+    },
+  ];
 
-  if (!savedAccount) {
-    return "Shopper";
+  for (const item of possibleKeys) {
+    try {
+      const savedAccount =
+        item.storage.getItem(item.key);
+
+      if (savedAccount) {
+        return JSON.parse(savedAccount);
+      }
+    } catch {
+      // Continue checking the next stored account.
+    }
   }
 
-  try {
-    const account = JSON.parse(savedAccount);
-
-    return account.username || "Shopper";
-  } catch {
-    return "Shopper";
-  }
+  return null;
 }
 
 function ShopperDashboard() {
   const navigate = useNavigate();
+  const currentShopper = getCurrentShopper();
 
-  const username = getRegisteredUsername();
+  const username =
+    currentShopper?.username ||
+    currentShopper?.firstName ||
+    "Shopper";
 
   const cartItems = readStoredArray(
-    "fitfusion-cart-items"
+    "fitfusion-cart",
+    "fitfusion-shopping-cart",
+    "cartItems"
   );
 
   const savedOutfits = readStoredArray(
-    "fitfusion-saved-outfits"
+    "fitfusion-saved-outfits",
+    "savedOutfits"
   );
 
-  const orderHistory = readStoredArray(
-    "fitfusion-order-history"
+  const customPresets = readStoredArray(
+    "fitfusion-avatar-presets",
+    "avatarPresets"
   );
-
-  const avatarPresets = readStoredArray(
-    "fitfusion-avatar-presets"
-  );
-
-  const cartCount = cartItems.reduce(
-    (total, item) =>
-      total + Number(item.quantity || 1),
-    0
-  );
-
-  function handleLogout() {
-    const confirmed = window.confirm(
-      "Are you sure you want to log out?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
-
-    navigate("/login");
-  }
 
   return (
-    <main className="shopper-dashboard">
-      <aside className="shopper-sidebar">
-        <NavLink
-          className="shopper-sidebar-logo"
-          to="/shopper/dashboard"
-          aria-label="FitFusion dashboard"
-        >
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </NavLink>
+    <main className="shopper-dashboard-page">
+      <header className="shopper-dashboard-header">
+        <div>
+          <p className="shopper-page-code">
+            05 — NEW USER DASHBOARD
+          </p>
 
-        <nav
-          className="shopper-navigation"
-          aria-label="Registered shopper navigation"
-        >
-          <NavLink
-            end
-            to="/shopper/dashboard"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
+          <p className="shopper-page-description">
+            Onboarding and account overview
+          </p>
+        </div>
+
+        <div className="shopper-header-actions">
+          <button
+            type="button"
+            className="shopper-cart-button"
+            onClick={() =>
+              navigate("/shopper/cart")
             }
+            aria-label={`Open cart with ${
+              cartItems.length
+            } ${
+              cartItems.length === 1
+                ? "item"
+                : "items"
+            }`}
           >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className={({ isActive }) =>
-              isActive
-                ? "shopper-nav-link active"
-                : "shopper-nav-link"
-            }
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="shopper-logout-button"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
-
-      <section className="shopper-content">
-        <header className="shopper-header">
-          <div>
-            <p className="shopper-page-code">
-              05 — NEW USER DASHBOARD
-            </p>
-
-            <p className="shopper-page-description">
-              Onboarding and empty states
-            </p>
-          </div>
-
-          <div className="shopper-header-actions">
-            <button
-              type="button"
-              className="shopper-cart-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
-              aria-label={`Open cart with ${cartCount} items`}
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle
-                  cx="10"
-                  cy="20"
-                  r="1"
-                />
-                <circle
-                  cx="18"
-                  cy="20"
-                  r="1"
-                />
-              </svg>
+              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+              <circle cx="10" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
+            </svg>
 
-              <span>{cartCount}</span>
-            </button>
+            <span>{cartItems.length}</span>
+          </button>
 
-            <div className="shopper-role-badge">
-              REGISTERED SHOPPER
-            </div>
+          <div className="shopper-role-badge">
+            REGISTERED SHOPPER
           </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="shopper-dashboard-body">
-          <section className="shopper-welcome">
-            <p>
-              WELCOME, {username.toUpperCase()}
-            </p>
+      <div className="shopper-dashboard-body">
+        <section className="shopper-welcome">
+          <p>
+            WELCOME, {username.toUpperCase()}
+          </p>
 
-            <h1>
-              Start your first fitting session
-            </h1>
+          <h1>Start your first fitting session</h1>
 
-            <span>
-              Choose the premade avatar or create a
-              Male/Female custom avatar.
-            </span>
-          </section>
+          <span>
+            Choose the premade avatar or create a
+            Male/Female custom avatar.
+          </span>
+        </section>
 
-          <section className="shopper-onboarding-grid">
-            <article className="shopper-start-card">
+        <section className="shopper-onboarding-grid">
+          <article className="shopper-start-card">
+            <div className="shopper-start-card-content">
               <p className="shopper-card-label">
                 START HERE
               </p>
 
-              <h2>
-                Your fitting profile is empty
-              </h2>
+              <h2>Your fitting profile is empty</h2>
 
               <p>
-                Use the one premade avatar
-                immediately, or customize height,
-                weight, skin tone, and body
-                proportions.
+                Use the premade avatar immediately,
+                or customize height, weight, skin
+                tone, and body proportions.
               </p>
 
               <div className="shopper-card-actions">
@@ -295,101 +174,176 @@ function ShopperDashboard() {
                   Create Custom Avatar
                 </button>
               </div>
-            </article>
+            </div>
 
-            <article className="shopper-guide-card">
-              <p>2-MINUTE ONBOARDING</p>
+            <div
+              className="shopper-start-decoration"
+              aria-hidden="true"
+            >
+              <div className="shopper-avatar-symbol">
+                <span className="shopper-avatar-head" />
+                <span className="shopper-avatar-body" />
+              </div>
+            </div>
+          </article>
+        </section>
 
-              <ol>
-                <li>
-                  <span>1</span>
-                  Select avatar
-                </li>
+        <section className="shopper-quick-actions">
+          <button
+            type="button"
+            className="shopper-quick-action"
+            onClick={() =>
+              navigate("/shopper/catalog")
+            }
+          >
+            <span className="shopper-quick-number">
+              01
+            </span>
 
-                <li>
-                  <span>2</span>
-                  Open Fitting Studio
-                </li>
+            <div>
+              <strong>Browse Catalog</strong>
+              <small>
+                Discover clothing from different
+                sellers
+              </small>
+            </div>
 
-                <li>
-                  <span>3</span>
-                  Try a garment
-                </li>
+            <span
+              className="shopper-action-arrow"
+              aria-hidden="true"
+            >
+              →
+            </span>
+          </button>
 
-                <li>
-                  <span>4</span>
-                  Save or add to cart
-                </li>
-              </ol>
-            </article>
-          </section>
+          <button
+            type="button"
+            className="shopper-quick-action"
+            onClick={() =>
+              navigate("/shopper/fitting-studio")
+            }
+          >
+            <span className="shopper-quick-number">
+              02
+            </span>
 
-          <section className="shopper-account-status">
-            <h2>ACCOUNT STATUS</h2>
+            <div>
+              <strong>Open Fitting Studio</strong>
+              <small>
+                Customize your avatar and try
+                clothing
+              </small>
+            </div>
 
-            <StatusRow
-              label="Avatar presets"
-              value={
-                avatarPresets.length > 0
-                  ? `${avatarPresets.length} saved preset${
-                      avatarPresets.length === 1
-                        ? ""
-                        : "s"
-                    }`
-                  : "0 custom • 1 premade"
-              }
+            <span
+              className="shopper-action-arrow"
+              aria-hidden="true"
+            >
+              →
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="shopper-quick-action"
+            onClick={() =>
+              navigate("/shopper/saved-outfits")
+            }
+          >
+            <span className="shopper-quick-number">
+              03
+            </span>
+
+            <div>
+              <strong>Saved Outfits</strong>
+              <small>
+                Review your saved clothing
+                combinations
+              </small>
+            </div>
+
+            <span
+              className="shopper-action-arrow"
+              aria-hidden="true"
+            >
+              →
+            </span>
+          </button>
+        </section>
+
+        <section className="shopper-account-status">
+          <div className="shopper-status-heading">
+            <div>
+              <p>ACCOUNT OVERVIEW</p>
+              <h2>Your FitFusion activity</h2>
+            </div>
+
+            <button
+              type="button"
               onClick={() =>
-                navigate(
-                  "/shopper/avatar-presets"
-                )
+                navigate("/shopper/account")
               }
-            />
+            >
+              Manage Account
+            </button>
+          </div>
 
-            <StatusRow
-              label="Saved outfits"
-              value={
-                savedOutfits.length > 0
-                  ? `${savedOutfits.length} saved outfit${
-                      savedOutfits.length === 1
-                        ? ""
-                        : "s"
-                    }`
-                  : "No saved outfits"
-              }
-              onClick={() =>
-                navigate(
-                  "/shopper/saved-outfits"
-                )
-              }
-            />
+          <StatusRow
+            label="Avatar presets"
+            value={`${
+              customPresets.length
+            } custom • 1 premade`}
+            onClick={() =>
+              navigate("/shopper/avatar-presets")
+            }
+          />
 
-            <StatusRow
-              label="Orders"
-              value={
-                orderHistory.length > 0
-                  ? `${orderHistory.length} order${
-                      orderHistory.length === 1
-                        ? ""
-                        : "s"
-                    }`
-                  : "No orders yet"
-              }
-              onClick={() =>
-                navigate("/shopper/orders")
-              }
-            />
-          </section>
-        </div>
-      </section>
+          <StatusRow
+            label="Saved outfits"
+            value={
+              savedOutfits.length > 0
+                ? `${savedOutfits.length} saved ${
+                    savedOutfits.length === 1
+                      ? "outfit"
+                      : "outfits"
+                  }`
+                : "No saved outfits"
+            }
+            onClick={() =>
+              navigate("/shopper/saved-outfits")
+            }
+          />
+
+          <StatusRow
+            label="Shopping cart"
+            value={
+              cartItems.length > 0
+                ? `${cartItems.length} ${
+                    cartItems.length === 1
+                      ? "item"
+                      : "items"
+                  }`
+                : "Your cart is empty"
+            }
+            onClick={() =>
+              navigate("/shopper/cart")
+            }
+          />
+
+          <StatusRow
+            label="Orders"
+            value="View your order history"
+            onClick={() =>
+              navigate("/shopper/orders")
+            }
+          />
+        </section>
+      </div>
     </main>
   );
 }
 
-function StatusRow({
-  label,
-  value,
-  onClick,
-}) {
+function StatusRow({ label, value, onClick }) {
   return (
     <button
       type="button"
@@ -399,6 +353,13 @@ function StatusRow({
       <strong>{label}</strong>
 
       <span>{value}</span>
+
+      <span
+        className="shopper-status-arrow"
+        aria-hidden="true"
+      >
+        →
+      </span>
     </button>
   );
 }
