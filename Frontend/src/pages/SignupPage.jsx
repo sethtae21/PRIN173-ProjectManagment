@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import { authAPI } from "../services/api"; // Import the API service
 import "./css/SignupPage.css";
 
-const initialFormData = {
+const initialForm = {
   username: "",
+  storeName: "",
   email: "",
   mobile: "",
   street: "",
+  barangay: "",
   city: "",
   province: "",
   postalCode: "",
@@ -16,359 +17,1033 @@ const initialFormData = {
   confirmPassword: "",
 };
 
-const steps = [
-  { number: 1, title: "Account & Contact", description: "Basic account information" },
-  { number: 2, title: "Delivery Address", description: "Shipping information" },
-  { number: 3, title: "Account Security", description: "Create a secure password" },
-];
-
-function SignupPage() {
+function SignupPage({
+  accountRole = "shopper",
+}) {
   const navigate = useNavigate();
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState(initialFormData);
+  const isSeller = accountRole === "seller";
+
+  const [step, setStep] = useState(1);
+  const [form, setForm] =
+    useState(initialForm);
   const [errors, setErrors] = useState({});
-  const [formMessage, setFormMessage] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // New loading state
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-  const passwordChecks = useMemo(
-    () => ({
-      minimumLength: formData.password.length >= 8,
-      uppercase: /[A-Z]/.test(formData.password),
-      lowercase: /[a-z]/.test(formData.password),
-      number: /[0-9]/.test(formData.password),
-      specialCharacter: /[^A-Za-z0-9]/.test(formData.password),
-    }),
-    [formData.password]
-  );
+  const [
+    showConfirmPassword,
+    setShowConfirmPassword,
+  ] = useState(false);
 
-  const passwordIsValid = Object.values(passwordChecks).every(Boolean);
-  const passwordsMatch = formData.confirmPassword.length > 0 && formData.password === formData.confirmPassword;
+  const [isCreating, setIsCreating] =
+    useState(false);
+
+  const passwordRules = {
+    length: form.password.length >= 8,
+    uppercase: /[A-Z]/.test(form.password),
+    lowercase: /[a-z]/.test(form.password),
+    number: /\d/.test(form.password),
+    special: /[^A-Za-z0-9]/.test(
+      form.password
+    ),
+  };
+
+  const passwordComplete = Object.values(
+    passwordRules
+  ).every(Boolean);
+
+  const confirmStarted =
+    form.confirmPassword.length > 0;
+
+  const passwordsMatch =
+    confirmStarted &&
+    form.password === form.confirmPassword;
+
+  const canCreate =
+    passwordComplete &&
+    passwordsMatch &&
+    !isCreating;
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setFormData((currentData) => ({ ...currentData, [name]: value }));
-    setErrors((currentErrors) => ({ ...currentErrors, [name]: "" }));
-    setFormMessage("");
+
+    let updatedValue = value;
+
+    if (name === "postalCode") {
+      updatedValue = value
+        .replace(/\D/g, "")
+        .slice(0, 4);
+    }
+
+    setForm((current) => ({
+      ...current,
+      [name]: updatedValue,
+    }));
+
+    setErrors((current) => {
+      const updatedErrors = {
+        ...current,
+        [name]: "",
+      };
+
+      if (
+        name === "password" ||
+        name === "confirmPassword"
+      ) {
+        updatedErrors.password = "";
+        updatedErrors.confirmPassword = "";
+      }
+
+      return updatedErrors;
+    });
   }
 
   function validateStepOne() {
     const newErrors = {};
-    if (!formData.username.trim()) newErrors.username = "Username is required.";
-    else if (formData.username.trim().length < 3) newErrors.username = "Username must contain at least 3 characters.";
 
-    if (!formData.email.trim()) newErrors.email = "Email address is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Enter a valid email address.";
+    const normalizedMobile =
+      form.mobile.replace(/[\s-]/g, "");
 
-    if (!formData.mobile.trim()) newErrors.mobile = "Mobile number is required.";
-    else if (!/^(09\d{9}|\+639\d{9})$/.test(formData.mobile.replace(/\s/g, ""))) newErrors.mobile = "Use 09XXXXXXXXX or +639XXXXXXXXX.";
+    if (!form.username.trim()) {
+      newErrors.username =
+        "Username is required.";
+    } else if (
+      form.username.trim().length < 3
+    ) {
+      newErrors.username =
+        "Username must contain at least 3 characters.";
+    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (isSeller && !form.storeName.trim()) {
+      newErrors.storeName =
+        "Store Name is required for Seller accounts.";
+    } else if (
+      isSeller &&
+      form.storeName.trim().length < 3
+    ) {
+      newErrors.storeName =
+        "Store Name must contain at least 3 characters.";
+    }
+
+    if (!form.email.trim()) {
+      newErrors.email =
+        "Email address is required.";
+    } else if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        form.email.trim()
+      )
+    ) {
+      newErrors.email =
+        "Enter a valid email address.";
+    }
+
+    if (!form.mobile.trim()) {
+      newErrors.mobile =
+        "Mobile number is required.";
+    } else if (
+      !/^(09\d{9}|\+639\d{9})$/.test(
+        normalizedMobile
+      )
+    ) {
+      newErrors.mobile =
+        "Use 09XXXXXXXXX or +639XXXXXXXXX.";
+    }
+
+    return newErrors;
   }
 
   function validateStepTwo() {
     const newErrors = {};
-    if (!formData.street.trim()) newErrors.street = "Street and house information are required.";
-    if (!formData.city.trim()) newErrors.city = "Barangay or city is required.";
-    if (!formData.province.trim()) newErrors.province = "Province is required.";
-    if (!formData.postalCode.trim()) newErrors.postalCode = "Postal code is required.";
-    else if (!/^\d{4}$/.test(formData.postalCode)) newErrors.postalCode = "Postal code must contain exactly 4 digits.";
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.street.trim()) {
+      newErrors.street =
+        "House number, building, or street is required.";
+    }
+
+    if (!form.barangay.trim()) {
+      newErrors.barangay =
+        "Barangay is required.";
+    }
+
+    if (!form.city.trim()) {
+      newErrors.city =
+        "City or municipality is required.";
+    }
+
+    if (!form.province.trim()) {
+      newErrors.province =
+        "Province is required.";
+    }
+
+    if (!form.postalCode.trim()) {
+      newErrors.postalCode =
+        "Postal code is required.";
+    } else if (
+      !/^\d{4}$/.test(form.postalCode)
+    ) {
+      newErrors.postalCode =
+        "Postal code must contain exactly 4 digits.";
+    }
+
+    return newErrors;
   }
 
   function validateStepThree() {
     const newErrors = {};
-    if (!formData.password) newErrors.password = "Password is required.";
-    else if (!passwordIsValid) newErrors.password = "Complete all password requirements.";
 
-    if (!formData.confirmPassword) newErrors.confirmPassword = "Please confirm your password.";
-    else if (!passwordsMatch) newErrors.confirmPassword = "Passwords do not match.";
+    if (!form.password) {
+      newErrors.password =
+        "Password is required.";
+    } else if (!passwordComplete) {
+      newErrors.password =
+        "Complete every password requirement.";
+    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.confirmPassword) {
+      newErrors.confirmPassword =
+        "Please confirm your password.";
+    } else if (!passwordsMatch) {
+      newErrors.confirmPassword =
+        "Passwords do not match.";
+    }
+
+    return newErrors;
   }
 
   function handleNext() {
-    let stepIsValid = false;
-    if (currentStep === 1) stepIsValid = validateStepOne();
-    if (currentStep === 2) stepIsValid = validateStepTwo();
+    let newErrors = {};
 
-    if (!stepIsValid) return;
+    if (step === 1) {
+      newErrors = validateStepOne();
+    }
 
-    setErrors({});
-    setFormMessage("");
-    setCurrentStep((step) => step + 1);
+    if (step === 2) {
+      newErrors = validateStepTwo();
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length === 0) {
+      setStep((current) => current + 1);
+
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    }
   }
 
   function handleBack() {
     setErrors({});
-    setFormMessage("");
-    setCurrentStep((step) => Math.max(1, step - 1));
+
+    if (step === 1) {
+      navigate("/login");
+      return;
+    }
+
+    setStep((current) => current - 1);
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!validateStepThree()) return;
 
-    setIsSubmitting(true);
-    setFormMessage("");
-    setErrors({});
-
-    try {
-      // Map frontend form to backend expected payload
-      const payload = {
-        username: formData.username.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        role: "user", // FIX: Backend expects "user" instead of "shopper"
-        phone: formData.mobile.trim(),
-        // Include address fields
-        street: formData.street.trim(),
-        city: formData.city.trim(),
-        province: formData.province.trim(),
-        postal_code: formData.postalCode.trim(),
-      };
-
-      const response = await authAPI.register(payload);
-
-      // Save token and user info on success
-      if (response.tokens?.access) {
-        localStorage.setItem("access_token", response.tokens.access);
-      }
-
-      const currentUser = {
-        username: formData.username.trim(),
-        email: formData.email.trim().toLowerCase(),
-        role: "shopper", // Keep as "shopper" for frontend routing logic
-      };
-
-      localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
-      sessionStorage.setItem("userRole", "shopper");
-      sessionStorage.setItem("userEmail", currentUser.email);
-      sessionStorage.setItem("registeredAccount", JSON.stringify(currentUser));
-
-      navigate("/shopper/dashboard", { replace: true });
-    } catch (error) {
-      console.error("Registration failed:", error);
-      let generalError = "Registration failed. Please check your details.";
-      
-      // Try to parse specific field errors from Django backend
-      try {
-        const errorData = JSON.parse(error.message);
-        if (errorData.username) generalError = `Username: ${errorData.username[0]}`;
-        else if (errorData.email) generalError = `Email: ${errorData.email[0]}`;
-        else if (errorData.role) generalError = `Role: ${errorData.role[0]}`;
-        else if (errorData.detail) generalError = errorData.detail;
-        else if (errorData.non_field_errors) generalError = errorData.non_field_errors[0];
-      } catch (e) {
-        // Not JSON, keep generalError as is
-      }
-
-      setFormMessage(generalError);
-      setCurrentStep(1); // Go back to step 1 to show the error
-    } finally {
-      setIsSubmitting(false);
+    if (step < 3) {
+      handleNext();
+      return;
     }
+
+    const newErrors =
+      validateStepThree();
+
+    setErrors(newErrors);
+
+    if (
+      Object.keys(newErrors).length > 0 ||
+      !canCreate
+    ) {
+      return;
+    }
+
+    setIsCreating(true);
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 700);
+    });
+
+    const account = {
+      role: isSeller ? "seller" : "shopper",
+      username: form.username.trim(),
+      email: form.email.trim(),
+      mobile: form.mobile.trim(),
+
+      ...(isSeller
+        ? {
+            storeName:
+              form.storeName.trim(),
+          }
+        : {}),
+
+      address: {
+        street: form.street.trim(),
+        barangay: form.barangay.trim(),
+        city: form.city.trim(),
+        province: form.province.trim(),
+        postalCode: form.postalCode,
+        country: "Philippines",
+      },
+    };
+
+    if (isSeller) {
+      sessionStorage.setItem(
+        "sellerAccount",
+        JSON.stringify(account)
+      );
+
+      localStorage.setItem(
+        "fitfusion-seller-account",
+        JSON.stringify(account)
+      );
+    } else {
+      sessionStorage.setItem(
+        "registeredAccount",
+        JSON.stringify(account)
+      );
+
+      localStorage.setItem(
+        "fitfusion-shopper-account",
+        JSON.stringify(account)
+      );
+    }
+
+    sessionStorage.setItem(
+      "userRole",
+      account.role
+    );
+
+    sessionStorage.setItem(
+      "userEmail",
+      account.email
+    );
+
+    localStorage.setItem(
+      "fitfusion-current-user",
+      JSON.stringify(account)
+    );
+
+    navigate(
+      isSeller
+        ? "/seller/dashboard"
+        : "/shopper/dashboard",
+      { replace: true }
+    );
   }
+
+  const information = {
+    1: {
+      number: "STEP 1 OF 3",
+
+      title: isSeller
+        ? "Create your seller identity."
+        : "Let’s start with the basics.",
+
+      first: isSeller
+        ? "Enter your account, contact, and required Store Name."
+        : "Only your account and contact details are requested on this step.",
+
+      second:
+        "Your address and password will be entered in the next steps.",
+    },
+
+    2: {
+      number: "STEP 2 OF 3",
+
+      title: isSeller
+        ? "Where is your store located?"
+        : "Where should orders go?",
+
+      first: isSeller
+        ? "This address identifies your Seller account and store location."
+        : "This address will be used as your default delivery address.",
+
+      second:
+        "Enter every part of the address in its corresponding field.",
+    },
+
+    3: {
+      number: "STEP 3 OF 3",
+      title: "Secure your account.",
+
+      first:
+        "Every password requirement is checked while you type.",
+
+      second:
+        "The account button remains disabled until the passwords match.",
+    },
+  };
 
   return (
     <main className="signup-page">
-      <div className="signup-background signup-background-left" />
-      <div className="signup-background signup-background-right" />
+      <section className="signup-card">
+        <img
+          src={fitFusionLogo}
+          alt="FitFusion AI"
+          className="signup-logo"
+        />
 
-      <header className="signup-topbar">
-        <Link to="/" className="signup-logo-link" aria-label="Return to FitFusion home">
-          <img src={fitFusionLogo} alt="FitFusion AI" />
-        </Link>
-        <p>Already registered? <Link to="/login">Log in</Link></p>
-      </header>
+        <header className="signup-header">
+          <h1>
+            {isSeller
+              ? "Create your seller account"
+              : "Create your shopper account"}
+          </h1>
 
-      <section className="signup-container">
-        <aside className="signup-information-panel">
-          <div className="signup-introduction">
-            <p>SHOPPER REGISTRATION</p>
-            <h1>Create your <span> fitting profile.</span></h1>
-            <p className="signup-introduction-text">
-              Create your account to customize an avatar, try clothing, save outfits, manage your cart, and view orders.
-            </p>
-          </div>
+          <p>
+            Selected role:{" "}
+            <strong>
+              {isSeller
+                ? "Seller"
+                : "Registered Shopper"}
+            </strong>
 
-          <div className="signup-sidebar-steps">
-            {steps.map((step) => (
-              <div
-                className={`signup-sidebar-step ${currentStep === step.number ? "active" : ""} ${currentStep > step.number ? "completed" : ""}`}
-                key={step.number}
-              >
-                <span className="signup-sidebar-number">{currentStep > step.number ? "✓" : step.number}</span>
-                <div>
-                  <strong>{step.title}</strong>
-                  <small>{step.description}</small>
-                </div>
-              </div>
-            ))}
-          </div>
-        </aside>
+            <span> • </span>
 
-        <section className="signup-form-panel">
-          <div className="signup-progress-heading">
-            <span>Step {currentStep} of {steps.length}</span>
-            <div className="signup-progress-track">
-              <div className="signup-progress-value" style={{ width: `${(currentStep / steps.length) * 100}%` }} />
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/login")
+              }
+            >
+              Change role
+            </button>
+          </p>
+        </header>
+
+        <div className="signup-progress">
+          <ProgressStep
+            number={1}
+            label={
+              isSeller
+                ? "Account & Store"
+                : "Account & Contact"
+            }
+            currentStep={step}
+          />
+
+          <ProgressStep
+            number={2}
+            label="Address"
+            currentStep={step}
+          />
+
+          <ProgressStep
+            number={3}
+            label="Account Security"
+            currentStep={step}
+          />
+        </div>
+
+        <div className="signup-main-content">
+          <aside className="signup-side-panel">
+            <div>
+              <p className="signup-step-label">
+                {information[step].number}
+              </p>
+
+              <h2>
+                {information[step].title}
+              </h2>
+
+              <p>
+                {information[step].first}
+              </p>
+
+              <p>
+                {information[step].second}
+              </p>
             </div>
-          </div>
 
-          <form className="signup-form" onSubmit={handleSubmit} noValidate>
-            {currentStep === 1 && <SignupStepOne formData={formData} errors={errors} handleChange={handleChange} />}
-            {currentStep === 2 && <SignupStepTwo formData={formData} errors={errors} handleChange={handleChange} />}
-            {currentStep === 3 && (
-              <SignupStepThree
-                formData={formData}
-                errors={errors}
-                handleChange={handleChange}
-                passwordChecks={passwordChecks}
-                passwordsMatch={passwordsMatch}
-                showPassword={showPassword}
-                setShowPassword={setShowPassword}
-                showConfirmPassword={showConfirmPassword}
-                setShowConfirmPassword={setShowConfirmPassword}
-              />
+            <div className="signup-role-box">
+              <strong>
+                {isSeller
+                  ? "SELLER ACCOUNT"
+                  : "REGISTERED SHOPPER"}
+              </strong>
+
+              <span>
+                Required fields are marked with
+                an asterisk.
+              </span>
+            </div>
+          </aside>
+
+          <form
+            className="signup-form"
+            onSubmit={handleSubmit}
+            noValidate
+          >
+            {step === 1 && (
+              <>
+                <FormHeading
+                  eyebrow={
+                    isSeller
+                      ? "ACCOUNT & STORE"
+                      : "ACCOUNT & CONTACT"
+                  }
+                  title={
+                    isSeller
+                      ? "Tell us about your seller account."
+                      : "Tell us how to identify and contact you."
+                  }
+                  description={
+                    isSeller
+                      ? "The Store Name is required and will be assigned automatically to uploaded products."
+                      : "This information will be used for your account and order updates."
+                  }
+                />
+
+                <FormField
+                  label="Username"
+                  name="username"
+                  placeholder="Enter username"
+                  value={form.username}
+                  error={errors.username}
+                  onChange={handleChange}
+                  required
+                />
+
+                {isSeller && (
+                  <FormField
+                    label="Store Name"
+                    name="storeName"
+                    placeholder="Enter your store name"
+                    value={form.storeName}
+                    error={errors.storeName}
+                    onChange={handleChange}
+                    required
+                  />
+                )}
+
+                <div className="signup-field-row">
+                  <FormField
+                    label="Email Address"
+                    name="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={form.email}
+                    error={errors.email}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <FormField
+                    label="Mobile Number"
+                    name="mobile"
+                    type="tel"
+                    placeholder="+63 9XX XXX XXXX"
+                    value={form.mobile}
+                    error={errors.mobile}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="signup-note">
+                  <strong>
+                    {isSeller
+                      ? "SELLER REQUIREMENT"
+                      : "REGISTERED SHOPPER"}
+                  </strong>
+
+                  <p>
+                    {isSeller
+                      ? "Your Store Name will be displayed with every accepted product listing."
+                      : "A Store Name is not requested because this account is for shopping."}
+                  </p>
+                </div>
+              </>
             )}
 
-            {formMessage && (
-              <div className="signup-form-message" role="alert">
-                {formMessage}
-              </div>
+            {step === 2 && (
+              <>
+                <FormHeading
+                  eyebrow={
+                    isSeller
+                      ? "STORE ADDRESS"
+                      : "DELIVERY ADDRESS"
+                  }
+                  title="Enter each location detail separately."
+                  description={
+                    isSeller
+                      ? "This information will be associated with your authenticated Seller account."
+                      : "This information will be used as your default delivery address."
+                  }
+                />
+
+                <FormField
+                  label="House No. / Building / Street"
+                  name="street"
+                  placeholder="Enter complete address line"
+                  value={form.street}
+                  error={errors.street}
+                  onChange={handleChange}
+                  required
+                />
+
+                <div className="signup-field-row">
+                  <FormField
+                    label="Barangay"
+                    name="barangay"
+                    placeholder="Enter barangay"
+                    value={form.barangay}
+                    error={errors.barangay}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <FormField
+                    label="City / Municipality"
+                    name="city"
+                    placeholder="Enter city or municipality"
+                    value={form.city}
+                    error={errors.city}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="signup-field-row">
+                  <FormField
+                    label="Province"
+                    name="province"
+                    placeholder="Enter province"
+                    value={form.province}
+                    error={errors.province}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <FormField
+                    label="Postal Code"
+                    name="postalCode"
+                    placeholder="Enter 4-digit postal code"
+                    value={form.postalCode}
+                    error={errors.postalCode}
+                    onChange={handleChange}
+                    inputMode="numeric"
+                    maxLength={4}
+                    required
+                  />
+                </div>
+
+                <div className="signup-country">
+                  <label htmlFor="country">
+                    Country
+                  </label>
+
+                  <input
+                    id="country"
+                    value="Philippines"
+                    disabled
+                    readOnly
+                  />
+                </div>
+              </>
             )}
 
-            <div className="signup-form-actions">
-              {currentStep > 1 && (
-                <button type="button" className="signup-back-button" onClick={handleBack} disabled={isSubmitting}>
-                  Back
-                </button>
-              )}
+            {step === 3 && (
+              <>
+                <FormHeading
+                  eyebrow="ACCOUNT SECURITY"
+                  title="Create a secure password."
+                  description="The checks and password confirmation update in real time."
+                />
 
-              {currentStep < 3 ? (
-                <button type="button" className="signup-next-button" onClick={handleNext}>
-                  Save and Continue
+                <div className="signup-field-row">
+                  <PasswordField
+                    label="Password"
+                    name="password"
+                    value={form.password}
+                    placeholder="Enter password"
+                    show={showPassword}
+                    onToggle={() =>
+                      setShowPassword(
+                        (current) => !current
+                      )
+                    }
+                    onChange={handleChange}
+                    error={errors.password}
+                  />
+
+                  <PasswordField
+                    label="Confirm Password"
+                    name="confirmPassword"
+                    value={
+                      form.confirmPassword
+                    }
+                    placeholder="Re-enter password"
+                    show={
+                      showConfirmPassword
+                    }
+                    onToggle={() =>
+                      setShowConfirmPassword(
+                        (current) => !current
+                      )
+                    }
+                    onChange={handleChange}
+                    error={
+                      errors.confirmPassword
+                    }
+                  />
+                </div>
+
+                <div
+                  className={`password-match-message ${
+                    !confirmStarted
+                      ? "waiting"
+                      : passwordsMatch
+                        ? "matched"
+                        : "not-matched"
+                  }`}
+                  aria-live="polite"
+                >
+                  <span>
+                    {!confirmStarted
+                      ? "✓"
+                      : passwordsMatch
+                        ? "✓"
+                        : "×"}
+                  </span>
+
+                  <div>
+                    <strong>
+                      {!confirmStarted
+                        ? "Confirm your password"
+                        : passwordsMatch
+                          ? "Passwords match"
+                          : "Passwords do not match"}
+                    </strong>
+
+                    <p>
+                      {!confirmStarted
+                        ? "Re-enter your password to verify it."
+                        : passwordsMatch
+                          ? "Your password confirmation is correct."
+                          : "Enter the same password in both fields."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="password-checklist">
+                  <h3>
+                    PASSWORD REQUIREMENTS — LIVE
+                  </h3>
+
+                  <div className="password-rule-grid">
+                    <PasswordRule
+                      passed={
+                        passwordRules.length
+                      }
+                      text="At least 8 characters"
+                    />
+
+                    <PasswordRule
+                      passed={
+                        passwordRules.uppercase
+                      }
+                      text="One uppercase letter"
+                    />
+
+                    <PasswordRule
+                      passed={
+                        passwordRules.lowercase
+                      }
+                      text="One lowercase letter"
+                    />
+
+                    <PasswordRule
+                      passed={
+                        passwordRules.number
+                      }
+                      text="One number"
+                    />
+
+                    <PasswordRule
+                      passed={
+                        passwordRules.special
+                      }
+                      text="One special character"
+                    />
+                  </div>
+                </div>
+
+                {form.password &&
+                  !passwordComplete && (
+                    <div className="security-message error">
+                      <strong>
+                        Password is incomplete.
+                      </strong>
+
+                      <span>
+                        Complete every requirement
+                        before creating the account.
+                      </span>
+                    </div>
+                  )}
+
+                {passwordComplete &&
+                  passwordsMatch && (
+                    <div className="security-message success">
+                      <strong>
+                        Account security complete.
+                      </strong>
+
+                      <span>
+                        You may now create your
+                        account.
+                      </span>
+                    </div>
+                  )}
+              </>
+            )}
+
+            <div className="signup-buttons">
+              <button
+                type="button"
+                className="signup-back"
+                onClick={handleBack}
+              >
+                Back
+              </button>
+
+              {step < 3 ? (
+                <button
+                  type="submit"
+                  className="signup-next"
+                >
+                  {step === 1
+                    ? "Next: Address"
+                    : "Next: Security"}
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="signup-next-button"
-                  disabled={!passwordIsValid || !passwordsMatch || isSubmitting}
+                  className="signup-next"
+                  disabled={!canCreate}
                 >
-                  {isSubmitting ? "Creating Account..." : "Create Shopper Account"}
+                  {isCreating
+                    ? "Creating Account..."
+                    : isSeller
+                      ? "Create Seller Account"
+                      : "Create Shopper Account"}
                 </button>
               )}
             </div>
+
+            <p className="signup-counter">
+              Step {step} of 3
+            </p>
           </form>
-        </section>
+        </div>
       </section>
     </main>
   );
 }
 
-// --- Helper Components (Unchanged) ---
-function SignupStepOne({ formData, errors, handleChange }) {
+function ProgressStep({
+  number,
+  label,
+  currentStep,
+}) {
+  let className = "progress-item";
+
+  if (number === currentStep) {
+    className += " active";
+  }
+
+  if (number < currentStep) {
+    className += " complete";
+  }
+
   return (
-    <>
-      <div className="signup-form-heading">
-        <p>STEP 1</p>
-        <h2>Account & Contact</h2>
-        <span>Enter your basic account and contact information.</span>
+    <div className={className}>
+      <div className="progress-number">
+        {number < currentStep ? "✓" : number}
       </div>
-      <div className="signup-fields-grid">
-        <SignupInput label="Username" name="username" value={formData.username} onChange={handleChange} placeholder="Choose a username" autoComplete="username" error={errors.username} required />
-        <SignupInput label="Email Address" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="name@example.com" autoComplete="email" error={errors.email} required />
-        <SignupInput label="Mobile Number" name="mobile" type="tel" value={formData.mobile} onChange={handleChange} placeholder="09XXXXXXXXX" autoComplete="tel" error={errors.mobile} required fullWidth />
-      </div>
-    </>
+
+      <span>{label}</span>
+    </div>
   );
 }
 
-function SignupStepTwo({ formData, errors, handleChange }) {
+function FormHeading({
+  eyebrow,
+  title,
+  description,
+}) {
   return (
-    <>
-      <div className="signup-form-heading">
-        <p>STEP 2</p>
-        <h2>Delivery Address</h2>
-        <span>Keep every location value in its proper field.</span>
-      </div>
-      <div className="signup-fields-grid">
-        <SignupInput label="House Number and Street" name="street" value={formData.street} onChange={handleChange} placeholder="123 Sample Street" autoComplete="street-address" error={errors.street} required fullWidth />
-        <SignupInput label="Barangay / City" name="city" value={formData.city} onChange={handleChange} placeholder="Barangay and city" autoComplete="address-level2" error={errors.city} required />
-        <SignupInput label="Province" name="province" value={formData.province} onChange={handleChange} placeholder="Province" autoComplete="address-level1" error={errors.province} required />
-        <SignupInput label="Postal Code" name="postalCode" value={formData.postalCode} onChange={handleChange} placeholder="0000" inputMode="numeric" maxLength={4} autoComplete="postal-code" error={errors.postalCode} required />
-      </div>
-    </>
+    <header className="form-heading">
+      <p>{eyebrow}</p>
+      <h2>{title}</h2>
+      <span>{description}</span>
+    </header>
   );
 }
 
-function SignupStepThree({ formData, errors, handleChange, passwordChecks, passwordsMatch, showPassword, setShowPassword, showConfirmPassword, setShowConfirmPassword }) {
+function FormField({
+  label,
+  name,
+  type = "text",
+  value,
+  placeholder,
+  error,
+  onChange,
+  required,
+  ...properties
+}) {
   return (
-    <>
-      <div className="signup-form-heading">
-        <p>STEP 3</p>
-        <h2>Account Security</h2>
-        <span>Create a password that meets all requirements.</span>
-      </div>
-      <div className="signup-security-fields">
-        <label className="signup-field" htmlFor="signup-password">
-          <span className="signup-field-label">Password<strong aria-hidden="true">*</strong></span>
-          <div className="signup-password-wrapper">
-            <input id="signup-password" name="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={handleChange} placeholder="Enter your password" autoComplete="new-password" className={errors.password ? "signup-input-error" : ""} required />
-            <button type="button" className="signup-password-toggle" onClick={() => setShowPassword((currentValue) => !currentValue)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-          {errors.password && <small className="signup-field-error">{errors.password}</small>}
-        </label>
+    <div className="signup-field">
+      <label htmlFor={name}>
+        {label}
+        {required ? " *" : ""}
+      </label>
 
-        <div className="signup-password-requirements">
-          <Requirement complete={passwordChecks.minimumLength}>At least 8 characters</Requirement>
-          <Requirement complete={passwordChecks.uppercase}>One uppercase letter</Requirement>
-          <Requirement complete={passwordChecks.lowercase}>One lowercase letter</Requirement>
-          <Requirement complete={passwordChecks.number}>One number</Requirement>
-          <Requirement complete={passwordChecks.specialCharacter}>One special character</Requirement>
-        </div>
+      <input
+        id={name}
+        name={name}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={onChange}
+        className={
+          error ? "invalid" : ""
+        }
+        {...properties}
+      />
 
-        <label className="signup-field" htmlFor="signup-confirm-password">
-          <span className="signup-field-label">Confirm Password<strong aria-hidden="true">*</strong></span>
-          <div className="signup-password-wrapper">
-            <input id="signup-confirm-password" name="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={handleChange} placeholder="Re-enter your password" autoComplete="new-password" className={errors.confirmPassword ? "signup-input-error" : ""} required />
-            <button type="button" className="signup-password-toggle" onClick={() => setShowConfirmPassword((currentValue) => !currentValue)} aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"} aria-pressed={showConfirmPassword}>
-              {showConfirmPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-          {errors.confirmPassword && <small className="signup-field-error">{errors.confirmPassword}</small>}
-          {!errors.confirmPassword && passwordsMatch && <small className="signup-field-success">Passwords match.</small>}
-        </label>
-      </div>
-    </>
+      {error && (
+        <p className="field-error">
+          <span>!</span>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
-function SignupInput({ label, name, type = "text", value, onChange, placeholder, error, required = false, fullWidth = false, ...inputProperties }) {
+function PasswordField({
+  label,
+  name,
+  value,
+  placeholder,
+  show,
+  onToggle,
+  onChange,
+  error,
+}) {
   return (
-    <label className={`signup-field ${fullWidth ? "signup-field-full-width" : ""}`} htmlFor={`signup-${name}`}>
-      <span className="signup-field-label">{label}{required && <strong aria-hidden="true">*</strong>}</span>
-      <input id={`signup-${name}`} name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} className={error ? "signup-input-error" : ""} required={required} {...inputProperties} />
-      {error && <small className="signup-field-error">{error}</small>}
-    </label>
+    <div className="signup-field">
+      <label htmlFor={name}>
+        {label} *
+      </label>
+
+      <div
+        className={`password-field ${
+          error ? "invalid" : ""
+        }`}
+      >
+        <input
+          id={name}
+          name={name}
+          type={
+            show ? "text" : "password"
+          }
+          value={value}
+          placeholder={placeholder}
+          onChange={onChange}
+          autoComplete="new-password"
+        />
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={
+            show
+              ? `Hide ${label.toLowerCase()}`
+              : `Show ${label.toLowerCase()}`
+          }
+          aria-pressed={show}
+          title={
+            show
+              ? "Hide password"
+              : "Show password"
+          }
+        >
+          <EyeIcon hidden={!show} />
+        </button>
+      </div>
+
+      {error && (
+        <p className="field-error">
+          <span>!</span>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
-function Requirement({ complete, children }) {
+function PasswordRule({ passed, text }) {
   return (
-    <p className={complete ? "completed" : ""}>
-      <span aria-hidden="true">{complete ? "✓" : "○"}</span>
-      {children}
-    </p>
+    <div
+      className={`password-rule ${
+        passed ? "passed" : ""
+      }`}
+    >
+      <span>✓</span>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function EyeIcon({ hidden }) {
+  if (hidden) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path d="M3 3l18 18" />
+
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+
+        <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5 9 5a16.6 16.6 0 0 1-3.1 3.7" />
+
+        <path d="M6.6 6.7C4.3 8.2 3 10 3 10s3.5 5 9 5a9.8 9.8 0 0 0 3-.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M3 12s3.5-5 9-5 9 5 9 5-3.5 5-9 5-9-5-9-5Z" />
+
+      <circle
+        cx="12"
+        cy="12"
+        r="2.5"
+      />
+    </svg>
   );
 }
 
