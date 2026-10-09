@@ -1,202 +1,87 @@
 import { useState } from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router-dom";
-
+import { Link, useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { authAPI } from "../services/api"; // Correct path for pages/LoginPage.jsx
 import "./css/LoginPage.css";
-
-const demoAccounts = [
-  {
-    username: "shopper",
-    email: "shopper@fitfusion.com",
-    password: "Shopper123!",
-    role: "shopper",
-  },
-  {
-    username: "seller",
-    email: "seller@fitfusion.com",
-    password: "Seller123!",
-    role: "seller",
-    storeName: "FitFusion Demo Store",
-  },
-];
-
-function readAccounts(storageKey) {
-  try {
-    const savedAccounts = JSON.parse(
-      localStorage.getItem(storageKey) || "[]"
-    );
-
-    return Array.isArray(savedAccounts)
-      ? savedAccounts
-      : [];
-  } catch {
-    return [];
-  }
-}
 
 function LoginPage() {
   const navigate = useNavigate();
-
-  const [credentials, setCredentials] = useState({
-    identifier: "",
-    password: "",
-  });
-
-  const [showPassword, setShowPassword] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState("");
-
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
+  const [credentials, setCredentials] = useState({ identifier: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleChange(event) {
     const { name, value } = event.target;
-
-    setCredentials((currentCredentials) => ({
-      ...currentCredentials,
-      [name]: value,
-    }));
-
+    setCredentials((currentCredentials) => ({ ...currentCredentials, [name]: value }));
     setErrorMessage("");
   }
 
-  function findAccount() {
-    const shopperAccounts = readAccounts(
-      "fitfusion-shopper-accounts"
-    ).map((account) => ({
-      ...account,
-      role: "shopper",
-    }));
-
-    const sellerAccounts = readAccounts(
-      "fitfusion-seller-accounts"
-    ).map((account) => ({
-      ...account,
-      role: "seller",
-    }));
-
-    const allAccounts = [
-      ...shopperAccounts,
-      ...sellerAccounts,
-      ...demoAccounts,
-    ];
-
-    const normalizedIdentifier =
-      credentials.identifier.trim().toLowerCase();
-
-    return allAccounts.find((account) => {
-      const email = String(
-        account.email || ""
-      ).toLowerCase();
-
-      const username = String(
-        account.username || ""
-      ).toLowerCase();
-
-      return (
-        (email === normalizedIdentifier ||
-          username === normalizedIdentifier) &&
-        account.password === credentials.password
-      );
-    });
-  }
-
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage("");
 
-    if (
-      !credentials.identifier.trim() ||
-      !credentials.password
-    ) {
-      setErrorMessage(
-        "Please enter your email or username and password."
-      );
-
+    if (!credentials.identifier.trim() || !credentials.password) {
+      setErrorMessage("Please enter your email or username and password.");
       return;
     }
 
     setIsSubmitting(true);
 
-    const account = findAccount();
+    try {
+      // Attempt login via backend API
+      const response = await authAPI.login(credentials.identifier, credentials.password);
 
-    if (!account) {
-      setErrorMessage(
-        "The email, username, or password is incorrect."
-      );
+      // Save tokens
+      if (response.tokens?.access) {
+        localStorage.setItem("access_token", response.tokens.access);
+      }
+      if (response.tokens?.refresh) {
+        localStorage.setItem("refresh_token", response.tokens.refresh);
+      }
 
+      // Determine role (backend might return it, or we default)
+      const userData = response.user || {};
+      const role = userData.role === "seller" ? "seller" : "shopper";
+      const storeName = userData.store_name || "My Store";
+
+      const currentUser = {
+        username: credentials.identifier,
+        email: userData.email || credentials.identifier,
+        role: role,
+        storeName: storeName,
+      };
+
+      localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
+      sessionStorage.setItem("userRole", role);
+      sessionStorage.setItem("userEmail", currentUser.email);
+
+      if (role === "shopper") {
+        sessionStorage.setItem("registeredAccount", JSON.stringify(currentUser));
+        navigate("/shopper/dashboard", { replace: true });
+      } else {
+        navigate("/seller/dashboard", { replace: true });
+      }
+    } catch (error) {
+      console.error("Login failed:", error);
+      setErrorMessage("The email, username, or password is incorrect.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    const role =
-      account.role === "seller"
-        ? "seller"
-        : "shopper";
-
-    const currentUser = {
-      ...account,
-      role,
-    };
-
-    localStorage.setItem(
-      "fitfusion-current-user",
-      JSON.stringify(currentUser)
-    );
-
-    sessionStorage.setItem("userRole", role);
-
-    sessionStorage.setItem(
-      "userEmail",
-      account.email || ""
-    );
-
-    if (role === "shopper") {
-      sessionStorage.setItem(
-        "registeredAccount",
-        JSON.stringify(currentUser)
-      );
-
-      navigate("/shopper/dashboard", {
-        replace: true,
-      });
-
-      return;
-    }
-
-    navigate("/seller/dashboard", {
-      replace: true,
-    });
   }
 
   function handleGuestEntry() {
     sessionStorage.setItem("userRole", "guest");
     sessionStorage.removeItem("userEmail");
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
-
+    localStorage.removeItem("fitfusion-current-user");
     navigate("/guest");
   }
 
   return (
     <main className="login-page">
       <header className="login-brand-header">
-        <Link
-          to="/"
-          className="login-logo-link"
-          aria-label="Return to landing page"
-        >
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-            className="login-logo"
-          />
+        <Link to="/" className="login-logo-link" aria-label="Return to landing page">
+          <img src={fitFusionLogo} alt="FitFusion AI" className="login-logo" />
         </Link>
       </header>
 
@@ -206,25 +91,10 @@ function LoginPage() {
             <h1>Welcome back to</h1>
             <h2>your fitting room.</h2>
           </div>
-
           <div className="login-role-list">
-            <p>
-              Shopper account
-              <span>→</span>
-              Shopper Dashboard
-            </p>
-
-            <p>
-              Seller account
-              <span>→</span>
-              Seller Dashboard
-            </p>
-
-            <p>
-              Guest
-              <span>→</span>
-              Continue without an account
-            </p>
+            <p>Shopper account <span>→</span> Shopper Dashboard</p>
+            <p>Seller account <span>→</span> Seller Dashboard</p>
+            <p>Guest <span>→</span> Continue without an account</p>
           </div>
         </div>
 
@@ -232,68 +102,40 @@ function LoginPage() {
           <div className="login-form-wrapper">
             <div className="login-form-heading">
               <h2>Log in</h2>
-
-              <p>
-                One form; your assigned role controls
-                the destination.
-              </p>
+              <p>One form; your assigned role controls the destination.</p>
             </div>
 
-            <form
-              className="login-form"
-              onSubmit={handleSubmit}
-              noValidate
-            >
+            <form className="login-form" onSubmit={handleSubmit} noValidate>
               <div className="login-field">
-                <label htmlFor="login-identifier">
-                  Email Address or Username
-                </label>
-
-                <input
-                  id="login-identifier"
-                  name="identifier"
-                  type="text"
-                  value={credentials.identifier}
-                  onChange={handleChange}
-                  placeholder="name@example.com"
-                  autoComplete="username"
+                <label htmlFor="login-identifier">Email Address or Username</label>
+                <input 
+                  id="login-identifier" 
+                  name="identifier" 
+                  type="text" 
+                  value={credentials.identifier} 
+                  onChange={handleChange} 
+                  placeholder="name@example.com" 
+                  autoComplete="username" 
                 />
               </div>
 
               <div className="login-field">
-                <label htmlFor="login-password">
-                  Password
-                </label>
-
+                <label htmlFor="login-password">Password</label>
                 <div className="login-password-control">
-                  <input
-                    id="login-password"
-                    name="password"
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
-                    value={credentials.password}
-                    onChange={handleChange}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
+                  <input 
+                    id="login-password" 
+                    name="password" 
+                    type={showPassword ? "text" : "password"} 
+                    value={credentials.password} 
+                    onChange={handleChange} 
+                    placeholder="Enter your password" 
+                    autoComplete="current-password" 
                   />
-
-                  <button
-                    type="button"
-                    className="login-password-toggle"
-                    onClick={() =>
-                      setShowPassword(
-                        (currentValue) =>
-                          !currentValue
-                      )
-                    }
-                    aria-label={
-                      showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
+                  <button 
+                    type="button" 
+                    className="login-password-toggle" 
+                    onClick={() => setShowPassword((currentValue) => !currentValue)} 
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
@@ -301,58 +143,24 @@ function LoginPage() {
               </div>
 
               <div className="login-forgot-row">
-                <Link to="/forgot-password">
-                  Forgot password?
-                </Link>
+                <Link to="/forgot-password">Forgot password?</Link>
               </div>
 
-              {errorMessage && (
-                <div
-                  className="login-error-message"
-                  role="alert"
-                >
-                  {errorMessage}
-                </div>
-              )}
+              {errorMessage && <div className="login-error-message" role="alert">{errorMessage}</div>}
 
-              <button
-                type="submit"
-                className="login-submit-button"
-                disabled={isSubmitting}
-              >
-                {isSubmitting
-                  ? "Logging in..."
-                  : "Log In"}
+              <button type="submit" className="login-submit-button" disabled={isSubmitting}>
+                {isSubmitting ? "Logging in..." : "Log In"}
               </button>
             </form>
 
-            <p className="login-signup-message">
-              No account yet?{" "}
-              <Link to="/signup">
-                Create an account
-              </Link>
-            </p>
+            <p className="login-signup-message">No account yet? <Link to="/signup">Create an account</Link></p>
 
-            <button
-              type="button"
-              className="login-guest-button"
-              onClick={handleGuestEntry}
-            >
-              Continue as Guest
-            </button>
+            <button type="button" className="login-guest-button" onClick={handleGuestEntry}>Continue as Guest</button>
 
             <div className="login-demo-accounts">
               <p>Demo accounts</p>
-
-              <span>
-                Shopper: shopper@fitfusion.com /
-                Shopper123!
-              </span>
-
-              <span>
-                Seller: seller@fitfusion.com /
-                Seller123!
-              </span>
+              <span>Shopper: shopper@fitfusion.com / Shopper123!</span>
+              <span>Seller: seller@fitfusion.com / Seller123!</span>
             </div>
           </div>
         </div>
