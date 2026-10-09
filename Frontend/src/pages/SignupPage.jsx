@@ -1,11 +1,98 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/SignupPage.css";
 
+const provinces = [
+  "Abra",
+  "Agusan del Norte",
+  "Agusan del Sur",
+  "Aklan",
+  "Albay",
+  "Antique",
+  "Apayao",
+  "Aurora",
+  "Basilan",
+  "Bataan",
+  "Batanes",
+  "Batangas",
+  "Benguet",
+  "Biliran",
+  "Bohol",
+  "Bukidnon",
+  "Bulacan",
+  "Cagayan",
+  "Camarines Norte",
+  "Camarines Sur",
+  "Camiguin",
+  "Capiz",
+  "Catanduanes",
+  "Cavite",
+  "Cebu",
+  "Cotabato",
+  "Davao de Oro",
+  "Davao del Norte",
+  "Davao del Sur",
+  "Davao Occidental",
+  "Davao Oriental",
+  "Dinagat Islands",
+  "Eastern Samar",
+  "Guimaras",
+  "Ifugao",
+  "Ilocos Norte",
+  "Ilocos Sur",
+  "Iloilo",
+  "Isabela",
+  "Kalinga",
+  "La Union",
+  "Laguna",
+  "Lanao del Norte",
+  "Lanao del Sur",
+  "Leyte",
+  "Maguindanao del Norte",
+  "Maguindanao del Sur",
+  "Marinduque",
+  "Masbate",
+  "Metro Manila",
+  "Misamis Occidental",
+  "Misamis Oriental",
+  "Mountain Province",
+  "Negros Occidental",
+  "Negros Oriental",
+  "Northern Samar",
+  "Nueva Ecija",
+  "Nueva Vizcaya",
+  "Occidental Mindoro",
+  "Oriental Mindoro",
+  "Palawan",
+  "Pampanga",
+  "Pangasinan",
+  "Quezon",
+  "Quirino",
+  "Rizal",
+  "Romblon",
+  "Samar",
+  "Sarangani",
+  "Siquijor",
+  "Sorsogon",
+  "South Cotabato",
+  "Southern Leyte",
+  "Sultan Kudarat",
+  "Sulu",
+  "Surigao del Norte",
+  "Surigao del Sur",
+  "Tarlac",
+  "Tawi-Tawi",
+  "Zambales",
+  "Zamboanga del Norte",
+  "Zamboanga del Sur",
+  "Zamboanga Sibugay",
+];
+
 const initialForm = {
+  fullName: "",
   username: "",
-  storeName: "",
   email: "",
   mobile: "",
   street: "",
@@ -17,816 +104,965 @@ const initialForm = {
   confirmPassword: "",
 };
 
-function SignupPage({
-  accountRole = "shopper",
+const stepInformation = {
+  1: {
+    eyebrow: "STEP 1 OF 3",
+    title: "Create your shopper identity.",
+    description:
+      "Enter your personal account and contact information.",
+    secondary:
+      "Your full name will be formatted automatically using proper capitalization.",
+    label: "SHOPPER ACCOUNT",
+    note: "A middle name may be included but is optional.",
+  },
+
+  2: {
+    eyebrow: "STEP 2 OF 3",
+    title: "Add your delivery address.",
+    description:
+      "Provide the address where your future orders should be delivered.",
+    secondary:
+      "Make sure the address is complete and accurate before continuing.",
+    label: "DELIVERY INFORMATION",
+    note: "Your address can be updated later from Account Management.",
+  },
+
+  3: {
+    eyebrow: "STEP 3 OF 3",
+    title: "Secure your account.",
+    description:
+      "Create a strong password that follows all security requirements.",
+    secondary:
+      "Your password and confirmation must match before registration.",
+    label: "ACCOUNT SECURITY",
+    note: "All password requirements must turn green.",
+  },
+};
+
+function formatProperCase(value) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(
+      /(^|[\s'-])([a-zà-öø-ÿ])/gu,
+      (match, separator, letter) =>
+        `${separator}${letter.toUpperCase()}`
+    );
+}
+
+function isValidFullName(value) {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]+$/u.test(value);
+}
+
+function EyeIcon({ visible }) {
+  if (visible) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 12s3.5-5 9-5 9 5 9 5-3.5 5-9 5-9-5-9-5Z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+      <path d="M9.8 4.3A10.8 10.8 0 0 1 12 4c5.5 0 9 5 9 5a16.4 16.4 0 0 1-3 3.5" />
+      <path d="M6.1 6.1C4.2 7.3 3 9 3 9s3.5 5 9 5a10.8 10.8 0 0 0 3.1-.4" />
+    </svg>
+  );
+}
+
+function Requirement({ passed, children }) {
+  return (
+    <li className={passed ? "passed" : ""}>
+      <span aria-hidden="true">✓</span>
+      <p>{children}</p>
+    </li>
+  );
+}
+
+function InputField({
+  label,
+  name,
+  value,
+  error,
+  onChange,
+  onBlur,
+  type = "text",
+  wide = false,
+  ...inputProps
 }) {
+  return (
+    <label
+      className={`shopper-register-field ${
+        wide ? "shopper-register-wide" : ""
+      }`}
+    >
+      <span>{label} *</span>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        className={error ? "input-error" : ""}
+        {...inputProps}
+      />
+
+      {error && (
+        <small className="shopper-register-error">
+          {error}
+        </small>
+      )}
+    </label>
+  );
+}
+
+function SignupPage() {
   const navigate = useNavigate();
 
-  const isSeller = accountRole === "seller";
-
   const [step, setStep] = useState(1);
-  const [form, setForm] =
-    useState(initialForm);
+  const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+
   const [showPassword, setShowPassword] =
     useState(false);
 
-  const [
-    showConfirmPassword,
-    setShowConfirmPassword,
-  ] = useState(false);
-
-  const [isCreating, setIsCreating] =
+  const [showConfirmation, setShowConfirmation] =
     useState(false);
 
-  const passwordRules = {
-    length: form.password.length >= 8,
-    uppercase: /[A-Z]/.test(form.password),
-    lowercase: /[a-z]/.test(form.password),
-    number: /\d/.test(form.password),
-    special: /[^A-Za-z0-9]/.test(
-      form.password
-    ),
-  };
+  const currentInformation = stepInformation[step];
 
-  const passwordComplete = Object.values(
-    passwordRules
-  ).every(Boolean);
+  const passwordRules = useMemo(
+    () => ({
+      length: form.password.length >= 8,
+      uppercase: /[A-Z]/.test(form.password),
+      lowercase: /[a-z]/.test(form.password),
+      number: /\d/.test(form.password),
+      special: /[^A-Za-z0-9]/.test(form.password),
+    }),
+    [form.password]
+  );
 
-  const confirmStarted =
-    form.confirmPassword.length > 0;
+  const passwordIsValid =
+    Object.values(passwordRules).every(Boolean);
 
   const passwordsMatch =
-    confirmStarted &&
+    form.confirmPassword.length > 0 &&
     form.password === form.confirmPassword;
 
-  const canCreate =
-    passwordComplete &&
-    passwordsMatch &&
-    !isCreating;
+  function updateField(event) {
+    const { name } = event.target;
+    let { value } = event.target;
 
-  function handleChange(event) {
-    const { name, value } = event.target;
-
-    let updatedValue = value;
+    if (name === "mobile") {
+      value = value
+        .replace(/\D/g, "")
+        .slice(0, 11);
+    }
 
     if (name === "postalCode") {
-      updatedValue = value
+      value = value
         .replace(/\D/g, "")
         .slice(0, 4);
     }
 
     setForm((current) => ({
       ...current,
-      [name]: updatedValue,
+      [name]: value,
     }));
 
-    setErrors((current) => {
-      const updatedErrors = {
-        ...current,
-        [name]: "",
-      };
+    setErrors((current) => ({
+      ...current,
+      [name]: "",
+    }));
 
-      if (
-        name === "password" ||
-        name === "confirmPassword"
-      ) {
-        updatedErrors.password = "";
-        updatedErrors.confirmPassword = "";
-      }
+    setSubmitError("");
+  }
 
-      return updatedErrors;
-    });
+  function formatFullName() {
+    if (!form.fullName.trim()) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      fullName: formatProperCase(
+        current.fullName
+      ),
+    }));
   }
 
   function validateStepOne() {
-    const newErrors = {};
+    const nextErrors = {};
 
-    const normalizedMobile =
-      form.mobile.replace(/[\s-]/g, "");
+    const formattedFullName =
+      formatProperCase(form.fullName);
+
+    if (!formattedFullName) {
+      nextErrors.fullName =
+        "Full name is required.";
+    } else if (
+      !isValidFullName(formattedFullName)
+    ) {
+      nextErrors.fullName =
+        "Full name may contain letters, spaces, apostrophes, periods, and hyphens only.";
+    } else if (
+      formattedFullName
+        .split(" ")
+        .filter(Boolean).length < 2
+    ) {
+      nextErrors.fullName =
+        "Please enter at least your first name and surname.";
+    }
 
     if (!form.username.trim()) {
-      newErrors.username =
+      nextErrors.username =
         "Username is required.";
     } else if (
       form.username.trim().length < 3
     ) {
-      newErrors.username =
+      nextErrors.username =
         "Username must contain at least 3 characters.";
     }
 
-    if (isSeller && !form.storeName.trim()) {
-      newErrors.storeName =
-        "Store Name is required for Seller accounts.";
-    } else if (
-      isSeller &&
-      form.storeName.trim().length < 3
-    ) {
-      newErrors.storeName =
-        "Store Name must contain at least 3 characters.";
-    }
-
     if (!form.email.trim()) {
-      newErrors.email =
+      nextErrors.email =
         "Email address is required.";
     } else if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        form.email.trim()
+        form.email
       )
     ) {
-      newErrors.email =
-        "Enter a valid email address.";
+      nextErrors.email =
+        "Please enter a valid email address.";
     }
 
-    if (!form.mobile.trim()) {
-      newErrors.mobile =
+    if (!form.mobile) {
+      nextErrors.mobile =
         "Mobile number is required.";
+    } else if (!/^\d{11}$/.test(form.mobile)) {
+      nextErrors.mobile =
+        "Mobile number must contain exactly 11 digits.";
     } else if (
-      !/^(09\d{9}|\+639\d{9})$/.test(
-        normalizedMobile
-      )
+      !form.mobile.startsWith("09")
     ) {
-      newErrors.mobile =
-        "Use 09XXXXXXXXX or +639XXXXXXXXX.";
+      nextErrors.mobile =
+        "Philippine mobile number must start with 09.";
     }
 
-    return newErrors;
+    setForm((current) => ({
+      ...current,
+      fullName: formattedFullName,
+    }));
+
+    setErrors(nextErrors);
+
+    return (
+      Object.keys(nextErrors).length === 0
+    );
   }
 
   function validateStepTwo() {
-    const newErrors = {};
+    const nextErrors = {};
 
     if (!form.street.trim()) {
-      newErrors.street =
-        "House number, building, or street is required.";
+      nextErrors.street =
+        "House number and street are required.";
     }
 
     if (!form.barangay.trim()) {
-      newErrors.barangay =
+      nextErrors.barangay =
         "Barangay is required.";
     }
 
     if (!form.city.trim()) {
-      newErrors.city =
+      nextErrors.city =
         "City or municipality is required.";
     }
 
-    if (!form.province.trim()) {
-      newErrors.province =
-        "Province is required.";
+    if (!form.province) {
+      nextErrors.province =
+        "Please select your province.";
     }
 
     if (!form.postalCode.trim()) {
-      newErrors.postalCode =
+      nextErrors.postalCode =
         "Postal code is required.";
     } else if (
       !/^\d{4}$/.test(form.postalCode)
     ) {
-      newErrors.postalCode =
+      nextErrors.postalCode =
         "Postal code must contain exactly 4 digits.";
     }
 
-    return newErrors;
+    setErrors(nextErrors);
+
+    return (
+      Object.keys(nextErrors).length === 0
+    );
   }
 
   function validateStepThree() {
-    const newErrors = {};
+    const nextErrors = {};
 
-    if (!form.password) {
-      newErrors.password =
-        "Password is required.";
-    } else if (!passwordComplete) {
-      newErrors.password =
-        "Complete every password requirement.";
+    if (!passwordIsValid) {
+      nextErrors.password =
+        "Complete all password requirements.";
     }
 
     if (!form.confirmPassword) {
-      newErrors.confirmPassword =
+      nextErrors.confirmPassword =
         "Please confirm your password.";
     } else if (!passwordsMatch) {
-      newErrors.confirmPassword =
-        "Passwords do not match.";
+      nextErrors.confirmPassword =
+        "The passwords do not match.";
     }
 
-    return newErrors;
+    setErrors(nextErrors);
+
+    return (
+      Object.keys(nextErrors).length === 0
+    );
   }
 
   function handleNext() {
-    let newErrors = {};
+    let valid = false;
 
     if (step === 1) {
-      newErrors = validateStepOne();
+      valid = validateStepOne();
     }
 
     if (step === 2) {
-      newErrors = validateStepTwo();
+      valid = validateStepTwo();
     }
 
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      setStep((current) => current + 1);
-
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "auto",
-      });
+    if (!valid) {
+      return;
     }
+
+    setErrors({});
+
+    setStep((current) => current + 1);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   function handleBack() {
-    setErrors({});
-
     if (step === 1) {
-      navigate("/login");
+      navigate("/signup");
       return;
     }
+
+    setErrors({});
 
     setStep((current) => current - 1);
 
     window.scrollTo({
       top: 0,
-      left: 0,
-      behavior: "auto",
+      behavior: "smooth",
     });
   }
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault();
 
-    if (step < 3) {
-      handleNext();
+    if (!validateStepThree()) {
       return;
     }
 
-    const newErrors =
-      validateStepThree();
+    const shopperAccount = {
+      id: `shopper-${Date.now()}`,
+      role: "shopper",
 
-    setErrors(newErrors);
+      fullName: formatProperCase(
+        form.fullName
+      ),
 
-    if (
-      Object.keys(newErrors).length > 0 ||
-      !canCreate
-    ) {
-      return;
-    }
-
-    setIsCreating(true);
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 700);
-    });
-
-    const account = {
-      role: isSeller ? "seller" : "shopper",
       username: form.username.trim(),
-      email: form.email.trim(),
-      mobile: form.mobile.trim(),
 
-      ...(isSeller
-        ? {
-            storeName:
-              form.storeName.trim(),
-          }
-        : {}),
+      email: form.email
+        .trim()
+        .toLowerCase(),
+
+      mobile: form.mobile,
 
       address: {
         street: form.street.trim(),
         barangay: form.barangay.trim(),
         city: form.city.trim(),
-        province: form.province.trim(),
-        postalCode: form.postalCode,
-        country: "Philippines",
+        province: form.province,
+        postalCode:
+          form.postalCode.trim(),
       },
+
+      password: form.password,
+
+      createdAt:
+        new Date().toISOString(),
     };
 
-    if (isSeller) {
-      sessionStorage.setItem(
-        "sellerAccount",
-        JSON.stringify(account)
+    try {
+      const users = JSON.parse(
+        localStorage.getItem(
+          "fitfusion-users"
+        ) || "[]"
+      );
+
+      const accountExists = users.some(
+        (user) =>
+          user.email?.toLowerCase() ===
+            shopperAccount.email ||
+          user.username?.toLowerCase() ===
+            shopperAccount.username.toLowerCase()
+      );
+
+      if (accountExists) {
+        setSubmitError(
+          "An account with this email address or username already exists."
+        );
+
+        return;
+      }
+
+      localStorage.setItem(
+        "fitfusion-users",
+        JSON.stringify([
+          ...users,
+          shopperAccount,
+        ])
       );
 
       localStorage.setItem(
-        "fitfusion-seller-account",
-        JSON.stringify(account)
+        "fitfusion-current-user",
+        JSON.stringify(shopperAccount)
       );
-    } else {
+
+      localStorage.setItem(
+        "registeredAccount",
+        JSON.stringify(shopperAccount)
+      );
+
       sessionStorage.setItem(
         "registeredAccount",
-        JSON.stringify(account)
+        JSON.stringify(shopperAccount)
       );
 
-      localStorage.setItem(
-        "fitfusion-shopper-account",
-        JSON.stringify(account)
+      sessionStorage.setItem(
+        "userRole",
+        "shopper"
+      );
+
+      sessionStorage.setItem(
+        "userEmail",
+        shopperAccount.email
+      );
+
+      navigate("/shopper/dashboard", {
+        replace: true,
+      });
+    } catch {
+      setSubmitError(
+        "The account could not be created. Please try again."
       );
     }
-
-    sessionStorage.setItem(
-      "userRole",
-      account.role
-    );
-
-    sessionStorage.setItem(
-      "userEmail",
-      account.email
-    );
-
-    localStorage.setItem(
-      "fitfusion-current-user",
-      JSON.stringify(account)
-    );
-
-    navigate(
-      isSeller
-        ? "/seller/dashboard"
-        : "/shopper/dashboard",
-      { replace: true }
-    );
   }
 
-  const information = {
-    1: {
-      number: "STEP 1 OF 3",
-
-      title: isSeller
-        ? "Create your seller identity."
-        : "Let’s start with the basics.",
-
-      first: isSeller
-        ? "Enter your account, contact, and required Store Name."
-        : "Only your account and contact details are requested on this step.",
-
-      second:
-        "Your address and password will be entered in the next steps.",
-    },
-
-    2: {
-      number: "STEP 2 OF 3",
-
-      title: isSeller
-        ? "Where is your store located?"
-        : "Where should orders go?",
-
-      first: isSeller
-        ? "This address identifies your Seller account and store location."
-        : "This address will be used as your default delivery address.",
-
-      second:
-        "Enter every part of the address in its corresponding field.",
-    },
-
-    3: {
-      number: "STEP 3 OF 3",
-      title: "Secure your account.",
-
-      first:
-        "Every password requirement is checked while you type.",
-
-      second:
-        "The account button remains disabled until the passwords match.",
-    },
-  };
-
   return (
-    <main className="signup-page">
-      <section className="signup-card">
-        <img
-          src={fitFusionLogo}
-          alt="FitFusion AI"
-          className="signup-logo"
-        />
+    <main className="shopper-register-page">
+      <div className="shopper-register-background left" />
+      <div className="shopper-register-background right" />
 
-        <header className="signup-header">
-          <h1>
-            {isSeller
-              ? "Create your seller account"
-              : "Create your shopper account"}
-          </h1>
+      <header className="shopper-register-header">
+        <button
+          type="button"
+          className="shopper-register-logo"
+          onClick={() => navigate("/")}
+          aria-label="Return to landing page"
+        >
+          <img
+            src={fitFusionLogo}
+            alt="FitFusion AI"
+          />
+        </button>
 
-          <p>
-            Selected role:{" "}
+        <div className="shopper-register-header-actions">
+          <span>Already registered?</span>
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate("/login")
+            }
+          >
+            Log In
+          </button>
+        </div>
+      </header>
+
+      <section className="shopper-register-shell">
+        <aside className="shopper-register-panel">
+          <div>
+            <p className="shopper-register-step-label">
+              {currentInformation.eyebrow}
+            </p>
+
+            <h1>
+              {currentInformation.title}
+            </h1>
+
+            <p className="shopper-register-description">
+              {
+                currentInformation.description
+              }
+            </p>
+
+            <p className="shopper-register-secondary">
+              {
+                currentInformation.secondary
+              }
+            </p>
+          </div>
+
+          <div className="shopper-register-panel-note">
             <strong>
-              {isSeller
-                ? "Seller"
-                : "Registered Shopper"}
+              {currentInformation.label}
             </strong>
 
-            <span> • </span>
+            <p>
+              {currentInformation.note}
+            </p>
+          </div>
+        </aside>
 
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/login")
-              }
-            >
-              Change role
-            </button>
-          </p>
-        </header>
+        <form
+          className="shopper-register-form"
+          onSubmit={handleSubmit}
+          noValidate
+        >
+          {step === 1 && (
+            <section className="shopper-register-form-step">
+              <div className="shopper-register-title">
+                <p>ACCOUNT & CONTACT</p>
 
-        <div className="signup-progress">
-          <ProgressStep
-            number={1}
-            label={
-              isSeller
-                ? "Account & Store"
-                : "Account & Contact"
-            }
-            currentStep={step}
-          />
+                <h2>
+                  Tell us about your
+                  shopper account.
+                </h2>
 
-          <ProgressStep
-            number={2}
-            label="Address"
-            currentStep={step}
-          />
+                <span>
+                  Enter your personal and
+                  contact information.
+                </span>
+              </div>
 
-          <ProgressStep
-            number={3}
-            label="Account Security"
-            currentStep={step}
-          />
-        </div>
-
-        <div className="signup-main-content">
-          <aside className="signup-side-panel">
-            <div>
-              <p className="signup-step-label">
-                {information[step].number}
-              </p>
-
-              <h2>
-                {information[step].title}
-              </h2>
-
-              <p>
-                {information[step].first}
-              </p>
-
-              <p>
-                {information[step].second}
-              </p>
-            </div>
-
-            <div className="signup-role-box">
-              <strong>
-                {isSeller
-                  ? "SELLER ACCOUNT"
-                  : "REGISTERED SHOPPER"}
-              </strong>
-
-              <span>
-                Required fields are marked with
-                an asterisk.
-              </span>
-            </div>
-          </aside>
-
-          <form
-            className="signup-form"
-            onSubmit={handleSubmit}
-            noValidate
-          >
-            {step === 1 && (
-              <>
-                <FormHeading
-                  eyebrow={
-                    isSeller
-                      ? "ACCOUNT & STORE"
-                      : "ACCOUNT & CONTACT"
-                  }
-                  title={
-                    isSeller
-                      ? "Tell us about your seller account."
-                      : "Tell us how to identify and contact you."
-                  }
-                  description={
-                    isSeller
-                      ? "The Store Name is required and will be assigned automatically to uploaded products."
-                      : "This information will be used for your account and order updates."
-                  }
+              <div className="shopper-register-grid">
+                <InputField
+                  label="Full Name"
+                  name="fullName"
+                  value={form.fullName}
+                  error={errors.fullName}
+                  onChange={updateField}
+                  onBlur={formatFullName}
+                  placeholder="Juan Santos Dela Cruz"
+                  autoComplete="name"
+                  wide
                 />
 
-                <FormField
+                <InputField
                   label="Username"
                   name="username"
-                  placeholder="Enter username"
                   value={form.username}
                   error={errors.username}
-                  onChange={handleChange}
-                  required
+                  onChange={updateField}
+                  placeholder="juan_delacruz"
+                  autoComplete="username"
+                  wide
                 />
 
-                {isSeller && (
-                  <FormField
-                    label="Store Name"
-                    name="storeName"
-                    placeholder="Enter your store name"
-                    value={form.storeName}
-                    error={errors.storeName}
-                    onChange={handleChange}
-                    required
-                  />
-                )}
+                <InputField
+                  label="Email Address"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  error={errors.email}
+                  onChange={updateField}
+                  placeholder="shopper@example.com"
+                  autoComplete="email"
+                />
 
-                <div className="signup-field-row">
-                  <FormField
-                    label="Email Address"
-                    name="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    value={form.email}
-                    error={errors.email}
-                    onChange={handleChange}
-                    required
-                  />
+                <InputField
+                  label="Mobile Number"
+                  name="mobile"
+                  type="tel"
+                  value={form.mobile}
+                  error={errors.mobile}
+                  onChange={updateField}
+                  placeholder="09XXXXXXXXX"
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  maxLength={11}
+                />
 
-                  <FormField
-                    label="Mobile Number"
-                    name="mobile"
-                    type="tel"
-                    placeholder="+63 9XX XXX XXXX"
-                    value={form.mobile}
-                    error={errors.mobile}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="signup-note">
+                <div className="shopper-register-information">
                   <strong>
-                    {isSeller
-                      ? "SELLER REQUIREMENT"
-                      : "REGISTERED SHOPPER"}
+                    NAME AND MOBILE FORMAT
                   </strong>
 
                   <p>
-                    {isSeller
-                      ? "Your Store Name will be displayed with every accepted product listing."
-                      : "A Store Name is not requested because this account is for shopping."}
+                    Enter your first name,
+                    optional middle name, and
+                    surname in one field. Your
+                    mobile number must contain
+                    exactly 11 digits and begin
+                    with 09.
                   </p>
                 </div>
-              </>
-            )}
+              </div>
+            </section>
+          )}
 
-            {step === 2 && (
-              <>
-                <FormHeading
-                  eyebrow={
-                    isSeller
-                      ? "STORE ADDRESS"
-                      : "DELIVERY ADDRESS"
-                  }
-                  title="Enter each location detail separately."
-                  description={
-                    isSeller
-                      ? "This information will be associated with your authenticated Seller account."
-                      : "This information will be used as your default delivery address."
-                  }
-                />
+          {step === 2 && (
+            <section className="shopper-register-form-step">
+              <div className="shopper-register-title">
+                <p>DELIVERY ADDRESS</p>
 
-                <FormField
-                  label="House No. / Building / Street"
+                <h2>
+                  Where should your orders
+                  be delivered?
+                </h2>
+
+                <span>
+                  Enter a complete Philippine
+                  delivery address.
+                </span>
+              </div>
+
+              <div className="shopper-register-grid">
+                <InputField
+                  label="House Number and Street"
                   name="street"
-                  placeholder="Enter complete address line"
                   value={form.street}
                   error={errors.street}
-                  onChange={handleChange}
-                  required
+                  onChange={updateField}
+                  placeholder="123 Rizal Street"
+                  autoComplete="address-line1"
+                  wide
                 />
 
-                <div className="signup-field-row">
-                  <FormField
-                    label="Barangay"
-                    name="barangay"
-                    placeholder="Enter barangay"
-                    value={form.barangay}
-                    error={errors.barangay}
-                    onChange={handleChange}
-                    required
-                  />
+                <InputField
+                  label="Barangay"
+                  name="barangay"
+                  value={form.barangay}
+                  error={errors.barangay}
+                  onChange={updateField}
+                  placeholder="Barangay San Antonio"
+                  autoComplete="address-line2"
+                />
 
-                  <FormField
-                    label="City / Municipality"
-                    name="city"
-                    placeholder="Enter city or municipality"
-                    value={form.city}
-                    error={errors.city}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
+                <InputField
+                  label="City / Municipality"
+                  name="city"
+                  value={form.city}
+                  error={errors.city}
+                  onChange={updateField}
+                  placeholder="Makati City"
+                  autoComplete="address-level2"
+                />
 
-                <div className="signup-field-row">
-                  <FormField
-                    label="Province"
+                <label className="shopper-register-field">
+                  <span>Province *</span>
+
+                  <select
                     name="province"
-                    placeholder="Enter province"
                     value={form.province}
-                    error={errors.province}
-                    onChange={handleChange}
-                    required
-                  />
+                    onChange={updateField}
+                    className={
+                      errors.province
+                        ? "input-error"
+                        : ""
+                    }
+                    autoComplete="address-level1"
+                  >
+                    <option value="">
+                      Select your province
+                    </option>
 
-                  <FormField
-                    label="Postal Code"
-                    name="postalCode"
-                    placeholder="Enter 4-digit postal code"
-                    value={form.postalCode}
-                    error={errors.postalCode}
-                    onChange={handleChange}
-                    inputMode="numeric"
-                    maxLength={4}
-                    required
-                  />
+                    {provinces.map(
+                      (province) => (
+                        <option
+                          key={province}
+                          value={province}
+                        >
+                          {province}
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  {errors.province && (
+                    <small className="shopper-register-error">
+                      {errors.province}
+                    </small>
+                  )}
+                </label>
+
+                <InputField
+                  label="Postal Code"
+                  name="postalCode"
+                  value={form.postalCode}
+                  error={errors.postalCode}
+                  onChange={updateField}
+                  placeholder="1200"
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                  maxLength={4}
+                />
+
+                <div className="shopper-register-information">
+                  <strong>
+                    ADDRESS PRIVACY
+                  </strong>
+
+                  <p>
+                    Your address is used only
+                    for account and
+                    delivery-related functions.
+                  </p>
                 </div>
+              </div>
+            </section>
+          )}
 
-                <div className="signup-country">
-                  <label htmlFor="country">
-                    Country
+          {step === 3 && (
+            <section className="shopper-register-form-step">
+              <div className="shopper-register-title">
+                <p>ACCOUNT SECURITY</p>
+
+                <h2>
+                  Create a secure password.
+                </h2>
+
+                <span>
+                  All password requirements
+                  must be satisfied before
+                  registration.
+                </span>
+              </div>
+
+              <div className="shopper-register-security">
+                <div className="shopper-register-password-fields">
+                  <label className="shopper-register-field">
+                    <span>Password *</span>
+
+                    <div
+                      className={`shopper-register-password ${
+                        errors.password
+                          ? "input-error"
+                          : ""
+                      }`}
+                    >
+                      <input
+                        type={
+                          showPassword
+                            ? "text"
+                            : "password"
+                        }
+                        name="password"
+                        value={form.password}
+                        onChange={updateField}
+                        placeholder="Enter password"
+                        autoComplete="new-password"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPassword(
+                            (current) =>
+                              !current
+                          )
+                        }
+                        aria-label={
+                          showPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        <EyeIcon
+                          visible={
+                            showPassword
+                          }
+                        />
+                      </button>
+                    </div>
+
+                    {errors.password && (
+                      <small className="shopper-register-error">
+                        {errors.password}
+                      </small>
+                    )}
                   </label>
 
-                  <input
-                    id="country"
-                    value="Philippines"
-                    disabled
-                    readOnly
-                  />
-                </div>
-              </>
-            )}
+                  <label className="shopper-register-field">
+                    <span>
+                      Confirm Password *
+                    </span>
 
-            {step === 3 && (
-              <>
-                <FormHeading
-                  eyebrow="ACCOUNT SECURITY"
-                  title="Create a secure password."
-                  description="The checks and password confirmation update in real time."
-                />
+                    <div
+                      className={`shopper-register-password ${
+                        errors.confirmPassword
+                          ? "input-error"
+                          : ""
+                      }`}
+                    >
+                      <input
+                        type={
+                          showConfirmation
+                            ? "text"
+                            : "password"
+                        }
+                        name="confirmPassword"
+                        value={
+                          form.confirmPassword
+                        }
+                        onChange={updateField}
+                        placeholder="Confirm password"
+                        autoComplete="new-password"
+                      />
 
-                <div className="signup-field-row">
-                  <PasswordField
-                    label="Password"
-                    name="password"
-                    value={form.password}
-                    placeholder="Enter password"
-                    show={showPassword}
-                    onToggle={() =>
-                      setShowPassword(
-                        (current) => !current
-                      )
-                    }
-                    onChange={handleChange}
-                    error={errors.password}
-                  />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowConfirmation(
+                            (current) =>
+                              !current
+                          )
+                        }
+                        aria-label={
+                          showConfirmation
+                            ? "Hide confirmation password"
+                            : "Show confirmation password"
+                        }
+                      >
+                        <EyeIcon
+                          visible={
+                            showConfirmation
+                          }
+                        />
+                      </button>
+                    </div>
 
-                  <PasswordField
-                    label="Confirm Password"
-                    name="confirmPassword"
-                    value={
-                      form.confirmPassword
-                    }
-                    placeholder="Re-enter password"
-                    show={
-                      showConfirmPassword
-                    }
-                    onToggle={() =>
-                      setShowConfirmPassword(
-                        (current) => !current
-                      )
-                    }
-                    onChange={handleChange}
-                    error={
-                      errors.confirmPassword
-                    }
-                  />
-                </div>
+                    {form.confirmPassword && (
+                      <small
+                        className={
+                          passwordsMatch
+                            ? "shopper-password-status valid"
+                            : "shopper-password-status invalid"
+                        }
+                      >
+                        {passwordsMatch
+                          ? "✓ Passwords match."
+                          : "× Passwords do not match."}
+                      </small>
+                    )}
 
-                <div
-                  className={`password-match-message ${
-                    !confirmStarted
-                      ? "waiting"
-                      : passwordsMatch
-                        ? "matched"
-                        : "not-matched"
-                  }`}
-                  aria-live="polite"
-                >
-                  <span>
-                    {!confirmStarted
-                      ? "✓"
-                      : passwordsMatch
-                        ? "✓"
-                        : "×"}
-                  </span>
-
-                  <div>
-                    <strong>
-                      {!confirmStarted
-                        ? "Confirm your password"
-                        : passwordsMatch
-                          ? "Passwords match"
-                          : "Passwords do not match"}
-                    </strong>
-
-                    <p>
-                      {!confirmStarted
-                        ? "Re-enter your password to verify it."
-                        : passwordsMatch
-                          ? "Your password confirmation is correct."
-                          : "Enter the same password in both fields."}
-                    </p>
-                  </div>
+                    {errors.confirmPassword && (
+                      <small className="shopper-register-error">
+                        {
+                          errors.confirmPassword
+                        }
+                      </small>
+                    )}
+                  </label>
                 </div>
 
-                <div className="password-checklist">
-                  <h3>
-                    PASSWORD REQUIREMENTS — LIVE
-                  </h3>
+                <aside className="shopper-register-requirements">
+                  <strong>
+                    PASSWORD REQUIREMENTS
+                  </strong>
 
-                  <div className="password-rule-grid">
-                    <PasswordRule
+                  <ul>
+                    <Requirement
                       passed={
                         passwordRules.length
                       }
-                      text="At least 8 characters"
-                    />
+                    >
+                      At least 8 characters
+                    </Requirement>
 
-                    <PasswordRule
+                    <Requirement
                       passed={
                         passwordRules.uppercase
                       }
-                      text="One uppercase letter"
-                    />
+                    >
+                      At least one uppercase
+                      letter
+                    </Requirement>
 
-                    <PasswordRule
+                    <Requirement
                       passed={
                         passwordRules.lowercase
                       }
-                      text="One lowercase letter"
-                    />
+                    >
+                      At least one lowercase
+                      letter
+                    </Requirement>
 
-                    <PasswordRule
+                    <Requirement
                       passed={
                         passwordRules.number
                       }
-                      text="One number"
-                    />
+                    >
+                      At least one number
+                    </Requirement>
 
-                    <PasswordRule
+                    <Requirement
                       passed={
                         passwordRules.special
                       }
-                      text="One special character"
-                    />
-                  </div>
+                    >
+                      At least one special
+                      character
+                    </Requirement>
+                  </ul>
+                </aside>
+              </div>
+
+              {submitError && (
+                <div
+                  className="shopper-register-submit-error"
+                  role="alert"
+                >
+                  {submitError}
                 </div>
+              )}
+            </section>
+          )}
 
-                {form.password &&
-                  !passwordComplete && (
-                    <div className="security-message error">
-                      <strong>
-                        Password is incomplete.
-                      </strong>
+          <footer className="shopper-register-actions">
+            <button
+              type="button"
+              className="shopper-register-back"
+              onClick={handleBack}
+            >
+              Back
+            </button>
 
-                      <span>
-                        Complete every requirement
-                        before creating the account.
-                      </span>
-                    </div>
-                  )}
-
-                {passwordComplete &&
-                  passwordsMatch && (
-                    <div className="security-message success">
-                      <strong>
-                        Account security complete.
-                      </strong>
-
-                      <span>
-                        You may now create your
-                        account.
-                      </span>
-                    </div>
-                  )}
-              </>
-            )}
-
-            <div className="signup-buttons">
-              <button
-                type="button"
-                className="signup-back"
-                onClick={handleBack}
-              >
-                Back
-              </button>
-
+            <div className="shopper-register-next-area">
               {step < 3 ? (
                 <button
-                  type="submit"
-                  className="signup-next"
+                  type="button"
+                  className="shopper-register-next"
+                  onClick={handleNext}
                 >
                   {step === 1
                     ? "Next: Address"
@@ -835,215 +1071,20 @@ function SignupPage({
               ) : (
                 <button
                   type="submit"
-                  className="signup-next"
-                  disabled={!canCreate}
+                  className="shopper-register-next"
                 >
-                  {isCreating
-                    ? "Creating Account..."
-                    : isSeller
-                      ? "Create Seller Account"
-                      : "Create Shopper Account"}
+                  Create Shopper Account
                 </button>
               )}
-            </div>
 
-            <p className="signup-counter">
-              Step {step} of 3
-            </p>
-          </form>
-        </div>
+              <span>
+                Step {step} of 3
+              </span>
+            </div>
+          </footer>
+        </form>
       </section>
     </main>
-  );
-}
-
-function ProgressStep({
-  number,
-  label,
-  currentStep,
-}) {
-  let className = "progress-item";
-
-  if (number === currentStep) {
-    className += " active";
-  }
-
-  if (number < currentStep) {
-    className += " complete";
-  }
-
-  return (
-    <div className={className}>
-      <div className="progress-number">
-        {number < currentStep ? "✓" : number}
-      </div>
-
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function FormHeading({
-  eyebrow,
-  title,
-  description,
-}) {
-  return (
-    <header className="form-heading">
-      <p>{eyebrow}</p>
-      <h2>{title}</h2>
-      <span>{description}</span>
-    </header>
-  );
-}
-
-function FormField({
-  label,
-  name,
-  type = "text",
-  value,
-  placeholder,
-  error,
-  onChange,
-  required,
-  ...properties
-}) {
-  return (
-    <div className="signup-field">
-      <label htmlFor={name}>
-        {label}
-        {required ? " *" : ""}
-      </label>
-
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={onChange}
-        className={
-          error ? "invalid" : ""
-        }
-        {...properties}
-      />
-
-      {error && (
-        <p className="field-error">
-          <span>!</span>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function PasswordField({
-  label,
-  name,
-  value,
-  placeholder,
-  show,
-  onToggle,
-  onChange,
-  error,
-}) {
-  return (
-    <div className="signup-field">
-      <label htmlFor={name}>
-        {label} *
-      </label>
-
-      <div
-        className={`password-field ${
-          error ? "invalid" : ""
-        }`}
-      >
-        <input
-          id={name}
-          name={name}
-          type={
-            show ? "text" : "password"
-          }
-          value={value}
-          placeholder={placeholder}
-          onChange={onChange}
-          autoComplete="new-password"
-        />
-
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={
-            show
-              ? `Hide ${label.toLowerCase()}`
-              : `Show ${label.toLowerCase()}`
-          }
-          aria-pressed={show}
-          title={
-            show
-              ? "Hide password"
-              : "Show password"
-          }
-        >
-          <EyeIcon hidden={!show} />
-        </button>
-      </div>
-
-      {error && (
-        <p className="field-error">
-          <span>!</span>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function PasswordRule({ passed, text }) {
-  return (
-    <div
-      className={`password-rule ${
-        passed ? "passed" : ""
-      }`}
-    >
-      <span>✓</span>
-      <p>{text}</p>
-    </div>
-  );
-}
-
-function EyeIcon({ hidden }) {
-  if (hidden) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path d="M3 3l18 18" />
-
-        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
-
-        <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5 9 5a16.6 16.6 0 0 1-3.1 3.7" />
-
-        <path d="M6.6 6.7C4.3 8.2 3 10 3 10s3.5 5 9 5a9.8 9.8 0 0 0 3-.5" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <path d="M3 12s3.5-5 9-5 9 5 9 5-3.5 5-9 5-9-5-9-5Z" />
-
-      <circle
-        cx="12"
-        cy="12"
-        r="2.5"
-      />
-    </svg>
   );
 }
 
