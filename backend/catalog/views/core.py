@@ -55,9 +55,9 @@ SELLER_IMAGE_GUIDELINES = (
 # Catalog Validator Logic
 # ==========================================
 class CatalogValidator:
-    MIN_IMAGE_DIMENSION = 800    # Updated per checklist confirmation
+    MIN_IMAGE_DIMENSION = 800
     MAX_IMAGE_DIMENSION = 4096
-    MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB max per file
+    MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
     ALLOWED_FORMATS = ['JPEG', 'JPG', 'PNG', 'WEBP']
     REQUIRED_FIELDS = [
         'name', 'description', 'category', 'size', 'color',
@@ -229,7 +229,7 @@ def process_batch_background(batch_id):
                 if img_field:
                     img_field.seek(0)
                     if rembg_session is None:
-                            rembg_session = new_session(settings.REMBG_MODEL)
+                        rembg_session = new_session(settings.REMBG_MODEL)
                     image_jobs[field_name] = (
                         view_label,
                         img_field.name,
@@ -238,7 +238,6 @@ def process_batch_background(batch_id):
                         ),
                     )
 
-            # The same initialized model session is safe to reuse for concurrent view inference.
             for field_name, (view_label, original_name, future) in image_jobs.items():
                 try:
                     processed_bytes = future.result()
@@ -277,9 +276,7 @@ def process_batch_background(batch_id):
                 item_time = time.time() - item_start
                 print(f"✅ Item {i}/{total_items} ({item.name}) processed in {item_time:.2f}s")
         
-        # Calculate total time
         total_time = time.time() - start_time
-        
         batch.accepted_count = accepted_count
         batch.rejected_count = rejected_count
         batch.rejection_report = rejection_report
@@ -287,7 +284,6 @@ def process_batch_background(batch_id):
         batch.completed_at = timezone.now()
         batch.save()
         
-        # FINAL TIMING OUTPUT
         print(f"🏁 BATCH {batch_id} PROCESSING COMPLETE")
         print(f"⏱️  Total Time: {total_time:.2f} seconds")
         print(f"📊 Accepted: {accepted_count} | Rejected: {rejected_count}")
@@ -366,7 +362,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
         image_files = request.FILES.getlist('images')
         
-        # 5 MB MAX FILE SIZE CHECK
         for img in image_files:
             if img.size > 5 * 1024 * 1024:
                 return Response({'error': f'Image "{img.name}" exceeds the 5 MB maximum file size limit.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -392,7 +387,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if len(rows) == 0:
             return Response({'error': 'CSV file is empty'}, status=status.HTTP_400_BAD_REQUEST)
             
-        # FIX: Reject the entire batch if there aren't enough images for the rows (3 views per item)
         if len(image_files) < len(rows) * 3:
             return Response({
                 'error': 'Missing view images. Each item requires 3 images (Front, Side, Rear). Please upload all required views.'
@@ -494,15 +488,21 @@ class CatalogViewSet(viewsets.ModelViewSet):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
         return Response(CatalogItemSerializer(items, many=True).data)
     
-    # COMBINED ROUTE FIX: Prevents DRF routing collisions by handling GET/PUT/PATCH/DELETE in one action
+    # COMBINED ROUTE FIX: Handles GET/PUT/PATCH/DELETE + File Uploads (FR-4.5 / FR-4.6 / FR-4.7)
     @extend_schema(
         summary="Manage a specific seller listing",
-        description="GET details, PUT/PATCH update, or DELETE a specific catalog item owned by the seller.",
+        description="GET details, PUT/PATCH update (with optional image replacement), or DELETE a specific catalog item.",
         parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description='Item ID')],
         responses={200: CatalogItemSerializer, 204: None, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
-    @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[IsSeller], url_path='my-listings/(?P<item_id>[^/.]+)')
+    @action(
+        detail=False, 
+        methods=['get', 'put', 'patch', 'delete'], 
+        permission_classes=[IsSeller], 
+        url_path='my-listings/(?P<item_id>[^/.]+)',
+        parser_classes=[parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+    )
     def my_listing_manage(self, request, item_id=None):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
@@ -515,7 +515,22 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             return Response(CatalogItemSerializer(item).data)
         
+        elif request.method == 'DELETE':
+            # FR-4.6: Explicit storage.delete calls (post_delete signal also handles this as a safety net)
+            for field in ('front_image', 'side_image', 'rear_image'):
+                image = getattr(item, field)
+                if image and image.name:
+                    image.delete(save=False)
+            item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
         elif request.method in ['PUT', 'PATCH']:
+            # FR-4.7: Any edited/re-uploaded item must return to status "processing" 
+            # and re-enter the validation pipeline.
+            item.status = 'processing'
+            item.rejection_reasons = []
+            item.save()
+
             image_fields = ('front_image', 'side_image', 'rear_image')
             payload = request.data.copy()
             replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
@@ -526,43 +541,40 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 item, data=payload, partial=request.method == 'PATCH'
             )
             serializer.is_valid(raise_exception=True)
+            
+            # Save text fields first
+            updated = serializer.save()
             validator = CatalogValidator()
+            
+            # Process any new images
             processed_images = {}
             for field, image_file in replacement_images.items():
                 if image_file.size > validator.MAX_FILE_SIZE_BYTES:
+                    updated.status = 'rejected'
+                    updated.rejection_reasons = ['Image must not exceed 5 MB.']
+                    updated.save()
                     return Response({field: 'Image must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+                
                 format_valid, format_error = validator.validate_image_format(image_file)
                 dimensions_valid, dimensions_error = validator.check_image_dimensions(image_file)
                 if not format_valid or not dimensions_valid:
+                    updated.status = 'rejected'
+                    updated.rejection_reasons = [format_error or dimensions_error]
+                    updated.save()
                     return Response({field: format_error or dimensions_error}, status=status.HTTP_400_BAD_REQUEST)
+                
                 image_file.seek(0)
                 try:
                     processed_images[field] = validator.process_image_with_rembg(image_file)
                 except Exception as error:
+                    updated.status = 'rejected'
+                    updated.rejection_reasons = [str(error)]
+                    updated.save()
                     return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-            needs_palette_update = (
-                'color_family' in serializer.validated_data
-                or 'color' in serializer.validated_data
-                or 'front_image' in processed_images
-            )
-            front_color = None
-            if needs_palette_update:
-                front_image = processed_images.get('front_image') or item.front_image
-                if front_image:
-                    front_image.seek(0)
-                    front_color = validator.extract_dominant_color(front_image)
-                    declared_color = serializer.validated_data.get('color', item.color)
-                    if 'front_image' in processed_images or 'color' in serializer.validated_data:
-                        color_valid, color_message = validator.validate_color_alignment(
-                            declared_color, front_color
-                        )
-                        if not color_valid:
-                            return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
-
-            updated = serializer.save()
+            # FR-4.5: Delete old GridFS objects before saving new file references
             old_image_names = {
-                field: getattr(item, field).name for field in processed_images
+                field: getattr(updated, field).name for field in processed_images
             }
             for field, processed_bytes in processed_images.items():
                 processed_bytes.seek(0)
@@ -574,20 +586,41 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 old_name = old_image_names.get(field)
                 if old_name:
                     getattr(updated, field).storage.delete(old_name)
-            if needs_palette_update and front_color is not None:
-                updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
-                    front_color, updated.color_family
-                )
+
+            # Re-validate color if front image or color changed, OR if the item was previously rejected
+            needs_color_check = (
+                'color_family' in serializer.validated_data
+                or 'color' in serializer.validated_data
+                or 'front_image' in processed_images
+                or item.status == 'rejected'
+            )
+            
+            if needs_color_check:
+                front_image = processed_images.get('front_image') or updated.front_image
+                if front_image:
+                    front_image.seek(0)
+                    front_color = validator.extract_dominant_color(front_image)
+                    declared_color = serializer.validated_data.get('color', updated.color)
+                    
+                    color_valid, color_message = validator.validate_color_alignment(
+                        declared_color, front_color
+                    )
+                    if not color_valid:
+                        updated.status = 'rejected'
+                        updated.rejection_reasons = [color_message]
+                        updated.save()
+                        return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
+                        front_color, updated.color_family
+                    )
+
+            # If we reach here, validation passed
+            updated.status = 'active'
+            updated.rejection_reasons = []
             updated.save()
-            return Response(CatalogItemSerializer(item).data)
-        
-        elif request.method == 'DELETE':
-            for field in ('front_image', 'side_image', 'rear_image'):
-                image = getattr(item, field)
-                if image:
-                    image.delete(save=False)
-            item.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+            return Response(CatalogItemSerializer(updated).data)
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'download_template', 'download_package']:

@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from accounts.storage import gridfs_storage
 
@@ -73,3 +75,20 @@ class CatalogItem(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.store_name}"
+
+
+# ==========================================
+# FR-4.6 / RSK-03: GridFS Cleanup Signal
+# MUST BE AT THE BOTTOM, AFTER CatalogItem IS DEFINED
+# ==========================================
+@receiver(post_delete, sender=CatalogItem)
+def cleanup_catalog_images(sender, instance, **kwargs):
+    """
+    Cascade-delete all three image objects from GridFS 
+    when a listing is deleted to prevent orphaned files and protect free-tier quota.
+    """
+    for field_name in ['front_image', 'side_image', 'rear_image']:
+        file_field = getattr(instance, field_name)
+        if file_field and file_field.name:
+            # save=False prevents an unnecessary extra DB save since the model is being deleted
+            file_field.delete(save=False)
