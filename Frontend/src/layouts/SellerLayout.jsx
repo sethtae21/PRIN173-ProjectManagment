@@ -22,7 +22,6 @@ const navigationItems = [
     matches: [
       "/seller/upload-catalog",
       "/seller/catalog-upload",
-      "/seller/csv-template",
     ],
   },
   {

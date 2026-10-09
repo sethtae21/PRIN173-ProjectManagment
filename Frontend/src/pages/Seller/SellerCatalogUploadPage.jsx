@@ -1,6 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../../services/api";
 import "../css/SellerCatalogUploadPage.css";
+
+const requiredColumns = [
+  "name",
+  "description",
+  "category",
+  "size",
+  "color",
+  "color_description",
+  "color_family",
+  "price",
+  "style_tags",
+  "occasion_tags",
+  "front_image_filename",
+  "side_image_filename",
+  "rear_image_filename",
+];
 
 const initialImages = {
   front: null,
@@ -189,8 +206,48 @@ function SellerCatalogUploadPage() {
           .split(/\r?\n/)
           .filter((row) => row.trim() !== "");
 
-        // The first row is treated as the heading.
-        resolve(Math.max(rows.length - 1, 0));
+        const headerIndex = rows.findIndex((row) => {
+          const columns = row
+            .replace(/^\uFEFF/, "")
+            .split(",")
+            .map((column) =>
+              column.trim().replace(/^"|"$/g, "").toLowerCase()
+            );
+
+          return columns[0] === "name";
+        });
+
+        if (headerIndex < 0) {
+          reject(
+            new Error("The CSV file is missing its required header row.")
+          );
+          return;
+        }
+
+        const headerColumns = rows[headerIndex]
+          .replace(/^\uFEFF/, "")
+          .split(",")
+          .map((column) =>
+            column.trim().replace(/^"|"$/g, "").toLowerCase()
+          );
+        const missingColumns = requiredColumns.filter(
+          (column) => !headerColumns.includes(column)
+        );
+
+        if (missingColumns.length > 0) {
+          reject(
+            new Error(
+              `The CSV header is missing required columns: ${missingColumns.join(", ")}.`
+            )
+          );
+          return;
+        }
+
+        const productRows = rows
+          .slice(headerIndex + 1)
+          .filter((row) => row.trim() !== "");
+
+        resolve(productRows.length);
       };
 
       reader.onerror = () => {
@@ -250,9 +307,9 @@ function SellerCatalogUploadPage() {
         return;
       }
 
-      if (productCount > 50) {
+      if (productCount > 10) {
         setErrors({
-          csv: `The CSV contains ${productCount} products. Only 50 products can be uploaded at one time.`,
+          csv: `The CSV contains ${productCount} products. Only 10 products can be uploaded at one time.`,
         });
 
         setIsProcessing(false);
@@ -294,11 +351,11 @@ function SellerCatalogUploadPage() {
           productCount === 1 ? "" : "s"
         } assigned to ${storeName}.`,
       });
-    } catch {
+    } catch (error) {
       setValidationResult({
         type: "error",
         title: "Validation failed",
-        message:
+        message: error.message ||
           "The CSV file could not be processed. Please check the file and try again.",
       });
     } finally {
@@ -376,23 +433,25 @@ function SellerCatalogUploadPage() {
             <div className="seller-upload-guidelines">
               <p>
                 Use the required CSV template and
-                upload up to 50 products.
+                upload up to 10 products.
               </p>
 
               <ul>
                 <li>Accepted format: CSV</li>
                 <li>Maximum file size: 5 MB</li>
-                <li>Maximum records: 50 products</li>
+                <li>Maximum records: 10 products</li>
               </ul>
             </div>
 
-            <a
+            <button
+              type="button"
               className="seller-template-button"
-              href="/templates/fitfusion-catalog-template.csv"
-              download
+              onClick={() => {
+                window.location.href = `${API_URL}/catalog/download-template/`;
+              }}
             >
-              Download CSV Template
-            </a>
+              Download Required Template
+            </button>
 
             <label
               className={

@@ -197,11 +197,11 @@ function SellerDashboardPage() {
         <DashboardActionCard
           label="CSV TEMPLATE"
           title="Download the catalog template"
-          description="Use the required CSV format before uploading multiple product records."
-          buttonLabel="Open CSV Template"
+          description="Download the required CSV template from the catalog upload page."
+          buttonLabel="Open Catalog Upload"
           buttonStyle="primary"
           onClick={() =>
-            navigate("/seller/csv-template")
+            navigate("/seller/upload-catalog")
           }
         />
 

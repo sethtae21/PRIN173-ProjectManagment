@@ -50,7 +50,6 @@ import EditAccountPage from "./pages/EditAccountPage";
 import SellerSignupPage from "./pages/Seller/SellerSignupPage";
 import SellerDashboardPage from "./pages/Seller/SellerDashboardPage";
 import SellerCatalogUploadPage from "./pages/Seller/SellerCatalogUploadPage";
-import SellerCsvTemplatePage from "./pages/Seller/SellerCsvTemplatePage";
 import SellerProductListingsPage from "./pages/Seller/SellerProductListingsPage";
 import SellerItemDetailsPage from "./pages/Seller/SellerItemDetailsPage";
 import EditSellerListingPage from "./pages/Seller/EditSellerListingPage";
@@ -374,17 +373,6 @@ function App() {
           <Route
             path="catalog-upload"
             element={<SellerCatalogUploadPage />}
-          />
-
-          {/* CSV Template */}
-          <Route
-            path="csv-template"
-            element={<SellerCsvTemplatePage />}
-          />
-
-          <Route
-            path="upload-catalog/csv-template"
-            element={<SellerCsvTemplatePage />}
           />
 
           {/* Product Listings */}
