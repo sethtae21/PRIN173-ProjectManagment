@@ -156,19 +156,44 @@ SIMPLE_JWT = {
 }
 
 # ==========================================
-# CORS Configuration
-# CRITICAL FIX: Restricted CORS origins for production security.
+# CORS Configuration (React Frontend Integration)
 # ==========================================
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
-        'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000'
+        'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000'
     ).split(',')
     if origin.strip()
 ]
 
-# Allow all origins only in local development
+# Allow credentials (cookies, authorization headers) for JWT auth
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow specific headers needed for file uploads and JWT
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Allow methods needed for REST API
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Allow all origins only in local development (for easier debugging)
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 
