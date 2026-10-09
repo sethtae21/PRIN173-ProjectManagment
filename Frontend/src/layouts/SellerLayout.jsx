@@ -10,7 +10,7 @@ import {
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./SellerLayout.css";
 
-const sellerNavigation = [
+const navigationItems = [
   {
     label: "Dashboard",
     to: "/seller/dashboard",
@@ -18,30 +18,30 @@ const sellerNavigation = [
   },
   {
     label: "Upload Catalog",
-    to: "/seller/products/upload",
-    matches: ["/seller/products/upload"],
+    to: "/seller/upload-catalog",
+    matches: [
+      "/seller/upload-catalog",
+      "/seller/catalog-upload",
+      "/seller/csv-template",
+    ],
   },
   {
     label: "Listings",
-    to: "/seller/products",
+    to: "/seller/listings",
     matches: [
+      "/seller/listings",
       "/seller/products",
-      "/seller/products/new",
     ],
-    exclude: ["/seller/products/upload"],
   },
   {
-    label: "Validation",
-    to: "/seller/validation-report",
-    matches: ["/seller/validation-report"],
+   label: "Reports",
+   to: "/seller/validation",
+   matches: ["/seller/validation"],
   },
   {
     label: "Store Profile",
-    to: "/seller/account",
-    matches: [
-      "/seller/account",
-      "/seller/store-profile",
-    ],
+    to: "/seller/store-profile",
+    matches: ["/seller/store-profile"],
   },
 ];
 
@@ -49,40 +49,27 @@ function SellerLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const [
-    showLogoutConfirmation,
-    setShowLogoutConfirmation,
-  ] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] =
+    useState(false);
 
-  function isCurrentPage(item) {
-    const matchesPath = item.matches.some(
+  function isCurrentPage(matches) {
+    return matches.some(
       (path) =>
         pathname === path ||
         pathname.startsWith(`${path}/`)
     );
-
-    const matchesExcludedPath =
-      item.exclude?.some(
-        (path) =>
-          pathname === path ||
-          pathname.startsWith(`${path}/`)
-      ) || false;
-
-    return matchesPath && !matchesExcludedPath;
   }
 
   function handleLogout() {
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
-    sessionStorage.removeItem(
-      "registeredAccount"
-    );
+    sessionStorage.removeItem("registeredAccount");
 
     localStorage.removeItem(
       "fitfusion-current-user"
     );
 
-    setShowLogoutConfirmation(false);
+    setShowLogoutModal(false);
 
     navigate("/login", {
       replace: true,
@@ -90,12 +77,12 @@ function SellerLayout() {
   }
 
   return (
-    <div className="seller-layout">
-      <aside className="seller-sidebar">
+    <div className="seller-shell">
+      <aside className="unified-seller-sidebar">
         <Link
           to="/seller/dashboard"
-          className="seller-sidebar-logo"
-          aria-label="Open Seller Dashboard"
+          className="unified-seller-logo"
+          aria-label="Go to seller dashboard"
         >
           <img
             src={fitFusionLogo}
@@ -104,11 +91,13 @@ function SellerLayout() {
         </Link>
 
         <nav
-          className="seller-sidebar-navigation"
+          className="unified-seller-navigation"
           aria-label="Seller navigation"
         >
-          {sellerNavigation.map((item) => {
-            const active = isCurrentPage(item);
+          {navigationItems.map((item) => {
+            const active = isCurrentPage(
+              item.matches
+            );
 
             return (
               <Link
@@ -116,8 +105,8 @@ function SellerLayout() {
                 to={item.to}
                 className={
                   active
-                    ? "seller-sidebar-link active"
-                    : "seller-sidebar-link"
+                    ? "unified-seller-link active"
+                    : "unified-seller-link"
                 }
                 aria-current={
                   active ? "page" : undefined
@@ -131,26 +120,29 @@ function SellerLayout() {
 
         <button
           type="button"
-          className="seller-sidebar-logout"
+          className="unified-seller-logout"
           onClick={() =>
-            setShowLogoutConfirmation(true)
+            setShowLogoutModal(true)
           }
         >
           Logout
         </button>
       </aside>
 
-      <section className="seller-layout-content">
+      <main className="seller-layout-content">
         <Outlet />
-      </section>
+      </main>
 
-      {showLogoutConfirmation && (
+      {showLogoutModal && (
         <div
           className="seller-logout-overlay"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowLogoutConfirmation(false);
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setShowLogoutModal(false);
             }
           }}
         >
@@ -160,29 +152,13 @@ function SellerLayout() {
             aria-modal="true"
             aria-labelledby="seller-logout-title"
           >
-            <div className="seller-logout-icon">
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M10 5H5v14h5" />
-                <path d="M14 8l4 4-4 4" />
-                <path d="M8 12h10" />
-              </svg>
-            </div>
-
-            <p className="seller-logout-label">
-              SELLER ACCOUNT
-            </p>
-
             <h2 id="seller-logout-title">
-              Log out of FitFusion?
+              Log out?
             </h2>
 
-            <p className="seller-logout-message">
-              You will need to enter your seller
-              credentials again to access your
-              dashboard and product management tools.
+            <p>
+              Are you sure you want to end your
+              seller session?
             </p>
 
             <div className="seller-logout-actions">
@@ -190,7 +166,7 @@ function SellerLayout() {
                 type="button"
                 className="seller-logout-cancel"
                 onClick={() =>
-                  setShowLogoutConfirmation(false)
+                  setShowLogoutModal(false)
                 }
               >
                 Cancel

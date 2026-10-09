@@ -13,16 +13,14 @@ import ShopperLayout from "./layouts/ShopperLayout";
 import GuestLayout from "./layouts/GuestLayout";
 import SellerLayout from "./layouts/SellerLayout";
 
-/* Shared Pages */
+/* Shared and authentication pages */
 import LandingPage from "./pages/Shared Pages/LandingPage";
 import ChooseRegistrationRolePage from "./pages/Shared Pages/ChooseRegistrationRolePage";
-
-/* Authentication Pages */
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import GuestPage from "./pages/GuestPage";
 
-/* Shopper Pages */
+/* Shopper pages */
 import ShopperDashboard from "./pages/ShopperDashboard";
 import ChooseAvatarGenderPage from "./pages/ChooseAvatarGenderPage";
 import FittingStudioPage from "./pages/FittingStudioPage";
@@ -48,7 +46,7 @@ import OrderDetailsPage from "./pages/OrderDetailsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
 import EditAccountPage from "./pages/EditAccountPage";
 
-/* Seller Pages */
+/* Seller pages */
 import SellerSignupPage from "./pages/Seller/SellerSignupPage";
 import SellerDashboardPage from "./pages/Seller/SellerDashboardPage";
 import SellerCatalogUploadPage from "./pages/Seller/SellerCatalogUploadPage";
@@ -61,9 +59,7 @@ import SellerStoreProfilePage from "./pages/Seller/SellerStoreProfilePage";
 
 import "./App.css";
 
-/*
- * Scrolls to the top whenever the route changes.
- */
+/* Scroll to the top whenever the URL changes */
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -78,9 +74,7 @@ function ScrollToTop() {
   return null;
 }
 
-/*
- * Used for unfinished pages.
- */
+/* Temporary page for features that are not finished yet */
 function TemporaryPage({
   title,
   message,
@@ -108,34 +102,50 @@ function App() {
       <ScrollToTop />
 
       <Routes>
-        {/* ======================================== */}
-        {/* LANDING PAGE                             */}
-        {/* ======================================== */}
+        {/* =====================================
+            LANDING PAGE
+        ====================================== */}
 
         <Route
           path="/"
           element={<LandingPage />}
         />
 
-        {/* ======================================== */}
-        {/* AUTHENTICATION                           */}
-        {/* ======================================== */}
+        {/* =====================================
+            AUTHENTICATION AND REGISTRATION
+        ====================================== */}
 
         <Route
           path="/login"
           element={<LoginPage />}
         />
 
+        {/* Choose between Shopper and Seller */}
         <Route
           path="/signup"
-          element={
-            <ChooseRegistrationRolePage />
-          }
+          element={<ChooseRegistrationRolePage />}
         />
 
         <Route
+          path="/register"
+          element={<ChooseRegistrationRolePage />}
+        />
+
+        {/* Shopper registration */}
+        <Route
           path="/signup/shopper"
           element={<SignupPage />}
+        />
+
+        <Route
+          path="/shopper/signup"
+          element={<SignupPage />}
+        />
+
+        {/* Seller registration */}
+        <Route
+          path="/signup/seller"
+          element={<SellerSignupPage />}
         />
 
         <Route
@@ -155,78 +165,58 @@ function App() {
           }
         />
 
-        {/* ======================================== */}
-        {/* GUEST PAGES                              */}
-        {/* ======================================== */}
+        {/* =====================================
+            GUEST PAGES
+        ====================================== */}
 
         <Route
           path="/guest"
           element={<GuestLayout />}
         >
-          {/* Guest Dashboard */}
           <Route
             index
             element={<GuestPage />}
           />
 
-          {/* Guest Catalog */}
           <Route
             path="catalog"
             element={<CatalogPage isGuest />}
           />
 
-          {/* Guest Product Details */}
           <Route
             path="products/:productId"
-            element={
-              <ProductDetailsPage isGuest />
-            }
+            element={<ProductDetailsPage isGuest />}
           />
 
-          {/* Guest Seller Store */}
           <Route
             path="sellers/:sellerId"
-            element={
-              <SellerStorePage isGuest />
-            }
+            element={<SellerStorePage isGuest />}
           />
 
           <Route
             path="store/:sellerId"
-            element={
-              <SellerStorePage isGuest />
-            }
+            element={<SellerStorePage isGuest />}
           />
 
-          {/* Guest Fitting Studio */}
           <Route
             path="fitting-studio"
-            element={
-              <ChooseAvatarGenderPage
-                isGuest
-              />
-            }
+            element={<ChooseAvatarGenderPage isGuest />}
           />
 
           <Route
             path="fitting-studio/customize"
-            element={
-              <FittingStudioPage isGuest />
-            }
+            element={<FittingStudioPage isGuest />}
           />
 
-          {/* Guest Avatar Presets */}
           <Route
             path="avatar-presets"
-            element={
-              <AvatarPresetPage isGuest />
-            }
+            element={<AvatarPresetPage isGuest />}
           />
         </Route>
 
-        {/* ======================================== */}
-        {/* REGISTERED SHOPPER PAGES                 */}
-        {/* ======================================== */}
+        {/* =====================================
+            REGISTERED SHOPPER PAGES
+        ====================================== */}
 
         <Route
           path="/shopper"
@@ -242,7 +232,7 @@ function App() {
             }
           />
 
-          {/* Shopper Dashboard */}
+          {/* Dashboard */}
           <Route
             path="dashboard"
             element={<ShopperDashboard />}
@@ -251,23 +241,17 @@ function App() {
           {/* Fitting Studio */}
           <Route
             path="fitting-studio"
-            element={
-              <ChooseAvatarGenderPage />
-            }
+            element={<ChooseAvatarGenderPage />}
           />
 
           <Route
             path="fitting-studio/customize"
-            element={
-              <FittingStudioPage />
-            }
+            element={<FittingStudioPage />}
           />
 
           <Route
             path="fitting-studio/select-items"
-            element={
-              <CartSelectedItems />
-            }
+            element={<CartSelectedItems />}
           />
 
           {/* Avatar Presets */}
@@ -278,9 +262,7 @@ function App() {
 
           <Route
             path="avatar-presets/:presetId/edit"
-            element={
-              <EditAvatarPresetPage />
-            }
+            element={<EditAvatarPresetPage />}
           />
 
           {/* Catalog */}
@@ -289,15 +271,12 @@ function App() {
             element={<CatalogPage />}
           />
 
-          {/* Product Details */}
           <Route
             path="products/:productId"
-            element={
-              <ProductDetailsPage />
-            }
+            element={<ProductDetailsPage />}
           />
 
-          {/* Seller Store */}
+          {/* Seller Store viewed by shoppers */}
           <Route
             path="sellers/:sellerId"
             element={<SellerStorePage />}
@@ -311,24 +290,18 @@ function App() {
           {/* Saved Outfits */}
           <Route
             path="saved-outfits"
-            element={
-              <SavedOutfitsPage />
-            }
+            element={<SavedOutfitsPage />}
           />
 
           <Route
             path="saved-outfits/:outfitId/edit"
-            element={
-              <EditSavedOutfitPage />
-            }
+            element={<EditSavedOutfitPage />}
           />
 
           {/* Shopping Cart */}
           <Route
             path="cart"
-            element={
-              <ShoppingCartPage />
-            }
+            element={<ShoppingCartPage />}
           />
 
           {/* Checkout */}
@@ -340,33 +313,24 @@ function App() {
           {/* Order Confirmation */}
           <Route
             path="order-confirmation"
-            element={
-              <OrderConfirmationPage />
-            }
+            element={<OrderConfirmationPage />}
           />
 
           {/* Order History */}
           <Route
             path="orders"
-            element={
-              <OrderHistoryPage />
-            }
+            element={<OrderHistoryPage />}
           />
 
-          {/* Order Details */}
           <Route
             path="orders/:orderId"
-            element={
-              <OrderDetailsPage />
-            }
+            element={<OrderDetailsPage />}
           />
 
-          {/* Account Management */}
+          {/* Account */}
           <Route
             path="account"
-            element={
-              <AccountManagementPage />
-            }
+            element={<AccountManagementPage />}
           />
 
           <Route
@@ -375,14 +339,15 @@ function App() {
           />
         </Route>
 
-        {/* ======================================== */}
-        {/* SELLER PAGES                             */}
-        {/* ======================================== */}
+        {/* =====================================
+            SELLER PAGES
+        ====================================== */}
 
         <Route
           path="/seller"
           element={<SellerLayout />}
         >
+          {/* Opening /seller redirects to dashboard */}
           <Route
             index
             element={
@@ -396,71 +361,82 @@ function App() {
           {/* Seller Dashboard */}
           <Route
             path="dashboard"
-            element={
-              <SellerDashboardPage />
-            }
+            element={<SellerDashboardPage />}
           />
 
           {/* Upload Catalog */}
           <Route
-            path="products/upload"
-            element={
-              <SellerCatalogUploadPage />
-            }
+            path="upload-catalog"
+            element={<SellerCatalogUploadPage />}
+          />
+
+          {/* Alternative upload URL */}
+          <Route
+            path="catalog-upload"
+            element={<SellerCatalogUploadPage />}
           />
 
           {/* CSV Template */}
           <Route
-            path="products/upload/template"
-            element={
-              <SellerCsvTemplatePage />
-            }
+            path="csv-template"
+            element={<SellerCsvTemplatePage />}
+          />
+
+          <Route
+            path="upload-catalog/csv-template"
+            element={<SellerCsvTemplatePage />}
           />
 
           {/* Product Listings */}
           <Route
-            path="products"
-            element={
-              <SellerProductListingsPage />
-            }
+            path="listings"
+            element={<SellerProductListingsPage />}
           />
 
           {/* Seller Item Details */}
           <Route
-            path="products/:productId"
-            element={
-              <SellerItemDetailsPage />
-            }
+            path="listings/:productId"
+            element={<SellerItemDetailsPage />}
           />
 
-          {/* Edit Seller Listing */}
+          {/* Alternative product details URL */}
+          <Route
+            path="products/:productId"
+            element={<SellerItemDetailsPage />}
+          />
+
+          {/* Edit or re-upload listing */}
+          <Route
+            path="listings/:productId/edit"
+            element={<EditSellerListingPage />}
+          />
+
           <Route
             path="products/:productId/edit"
-            element={
-              <EditSellerListingPage />
-            }
+            element={<EditSellerListingPage />}
           />
 
           {/* Validation Report */}
           <Route
+            path="validation"
+            element={<SellerValidationReportPage />}
+          />
+
+          <Route
             path="validation-report"
-            element={
-              <SellerValidationReportPage />
-            }
+            element={<SellerValidationReportPage />}
           />
 
           {/* Seller Store Profile */}
           <Route
-            path="account"
-            element={
-              <SellerStoreProfilePage />
-            }
+            path="store-profile"
+            element={<SellerStoreProfilePage />}
           />
         </Route>
 
-        {/* ======================================== */}
-        {/* UNKNOWN URL                              */}
-        {/* ======================================== */}
+        {/* =====================================
+            UNKNOWN URL
+        ====================================== */}
 
         <Route
           path="*"

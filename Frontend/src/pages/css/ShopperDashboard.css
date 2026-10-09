@@ -1,5 +1,6 @@
 .shopper-dashboard-page {
   min-height: 100vh;
+  padding-bottom: 70px;
   background:
     radial-gradient(
       circle at right center,
@@ -20,56 +21,39 @@
   box-sizing: border-box;
 }
 
-/* PAGE HEADER */
+/* CART AND ROLE ONLY */
 
-.shopper-dashboard-header {
+.shopper-dashboard-top-actions {
   display: flex;
-  min-height: 122px;
+  min-height: 86px;
   align-items: center;
-  justify-content: space-between;
-  gap: 25px;
-  padding: 25px 34px;
-  background: rgba(255, 253, 249, 0.97);
-  border-bottom: 1px solid #e2d8c7;
-}
-
-.shopper-page-code {
-  margin: 0 0 13px;
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.shopper-page-description {
-  margin: 0;
-  color: #5c554c;
-  font-size: 12px;
-}
-
-.shopper-header-actions {
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 18px;
+  padding: 18px 35px 10px;
 }
 
 .shopper-cart-button {
   display: flex;
   min-width: 110px;
-  min-height: 47px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background: #f8f5ef;
+  background: #fffdf9;
   border: 1px solid #d2be91;
-  border-radius: 8px;
+  border-radius: 9px;
   color: #29251f;
   cursor: pointer;
   transition:
     background 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .shopper-cart-button:hover {
   background: #fff8e6;
+  box-shadow: 0 8px 18px
+    rgba(142, 100, 31, 0.12);
   transform: translateY(-1px);
 }
 
@@ -90,30 +74,30 @@
 
 .shopper-role-badge {
   display: grid;
-  min-width: 130px;
-  min-height: 47px;
+  min-width: 190px;
+  min-height: 48px;
   place-items: center;
-  padding: 10px 15px;
+  padding: 10px 18px;
   background: #17130f;
   border: 1px solid #17130f;
-  border-radius: 8px;
+  border-radius: 9px;
   color: #f6e7b7;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-align: center;
 }
 
-/* MAIN BODY */
+/* BODY */
 
 .shopper-dashboard-body {
   width: min(1170px, calc(100% - 60px));
   margin: 0 auto;
-  padding: 45px 0 70px;
+  padding-top: 18px;
 }
 
 .shopper-welcome {
-  margin-bottom: 30px;
+  margin-bottom: 31px;
 }
 
 .shopper-welcome > p {
@@ -126,8 +110,8 @@
 
 .shopper-welcome h1 {
   margin: 0 0 13px;
-  font-size: clamp(30px, 3vw, 41px);
-  line-height: 1.2;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.15;
 }
 
 .shopper-welcome span {
@@ -137,35 +121,30 @@
 
 /* START CARD */
 
-.shopper-onboarding-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  margin-bottom: 28px;
-}
-
 .shopper-start-card {
   position: relative;
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
-    minmax(190px, 0.35fr);
-  min-height: 290px;
+    minmax(245px, 0.36fr);
+  min-height: 310px;
+  margin-bottom: 28px;
   overflow: hidden;
   background: #fffdf9;
   border: 1px solid #e2d8c7;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px
-    rgba(83, 55, 13, 0.05);
+  border-radius: 17px;
+  box-shadow: 0 13px 32px
+    rgba(83, 55, 13, 0.06);
 }
 
 .shopper-start-card-content {
   position: relative;
   z-index: 1;
-  padding: 40px;
+  padding: 49px;
 }
 
 .shopper-card-label {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   color: #b57e20;
   font-size: 10px;
   font-weight: 800;
@@ -173,15 +152,15 @@
 }
 
 .shopper-start-card h2 {
-  margin: 0 0 19px;
-  font-size: clamp(24px, 3vw, 31px);
+  margin: 0 0 20px;
+  font-size: clamp(26px, 3vw, 34px);
   line-height: 1.25;
 }
 
 .shopper-start-card-content > p:not(
     .shopper-card-label
   ) {
-  max-width: 670px;
+  max-width: 680px;
   margin: 0;
   color: #5c554c;
   font-size: 13px;
@@ -191,14 +170,14 @@
 .shopper-card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
-  margin-top: 31px;
+  gap: 16px;
+  margin-top: 32px;
 }
 
 .shopper-primary-button,
 .shopper-secondary-button {
-  min-height: 48px;
-  padding: 11px 23px;
+  min-height: 49px;
+  padding: 11px 24px;
   border-radius: 8px;
   font: inherit;
   font-size: 10px;
@@ -250,34 +229,34 @@
 .shopper-start-decoration::before,
 .shopper-start-decoration::after {
   position: absolute;
-  width: 170px;
-  height: 170px;
+  width: 180px;
+  height: 180px;
   border: 1px solid
-    rgba(246, 231, 183, 0.2);
+    rgba(246, 231, 183, 0.22);
   border-radius: 50%;
   content: "";
 }
 
 .shopper-start-decoration::before {
-  top: -65px;
-  right: -65px;
+  top: -70px;
+  right: -70px;
 }
 
 .shopper-start-decoration::after {
-  bottom: -70px;
-  left: -75px;
+  bottom: -80px;
+  left: -85px;
 }
 
 .shopper-avatar-symbol {
   position: relative;
-  width: 100px;
-  height: 170px;
+  width: 105px;
+  height: 178px;
 }
 
 .shopper-avatar-head {
   display: block;
-  width: 47px;
-  height: 53px;
+  width: 49px;
+  height: 55px;
   margin: 0 auto;
   background: #e6c997;
   border-radius: 50% 50% 45% 45%;
@@ -285,9 +264,9 @@
 
 .shopper-avatar-body {
   display: block;
-  width: 100px;
-  height: 110px;
-  margin: 7px auto 0;
+  width: 105px;
+  height: 115px;
+  margin: 8px auto 0;
   background: linear-gradient(
     180deg,
     #fffdf9,
@@ -463,9 +442,7 @@
   font-size: 16px;
 }
 
-/* RESPONSIVE */
-
-@media (max-width: 980px) {
+@media (max-width: 1000px) {
   .shopper-start-card {
     grid-template-columns: 1fr;
   }
@@ -480,24 +457,25 @@
 }
 
 @media (max-width: 700px) {
-  .shopper-dashboard-header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 24px 20px;
+  .shopper-dashboard-top-actions {
+    padding: 18px 15px 5px;
   }
 
-  .shopper-header-actions {
-    width: 100%;
-    justify-content: space-between;
+  .shopper-cart-button {
+    min-width: 90px;
+  }
+
+  .shopper-role-badge {
+    min-width: 150px;
+    font-size: 9px;
   }
 
   .shopper-dashboard-body {
     width: min(100% - 30px, 1170px);
-    padding-top: 32px;
   }
 
   .shopper-start-card-content {
-    padding: 30px 22px;
+    padding: 31px 22px;
   }
 
   .shopper-card-actions {

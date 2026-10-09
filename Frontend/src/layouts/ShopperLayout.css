@@ -1,57 +1,60 @@
 .shopper-shell {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at right center,
-      rgba(181, 126, 32, 0.23),
-      transparent 42%
-    ),
-    linear-gradient(
-      135deg,
-      #f2efe8,
-      #fffdf9 52%,
-      #eee8de
-    );
-  color: #17130f;
+  background: #f2efe8;
 }
 
 .unified-shopper-sidebar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 20;
   display: flex;
   height: 100vh;
+  height: 100dvh;
+  min-height: 600px;
   flex-direction: column;
-  padding: 18px;
+  overflow-y: auto;
+  padding: 16px 18px;
   background: linear-gradient(
     180deg,
-    #f6e7b7,
+    #f6e7b7 0%,
     #d7af4b 52%,
-    #b57e20
+    #b57e20 100%
   );
-  box-shadow: 8px 0 24px
-    rgba(87, 57, 12, 0.08);
+  border-right: 1px solid
+    rgba(142, 100, 31, 0.28);
+}
+
+.unified-shopper-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.unified-shopper-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(23, 19, 15, 0.25);
+  border-radius: 999px;
 }
 
 .unified-sidebar-logo {
   display: grid;
-  min-height: 90px;
+  flex: 0 0 auto;
+  min-height: 92px;
   place-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
+  border-radius: 10px;
 }
 
 .unified-sidebar-logo img {
-  width: 140px;
-  height: 76px;
+  width: 150px;
+  height: 78px;
   object-fit: contain;
 }
 
 .unified-shopper-navigation {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .unified-shopper-link {
@@ -59,238 +62,165 @@
   min-height: 48px;
   align-items: center;
   justify-content: center;
-  padding: 11px 10px;
-  background: rgba(255, 253, 249, 0.57);
-  border: 1px solid #e2c978;
+  padding: 10px;
+  background: rgba(255, 253, 249, 0.68);
+  border: 1px solid rgba(226, 201, 120, 0.9);
   border-radius: 9px;
   color: #29251f;
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
   text-decoration: none;
   transition:
     background 0.2s ease,
     color 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .unified-shopper-link:hover {
-  background: rgba(255, 253, 249, 0.87);
+  background: rgba(255, 253, 249, 0.92);
   transform: translateX(2px);
 }
 
 .unified-shopper-link.active {
   background: linear-gradient(
     135deg,
-    #17130f,
-    #8e641f 55%,
-    #d7af4b
+    #17130f 0%,
+    #8e641f 58%,
+    #d7af4b 100%
   );
   border-color: #e2c978;
+  box-shadow: 0 8px 18px
+    rgba(72, 48, 14, 0.15);
   color: #fffdf9;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .unified-shopper-logout {
-  min-height: 48px;
+  flex: 0 0 auto;
+  min-height: 47px;
   margin-top: auto;
+  padding: 11px 15px;
   background: #fffdf9;
-  border: 1.2px solid #b57e20;
+  border: 1px solid #b57e20;
   border-radius: 9px;
   color: #8e641f;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .unified-shopper-logout:hover {
   background: #17130f;
   color: #fffdf9;
+  transform: translateY(-1px);
 }
 
-.shopper-shell-content {
+.shopper-layout-content {
   min-width: 0;
   min-height: 100vh;
 }
 
-/*
-  These selectors hide the old sidebars that are
-  still inside your individual shopper pages.
-*/
+/* LOGOUT MODAL */
 
-.shopper-shell-content .shopper-sidebar,
-.shopper-shell-content .gender-sidebar,
-.shopper-shell-content .studio-sidebar,
-.shopper-shell-content .avatar-presets-sidebar,
-.shopper-shell-content .edit-avatar-sidebar,
-.shopper-shell-content .catalog-sidebar,
-.shopper-shell-content .product-details-sidebar,
-.shopper-shell-content .select-items-sidebar,
-.shopper-shell-content .saved-outfits-sidebar,
-.shopper-shell-content .edit-account-sidebar,
-.shopper-shell-content .confirmation-sidebar {
-  display: none !important;
-}
-
-/*
-  The shopper layout already provides the sidebar
-  column, so every individual page only needs one
-  content column.
-*/
-
-.shopper-shell-content > .shopper-dashboard,
-.shopper-shell-content > .gender-page,
-.shopper-shell-content > .fitting-studio-page,
-.shopper-shell-content > .avatar-presets-page,
-.shopper-shell-content > .edit-avatar-page,
-.shopper-shell-content > .catalog-page,
-.shopper-shell-content > .product-details-page,
-.shopper-shell-content > .seller-store-page,
-.shopper-shell-content > .shopping-cart-page,
-.shopper-shell-content > .checkout-page,
-.shopper-shell-content > .order-history-page,
-.shopper-shell-content > .order-details-page,
-.shopper-shell-content > .saved-outfits-page,
-.shopper-shell-content > .edit-outfit-page,
-.shopper-shell-content > .account-page,
-.shopper-shell-content > .edit-account-page,
-.shopper-shell-content > .confirmation-page {
-  grid-template-columns: minmax(0, 1fr) !important;
-  width: 100%;
-}
-
-.shopper-shell-content
-  > .select-items-page
-  .select-items-content {
-  margin-left: 0 !important;
-}
-
-.unified-logout-backdrop {
+.shopper-logout-overlay {
   position: fixed;
   z-index: 1000;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: rgba(23, 19, 15, 0.66);
+  padding: 20px;
+  background: rgba(23, 19, 15, 0.68);
   backdrop-filter: blur(4px);
 }
 
-.unified-logout-modal {
-  width: min(440px, 100%);
-  padding: 38px 34px;
+.shopper-logout-modal {
+  width: min(430px, 100%);
+  padding: 35px;
   background: #fffdf9;
   border: 1px solid #d2be91;
-  border-radius: 18px;
+  border-radius: 17px;
   box-shadow: 0 24px 70px
-    rgba(23, 19, 15, 0.28);
-  color: #17130f;
-  text-align: center;
+    rgba(23, 19, 15, 0.3);
 }
 
-.unified-logout-icon {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  margin: 0 auto 18px;
-  background: #f6e7b7;
-  border: 1px solid #d7af4b;
-  border-radius: 50%;
-  color: #8e641f;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.unified-logout-modal > p {
-  margin: 0 0 10px;
-  color: #8e641f;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-}
-
-.unified-logout-modal h2 {
+.shopper-logout-label {
   margin: 0 0 12px;
-  font-size: 26px;
-  line-height: 1.2;
+  color: #9a6a1d;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
 }
 
-.unified-logout-modal > span {
-  display: block;
+.shopper-logout-modal h2 {
+  margin: 0 0 15px;
+  color: #17130f;
+  font-size: 25px;
+}
+
+.shopper-logout-modal > p:not(
+    .shopper-logout-label
+  ) {
+  margin: 0;
   color: #5c554c;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
-.unified-logout-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.shopper-logout-actions {
+  display: flex;
+  justify-content: flex-end;
   gap: 12px;
   margin-top: 28px;
 }
 
-.unified-logout-actions button {
-  min-height: 46px;
-  padding: 10px 18px;
-  border-radius: 9px;
+.shopper-logout-cancel,
+.shopper-logout-confirm {
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 8px;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.unified-logout-actions button:first-child {
+.shopper-logout-cancel {
   background: #fffdf9;
   border: 1px solid #b57e20;
   color: #8e641f;
 }
 
-.unified-logout-actions button:last-child {
+.shopper-logout-confirm {
   background: linear-gradient(
     135deg,
     #17130f,
-    #8e641f 60%,
-    #d7af4b
+    #8e641f
   );
-  border: 1px solid #8e641f;
+  border: 1px solid #17130f;
   color: #fffdf9;
 }
 
-.unified-shopper-link:focus-visible,
-.unified-shopper-logout:focus-visible,
-.unified-logout-actions button:focus-visible {
-  outline: 3px solid
-    rgba(142, 100, 31, 0.35);
-  outline-offset: 2px;
-}
-
-@media (max-width: 980px) {
+@media (max-width: 850px) {
   .shopper-shell {
-    grid-template-columns:
-      160px
-      minmax(0, 1fr);
+    grid-template-columns: 180px minmax(0, 1fr);
   }
 
   .unified-shopper-sidebar {
-    padding: 14px 12px;
+    padding: 13px;
   }
 
   .unified-sidebar-logo img {
-    width: 124px;
-  }
-
-  .unified-shopper-navigation {
-    gap: 9px;
-  }
-
-  .unified-shopper-link {
-    min-height: 44px;
-    font-size: 12px;
+    width: 125px;
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 680px) {
   .shopper-shell {
     display: block;
   }
@@ -298,52 +228,20 @@
   .unified-shopper-sidebar {
     position: relative;
     height: auto;
-    padding: 12px;
+    min-height: 0;
+    overflow: visible;
   }
 
   .unified-sidebar-logo {
-    min-height: 66px;
-    margin-bottom: 10px;
-  }
-
-  .unified-sidebar-logo img {
-    width: 118px;
-    height: 60px;
+    min-height: 70px;
   }
 
   .unified-shopper-navigation {
     display: grid;
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .unified-shopper-link {
-    min-height: 42px;
-    padding: 9px 7px;
-  }
-
-  .unified-shopper-link:hover {
-    transform: translateY(-1px);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .unified-shopper-logout {
-    width: 100%;
-    min-height: 43px;
-    margin-top: 10px;
-  }
-
-  .unified-logout-modal {
-    padding: 32px 22px;
-  }
-}
-
-@media (max-width: 430px) {
-  .unified-shopper-navigation {
-    grid-template-columns: 1fr;
-  }
-
-  .unified-logout-actions {
-    grid-template-columns: 1fr;
+    margin-top: 14px;
   }
 }

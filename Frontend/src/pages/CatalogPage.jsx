@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -20,16 +19,14 @@ const PRODUCTS = [
     price: 899,
     originalPrice: 1099,
     rating: 4.8,
-    reviews: 128,
+    ratingsCount: 128,
     sellerId: "seller-001",
     sellerName: "Aurelia Studio",
-    location: "Makati City",
     symbol: "👚",
-    color: "Ivory",
-    sizes: ["S", "M", "L", "XL"],
-    stock: 24,
     matchScore: "6/7",
     featured: true,
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Ivory", "Beige", "Black"],
   },
   {
     id: "product-002",
@@ -39,41 +36,31 @@ const PRODUCTS = [
     price: 1299,
     originalPrice: 1499,
     rating: 4.7,
-    reviews: 96,
+    ratingsCount: 94,
     sellerId: "seller-001",
     sellerName: "Aurelia Studio",
-    location: "Makati City",
     symbol: "👖",
-    color: "Black",
+    matchScore: "5/7",
+    featured: true,
     sizes: ["S", "M", "L", "XL"],
-    stock: 18,
-    matchScore: "6/7",
-    featured: false,
+    colors: ["Sand", "Brown", "Black"],
   },
   {
     id: "product-003",
     name: "Modern Structured Blazer",
     category: "Outerwear",
-    gender: "Unisex",
+    gender: "Women",
     price: 1899,
     originalPrice: 2299,
     rating: 4.9,
-    reviews: 212,
+    ratingsCount: 76,
     sellerId: "seller-002",
     sellerName: "Maison Moderne",
-    location: "Quezon City",
     symbol: "🧥",
-    color: "Beige",
-    sizes: [
-      "S",
-      "M",
-      "L",
-      "XL",
-      "2XL",
-    ],
-    stock: 12,
     matchScore: "7/7",
     featured: true,
+    sizes: ["S", "M", "L", "XL", "2XL"],
+    colors: ["Cream", "Brown", "Black"],
   },
   {
     id: "product-004",
@@ -83,110 +70,48 @@ const PRODUCTS = [
     price: 799,
     originalPrice: 999,
     rating: 4.6,
-    reviews: 75,
+    ratingsCount: 82,
     sellerId: "seller-003",
     sellerName: "North & Thread",
-    location: "Pasig City",
     symbol: "👕",
-    color: "Navy Blue",
-    sizes: [
-      "S",
-      "M",
-      "L",
-      "XL",
-      "2XL",
-    ],
-    stock: 31,
     matchScore: "6/7",
     featured: false,
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["White", "Navy", "Olive"],
   },
   {
     id: "product-005",
     name: "Pleated Midi Dress",
     category: "Dresses",
     gender: "Women",
-    price: 1499,
-    originalPrice: 1799,
+    price: 1599,
+    originalPrice: 1899,
     rating: 4.8,
-    reviews: 164,
-    sellerId: "seller-004",
-    sellerName: "Élan Collective",
-    location: "Taguig City",
+    ratingsCount: 110,
+    sellerId: "seller-002",
+    sellerName: "Maison Moderne",
     symbol: "👗",
-    color: "Champagne",
-    sizes: [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-    ],
-    stock: 16,
-    matchScore: "7/7",
+    matchScore: "6/7",
     featured: true,
+    sizes: ["XS", "S", "M", "L"],
+    colors: ["Rose", "Cream", "Black"],
   },
   {
     id: "product-006",
-    name: "Relaxed Utility Jacket",
-    category: "Outerwear",
-    gender: "Unisex",
-    price: 1599,
-    originalPrice: 1899,
-    rating: 4.5,
-    reviews: 68,
-    sellerId: "seller-003",
-    sellerName: "North & Thread",
-    location: "Pasig City",
-    symbol: "🥼",
-    color: "Olive",
-    sizes: ["M", "L", "XL", "2XL"],
-    stock: 20,
-    matchScore: "5/7",
-    featured: false,
-  },
-  {
-    id: "product-007",
-    name: "High-Waist A-Line Skirt",
-    category: "Bottoms",
-    gender: "Women",
-    price: 999,
+    name: "Relaxed Fit Shirt",
+    category: "Tops",
+    gender: "Men",
+    price: 949,
     originalPrice: 1199,
     rating: 4.7,
-    reviews: 84,
-    sellerId: "seller-004",
-    sellerName: "Élan Collective",
-    location: "Taguig City",
-    symbol: "👗",
-    color: "Mocha",
-    sizes: ["XS", "S", "M", "L"],
-    stock: 14,
-    matchScore: "6/7",
+    ratingsCount: 64,
+    sellerId: "seller-003",
+    sellerName: "North & Thread",
+    symbol: "👔",
+    matchScore: "5/7",
     featured: false,
-  },
-  {
-    id: "product-008",
-    name: "Straight-Cut Denim Jeans",
-    category: "Bottoms",
-    gender: "Unisex",
-    price: 1199,
-    originalPrice: 1399,
-    rating: 4.6,
-    reviews: 143,
-    sellerId: "seller-005",
-    sellerName: "Streetform Manila",
-    location: "Manila",
-    symbol: "👖",
-    color: "Dark Blue",
-    sizes: [
-      "S",
-      "M",
-      "L",
-      "XL",
-      "2XL",
-    ],
-    stock: 27,
-    matchScore: "6/7",
-    featured: false,
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Blue", "White", "Gray"],
   },
 ];
 
@@ -198,29 +123,17 @@ const CATEGORIES = [
   "Outerwear",
 ];
 
-const GENDERS = [
-  "All",
-  "Women",
-  "Men",
-  "Unisex",
-];
+function readStorage(key, fallback) {
+  try {
+    const value =
+      localStorage.getItem(key);
 
-const SIZES = [
-  "All",
-  "XS",
-  "S",
-  "M",
-  "L",
-  "XL",
-  "2XL",
-];
-
-function formatPrice(price) {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 0,
-  }).format(price);
+    return value
+      ? JSON.parse(value)
+      : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function CatalogPage({
@@ -237,188 +150,75 @@ function CatalogPage({
     ? "/guest"
     : "/shopper";
 
-  const storage = guestMode
-    ? sessionStorage
-    : localStorage;
-
-  const [searchTerm, setSearchTerm] =
+  const [search, setSearch] =
     useState("");
 
   const [category, setCategory] =
     useState("All");
 
-  const [gender, setGender] =
-    useState("All");
-
-  const [size, setSize] =
-    useState("All");
-
-  const [seller, setSeller] =
-    useState("All");
-
-  const [
-    maximumPrice,
-    setMaximumPrice,
-  ] = useState(2500);
-
-  const [sortBy, setSortBy] =
+  const [sort, setSort] =
     useState("recommended");
 
-  const [showFilters, setShowFilters] =
-    useState(false);
-
-  const [
-    toastMessage,
-    setToastMessage,
-  ] = useState("");
-
-  useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!toastMessage) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setToastMessage("");
-    }, 2500);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [toastMessage]);
-
-  const sellerNames = useMemo(
-    () => [
-      "All",
-      ...new Set(
-        PRODUCTS.map(
-          (product) =>
-            product.sellerName
-        )
-      ),
-    ],
-    []
-  );
-
   const filteredProducts = useMemo(() => {
-    const normalizedSearch =
-      searchTerm.trim().toLowerCase();
-
-    const results = PRODUCTS.filter(
+    let products = PRODUCTS.filter(
       (product) => {
         const matchesSearch =
-          !normalizedSearch ||
           product.name
             .toLowerCase()
-            .includes(normalizedSearch) ||
+            .includes(
+              search.toLowerCase()
+            ) ||
           product.sellerName
             .toLowerCase()
-            .includes(normalizedSearch) ||
-          product.category
-            .toLowerCase()
-            .includes(normalizedSearch) ||
-          product.color
-            .toLowerCase()
-            .includes(normalizedSearch);
+            .includes(
+              search.toLowerCase()
+            );
 
         const matchesCategory =
           category === "All" ||
           product.category === category;
 
-        const matchesGender =
-          gender === "All" ||
-          product.gender === gender;
-
-        const matchesSize =
-          size === "All" ||
-          product.sizes.includes(size);
-
-        const matchesSeller =
-          seller === "All" ||
-          product.sellerName === seller;
-
-        const matchesPrice =
-          product.price <= maximumPrice;
-
         return (
           matchesSearch &&
-          matchesCategory &&
-          matchesGender &&
-          matchesSize &&
-          matchesSeller &&
-          matchesPrice
+          matchesCategory
         );
       }
     );
 
-    return [...results].sort(
-      (firstProduct, secondProduct) => {
-        if (sortBy === "price-low") {
-          return (
-            firstProduct.price -
-            secondProduct.price
-          );
-        }
+    if (sort === "price-low") {
+      products = [...products].sort(
+        (a, b) => a.price - b.price
+      );
+    }
 
-        if (sortBy === "price-high") {
-          return (
-            secondProduct.price -
-            firstProduct.price
-          );
-        }
+    if (sort === "price-high") {
+      products = [...products].sort(
+        (a, b) => b.price - a.price
+      );
+    }
 
-        if (sortBy === "rating") {
-          return (
-            secondProduct.rating -
-            firstProduct.rating
-          );
-        }
+    if (sort === "rating") {
+      products = [...products].sort(
+        (a, b) => b.rating - a.rating
+      );
+    }
 
-        if (sortBy === "newest") {
-          return secondProduct.id.localeCompare(
-            firstProduct.id
-          );
-        }
+    return products;
+  }, [search, category, sort]);
 
-        return (
-          Number(
-            secondProduct.featured
-          ) -
-            Number(
-              firstProduct.featured
-            ) ||
-          secondProduct.rating -
-            firstProduct.rating
-        );
-      }
-    );
-  }, [
-    category,
-    gender,
-    maximumPrice,
-    searchTerm,
-    seller,
-    size,
-    sortBy,
-  ]);
+  const cartItems = readStorage(
+    "fitfusion-cart-items",
+    []
+  );
 
-  const activeFilterCount = [
-    category !== "All",
-    gender !== "All",
-    size !== "All",
-    seller !== "All",
-    maximumPrice < 2500,
-  ].filter(Boolean).length;
+  const cartCount = cartItems.reduce(
+    (total, item) =>
+      total + Number(item.quantity || 1),
+    0
+  );
 
-  function viewProduct(product) {
-    storage.setItem(
+  function openProduct(product) {
+    localStorage.setItem(
       "fitfusion-selected-product",
       JSON.stringify(product)
     );
@@ -428,13 +228,12 @@ function CatalogPage({
     );
   }
 
-  function viewSeller(product) {
-    storage.setItem(
+  function openSeller(product) {
+    localStorage.setItem(
       "fitfusion-selected-seller",
       JSON.stringify({
         id: product.sellerId,
         name: product.sellerName,
-        location: product.location,
       })
     );
 
@@ -443,148 +242,80 @@ function CatalogPage({
     );
   }
 
-  function tryProduct(product) {
-    const selectedItem = {
-      ...product,
-      quantity: 1,
-      selectedSize: null,
-      selectedAt:
-        new Date().toISOString(),
-    };
-
-    storage.setItem(
-      "fitfusion-selected-product",
-      JSON.stringify(product)
-    );
-
-    storage.setItem(
-      "fitfusion-selected-items",
-      JSON.stringify([selectedItem])
-    );
-
-    setToastMessage(
-      `${product.name} was sent to the Fitting Studio.`
-    );
-
-    window.setTimeout(() => {
-      navigate(
-        `${basePath}/fitting-studio/customize`
-      );
-    }, 600);
-  }
-
-  function resetFilters() {
-    setSearchTerm("");
-    setCategory("All");
-    setGender("All");
-    setSize("All");
-    setSeller("All");
-    setMaximumPrice(2500);
-    setSortBy("recommended");
-  }
-
   return (
     <main className="catalog-page">
-      <div className="catalog-body">
-        <section className="catalog-introduction">
-          <div>
-            <p>EXPLORE YOUR STYLE</p>
+      <section className="catalog-header">
+        <div>
+          <h1>09 — PRODUCT CATALOG</h1>
 
-            <h1>
-              Find your next favorite outfit
-            </h1>
+          <p>
+            Browse products from verified
+            FitFusion sellers.
+          </p>
+        </div>
 
-            <span>
-              Open a product to view its
-              seller, ratings, available
-              sizes, and purchasing options.
-            </span>
-          </div>
-
-          <div className="catalog-result-summary">
-            <strong>
-              {filteredProducts.length}
-            </strong>
-
-            <span>
-              {filteredProducts.length === 1
-                ? "product"
-                : "products"}
-            </span>
-          </div>
-        </section>
-
-        <section className="catalog-search-section">
-          <div className="catalog-search-box">
+        {!guestMode && (
+          <button
+            type="button"
+            className="catalog-cart-button"
+            onClick={() =>
+              navigate("/shopper/cart")
+            }
+          >
             <svg
               viewBox="0 0 24 24"
               aria-hidden="true"
             >
-              <circle
-                cx="11"
-                cy="11"
-                r="7"
-              />
-
-              <path d="m20 20-4-4" />
+              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+              <circle cx="10" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
             </svg>
 
-            <input
-              type="search"
-              value={searchTerm}
-              placeholder="Search products, stores, colors, or categories..."
-              onChange={(event) =>
-                setSearchTerm(
-                  event.target.value
-                )
-              }
-            />
+            <span>{cartCount}</span>
+          </button>
+        )}
+      </section>
 
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSearchTerm("")
-                }
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
+      <div className="catalog-content">
+        <section className="catalog-introduction">
+          <div>
+            <p>EXPLORE YOUR STYLE</p>
+
+            <h2>
+              Find your next favorite outfit
+            </h2>
+
+            <span>
+              Open a product to view its seller,
+              ratings, available sizes, and
+              colors.
+            </span>
           </div>
 
-          <button
-            type="button"
-            className={
-              showFilters
-                ? "catalog-filter-toggle active"
-                : "catalog-filter-toggle"
-            }
-            onClick={() =>
-              setShowFilters(
-                (currentValue) =>
-                  !currentValue
-              )
-            }
-          >
-            Filters
+          <div className="catalog-result-count">
+            <strong>
+              {filteredProducts.length}
+            </strong>
 
-            {activeFilterCount > 0 && (
-              <span>
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+            <span>products</span>
+          </div>
+        </section>
+
+        <section className="catalog-controls">
+          <input
+            type="search"
+            value={search}
+            placeholder="Search products, stores, or categories..."
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
+          />
 
           <select
-            className="catalog-sort-select"
-            value={sortBy}
+            value={sort}
             onChange={(event) =>
-              setSortBy(
-                event.target.value
-              )
+              setSort(event.target.value)
             }
-            aria-label="Sort products"
           >
             <option value="recommended">
               Recommended
@@ -599,304 +330,131 @@ function CatalogPage({
             </option>
 
             <option value="rating">
-              Highest Rated
-            </option>
-
-            <option value="newest">
-              Newest
+              Highest Rating
             </option>
           </select>
         </section>
 
-        <div className="catalog-category-tabs">
-          {CATEGORIES.map(
-            (categoryOption) => (
-              <button
-                key={categoryOption}
-                type="button"
-                className={
-                  category ===
-                  categoryOption
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setCategory(
-                    categoryOption
-                  )
-                }
-              >
-                {categoryOption}
-              </button>
-            )
-          )}
+        <div className="catalog-categories">
+          {CATEGORIES.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={
+                category === item
+                  ? "active"
+                  : ""
+              }
+              onClick={() =>
+                setCategory(item)
+              }
+            >
+              {item}
+            </button>
+          ))}
         </div>
 
-        {showFilters && (
-          <section className="catalog-filter-panel">
-            <div className="catalog-filter-heading">
-              <div>
-                <p>REFINE RESULTS</p>
-                <h2>Product filters</h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={resetFilters}
+        <section className="catalog-grid">
+          {filteredProducts.map(
+            (product) => (
+              <article
+                key={product.id}
+                className="catalog-product-card"
               >
-                Reset all
-              </button>
-            </div>
+                <div className="catalog-product-image">
+                  {product.featured && (
+                    <span className="catalog-featured-label">
+                      FEATURED
+                    </span>
+                  )}
 
-            <div className="catalog-filter-grid">
-              <FilterSelect
-                label="Gender"
-                value={gender}
-                options={GENDERS}
-                onChange={setGender}
-              />
+                  <span
+                    className="catalog-product-symbol"
+                    role="img"
+                    aria-label={product.name}
+                  >
+                    {product.symbol}
+                  </span>
 
-              <FilterSelect
-                label="Size"
-                value={size}
-                options={SIZES}
-                onChange={setSize}
-              />
-
-              <FilterSelect
-                label="Seller"
-                value={seller}
-                options={sellerNames}
-                onChange={setSeller}
-              />
-
-              <div className="catalog-price-filter">
-                <div>
-                  <label htmlFor="maximum-price">
-                    Maximum price
-                  </label>
-
-                  <strong>
-                    {formatPrice(
-                      maximumPrice
-                    )}
-                  </strong>
+                  <span className="catalog-match-score">
+                    Match score:{" "}
+                    {product.matchScore}
+                  </span>
                 </div>
 
-                <input
-                  id="maximum-price"
-                  type="range"
-                  min="500"
-                  max="2500"
-                  step="100"
-                  value={maximumPrice}
-                  onChange={(event) =>
-                    setMaximumPrice(
-                      Number(
-                        event.target.value
-                      )
-                    )
-                  }
-                />
-
-                <div className="catalog-price-limits">
-                  <span>₱500</span>
-                  <span>₱2,500</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {filteredProducts.length > 0 ? (
-          <section className="catalog-product-grid">
-            {filteredProducts.map(
-              (product) => (
-                <article
-                  key={product.id}
-                  className="catalog-product-card"
-                >
+                <div className="catalog-product-information">
                   <button
                     type="button"
-                    className="catalog-product-image"
+                    className="catalog-seller-name"
                     onClick={() =>
-                      viewProduct(product)
+                      openSeller(product)
                     }
                   >
-                    {product.featured && (
-                      <span className="catalog-featured-label">
-                        FEATURED
-                      </span>
-                    )}
-
-                    <div className="catalog-product-symbol">
-                      {product.symbol}
-                    </div>
-
-                    <span className="catalog-match-score">
-                      Match score:{" "}
-                      {product.matchScore}
-                    </span>
+                    {product.sellerName}
                   </button>
 
-                  <div className="catalog-product-information">
-                    <button
-                      type="button"
-                      className="catalog-seller-link"
-                      onClick={() =>
-                        viewSeller(product)
+                  <p>
+                    {product.gender} •{" "}
+                    {product.category}
+                  </p>
+
+                  <h3>{product.name}</h3>
+
+                  <div className="catalog-product-rating">
+                    <span>★★★★★</span>
+
+                    <strong>
+                      {product.rating}
+                    </strong>
+
+                    <small>
+                      (
+                      {
+                        product.ratingsCount
                       }
-                    >
-                      {product.sellerName}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="catalog-product-name"
-                      onClick={() =>
-                        viewProduct(product)
-                      }
-                    >
-                      {product.name}
-                    </button>
-
-                    <div className="catalog-product-details">
-                      <span>
-                        {product.category}
-                      </span>
-
-                      <span>•</span>
-
-                      <span>
-                        {product.color}
-                      </span>
-                    </div>
-
-                    <div className="catalog-rating">
-                      <span>★</span>
-
-                      <strong>
-                        {product.rating}
-                      </strong>
-
-                      <small>
-                        ({product.reviews})
-                      </small>
-                    </div>
-
-                    <div className="catalog-product-price">
-                      <strong>
-                        {formatPrice(
-                          product.price
-                        )}
-                      </strong>
-
-                      <del>
-                        {formatPrice(
-                          product.originalPrice
-                        )}
-                      </del>
-                    </div>
-
-                    <div className="catalog-product-sizes">
-                      <span>
-                        Available sizes:
-                      </span>
-
-                      <strong>
-                        {product.sizes.join(
-                          ", "
-                        )}
-                      </strong>
-                    </div>
-
-                    <div className="catalog-product-actions">
-                      <button
-                        type="button"
-                        className="catalog-view-button"
-                        onClick={() =>
-                          viewProduct(product)
-                        }
-                      >
-                        View Details
-                      </button>
-
-                      <button
-                        type="button"
-                        className="catalog-try-button"
-                        onClick={() =>
-                          tryProduct(product)
-                        }
-                      >
-                        Try On
-                      </button>
-                    </div>
+                      )
+                    </small>
                   </div>
-                </article>
-              )
-            )}
-          </section>
-        ) : (
-          <section className="catalog-empty-state">
-            <div>⌕</div>
 
+                  <div className="catalog-product-price">
+                    <strong>
+                      ₱
+                      {product.price.toLocaleString()}
+                    </strong>
+
+                    <del>
+                      ₱
+                      {product.originalPrice.toLocaleString()}
+                    </del>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="catalog-view-button"
+                    onClick={() =>
+                      openProduct(product)
+                    }
+                  >
+                    View Product Details
+                  </button>
+                </div>
+              </article>
+            )
+          )}
+        </section>
+
+        {filteredProducts.length === 0 && (
+          <section className="catalog-empty-state">
             <h2>No products found</h2>
 
             <p>
-              No products match your current
-              search and filters. Try changing
-              the category, size, seller, or
-              maximum price.
+              Try another search term or
+              category.
             </p>
-
-            <button
-              type="button"
-              onClick={resetFilters}
-            >
-              Clear All Filters
-            </button>
           </section>
         )}
       </div>
-
-      {toastMessage && (
-        <div
-          className="catalog-toast"
-          role="status"
-        >
-          {toastMessage}
-        </div>
-      )}
     </main>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}) {
-  return (
-    <label className="catalog-filter-field">
-      <span>{label}</span>
-
-      <select
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-      >
-        {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-          >
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 

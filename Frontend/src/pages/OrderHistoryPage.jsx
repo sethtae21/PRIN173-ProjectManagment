@@ -5,150 +5,116 @@ import {
 } from "react";
 
 import {
-  NavLink,
   useNavigate,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/OrderHistoryPage.css";
 
-const sampleOrders = [
+const ORDERS_STORAGE_KEY =
+  "fitfusion-orders";
+
+const CART_STORAGE_KEY =
+  "fitfusion-cart";
+
+const RATINGS_STORAGE_KEY =
+  "fitfusion-product-ratings";
+
+const MAX_CART_QUANTITY = 10;
+
+const fallbackOrders = [
   {
-    id: "FF-10261001",
-    orderId: "FF-10261001",
-    orderNumber: "FF-10261001",
-    createdAt: "2026-10-01T08:30:00.000Z",
+    id: "FF-38252027",
+    placedAt: "October 8, 2026",
+    timestamp: "2026-10-08T13:30:00",
     status: "Processing",
-    paymentStatus: "To Pay",
-    paymentMethod: "cash-on-delivery",
-    subtotal: 1598,
-    discount: 200,
-    shippingFee: 0,
-    total: 1598,
-    deliveryDetails: {
-      fullName: "Karol Dein Tamo",
-      street: "123 Rizal Street",
-      barangay:
-        "Barangay San Antonio, Makati City",
-      province: "Metro Manila",
-      postalCode: "1203",
-    },
+    total: 5697,
+
     items: [
       {
-        id: "luna-1",
-        name: "Classic Beige Top",
-        sellerId: "luna-clothing",
-        sellerName: "Luna Clothing",
-        category: "Tops",
-        price: 699,
+        id: "001-M-Beige",
+        productId: "001",
+        name: "Modern Structured Blazer",
+        category: "Outerwear",
+        sellerId: "maison-moderne",
+        sellerName: "Maison Moderne",
+        price: 1899,
+        originalPrice: 2299,
+        quantity: 3,
+        size: "M",
+        color: "Beige",
+        image: "",
+      },
+    ],
+  },
+  {
+    id: "FF-07865527",
+    placedAt: "October 3, 2026",
+    timestamp: "2026-10-03T14:11:00",
+    status: "Delivered",
+    total: 1499,
+
+    items: [
+      {
+        id: "003-M-Beige",
+        productId: "003",
+        name: "Classic Beige Blazer",
+        category: "Clothing",
+        sellerId: "fitfusion-seller",
+        sellerName: "FitFusion Seller",
+        price: 1499,
+        originalPrice: 1699,
         quantity: 1,
         size: "M",
         color: "Beige",
-        colorClass: "beige",
+        image: "",
       },
+    ],
+  },
+  {
+    id: "FF-01928374",
+    placedAt: "September 28, 2026",
+    timestamp: "2026-09-28T10:30:00",
+    status: "Cancelled",
+    total: 899,
+
+    items: [
       {
-        id: "urban-1",
-        name: "High-Waist Denim Pants",
-        sellerId: "urban-threads",
-        sellerName: "Urban Threads",
-        category: "Bottoms",
+        id: "002-S-Ivory",
+        productId: "002",
+        name: "Classic Linen Blouse",
+        category: "Tops",
+        sellerId: "aurelia-studio",
+        sellerName: "Aurelia Studio",
         price: 899,
+        originalPrice: 1099,
         quantity: 1,
-        size: "M",
-        color: "Blue",
-        colorClass: "denim",
-      },
-    ],
-  },
-  {
-    id: "FF-09262026",
-    orderId: "FF-09262026",
-    orderNumber: "FF-09262026",
-    createdAt: "2026-09-26T05:15:00.000Z",
-    status: "Shipped",
-    paymentStatus: "Mock Paid",
-    paymentMethod: "e-wallet",
-    subtotal: 999,
-    discount: 200,
-    shippingFee: 80,
-    total: 1079,
-    deliveryDetails: {
-      fullName: "Karol Dein Tamo",
-      street: "123 Rizal Street",
-      barangay:
-        "Barangay San Antonio, Makati City",
-      province: "Metro Manila",
-      postalCode: "1203",
-    },
-    items: [
-      {
-        id: "luna-2",
-        name: "Floral Summer Dress",
-        sellerId: "luna-clothing",
-        sellerName: "Luna Clothing",
-        category: "Dresses",
-        price: 999,
-        quantity: 1,
-        size: "L",
-        color: "Rose Floral",
-        colorClass: "floral",
-      },
-    ],
-  },
-  {
-    id: "FF-09152026",
-    orderId: "FF-09152026",
-    orderNumber: "FF-09152026",
-    createdAt: "2026-09-15T03:45:00.000Z",
-    status: "Delivered",
-    paymentStatus: "Paid",
-    paymentMethod: "cash-on-delivery",
-    subtotal: 1399,
-    discount: 300,
-    shippingFee: 0,
-    total: 1399,
-    deliveryDetails: {
-      fullName: "Karol Dein Tamo",
-      street: "123 Rizal Street",
-      barangay:
-        "Barangay San Antonio, Makati City",
-      province: "Metro Manila",
-      postalCode: "1203",
-    },
-    items: [
-      {
-        id: "urban-4",
-        name: "Streetwear Bomber Jacket",
-        sellerId: "urban-threads",
-        sellerName: "Urban Threads",
-        category: "Outerwear",
-        price: 1399,
-        quantity: 1,
-        size: "L",
-        color: "Black",
-        colorClass: "black",
+        size: "S",
+        color: "Ivory",
+        image: "",
       },
     ],
   },
 ];
 
-const statusFilters = [
-  "All",
-  "Processing",
-  "Shipped",
-  "Delivered",
-  "Cancelled",
-];
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
 
-function readStoredArray(key) {
+function readArray(key) {
   try {
-    const value = localStorage.getItem(key);
+    const storedValue =
+      localStorage.getItem(key);
 
-    if (value === null) {
-      return null;
+    if (!storedValue) {
+      return [];
     }
 
-    const parsedValue = JSON.parse(value);
+    const parsedValue =
+      JSON.parse(storedValue);
 
     return Array.isArray(parsedValue)
       ? parsedValue
@@ -158,138 +124,157 @@ function readStoredArray(key) {
   }
 }
 
-function normalizeOrder(order, index) {
-  const items = Array.isArray(order?.items)
-    ? order.items
-    : Array.isArray(order?.products)
-      ? order.products
-      : [];
-
-  return {
-    id:
-      order?.id ||
-      order?.orderId ||
-      `FF-ORDER-${index + 1}`,
-    orderId:
-      order?.orderId ||
-      order?.id ||
-      `FF-ORDER-${index + 1}`,
-    orderNumber:
-      order?.orderNumber ||
-      order?.orderId ||
-      order?.id ||
-      `FF-ORDER-${index + 1}`,
-    createdAt:
-      order?.createdAt ||
-      order?.date ||
-      new Date().toISOString(),
-    status: order?.status || "Processing",
-    paymentStatus:
-      order?.paymentStatus || "To Pay",
-    paymentMethod:
-      order?.paymentMethod ||
-      "cash-on-delivery",
-    subtotal:
-      Number(order?.subtotal) || 0,
-    discount:
-      Number(order?.discount) || 0,
-    shippingFee:
-      Number(order?.shippingFee) || 0,
-    total:
-      Number(order?.total) || 0,
-    deliveryDetails:
-      order?.deliveryDetails || {},
-    deliveryNotes:
-      order?.deliveryNotes || "",
-    items: items.map((item, itemIndex) => ({
-      id:
-        item?.id ||
-        item?.productId ||
-        `order-item-${itemIndex + 1}`,
-      name:
-        item?.name ||
-        item?.productName ||
-        `Product ${itemIndex + 1}`,
-      sellerId:
-        item?.sellerId ||
-        item?.storeId ||
-        "luna-clothing",
-      sellerName:
-        item?.sellerName ||
-        item?.storeName ||
-        "FitFusion Seller",
-      category:
-        item?.category || "Clothing",
-      price: Number(item?.price) || 0,
-      quantity:
-        Number(item?.quantity) || 1,
-      size:
-        item?.size ||
-        item?.selectedSize ||
-        "",
-      color:
-        item?.color ||
-        item?.selectedColor ||
-        "Default",
-      image:
-        item?.image ||
-        item?.imageUrl ||
-        "",
-      colorClass:
-        item?.colorClass || "beige",
-    })),
-  };
-}
-
 function loadOrders() {
-  const storedOrders = readStoredArray(
-    "fitfusion-orders"
+  const storedOrders = readArray(
+    ORDERS_STORAGE_KEY
   );
 
-  /*
-    Show sample orders when no order key
-    exists yet. If the stored array is empty,
-    the actual empty state is displayed.
-  */
-  const orderSource =
-    storedOrders === null
-      ? sampleOrders
-      : storedOrders;
-
-  return orderSource.map(normalizeOrder);
-}
-
-function formatOrderDate(dateValue) {
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date unavailable";
+  if (storedOrders.length === 0) {
+    return fallbackOrders;
   }
 
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
+  const combinedOrders = [
+    ...storedOrders,
+    ...fallbackOrders,
+  ];
+
+  const uniqueOrders = new Map();
+
+  combinedOrders.forEach((order) => {
+    if (!order?.id) {
+      return;
     }
-  ).format(date);
+
+    if (!uniqueOrders.has(order.id)) {
+      uniqueOrders.set(order.id, order);
+    }
+  });
+
+  return Array.from(uniqueOrders.values());
 }
 
-function formatPaymentMethod(method) {
-  if (method === "cash-on-delivery") {
-    return "Cash on Delivery";
-  }
+function loadRatings() {
+  try {
+    const storedRatings =
+      localStorage.getItem(
+        RATINGS_STORAGE_KEY
+      );
 
-  if (method === "e-wallet") {
-    return "E-Wallet";
-  }
+    if (!storedRatings) {
+      return {};
+    }
 
-  if (method === "card") {
-    return "Debit or Credit Card";
-  }
+    const parsedRatings =
+      JSON.parse(storedRatings);
 
-  return method || "Not specified";
+    return parsedRatings &&
+      typeof parsedRatings === "object"
+      ? parsedRatings
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function addItemsToCart(items) {
+  const currentCart = readArray(
+    CART_STORAGE_KEY
+  );
+
+  const nextCart = [...currentCart];
+
+  items.forEach((orderItem) => {
+    const existingIndex =
+      nextCart.findIndex(
+        (cartItem) =>
+          String(
+            cartItem.productId ??
+              cartItem.id
+          ) ===
+            String(
+              orderItem.productId ??
+                orderItem.id
+            ) &&
+          cartItem.size ===
+            orderItem.size &&
+          cartItem.color ===
+            orderItem.color
+      );
+
+    if (existingIndex >= 0) {
+      const existingItem =
+        nextCart[existingIndex];
+
+      nextCart[existingIndex] = {
+        ...existingItem,
+        quantity: Math.min(
+          MAX_CART_QUANTITY,
+          Number(
+            existingItem.quantity || 1
+          ) +
+            Number(
+              orderItem.quantity || 1
+            )
+        ),
+        selected: true,
+      };
+
+      return;
+    }
+
+    nextCart.push({
+      id: `${orderItem.productId}-${orderItem.size}-${orderItem.color}`,
+      productId: orderItem.productId,
+      name: orderItem.name,
+      category:
+        orderItem.category || "Clothing",
+      sellerId:
+        orderItem.sellerId ||
+        "fitfusion-seller",
+      sellerName:
+        orderItem.sellerName ||
+        "FitFusion Seller",
+      price: Number(
+        orderItem.price || 0
+      ),
+      originalPrice: Number(
+        orderItem.originalPrice ||
+          orderItem.price ||
+          0
+      ),
+      quantity: Math.min(
+        MAX_CART_QUANTITY,
+        Math.max(
+          1,
+          Number(
+            orderItem.quantity || 1
+          )
+        )
+      ),
+      size: orderItem.size || "M",
+      color:
+        orderItem.color || "Default",
+      image: orderItem.image || "",
+      selected: true,
+    });
+  });
+
+  localStorage.setItem(
+    CART_STORAGE_KEY,
+    JSON.stringify(nextCart)
+  );
+
+  window.dispatchEvent(
+    new CustomEvent(
+      "fitfusion-cart-updated",
+      {
+        detail: {
+          cart: nextCart,
+          quantity: nextCart.length,
+        },
+      }
+    )
+  );
 }
 
 function OrderHistoryPage() {
@@ -298,123 +283,69 @@ function OrderHistoryPage() {
   const [orders, setOrders] =
     useState(loadOrders);
 
-  const [searchTerm, setSearchTerm] =
-    useState("");
+  const [ratings, setRatings] =
+    useState(loadRatings);
 
-  const [selectedStatus, setSelectedStatus] =
+  const [activeFilter, setActiveFilter] =
     useState("All");
 
-  const [sortOption, setSortOption] =
+  const [sortOrder, setSortOrder] =
     useState("newest");
 
-  const [notice, setNotice] = useState("");
-  const [orderToCancel, setOrderToCancel] =
-    useState(null);
-
-  const [showLogoutModal, setShowLogoutModal] =
-    useState(false);
+  const [notice, setNotice] =
+    useState("");
 
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, []);
-
-  const cartCount = useMemo(() => {
-    const cartItems =
-      readStoredArray(
-        "fitfusion-cart-items"
-      ) || [];
-
-    return cartItems.reduce(
-      (total, item) =>
-        total +
-        (Number(item.quantity) || 1),
-      0
+    localStorage.setItem(
+      ORDERS_STORAGE_KEY,
+      JSON.stringify(orders)
     );
-  }, [notice]);
-
-  const orderStatistics = useMemo(() => {
-    return {
-      total: orders.length,
-      processing: orders.filter(
-        (order) =>
-          order.status === "Processing"
-      ).length,
-      shipped: orders.filter(
-        (order) =>
-          order.status === "Shipped"
-      ).length,
-      delivered: orders.filter(
-        (order) =>
-          order.status === "Delivered"
-      ).length,
-    };
   }, [orders]);
 
+  useEffect(() => {
+    localStorage.setItem(
+      RATINGS_STORAGE_KEY,
+      JSON.stringify(ratings)
+    );
+  }, [ratings]);
+
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setNotice("");
+    }, 2500);
+
+    return () =>
+      window.clearTimeout(timeout);
+  }, [notice]);
+
   const filteredOrders = useMemo(() => {
-    const normalizedSearch =
-      searchTerm.trim().toLowerCase();
-
-    const matches = orders.filter(
-      (order) => {
-        const matchesStatus =
-          selectedStatus === "All" ||
-          order.status === selectedStatus;
-
-        const matchesSearch =
-          !normalizedSearch ||
-          order.orderNumber
-            .toLowerCase()
-            .includes(normalizedSearch) ||
-          order.items.some(
-            (item) =>
-              item.name
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                ) ||
-              item.sellerName
-                .toLowerCase()
-                .includes(
-                  normalizedSearch
-                )
+    const filtered =
+      activeFilter === "All"
+        ? orders
+        : orders.filter(
+            (order) =>
+              order.status ===
+              activeFilter
           );
 
-        return (
-          matchesStatus && matchesSearch
-        );
-      }
-    );
-
-    return [...matches].sort(
+    return [...filtered].sort(
       (firstOrder, secondOrder) => {
         const firstDate = new Date(
-          firstOrder.createdAt
+          firstOrder.timestamp ||
+            firstOrder.placedAt
         ).getTime();
 
         const secondDate = new Date(
-          secondOrder.createdAt
+          secondOrder.timestamp ||
+            secondOrder.placedAt
         ).getTime();
 
-        if (sortOption === "oldest") {
+        if (sortOrder === "oldest") {
           return firstDate - secondDate;
-        }
-
-        if (sortOption === "highest") {
-          return (
-            secondOrder.total -
-            firstOrder.total
-          );
-        }
-
-        if (sortOption === "lowest") {
-          return (
-            firstOrder.total -
-            secondOrder.total
-          );
         }
 
         return secondDate - firstDate;
@@ -422,814 +353,478 @@ function OrderHistoryPage() {
     );
   }, [
     orders,
-    searchTerm,
-    selectedStatus,
-    sortOption,
+    activeFilter,
+    sortOrder,
   ]);
 
-  function displayNotice(message) {
-    setNotice(message);
+  const cartProductCount =
+    readArray(CART_STORAGE_KEY).length;
 
-    setTimeout(() => {
-      setNotice("");
-    }, 2800);
-  }
+  function handleBuyAgain(order) {
+    const items = Array.isArray(
+      order.items
+    )
+      ? order.items
+      : [];
 
-  function viewOrder(order) {
-    localStorage.setItem(
-      "fitfusion-selected-order",
-      JSON.stringify(order)
-    );
+    if (items.length === 0) {
+      setNotice(
+        "This order has no products to add."
+      );
 
-    navigate(
-      `/shopper/orders/${order.orderId}`
-    );
-  }
-
-  function buyAgain(order) {
-    const existingCart =
-      readStoredArray(
-        "fitfusion-cart-items"
-      ) || [];
-
-    const updatedCart = [
-      ...existingCart,
-    ];
-
-    order.items.forEach((orderItem) => {
-      const existingIndex =
-        updatedCart.findIndex(
-          (cartItem) =>
-            String(
-              cartItem.id ||
-                cartItem.productId
-            ) === String(orderItem.id) &&
-            (cartItem.size ||
-              cartItem.selectedSize) ===
-              orderItem.size &&
-            (cartItem.color ||
-              cartItem.selectedColor) ===
-              orderItem.color
-        );
-
-      if (existingIndex >= 0) {
-        updatedCart[existingIndex] = {
-          ...updatedCart[existingIndex],
-          quantity:
-            (Number(
-              updatedCart[existingIndex]
-                .quantity
-            ) || 1) +
-            orderItem.quantity,
-        };
-      } else {
-        updatedCart.push({
-          ...orderItem,
-        });
-      }
-    });
-
-    localStorage.setItem(
-      "fitfusion-cart-items",
-      JSON.stringify(updatedCart)
-    );
-
-    displayNotice(
-      `${order.items.length} ${
-        order.items.length === 1
-          ? "product was"
-          : "products were"
-      } added to your cart.`
-    );
-  }
-
-  function confirmCancelOrder() {
-    if (!orderToCancel) {
       return;
     }
 
-    const updatedOrders = orders.map(
-      (order) =>
-        order.orderId ===
-        orderToCancel.orderId
-          ? {
-              ...order,
-              status: "Cancelled",
-              paymentStatus:
-                order.paymentStatus ===
-                "Mock Paid"
-                  ? "Mock Refund Pending"
-                  : "Cancelled",
-              cancelledAt:
-                new Date().toISOString(),
-            }
-          : order
+    addItemsToCart(items);
+
+    setNotice(
+      "Products were added to your cart."
     );
 
-    setOrders(updatedOrders);
-
-    localStorage.setItem(
-      "fitfusion-orders",
-      JSON.stringify(updatedOrders)
-    );
-
-    displayNotice(
-      `Order ${orderToCancel.orderNumber} was cancelled.`
-    );
-
-    setOrderToCancel(null);
+    window.setTimeout(() => {
+      navigate("/shopper/cart");
+    }, 500);
   }
 
-  function clearFilters() {
-    setSearchTerm("");
-    setSelectedStatus("All");
-    setSortOption("newest");
-  }
+  function handleRating(
+    orderId,
+    productId,
+    rating
+  ) {
+    const ratingKey =
+      `${orderId}-${productId}`;
 
-  function confirmLogout() {
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
+    setRatings((currentRatings) => ({
+      ...currentRatings,
+      [ratingKey]: rating,
+    }));
 
-    localStorage.removeItem(
-      "fitfusion-current-user"
+    setNotice(
+      `Your ${rating}-star rating was saved.`
     );
-
-    navigate("/login");
   }
 
   return (
     <main className="order-history-page">
-      <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
+      {notice && (
+        <div
+          className="order-history-toast"
+          role="status"
+        >
+          {notice}
         </div>
+      )}
 
-        <nav className="shopper-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="shopper-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="shopper-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="shopper-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="shopper-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="shopper-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className={() =>
-              "shopper-nav-link active"
-            }
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="shopper-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
+      <div className="order-history-toolbar">
+        <div />
 
         <button
           type="button"
-          className="shopper-logout-button"
+          className="order-history-cart-button"
           onClick={() =>
-            setShowLogoutModal(true)
+            navigate("/shopper/cart")
           }
+          aria-label={`Open cart with ${cartProductCount} products`}
         >
-          Logout
-        </button>
-      </aside>
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+            <circle cx="10" cy="20" r="1" />
+            <circle cx="18" cy="20" r="1" />
+          </svg>
 
-      <section className="order-history-content">
-        <header className="order-history-header">
+          <strong>
+            {cartProductCount}
+          </strong>
+        </button>
+      </div>
+
+      <div className="order-history-content">
+        <section className="order-history-intro">
           <div>
-            <p className="order-history-page-code">
-              SHOPPER ORDERS
-            </p>
+            <p>YOUR PURCHASES</p>
 
             <h1>Order History</h1>
 
             <span>
-              Review and manage your previous
-              orders.
+              Track your orders, view details,
+              purchase products again, and rate
+              delivered products.
             </span>
           </div>
 
-          <div className="order-history-header-actions">
-            <button
-              type="button"
-              className="order-history-cart-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
-              aria-label={`Open cart with ${cartCount} items`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
-              </svg>
+          <div className="order-history-total-badge">
+            <strong>{orders.length}</strong>
 
-              <span>{cartCount}</span>
-            </button>
-
-            <div className="order-history-role">
-              REGISTERED SHOPPER
-            </div>
+            <span>
+              {orders.length === 1
+                ? "order"
+                : "orders"}
+            </span>
           </div>
-        </header>
+        </section>
 
-        <div className="order-history-body">
-          {notice && (
-            <div
-              className="order-history-notice"
-              role="status"
+        <section className="order-history-controls">
+          <div className="order-history-filters">
+            {[
+              "All",
+              "Processing",
+              "To Ship",
+              "Delivered",
+              "Cancelled",
+            ].map((filter) => (
+              <button
+                type="button"
+                key={filter}
+                className={
+                  activeFilter === filter
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveFilter(filter)
+                }
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+
+          <label className="order-history-sort">
+            <span>Sort by</span>
+
+            <select
+              value={sortOrder}
+              onChange={(event) =>
+                setSortOrder(
+                  event.target.value
+                )
+              }
             >
-              {notice}
-            </div>
-          )}
+              <option value="newest">
+                Newest First
+              </option>
 
-          <section className="order-history-introduction">
-            <div>
-              <p>YOUR PURCHASES</p>
+              <option value="oldest">
+                Oldest First
+              </option>
+            </select>
+          </label>
+        </section>
 
-              <h2>
-                Track every order in one place
-              </h2>
+        {filteredOrders.length === 0 ? (
+          <section className="order-history-empty">
+            <div>!</div>
 
-              <span>
-                Open an order to view its full
-                products, payment and delivery
-                information.
-              </span>
-            </div>
+            <h2>No orders found</h2>
+
+            <p>
+              There are no orders matching the
+              selected status.
+            </p>
 
             <button
               type="button"
               onClick={() =>
-                navigate("/shopper/catalog")
+                setActiveFilter("All")
               }
             >
-              Continue Shopping
+              View All Orders
             </button>
           </section>
+        ) : (
+          <section className="order-history-list">
+            {filteredOrders.map(
+              (order) => {
+                const items =
+                  Array.isArray(
+                    order.items
+                  )
+                    ? order.items
+                    : [];
 
-          <section className="order-history-statistics">
-            <article>
-              <span>Total Orders</span>
-              <strong>
-                {orderStatistics.total}
-              </strong>
-            </article>
-
-            <article>
-              <span>Processing</span>
-              <strong>
-                {orderStatistics.processing}
-              </strong>
-            </article>
-
-            <article>
-              <span>Shipped</span>
-              <strong>
-                {orderStatistics.shipped}
-              </strong>
-            </article>
-
-            <article>
-              <span>Delivered</span>
-              <strong>
-                {orderStatistics.delivered}
-              </strong>
-            </article>
-          </section>
-
-          <section className="order-history-orders-card">
-            <div className="order-history-controls">
-              <label className="order-history-search">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    cx="11"
-                    cy="11"
-                    r="7"
-                  />
-
-                  <path d="m20 20-4-4" />
-                </svg>
-
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) =>
-                    setSearchTerm(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Search order number, product or seller"
-                />
-              </label>
-
-              <label className="order-history-sort">
-                <span>Sort by</span>
-
-                <select
-                  value={sortOption}
-                  onChange={(event) =>
-                    setSortOption(
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="newest">
-                    Newest First
-                  </option>
-
-                  <option value="oldest">
-                    Oldest First
-                  </option>
-
-                  <option value="highest">
-                    Highest Total
-                  </option>
-
-                  <option value="lowest">
-                    Lowest Total
-                  </option>
-                </select>
-              </label>
-            </div>
-
-            <div className="order-history-filter-tabs">
-              {statusFilters.map(
-                (status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    className={
-                      selectedStatus ===
-                      status
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() =>
-                      setSelectedStatus(
-                        status
-                      )
-                    }
+                return (
+                  <article
+                    className="order-history-card"
+                    key={order.id}
                   >
-                    {status}
+                    <div className="order-history-card-header">
+                      <div>
+                        <span>
+                          ORDER NUMBER
+                        </span>
 
-                    {status !== "All" && (
-                      <span>
-                        {
-                          orders.filter(
-                            (order) =>
-                              order.status ===
-                              status
-                          ).length
-                        }
-                      </span>
-                    )}
-                  </button>
-                )
-              )}
-            </div>
+                        <h2>
+                          #{order.id}
+                        </h2>
+                      </div>
 
-            <div className="order-history-result-row">
-              <strong>
-                {filteredOrders.length}{" "}
-                {filteredOrders.length === 1
-                  ? "order"
-                  : "orders"}
-              </strong>
-
-              {(searchTerm ||
-                selectedStatus !== "All" ||
-                sortOption !== "newest") && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-
-            {filteredOrders.length > 0 ? (
-              <div className="order-history-list">
-                {filteredOrders.map(
-                  (order) => (
-                    <article
-                      key={order.orderId}
-                      className="order-history-order"
-                    >
-                      <header className="order-history-order-header">
+                      <div className="order-history-card-header-right">
                         <div>
-                          <p>ORDER NUMBER</p>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              viewOrder(order)
-                            }
-                          >
-                            {order.orderNumber}
-                          </button>
-                        </div>
-
-                        <div>
-                          <p>ORDER DATE</p>
+                          <span>
+                            ORDER DATE
+                          </span>
 
                           <strong>
-                            {formatOrderDate(
-                              order.createdAt
-                            )}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <p>PAYMENT</p>
-
-                          <strong>
-                            {formatPaymentMethod(
-                              order.paymentMethod
-                            )}
+                            {order.placedAt ||
+                              "Date unavailable"}
                           </strong>
                         </div>
 
                         <span
-                          className={`order-status status-${order.status
+                          className={`order-history-status ${String(
+                            order.status ||
+                              "Processing"
+                          )
                             .toLowerCase()
-                            .replace(
-                              /\s+/g,
+                            .replaceAll(
+                              " ",
                               "-"
                             )}`}
                         >
-                          {order.status}
+                          {order.status ||
+                            "Processing"}
                         </span>
-                      </header>
+                      </div>
+                    </div>
 
-                      <div className="order-history-order-body">
-                        <div className="order-history-products">
-                          {order.items
-                            .slice(0, 3)
-                            .map((item) => (
-                              <div
-                                key={
-                                  item.id
+                    <div className="order-history-products">
+                      {items.map(
+                        (
+                          item,
+                          index
+                        ) => {
+                          const ratingKey =
+                            `${order.id}-${
+                              item.productId ||
+                              item.id
+                            }`;
+
+                          const currentRating =
+                            Number(
+                              ratings[
+                                ratingKey
+                              ] || 0
+                            );
+
+                          return (
+                            <div
+                              className="order-history-product"
+                              key={
+                                item.id ||
+                                `${item.productId}-${index}`
+                              }
+                            >
+                              <button
+                                type="button"
+                                className="order-history-product-image"
+                                onClick={() =>
+                                  navigate(
+                                    `/shopper/products/${
+                                      item.productId ||
+                                      item.id
+                                    }`
+                                  )
                                 }
-                                className="order-history-product"
                               >
+                                {item.image ? (
+                                  <img
+                                    src={
+                                      item.image
+                                    }
+                                    alt={
+                                      item.name
+                                    }
+                                  />
+                                ) : (
+                                  <strong>
+                                    {(
+                                      item.name ||
+                                      "Product"
+                                    ).charAt(
+                                      0
+                                    )}
+                                  </strong>
+                                )}
+
+                                <small>
+                                  ×
+                                  {Number(
+                                    item.quantity ||
+                                      1
+                                  )}
+                                </small>
+                              </button>
+
+                              <div className="order-history-product-copy">
+                                <span>
+                                  {item.sellerName ||
+                                    "FitFusion Seller"}
+                                </span>
+
                                 <button
                                   type="button"
-                                  className={`order-history-product-image ${item.colorClass}`}
-                                  onClick={() => {
-                                    localStorage.setItem(
-                                      "fitfusion-selected-product",
-                                      JSON.stringify(
-                                        item
-                                      )
-                                    );
-
+                                  onClick={() =>
                                     navigate(
-                                      `/shopper/products/${item.id}`
-                                    );
-                                  }}
+                                      `/shopper/products/${
+                                        item.productId ||
+                                        item.id
+                                      }`
+                                    )
+                                  }
                                 >
-                                  {item.image ? (
-                                    <img
-                                      src={
-                                        item.image
-                                      }
-                                      alt={
-                                        item.name
-                                      }
-                                    />
-                                  ) : (
-                                    <span>
-                                      {item.category
-                                        .slice(
-                                          0,
-                                          1
-                                        )
-                                        .toUpperCase()}
-                                    </span>
-                                  )}
-
-                                  <small>
-                                    ×
-                                    {
-                                      item.quantity
-                                    }
-                                  </small>
+                                  {item.name ||
+                                    "Fashion Item"}
                                 </button>
 
-                                <div>
+                                <small>
+                                  Size:{" "}
+                                  {item.size ||
+                                    "M"}
+                                </small>
+
+                                <small>
+                                  Color:{" "}
+                                  {item.color ||
+                                    "Default"}
+                                </small>
+                              </div>
+
+                              <div className="order-history-product-price">
+                                <span>
+                                  Item total
+                                </span>
+
+                                <strong>
+                                  {formatCurrency(
+                                    Number(
+                                      item.price ||
+                                        0
+                                    ) *
+                                      Number(
+                                        item.quantity ||
+                                          1
+                                      )
+                                  )}
+                                </strong>
+                              </div>
+
+                              {order.status ===
+                                "Delivered" && (
+                                <div className="order-history-rating">
                                   <span>
-                                    {
-                                      item.sellerName
-                                    }
+                                    Rate product
                                   </span>
 
-                                  <strong>
-                                    {item.name}
-                                  </strong>
-
-                                  <p>
-                                    Size:{" "}
-                                    {item.size ||
-                                      "N/A"}{" "}
-                                    • Color:{" "}
-                                    {
-                                      item.color
-                                    }
-                                  </p>
-
-                                  <b>
-                                    ₱
-                                  {(
-                                       item.price *
-                                       item.quantity
-                                   ).toLocaleString("en-PH")}
-                                  </b>
-
-                                  {order.status === "Delivered" && (
-                                   <ProductStarRating
-                                    orderId={order.orderId}
-                                    product={item}
-                                    onRated={displayNotice}
-                                   />
-                                  )}
+                                  <div
+                                    role="group"
+                                    aria-label={`Rate ${item.name}`}
+                                  >
+                                    {[
+                                      1, 2, 3, 4,
+                                      5,
+                                    ].map(
+                                      (
+                                        star
+                                      ) => (
+                                        <button
+                                          type="button"
+                                          key={
+                                            star
+                                          }
+                                          className={
+                                            star <=
+                                            currentRating
+                                              ? "selected"
+                                              : ""
+                                          }
+                                          onClick={() =>
+                                            handleRating(
+                                              order.id,
+                                              item.productId ||
+                                                item.id,
+                                              star
+                                            )
+                                          }
+                                          aria-label={`${star} star rating`}
+                                        >
+                                          ★
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-
-                          {order.items.length >
-                            3 && (
-                            <div className="order-history-more-items">
-                              +
-                              {order.items
-                                .length - 3}{" "}
-                              more
-                            </div>
-                          )}
-                        </div>
-
-                        <aside className="order-history-order-summary">
-                          <div>
-                            <span>
-                              Payment Status
-                            </span>
-
-                            <strong>
-                              {
-                                order.paymentStatus
-                              }
-                            </strong>
-                          </div>
-
-                          <div>
-                            <span>
-                              Order Total
-                            </span>
-
-                            <strong className="order-history-total">
-                              ₱
-                              {order.total.toLocaleString(
-                                "en-PH"
                               )}
-                            </strong>
-                          </div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
 
-                          <button
-                            type="button"
-                            className="order-history-details-button"
-                            onClick={() =>
-                              viewOrder(order)
-                            }
-                          >
-                            View Order Details
-                          </button>
+                    <div className="order-history-card-footer">
+                      <div>
+                        <span>
+                          Order total
+                        </span>
 
-                          {order.status ===
-                            "Delivered" ||
-                          order.status ===
-                            "Cancelled" ? (
-                            <button
-                              type="button"
-                              className="order-history-secondary-button"
-                              onClick={() =>
-                                buyAgain(order)
-                              }
-                            >
-                              Buy Again
-                            </button>
-                          ) : order.status ===
-                            "Processing" ? (
-                            <button
-                              type="button"
-                              className="order-history-cancel-button"
-                              onClick={() =>
-                                setOrderToCancel(
-                                  order
-                                )
-                              }
-                            >
-                              Cancel Order
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="order-history-secondary-button"
-                              onClick={() =>
-                                viewOrder(order)
-                              }
-                            >
-                              Track Order
-                            </button>
+                        <strong>
+                          {formatCurrency(
+                            order.total ||
+                              items.reduce(
+                                (
+                                  total,
+                                  item
+                                ) =>
+                                  total +
+                                  Number(
+                                    item.price ||
+                                      0
+                                  ) *
+                                    Number(
+                                      item.quantity ||
+                                        1
+                                    ),
+                                0
+                              )
                           )}
-                        </aside>
+                        </strong>
                       </div>
-                    </article>
-                  )
-                )}
-              </div>
-            ) : (
-              <section className="order-history-empty">
-                <div>⌕</div>
 
-                <p>NO ORDERS FOUND</p>
+                      <div className="order-history-actions">
+                        <button
+                          type="button"
+                          className="order-history-secondary-button"
+                          onClick={() =>
+                            navigate(
+                              `/shopper/orders/${order.id}`
+                            )
+                          }
+                        >
+                          View Details
+                        </button>
 
-                <h3>
-                  No orders match your filters
-                </h3>
-
-                <span>
-                  Try another search term or
-                  clear the selected status.
-                </span>
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                >
-                  Show All Orders
-                </button>
-              </section>
+                        <button
+                          type="button"
+                          className="order-history-primary-button"
+                          onClick={() =>
+                            handleBuyAgain(
+                              order
+                            )
+                          }
+                        >
+                          Buy Again
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              }
             )}
           </section>
-        </div>
-      </section>
-
-      {orderToCancel && (
-        <div
-          className="order-history-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setOrderToCancel(null);
-            }
-          }}
-        >
-          <section
-            className="order-history-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cancel-order-title"
-          >
-            <div className="order-history-modal-icon danger">
-              !
-            </div>
-
-            <h2 id="cancel-order-title">
-              Cancel this order?
-            </h2>
-
-            <p>
-              Order{" "}
-              <strong>
-                {orderToCancel.orderNumber}
-              </strong>{" "}
-              will be marked as cancelled. This
-              action cannot be undone in the
-              prototype.
-            </p>
-
-            <div className="order-history-modal-actions">
-              <button
-                type="button"
-                className="order-modal-secondary"
-                onClick={() =>
-                  setOrderToCancel(null)
-                }
-              >
-                Keep Order
-              </button>
-
-              <button
-                type="button"
-                className="order-modal-danger"
-                onClick={confirmCancelOrder}
-              >
-                Cancel Order
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showLogoutModal && (
-        <div
-          className="order-history-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowLogoutModal(false);
-            }
-          }}
-        >
-          <section
-            className="order-history-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="order-logout-title"
-          >
-            <div className="order-history-modal-icon">
-              ↪
-            </div>
-
-            <h2 id="order-logout-title">
-              Log out?
-            </h2>
-
-            <p>
-              You will need to log in again to
-              access your order history.
-            </p>
-
-            <div className="order-history-modal-actions">
-              <button
-                type="button"
-                className="order-modal-secondary"
-                onClick={() =>
-                  setShowLogoutModal(false)
-                }
-              >
-                Stay
-              </button>
-
-              <button
-                type="button"
-                className="order-modal-primary"
-                onClick={confirmLogout}
-              >
-                Logout
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }

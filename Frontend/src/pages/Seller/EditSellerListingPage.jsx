@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -12,196 +11,136 @@ import {
 import "../css/EditSellerListingPage.css";
 
 const fallbackProduct = {
-  id: "product-1",
-  name: "Camel Linen Shirt",
-  title: "Camel Linen Shirt",
-  description: "Relaxed linen tailoring",
-  category: "Tops",
-  sizes: ["S", "M", "L", "XL"],
-  price: 750,
-  color: "Camel",
-  colorFamily: "Warm Neutrals",
-  styleTags: ["Classic", "Minimal"],
-  occasionTags: ["Work", "Casual"],
-  status: "Active",
+  id: "product-003",
+  name: "Gold Dress",
+  description: "Elegant gold evening dress",
+  category: "Dresses",
+  size: "S",
+  color: "Gold",
+  price: 1450,
+  status: "Rejected",
+  rejectionReason:
+    "The rear-view image does not clearly show the complete garment.",
   images: {
     front: "",
     side: "",
     rear: "",
   },
   imageNames: {
-    front: "camel-shirt-front.png",
-    side: "camel-shirt-side.png",
-    rear: "camel-shirt-rear.png",
+    front: "gold-dress-front.jpg",
+    side: "gold-dress-side.jpg",
+    rear: "gold-dress-rear.jpg",
   },
 };
 
-function listToText(value) {
-  if (Array.isArray(value)) {
-    return value.join(", ");
-  }
+const categories = [
+  "Tops",
+  "Bottoms",
+  "Dresses",
+  "Outerwear",
+  "Footwear",
+  "Accessories",
+];
 
-  return value || "";
-}
+const sizes = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+];
 
-function textToList(value) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function readStoredProducts() {
+function readSellerProducts() {
   try {
-    const storedValue = localStorage.getItem(
-      "fitfusion-seller-products"
+    const storedProducts = JSON.parse(
+      localStorage.getItem(
+        "fitfusion-seller-products"
+      )
     );
 
-    if (!storedValue) {
-      return [];
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-
-    if (Array.isArray(parsedValue)) {
-      return parsedValue;
-    }
-
-    if (Array.isArray(parsedValue.products)) {
-      return parsedValue.products;
-    }
-
-    return [];
+    return Array.isArray(storedProducts)
+      ? storedProducts
+      : [];
   } catch {
     return [];
   }
-}
-
-function normalizeProduct(product, productId) {
-  return {
-    ...fallbackProduct,
-    ...product,
-    id: product?.id || productId || fallbackProduct.id,
-    name:
-      product?.name ||
-      product?.title ||
-      fallbackProduct.name,
-    title:
-      product?.title ||
-      product?.name ||
-      fallbackProduct.title,
-    sizes:
-      product?.sizes ||
-      product?.size ||
-      fallbackProduct.sizes,
-    styleTags:
-      product?.styleTags ||
-      product?.style_tags ||
-      fallbackProduct.styleTags,
-    occasionTags:
-      product?.occasionTags ||
-      product?.occasion_tags ||
-      fallbackProduct.occasionTags,
-    colorFamily:
-      product?.colorFamily ||
-      product?.color_family ||
-      fallbackProduct.colorFamily,
-    images: {
-      ...fallbackProduct.images,
-      ...(product?.images || {}),
-      front:
-        product?.images?.front ||
-        product?.frontImage ||
-        product?.front_image ||
-        "",
-      side:
-        product?.images?.side ||
-        product?.sideImage ||
-        product?.side_image ||
-        "",
-      rear:
-        product?.images?.rear ||
-        product?.rearImage ||
-        product?.rear_image ||
-        "",
-    },
-    imageNames: {
-      ...fallbackProduct.imageNames,
-      ...(product?.imageNames || {}),
-    },
-  };
 }
 
 function EditSellerListingPage() {
   const navigate = useNavigate();
   const { productId } = useParams();
 
-  const [originalProduct, setOriginalProduct] =
-    useState(null);
+  const storedProducts = useMemo(
+    () => readSellerProducts(),
+    []
+  );
+
+  const selectedProduct = useMemo(() => {
+    const matchingProduct =
+      storedProducts.find(
+        (product) =>
+          String(product.id) ===
+          String(productId)
+      );
+
+    if (!matchingProduct) {
+      return {
+        ...fallbackProduct,
+        id:
+          productId ||
+          fallbackProduct.id,
+      };
+    }
+
+    return {
+      ...fallbackProduct,
+      ...matchingProduct,
+      images: {
+        ...fallbackProduct.images,
+        ...(matchingProduct.images || {}),
+      },
+      imageNames: {
+        ...fallbackProduct.imageNames,
+        ...(matchingProduct.imageNames ||
+          {}),
+      },
+    };
+  }, [productId, storedProducts]);
 
   const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    description: "",
-    sizes: "",
-    price: "",
-    color: "",
-    colorFamily: "",
-    styleTags: "",
-    occasionTags: "",
+    name:
+      selectedProduct.name ||
+      selectedProduct.productName ||
+      "",
+    description:
+      selectedProduct.description || "",
+    category:
+      selectedProduct.category || "",
+    size: selectedProduct.size || "",
+    color: selectedProduct.color || "",
+    price: selectedProduct.price || "",
   });
+
+  const [images, setImages] = useState(
+    selectedProduct.images
+  );
+
+  const [imageNames, setImageNames] =
+    useState(selectedProduct.imageNames);
 
   const [replacementImages, setReplacementImages] =
     useState({
-      front: null,
-      side: null,
-      rear: null,
+      front: false,
+      side: false,
+      rear: false,
     });
 
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [pageError, setPageError] = useState("");
-  const [showSuccessModal, setShowSuccessModal] =
+  const [errors, setErrors] = useState({});
+  const [fileError, setFileError] =
+    useState("");
+  const [showSuccess, setShowSuccess] =
     useState(false);
-
-  useEffect(() => {
-    const products = readStoredProducts();
-
-    const matchingProduct = products.find(
-      (product) =>
-        String(product.id) === String(productId)
-    );
-
-    const selectedProduct = normalizeProduct(
-      matchingProduct || fallbackProduct,
-      productId
-    );
-
-    setOriginalProduct(selectedProduct);
-
-    setFormData({
-      name: selectedProduct.name,
-      category: selectedProduct.category || "",
-      description: selectedProduct.description || "",
-      sizes: listToText(selectedProduct.sizes),
-      price: String(selectedProduct.price || ""),
-      color: selectedProduct.color || "",
-      colorFamily: selectedProduct.colorFamily || "",
-      styleTags: listToText(
-        selectedProduct.styleTags
-      ),
-      occasionTags: listToText(
-        selectedProduct.occasionTags
-      ),
-    });
-  }, [productId]);
-
-  const hasReplacementImage = useMemo(
-    () =>
-      Object.values(replacementImages).some(
-        Boolean
-      ),
-    [replacementImages]
-  );
 
   function handleInputChange(event) {
     const { name, value } = event.target;
@@ -211,41 +150,41 @@ function EditSellerListingPage() {
       [name]: value,
     }));
 
-    setFieldErrors((currentErrors) => ({
+    setErrors((currentErrors) => ({
       ...currentErrors,
       [name]: "",
     }));
-
-    setPageError("");
   }
 
   function handleImageChange(view, event) {
     const file = event.target.files?.[0];
 
+    setFileError("");
+
     if (!file) {
       return;
     }
 
-    const acceptedTypes = [
-      "image/png",
+    const allowedTypes = [
       "image/jpeg",
+      "image/png",
       "image/webp",
     ];
 
-    if (!acceptedTypes.includes(file.type)) {
-      setPageError(
-        "Only PNG, JPG, JPEG, and WEBP images are allowed."
+    if (!allowedTypes.includes(file.type)) {
+      setFileError(
+        "Only JPG, PNG, and WEBP images are allowed."
       );
 
       event.target.value = "";
       return;
     }
 
-    const maximumSize = 5 * 1024 * 1024;
+    const maximumFileSize = 1024 * 1024;
 
-    if (file.size > maximumSize) {
-      setPageError(
-        "Each replacement image must not exceed 5 MB."
+    if (file.size > maximumFileSize) {
+      setFileError(
+        "Each image must be 1 MB or smaller."
       );
 
       event.target.value = "";
@@ -255,165 +194,165 @@ function EditSellerListingPage() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      setReplacementImages((currentImages) => ({
+      setImages((currentImages) => ({
         ...currentImages,
-        [view]: {
-          name: file.name,
-          source: reader.result,
-        },
+        [view]: reader.result,
       }));
 
-      setPageError("");
+      setImageNames((currentNames) => ({
+        ...currentNames,
+        [view]: file.name,
+      }));
+
+      setReplacementImages(
+        (currentReplacements) => ({
+          ...currentReplacements,
+          [view]: true,
+        })
+      );
+    };
+
+    reader.onerror = () => {
+      setFileError(
+        "The selected image could not be read. Please try another file."
+      );
     };
 
     reader.readAsDataURL(file);
   }
 
   function removeReplacement(view) {
-    setReplacementImages((currentImages) => ({
+    setImages((currentImages) => ({
       ...currentImages,
-      [view]: null,
+      [view]:
+        selectedProduct.images?.[view] || "",
     }));
+
+    setImageNames((currentNames) => ({
+      ...currentNames,
+      [view]:
+        selectedProduct.imageNames?.[view] ||
+        "",
+    }));
+
+    setReplacementImages(
+      (currentReplacements) => ({
+        ...currentReplacements,
+        [view]: false,
+      })
+    );
   }
 
   function validateForm() {
-    const errors = {};
+    const nextErrors = {};
 
     if (!formData.name.trim()) {
-      errors.name = "Item name is required.";
-    }
-
-    if (!formData.category.trim()) {
-      errors.category = "Category is required.";
+      nextErrors.name =
+        "Product name is required.";
     }
 
     if (!formData.description.trim()) {
-      errors.description =
+      nextErrors.description =
         "Product description is required.";
     }
 
-    if (!formData.sizes.trim()) {
-      errors.sizes =
-        "Enter at least one available size.";
+    if (!formData.category) {
+      nextErrors.category =
+        "Please select a category.";
     }
 
-    if (
-      !formData.price ||
-      Number(formData.price) <= 0
-    ) {
-      errors.price =
-        "Enter a valid price greater than zero.";
+    if (!formData.size) {
+      nextErrors.size =
+        "Please select a size.";
     }
 
     if (!formData.color.trim()) {
-      errors.color = "Product color is required.";
+      nextErrors.color =
+        "Product color is required.";
     }
 
-    if (!formData.colorFamily.trim()) {
-      errors.colorFamily =
-        "Color family is required.";
+    const numericPrice = Number(
+      formData.price
+    );
+
+    if (
+      !formData.price ||
+      Number.isNaN(numericPrice) ||
+      numericPrice <= 0
+    ) {
+      nextErrors.price =
+        "Enter a valid price greater than zero.";
     }
 
-    if (!formData.styleTags.trim()) {
-      errors.styleTags =
-        "Enter at least one style tag.";
+    if (
+      selectedProduct.status ===
+        "Rejected" &&
+      !replacementImages.rear
+    ) {
+      nextErrors.rearImage =
+        "Please re-upload the corrected rear-view image identified in the rejection reason.";
     }
 
-    if (!formData.occasionTags.trim()) {
-      errors.occasionTags =
-        "Enter at least one occasion tag.";
-    }
+    setErrors(nextErrors);
 
-    setFieldErrors(errors);
-
-    return Object.keys(errors).length === 0;
+    return (
+      Object.keys(nextErrors).length === 0
+    );
   }
 
   function handleSubmit(event) {
     event.preventDefault();
 
     if (!validateForm()) {
-      setPageError(
-        "Please correct the highlighted fields before saving."
-      );
-
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
-
       return;
     }
 
-    const storedProducts = readStoredProducts();
-
-    const updatedImages = {
-      ...originalProduct.images,
-    };
-
-    const updatedImageNames = {
-      ...originalProduct.imageNames,
-    };
-
-    Object.entries(replacementImages).forEach(
-      ([view, replacement]) => {
-        if (replacement) {
-          updatedImages[view] = replacement.source;
-          updatedImageNames[view] = replacement.name;
-        }
-      }
-    );
-
     const updatedProduct = {
-      ...originalProduct,
-      id: productId,
+      ...selectedProduct,
+      id:
+        selectedProduct.id ||
+        productId,
       name: formData.name.trim(),
-      title: formData.name.trim(),
-      category: formData.category.trim(),
-      description: formData.description.trim(),
-      sizes: textToList(formData.sizes),
-      size: formData.sizes.trim(),
-      price: Number(formData.price),
+      productName:
+        formData.name.trim(),
+      description:
+        formData.description.trim(),
+      category: formData.category,
+      size: formData.size,
       color: formData.color.trim(),
-      colorFamily: formData.colorFamily.trim(),
-      color_family:
-        formData.colorFamily.trim(),
-      styleTags: textToList(
-        formData.styleTags
-      ),
-      style_tags: textToList(
-        formData.styleTags
-      ),
-      occasionTags: textToList(
-        formData.occasionTags
-      ),
-      occasion_tags: textToList(
-        formData.occasionTags
-      ),
-      images: updatedImages,
-      imageNames: updatedImageNames,
+      price: Number(formData.price),
 
       /*
-       * An edited product returns to Pending because
-       * metadata and replacement images must be
-       * validated again.
+       * The listing remains rejected until
+       * it passes validation again.
        */
-      status: "Pending",
-      updatedAt: new Date().toISOString(),
-      hasReplacementImage,
+      status: "Rejected",
+
+      images,
+      imageNames,
+
+      correctedAt:
+        new Date().toISOString(),
+      resubmittedForValidation: true,
     };
 
-    const existingIndex = storedProducts.findIndex(
-      (product) =>
-        String(product.id) === String(productId)
-    );
+    const existingIndex =
+      storedProducts.findIndex(
+        (product) =>
+          String(product.id) ===
+          String(updatedProduct.id)
+      );
 
     let updatedProducts;
 
     if (existingIndex >= 0) {
-      updatedProducts = [...storedProducts];
-      updatedProducts[existingIndex] =
-        updatedProduct;
+      updatedProducts =
+        storedProducts.map((product) =>
+          String(product.id) ===
+          String(updatedProduct.id)
+            ? updatedProduct
+            : product
+        );
     } else {
       updatedProducts = [
         ...storedProducts,
@@ -427,293 +366,361 @@ function EditSellerListingPage() {
         JSON.stringify(updatedProducts)
       );
 
-      sessionStorage.setItem(
-        "fitfusion-latest-validation",
-        JSON.stringify({
-          productId,
-          productName: updatedProduct.name,
-          status: "Pending",
-          message:
-            "The updated listing was submitted for validation.",
-          submittedAt: new Date().toISOString(),
-        })
-      );
-
-      setOriginalProduct(updatedProduct);
-      setShowSuccessModal(true);
-      setPageError("");
+      setShowSuccess(true);
     } catch {
-      setPageError(
-        "The listing could not be saved. Replacement images may be too large for browser storage."
+      setFileError(
+        "The images could not be saved because they are too large. Try using smaller files."
       );
     }
   }
 
-  function handleCancel() {
-    navigate(`/seller/products/${productId}`);
+  function handleClose() {
+    navigate("/seller/listings");
   }
 
-  function handleViewListing() {
-    setShowSuccessModal(false);
-    navigate(`/seller/products/${productId}`);
-  }
-
-  if (!originalProduct) {
-    return (
-      <main className="edit-seller-loading">
-        Loading seller listing...
-      </main>
-    );
+  function handleSuccessClose() {
+    setShowSuccess(false);
+    navigate("/seller/validation");
   }
 
   return (
-    <main className="edit-seller-page">
-      <header className="edit-seller-header">
-        <div>
-          <h1>22B — EDIT SELLER LISTING</h1>
-
-          <p>
-            Update metadata and replace processed
-            images
-          </p>
-        </div>
-
-        <span className="edit-seller-role">
-          SELLER
-        </span>
-      </header>
-
-      <div className="edit-seller-body">
-        <section className="edit-seller-introduction">
-          <p>EDIT SELLER LISTING</p>
-
-          <h2>{originalProduct.name}</h2>
-
-          <span>
-            Update metadata, tags, categories, or
-            replace any processed view image.
-          </span>
-        </section>
-
-        {pageError && (
-          <div
-            className="edit-seller-page-error"
-            role="alert"
-          >
-            {pageError}
+    <main className="edit-seller-listing-page">
+      <section className="edit-listing-panel">
+        <header className="edit-listing-header">
+          <div>
+            <p>EDIT LISTING</p>
+            <h1>{formData.name}</h1>
           </div>
+
+          <button
+            type="button"
+            className="edit-listing-close"
+            onClick={handleClose}
+            aria-label="Close edit listing"
+          >
+            ×
+          </button>
+        </header>
+
+        {selectedProduct.status ===
+          "Rejected" && (
+          <section className="listing-rejection-box">
+            <strong>
+              Reason for rejection
+            </strong>
+
+            <p>
+              {
+                selectedProduct.rejectionReason
+              }
+            </p>
+
+            <span>
+              Correct the listed information
+              and re-upload the affected image
+              before submitting it for
+              validation again.
+            </span>
+          </section>
         )}
 
         <form
-          className="edit-seller-grid"
+          className="edit-listing-form"
           onSubmit={handleSubmit}
           noValidate
         >
-          <section className="edit-seller-form-card">
-            <div className="edit-seller-form-grid">
-              <FormField
-                label="Item Name"
-                name="name"
-                value={formData.name}
-                error={fieldErrors.name}
-                onChange={handleInputChange}
-              />
+          <label className="edit-listing-field edit-listing-full">
+            <span>Product Name</span>
 
-              <FormField
-                label="Category"
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Enter product name"
+            />
+
+            {errors.name && (
+              <small className="edit-field-error">
+                {errors.name}
+              </small>
+            )}
+          </label>
+
+          <label className="edit-listing-field edit-listing-full">
+            <span>Description</span>
+
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder="Describe the product"
+              rows="4"
+            />
+
+            {errors.description && (
+              <small className="edit-field-error">
+                {errors.description}
+              </small>
+            )}
+          </label>
+
+          <div className="edit-listing-row">
+            <label className="edit-listing-field">
+              <span>Category</span>
+
+              <select
                 name="category"
                 value={formData.category}
-                error={fieldErrors.category}
                 onChange={handleInputChange}
-              />
+              >
+                <option value="">
+                  Select category
+                </option>
 
-              <FormField
-                label="Description"
-                name="description"
-                value={formData.description}
-                error={fieldErrors.description}
+                {categories.map(
+                  (category) => (
+                    <option
+                      key={category}
+                      value={category}
+                    >
+                      {category}
+                    </option>
+                  )
+                )}
+              </select>
+
+              {errors.category && (
+                <small className="edit-field-error">
+                  {errors.category}
+                </small>
+              )}
+            </label>
+
+            <label className="edit-listing-field">
+              <span>Size</span>
+
+              <select
+                name="size"
+                value={formData.size}
                 onChange={handleInputChange}
-                fullWidth
-              />
+              >
+                <option value="">
+                  Select size
+                </option>
 
-              <FormField
-                label="Size"
-                name="sizes"
-                value={formData.sizes}
-                error={fieldErrors.sizes}
-                onChange={handleInputChange}
-                placeholder="S, M, L, XL"
-              />
+                {sizes.map((size) => (
+                  <option
+                    key={size}
+                    value={size}
+                  >
+                    {size}
+                  </option>
+                ))}
+              </select>
 
-              <FormField
-                label="Price"
-                name="price"
-                value={formData.price}
-                error={fieldErrors.price}
-                onChange={handleInputChange}
-                type="number"
-                min="1"
-                step="0.01"
-              />
+              {errors.size && (
+                <small className="edit-field-error">
+                  {errors.size}
+                </small>
+              )}
+            </label>
+          </div>
 
-              <FormField
-                label="Color"
+          <div className="edit-listing-row">
+            <label className="edit-listing-field">
+              <span>Color</span>
+
+              <input
+                type="text"
                 name="color"
                 value={formData.color}
-                error={fieldErrors.color}
                 onChange={handleInputChange}
+                placeholder="Enter color"
               />
 
-              <FormField
-                label="Color Family"
-                name="colorFamily"
-                value={formData.colorFamily}
-                error={fieldErrors.colorFamily}
-                onChange={handleInputChange}
-              />
+              {errors.color && (
+                <small className="edit-field-error">
+                  {errors.color}
+                </small>
+              )}
+            </label>
 
-              <FormField
-                label="Style Tags"
-                name="styleTags"
-                value={formData.styleTags}
-                error={fieldErrors.styleTags}
-                onChange={handleInputChange}
-                placeholder="Classic, Minimal"
-              />
+            <label className="edit-listing-field">
+              <span>Price</span>
 
-              <FormField
-                label="Occasion Tags"
-                name="occasionTags"
-                value={formData.occasionTags}
-                error={fieldErrors.occasionTags}
-                onChange={handleInputChange}
-                placeholder="Work, Casual"
-              />
+              <div className="edit-price-input">
+                <span>₱</span>
+
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  min="1"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {errors.price && (
+                <small className="edit-field-error">
+                  {errors.price}
+                </small>
+              )}
+            </label>
+          </div>
+
+          <section className="listing-image-section">
+            <div className="listing-image-heading">
+              <div>
+                <h2>Product Images</h2>
+
+                <p>
+                  Upload or re-upload the
+                  Front, Side, and Rear views
+                  of the garment.
+                </p>
+              </div>
+
+              <span>
+                JPG, PNG or WEBP · Maximum
+                1 MB each
+              </span>
             </div>
 
-            <div className="edit-seller-actions">
-              <button
-                type="submit"
-                className="edit-seller-save-button"
-              >
-                Save Changes
-              </button>
+            {fileError && (
+              <div className="listing-file-error">
+                {fileError}
+              </div>
+            )}
 
-              <button
-                type="button"
-                className="edit-seller-cancel-button"
-                onClick={handleCancel}
-              >
-                Cancel
-              </button>
+            <div className="listing-image-grid">
+              <ProductImageUpload
+                view="front"
+                label="Front View"
+                image={images.front}
+                fileName={
+                  imageNames.front
+                }
+                replaced={
+                  replacementImages.front
+                }
+                onChange={(event) =>
+                  handleImageChange(
+                    "front",
+                    event
+                  )
+                }
+                onRemove={() =>
+                  removeReplacement("front")
+                }
+              />
+
+              <ProductImageUpload
+                view="side"
+                label="Side View"
+                image={images.side}
+                fileName={
+                  imageNames.side
+                }
+                replaced={
+                  replacementImages.side
+                }
+                onChange={(event) =>
+                  handleImageChange(
+                    "side",
+                    event
+                  )
+                }
+                onRemove={() =>
+                  removeReplacement("side")
+                }
+              />
+
+              <ProductImageUpload
+                view="rear"
+                label="Rear View"
+                image={images.rear}
+                fileName={
+                  imageNames.rear
+                }
+                replaced={
+                  replacementImages.rear
+                }
+                error={errors.rearImage}
+                onChange={(event) => {
+                  handleImageChange(
+                    "rear",
+                    event
+                  );
+
+                  setErrors(
+                    (currentErrors) => ({
+                      ...currentErrors,
+                      rearImage: "",
+                    })
+                  );
+                }}
+                onRemove={() =>
+                  removeReplacement("rear")
+                }
+              />
             </div>
           </section>
 
-          <section className="edit-seller-images-card">
-            <h3>REPLACE VIEW IMAGES</h3>
+          <footer className="edit-listing-actions">
+            <button
+              type="button"
+              className="edit-listing-cancel"
+              onClick={handleClose}
+            >
+              Cancel
+            </button>
 
-            <ImageReplacement
-              view="front"
-              label="Front View"
-              currentSource={
-                originalProduct.images.front
-              }
-              currentName={
-                originalProduct.imageNames.front
-              }
-              replacement={
-                replacementImages.front
-              }
-              onChange={handleImageChange}
-              onRemove={removeReplacement}
-            />
-
-            <ImageReplacement
-              view="side"
-              label="Side View"
-              currentSource={
-                originalProduct.images.side
-              }
-              currentName={
-                originalProduct.imageNames.side
-              }
-              replacement={
-                replacementImages.side
-              }
-              onChange={handleImageChange}
-              onRemove={removeReplacement}
-            />
-
-            <ImageReplacement
-              view="rear"
-              label="Rear View"
-              currentSource={
-                originalProduct.images.rear
-              }
-              currentName={
-                originalProduct.imageNames.rear
-              }
-              replacement={
-                replacementImages.rear
-              }
-              onChange={handleImageChange}
-              onRemove={removeReplacement}
-            />
-
-            <p className="edit-seller-image-note">
-              Replacement images run through
-              background removal and validation again.
-            </p>
-          </section>
+            <button
+              type="submit"
+              className="edit-listing-save"
+            >
+              Save and Re-submit
+            </button>
+          </footer>
         </form>
-      </div>
+      </section>
 
-      {showSuccessModal && (
+      {showSuccess && (
         <div
-          className="edit-seller-modal-backdrop"
+          className="edit-success-overlay"
           role="presentation"
         >
           <section
-            className="edit-seller-modal"
+            className="edit-success-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="listing-update-title"
+            aria-labelledby="edit-success-title"
           >
-            <div className="edit-seller-success-icon">
+            <div className="edit-success-icon">
               ✓
             </div>
 
-            <h2 id="listing-update-title">
-              Listing Updated
+            <p>LISTING UPDATED</p>
+
+            <h2 id="edit-success-title">
+              Changes saved successfully
             </h2>
 
-            <p>
-              Your changes were saved. The listing
-              is now pending validation before it
-              becomes visible to shoppers.
-            </p>
+            <span>
+              The corrected listing and
+              replacement images were saved
+              and submitted for validation.
+            </span>
 
-            <div className="edit-seller-modal-actions">
-              <button
-                type="button"
-                className="edit-seller-save-button"
-                onClick={handleViewListing}
-              >
-                View Listing
-              </button>
-
-              <button
-                type="button"
-                className="edit-seller-cancel-button"
-                onClick={() =>
-                  navigate(
-                    "/seller/validation-report"
-                  )
-                }
-              >
-                View Validation
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSuccessClose}
+            >
+              View Validation Report
+            </button>
           </section>
         </div>
       )}
@@ -721,97 +728,87 @@ function EditSellerListingPage() {
   );
 }
 
-function FormField({
-  label,
-  error,
-  fullWidth = false,
-  ...inputProperties
-}) {
-  return (
-    <label
-      className={
-        fullWidth
-          ? "edit-seller-field edit-seller-field-full"
-          : "edit-seller-field"
-      }
-    >
-      <span>{label}</span>
-
-      <input
-        {...inputProperties}
-        className={error ? "input-error" : ""}
-      />
-
-      {error && (
-        <small role="alert">{error}</small>
-      )}
-    </label>
-  );
-}
-
-function ImageReplacement({
+function ProductImageUpload({
   view,
   label,
-  currentSource,
-  currentName,
-  replacement,
+  image,
+  fileName,
+  replaced,
+  error,
   onChange,
   onRemove,
 }) {
-  const displayedSource =
-    replacement?.source || currentSource;
-
-  const displayedName =
-    replacement?.name ||
-    currentName ||
-    `${label} image`;
+  const inputId = `${view}-image-upload`;
 
   return (
-    <article className="edit-seller-image-row">
-      <div className="edit-seller-thumbnail">
-        {displayedSource ? (
+    <article
+      className={`product-image-upload ${
+        error ? "has-error" : ""
+      }`}
+    >
+      <div className="product-image-preview">
+        {image ? (
           <img
-            src={displayedSource}
+            src={image}
             alt={`${label} preview`}
           />
         ) : (
-          <span>{label.charAt(0)}</span>
+          <div className="product-image-placeholder">
+            <span>◇</span>
+            <p>{label}</p>
+          </div>
+        )}
+
+        {replaced && (
+          <span className="replacement-badge">
+            New Image
+          </span>
         )}
       </div>
 
-      <div className="edit-seller-image-information">
+      <div className="product-image-information">
         <strong>{label}</strong>
-        <span title={displayedName}>
-          {displayedName}
-        </span>
 
-        {replacement && (
-          <small>New replacement selected</small>
-        )}
+        <small>
+          {fileName ||
+            "No image selected"}
+        </small>
       </div>
 
-      <div className="edit-seller-image-actions">
-        <label className="edit-seller-replace-button">
-          Replace
+      <input
+        id={inputId}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp"
+        onChange={onChange}
+        hidden
+      />
 
-          <input
-            type="file"
-            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-            onChange={(event) =>
-              onChange(view, event)
-            }
-          />
+      <div className="product-image-buttons">
+        <label
+          htmlFor={inputId}
+          className="product-upload-button"
+        >
+          {image
+            ? "Re-upload Image"
+            : "Upload Image"}
         </label>
 
-        {replacement && (
+        {replaced && (
           <button
             type="button"
-            onClick={() => onRemove(view)}
+            className="product-undo-button"
+            onClick={onRemove}
           >
             Undo
           </button>
         )}
       </div>
+
+      {error && (
+        <small className="product-image-error">
+          {error}
+        </small>
+      )}
     </article>
   );
 }

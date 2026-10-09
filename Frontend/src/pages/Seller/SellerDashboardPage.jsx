@@ -1,371 +1,398 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "../css/SellerDashboardPage.css";
 
-const recentProducts = [
+const fallbackProducts = [
   {
-    id: 1,
+    id: "product-001",
     name: "Classic Beige Blazer",
     category: "Outerwear",
     price: 1899,
-    stock: 12,
     status: "Active",
   },
   {
-    id: 2,
+    id: "product-002",
     name: "Black Formal Trousers",
     category: "Bottoms",
     price: 1299,
-    stock: 8,
     status: "Active",
   },
   {
-    id: 3,
+    id: "product-003",
     name: "Gold Satin Blouse",
     category: "Tops",
-    price: 999,
-    stock: 0,
-    status: "Out of Stock",
+    price: 995,
+    status: "Rejected",
   },
 ];
 
-const recentOrders = [
-  {
-    id: "FF-2026-0018",
-    customer: "Maria Santos",
-    total: 1899,
-    status: "Processing",
-  },
-  {
-    id: "FF-2026-0017",
-    customer: "Angela Reyes",
-    total: 2298,
-    status: "Shipped",
-  },
-  {
-    id: "FF-2026-0016",
-    customer: "Nicole Cruz",
-    total: 999,
-    status: "Delivered",
-  },
-];
+function getSellerProducts() {
+  try {
+    const savedProducts = localStorage.getItem(
+      "fitfusion-seller-products"
+    );
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-  }).format(amount);
+    if (!savedProducts) {
+      return fallbackProducts;
+    }
+
+    const parsedProducts = JSON.parse(savedProducts);
+
+    if (!Array.isArray(parsedProducts)) {
+      return fallbackProducts;
+    }
+
+    return parsedProducts;
+  } catch {
+    return fallbackProducts;
+  }
+}
+
+function getSellerAccount() {
+  try {
+    const storedAccount =
+      localStorage.getItem(
+        "fitfusion-current-user"
+      ) ||
+      sessionStorage.getItem(
+        "registeredAccount"
+      );
+
+    if (!storedAccount) {
+      return {
+        username: "Seller",
+        storeName: "Maison Aurelia",
+      };
+    }
+
+    const account = JSON.parse(storedAccount);
+
+    return {
+      username:
+        account.username ||
+        account.storeName ||
+        "Seller",
+      storeName:
+        account.storeName ||
+        "Maison Aurelia",
+    };
+  } catch {
+    return {
+      username: "Seller",
+      storeName: "Maison Aurelia",
+    };
+  }
+}
+
+function normalizeStatus(status) {
+  const normalizedStatus = String(
+    status || ""
+  ).toLowerCase();
+
+  if (normalizedStatus === "rejected") {
+    return "Rejected";
+  }
+
+  return "Active";
 }
 
 function SellerDashboardPage() {
   const navigate = useNavigate();
 
-  const savedSeller = localStorage.getItem(
-    "fitfusion-current-user"
+  const sellerAccount = useMemo(
+    () => getSellerAccount(),
+    []
   );
 
-  let storeName = "Your Store";
+  const products = useMemo(
+    () => getSellerProducts(),
+    []
+  );
 
-  if (savedSeller) {
-    try {
-      const seller = JSON.parse(savedSeller);
+  const recentProducts = products
+    .slice(0, 5)
+    .map((product, index) => ({
+      ...product,
+      id:
+        product.id ||
+        `seller-product-${index + 1}`,
+      name:
+        product.name ||
+        product.productName ||
+        "Unnamed Product",
+      category:
+        product.category ||
+        "Uncategorized",
+      price: Number(product.price || 0),
+      status: normalizeStatus(
+        product.status
+      ),
+    }));
 
-      storeName =
-        seller.storeName ||
-        seller.businessName ||
-        seller.username ||
-        "Your Store";
-    } catch {
-      storeName = "Your Store";
-    }
-  }
+  const activeListings = products.filter(
+    (product) =>
+      normalizeStatus(product.status) ===
+      "Active"
+  ).length;
+
+  const rejectedListings = products.filter(
+    (product) =>
+      normalizeStatus(product.status) ===
+      "Rejected"
+  ).length;
 
   return (
     <main className="seller-dashboard-page">
-      <section className="seller-dashboard-welcome">
+      <section className="seller-dashboard-heading">
         <div>
-          <p className="seller-dashboard-label">
-            WELCOME BACK
+          <p className="seller-dashboard-eyebrow">
+            SELLER DASHBOARD
           </p>
 
-          <h2>{storeName}</h2>
+          <h1>
+            Welcome, {sellerAccount.username}
+          </h1>
 
-          <p className="seller-dashboard-description">
-            Review your store activity, manage product
-            listings, and process customer orders.
+          <p>
+            Upload product records, manage your
+            listings, and review validation results.
           </p>
         </div>
 
         <button
           type="button"
-          className="seller-add-product-button"
+          className="seller-dashboard-add-button"
           onClick={() =>
-            navigate("/seller/products/new")
+            navigate("/seller/upload-catalog")
           }
         >
           + Add New Product
         </button>
       </section>
 
-      <section
-        className="seller-statistics-grid"
-        aria-label="Store overview"
-      >
-        <article className="seller-statistic-card">
-          <span className="seller-statistic-icon">
-            01
-          </span>
+      <section className="seller-dashboard-summary">
+        <SummaryCard
+          number="01"
+          label="Total Listings"
+          value={products.length}
+          description="Products uploaded by your store"
+        />
 
-          <div>
-            <p>Total Products</p>
-            <strong>24</strong>
-            <small>21 active listings</small>
-          </div>
-        </article>
+        <SummaryCard
+          number="02"
+          label="Active Listings"
+          value={activeListings}
+          description="Products accepted after validation"
+        />
 
-        <article className="seller-statistic-card">
-          <span className="seller-statistic-icon">
-            02
-          </span>
-
-          <div>
-            <p>Pending Orders</p>
-            <strong>6</strong>
-            <small>Require seller action</small>
-          </div>
-        </article>
-
-        <article className="seller-statistic-card">
-          <span className="seller-statistic-icon">
-            03
-          </span>
-
-          <div>
-            <p>Completed Orders</p>
-            <strong>38</strong>
-            <small>Successfully delivered</small>
-          </div>
-        </article>
-
-        <article className="seller-statistic-card">
-          <span className="seller-statistic-icon">
-            04
-          </span>
-
-          <div>
-            <p>Store Rating</p>
-            <strong>4.8</strong>
-            <small>Based on product ratings</small>
-          </div>
-        </article>
+        <SummaryCard
+          number="03"
+          label="Rejected Listings"
+          value={rejectedListings}
+          description="Products that require correction"
+        />
       </section>
 
       <section className="seller-dashboard-actions">
-        <article className="seller-dashboard-action-card">
-          <p className="seller-card-eyebrow">
-            PRODUCT MANAGEMENT
-          </p>
+        <DashboardActionCard
+          label="CSV TEMPLATE"
+          title="Download the catalog template"
+          description="Use the required CSV format before uploading multiple product records."
+          buttonLabel="Open CSV Template"
+          buttonStyle="primary"
+          onClick={() =>
+            navigate("/seller/csv-template")
+          }
+        />
 
-          <h3>Manage your product catalog</h3>
+        <DashboardActionCard
+          label="CATALOG UPLOAD"
+          title="Upload product records"
+          description="Upload a CSV file or add an individual product to your seller catalog."
+          buttonLabel="Upload Catalog"
+          buttonStyle="secondary"
+          onClick={() =>
+            navigate("/seller/upload-catalog")
+          }
+        />
 
-          <p>
-            Add products individually, edit existing
-            listings, or upload multiple product records.
-          </p>
+        <DashboardActionCard
+          label="LISTINGS MANAGEMENT"
+          title="Manage your product listings"
+          description="Review existing product information and update a selected listing."
+          buttonLabel="View Listings"
+          buttonStyle="secondary"
+          onClick={() =>
+            navigate("/seller/listings")
+          }
+        />
 
-          <div className="seller-action-buttons">
-            <button
-              type="button"
-              className="seller-primary-action"
-              onClick={() =>
-                navigate("/seller/products")
-              }
-            >
-              View Products
-            </button>
-
-            <button
-              type="button"
-              className="seller-secondary-action"
-              onClick={() =>
-                navigate("/seller/products/upload")
-              }
-            >
-              Upload Products
-            </button>
-          </div>
-        </article>
-
-        <article className="seller-dashboard-action-card dark">
-          <p className="seller-card-eyebrow">
-            ORDER MANAGEMENT
-          </p>
-
-          <h3>6 orders need attention</h3>
-
-          <p>
-            Review new customer orders and update their
-            processing and delivery status.
-          </p>
-
-          <button
-            type="button"
-            className="seller-gold-action"
-            onClick={() =>
-              navigate("/seller/orders")
-            }
-          >
-            Manage Orders
-          </button>
-        </article>
+        <DashboardActionCard
+          label="VALIDATION REPORTS"
+          title="Review validation results"
+          description="View accepted and rejected catalog records and correct rejected entries."
+          buttonLabel="View Validation"
+          buttonStyle="dark"
+          onClick={() =>
+            navigate("/seller/validation")
+          }
+        />
       </section>
 
-      <section className="seller-dashboard-panel">
-        <div className="seller-panel-heading">
+      <section className="seller-recent-listings">
+        <div className="seller-listings-heading">
           <div>
-            <p className="seller-card-eyebrow">
-              INVENTORY
-            </p>
-
-            <h3>Recent Product Listings</h3>
+            <p>LISTINGS MANAGEMENT</p>
+            <h2>Recent Product Listings</h2>
           </div>
 
           <button
             type="button"
-            className="seller-text-button"
+            className="seller-view-all-button"
             onClick={() =>
-              navigate("/seller/products")
+              navigate("/seller/listings")
             }
           >
             View All Products
           </button>
         </div>
 
-        <div className="seller-table-container">
-          <table className="seller-dashboard-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th>
-                  <span className="sr-only">
-                    Actions
-                  </span>
-                </th>
-              </tr>
-            </thead>
+        {recentProducts.length === 0 ? (
+          <div className="seller-listings-empty">
+            <h3>No product listings yet</h3>
 
-            <tbody>
-              {recentProducts.map((product) => (
-                <tr key={product.id}>
-                  <td>
-                    <strong>{product.name}</strong>
-                  </td>
-
-                  <td>{product.category}</td>
-
-                  <td>
-                    {formatCurrency(product.price)}
-                  </td>
-
-                  <td>{product.stock}</td>
-
-                  <td>
-                    <span
-                      className={
-                        product.status === "Active"
-                          ? "seller-status active"
-                          : "seller-status warning"
-                      }
-                    >
-                      {product.status}
-                    </span>
-                  </td>
-
-                  <td>
-                    <button
-                      type="button"
-                      className="seller-row-button"
-                      onClick={() =>
-                        navigate(
-                          `/seller/products/${product.id}/edit`
-                        )
-                      }
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="seller-dashboard-panel">
-        <div className="seller-panel-heading">
-          <div>
-            <p className="seller-card-eyebrow">
-              CUSTOMER ORDERS
+            <p>
+              Upload a product record to begin
+              building your store catalog.
             </p>
 
-            <h3>Recent Orders</h3>
-          </div>
-
-          <button
-            type="button"
-            className="seller-text-button"
-            onClick={() =>
-              navigate("/seller/orders")
-            }
-          >
-            View All Orders
-          </button>
-        </div>
-
-        <div className="seller-order-list">
-          {recentOrders.map((order) => (
-            <article
-              className="seller-order-row"
-              key={order.id}
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/seller/upload-catalog")
+              }
             >
-              <div>
-                <strong>{order.id}</strong>
-                <span>{order.customer}</span>
-              </div>
+              Upload First Product
+            </button>
+          </div>
+        ) : (
+          <div className="seller-listings-table-wrapper">
+            <table className="seller-listings-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Validation Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
 
-              <div>
-                <strong>
-                  {formatCurrency(order.total)}
-                </strong>
+              <tbody>
+                {recentProducts.map(
+                  (product) => (
+                    <tr key={product.id}>
+                      <td>
+                        <strong>
+                          {product.name}
+                        </strong>
+                      </td>
 
-                <span
-                  className={`seller-order-status ${order.status
-                    .toLowerCase()
-                    .replaceAll(" ", "-")}`}
-                >
-                  {order.status}
-                </span>
-              </div>
+                      <td>
+                        {product.category}
+                      </td>
 
-              <button
-                type="button"
-                className="seller-row-button"
-                onClick={() =>
-                  navigate(
-                    `/seller/orders/${order.id}`
+                      <td>
+                        ₱
+                        {product.price.toLocaleString(
+                          "en-PH",
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }
+                        )}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`seller-validation-status ${product.status.toLowerCase()}`}
+                        >
+                          {product.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          type="button"
+                          className="seller-edit-listing-button"
+                          onClick={() =>
+                            navigate(
+                              `/seller/listings/${product.id}/edit`
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
                   )
-                }
-              >
-                View
-              </button>
-            </article>
-          ))}
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </main>
+  );
+}
+
+function SummaryCard({
+  number,
+  label,
+  value,
+  description,
+}) {
+  return (
+    <article className="seller-summary-card">
+      <span className="seller-summary-number">
+        {number}
+      </span>
+
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <small>{description}</small>
+      </div>
+    </article>
+  );
+}
+
+function DashboardActionCard({
+  label,
+  title,
+  description,
+  buttonLabel,
+  buttonStyle,
+  onClick,
+}) {
+  return (
+    <article
+      className={`seller-dashboard-action-card ${buttonStyle}`}
+    >
+      <p className="seller-action-label">
+        {label}
+      </p>
+
+      <h2>{title}</h2>
+      <p>{description}</p>
+
+      <button
+        type="button"
+        onClick={onClick}
+      >
+        {buttonLabel}
+      </button>
+    </article>
   );
 }
 
