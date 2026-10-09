@@ -8,6 +8,9 @@ import {
   useOutletContext,
 } from "react-router-dom";
 
+// Import the API service we created
+import { catalogAPI } from "../services/api";
+
 import "./css/CatalogPage.css";
 
 const PRODUCTS = [
@@ -121,6 +124,7 @@ const CATEGORIES = [
   "Bottoms",
   "Dresses",
   "Outerwear",
+  "Footwear",
 ];
 
 function readStorage(key, fallback) {
@@ -136,19 +140,18 @@ function readStorage(key, fallback) {
   }
 }
 
-function CatalogPage({
-  isGuest = false,
-}) {
+function CatalogPage({ isGuest = false }) {
   const navigate = useNavigate();
   const outletContext = useOutletContext();
 
-  const guestMode =
-    isGuest ||
-    outletContext?.isGuest === true;
+  const guestMode = isGuest || outletContext?.isGuest === true;
+  const basePath = guestMode ? "/guest" : "/shopper";
+  const storage = guestMode ? sessionStorage : localStorage;
 
-  const basePath = guestMode
-    ? "/guest"
-    : "/shopper";
+  // --- NEW: State for Backend Data ---
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [search, setSearch] =
     useState("");
@@ -174,9 +177,11 @@ function CatalogPage({
               search.toLowerCase()
             );
 
-        const matchesCategory =
-          category === "All" ||
-          product.category === category;
+      const matchesCategory = category === "All" || product.category === category;
+      const matchesGender = gender === "All" || product.gender === gender;
+      const matchesSize = size === "All" || product.sizes.includes(size);
+      const matchesSeller = seller === "All" || product.sellerName === seller;
+      const matchesPrice = product.price <= maximumPrice;
 
         return (
           matchesSearch &&
@@ -236,10 +241,7 @@ function CatalogPage({
         name: product.sellerName,
       })
     );
-
-    navigate(
-      `${basePath}/sellers/${product.sellerId}`
-    );
+    navigate(`${basePath}/sellers/${product.sellerId}`);
   }
 
   return (
@@ -446,7 +448,6 @@ function CatalogPage({
         {filteredProducts.length === 0 && (
           <section className="catalog-empty-state">
             <h2>No products found</h2>
-
             <p>
               Try another search term or
               category.
