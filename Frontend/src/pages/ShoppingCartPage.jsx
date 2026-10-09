@@ -5,311 +5,318 @@ import {
 } from "react";
 
 import {
-  NavLink,
+  Link,
   useNavigate,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/ShoppingCartPage.css";
 
-const sampleCartItems = [
+const CART_STORAGE_KEY = "fitfusion-cart";
+const CHECKOUT_STORAGE_KEY =
+  "fitfusion-checkout-items";
+const MAX_QUANTITY = 10;
+
+const defaultCartItems = [
   {
-    id: "luna-1",
+    id: "001-S-Beige",
+    productId: "001",
     name: "Classic Beige Top",
+    category: "Tops",
     sellerId: "luna-clothing",
     sellerName: "Luna Clothing",
-    category: "Tops",
     price: 699,
     originalPrice: 799,
-    size: "M",
+    quantity: 2,
+    size: "S",
     color: "Beige",
-    quantity: 1,
-    stock: 12,
-    availableSizes: [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-    ],
-    colorClass: "beige",
+    sizes: ["XS", "S", "M", "L"],
+    colors: ["Beige", "White", "Black"],
+    selected: true,
+    image: "",
   },
   {
-    id: "urban-1",
-    name: "High-Waist Denim Pants",
-    sellerId: "urban-threads",
-    sellerName: "Urban Threads",
+    id: "002-M-Black",
+    productId: "002",
+    name: "Elegant Black Trousers",
     category: "Bottoms",
-    price: 899,
-    originalPrice: 1099,
+    sellerId: "maison-moderne",
+    sellerName: "Maison Moderne",
+    price: 1099,
+    originalPrice: 1299,
+    quantity: 1,
     size: "M",
-    color: "Blue",
-    quantity: 1,
-    stock: 8,
-    availableSizes: [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-    ],
-    colorClass: "denim",
-  },
-  {
-    id: "luna-2",
-    name: "Floral Summer Dress",
-    sellerId: "luna-clothing",
-    sellerName: "Luna Clothing",
-    category: "Dresses",
-    price: 999,
-    originalPrice: 1199,
-    size: "L",
-    color: "Rose Floral",
-    quantity: 1,
-    stock: 5,
-    availableSizes: [
-      "S",
-      "M",
-      "L",
-      "XL",
-    ],
-    colorClass: "floral",
+    color: "Black",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Black", "Brown"],
+    selected: false,
+    image: "",
   },
 ];
 
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
 function normalizeCartItem(item, index) {
+  const productId = String(
+    item.productId ?? item.id ?? index + 1
+  );
+
+  const size = item.size || "M";
+  const color = item.color || "Default";
+
   return {
     id:
-      item?.id ||
-      item?.productId ||
-      `cart-item-${index + 1}`,
-    name:
-      item?.name ||
-      item?.productName ||
-      item?.title ||
-      `Product ${index + 1}`,
+      item.id ||
+      `${productId}-${size}-${color}`,
+    productId,
+    name: item.name || "Fashion Item",
+    category: item.category || "Clothing",
     sellerId:
-      item?.sellerId ||
-      item?.storeId ||
-      "luna-clothing",
+      item.sellerId || "fitfusion-seller",
     sellerName:
-      item?.sellerName ||
-      item?.storeName ||
-      item?.seller ||
-      "FitFusion Seller",
-    category:
-      item?.category ||
-      item?.type ||
-      "Clothing",
-    price: Number(item?.price) || 0,
-    originalPrice:
-      Number(item?.originalPrice) ||
-      Number(item?.price) ||
-      0,
-    size:
-      item?.size ||
-      item?.selectedSize ||
-      "",
-    color:
-      item?.color ||
-      item?.selectedColor ||
-      "Default",
-    quantity:
+      item.sellerName || "FitFusion Seller",
+    price: Number(item.price || 0),
+    originalPrice: Number(
+      item.originalPrice || item.price || 0
+    ),
+    quantity: Math.min(
+      MAX_QUANTITY,
       Math.max(
         1,
-        Number(item?.quantity) || 1
-      ),
-    stock:
-      Math.max(
-        0,
-        Number(item?.stock) || 10
-      ),
-    availableSizes:
-      Array.isArray(item?.availableSizes) &&
-      item.availableSizes.length > 0
-        ? item.availableSizes
-        : Array.isArray(item?.sizes) &&
-            item.sizes.length > 0
-          ? item.sizes
-          : ["XS", "S", "M", "L", "XL"],
-    image:
-      item?.image ||
-      item?.imageUrl ||
-      item?.thumbnail ||
-      "",
-    colorClass:
-      item?.colorClass || "beige",
+        Number(item.quantity || 1)
+      )
+    ),
+    size,
+    color,
+    sizes:
+      Array.isArray(item.sizes) &&
+      item.sizes.length > 0
+        ? item.sizes
+        : ["S", "M", "L", "XL"],
+    colors:
+      Array.isArray(item.colors) &&
+      item.colors.length > 0
+        ? item.colors
+        : ["Beige", "Black", "White"],
+    selected: item.selected !== false,
+    image: item.image || "",
   };
+}
+
+function mergeDuplicateItems(items) {
+  const mergedItems = new Map();
+
+  items.forEach((item, index) => {
+    const normalizedItem =
+      normalizeCartItem(item, index);
+
+    const key = [
+      normalizedItem.productId,
+      normalizedItem.size,
+      normalizedItem.color,
+    ].join("-");
+
+    if (!mergedItems.has(key)) {
+      mergedItems.set(key, {
+        ...normalizedItem,
+        id: key,
+      });
+
+      return;
+    }
+
+    const existingItem =
+      mergedItems.get(key);
+
+    mergedItems.set(key, {
+      ...existingItem,
+      quantity: Math.min(
+        MAX_QUANTITY,
+        existingItem.quantity +
+          normalizedItem.quantity
+      ),
+      selected:
+        existingItem.selected ||
+        normalizedItem.selected,
+    });
+  });
+
+  return Array.from(mergedItems.values());
 }
 
 function loadCartItems() {
   try {
     const storedCart = localStorage.getItem(
-      "fitfusion-cart-items"
+      CART_STORAGE_KEY
     );
 
-    /*
-      If the key does not exist yet, sample items
-      are displayed for prototype demonstration.
-    */
-    if (storedCart === null) {
-      return sampleCartItems;
+    if (!storedCart) {
+      return defaultCartItems;
     }
 
     const parsedCart = JSON.parse(storedCart);
 
     if (!Array.isArray(parsedCart)) {
-      return [];
+      return defaultCartItems;
     }
 
-    return parsedCart.map(normalizeCartItem);
+    return mergeDuplicateItems(parsedCart);
   } catch {
-    return sampleCartItems;
+    return defaultCartItems;
   }
 }
 
 function ShoppingCartPage() {
   const navigate = useNavigate();
 
-  const [cartItems, setCartItems] = useState(
-    loadCartItems
-  );
-
-  const [selectedItemIds, setSelectedItemIds] =
-    useState(() =>
-      loadCartItems().map((item) =>
-        String(item.id)
-      )
-    );
-
-  const [itemToRemove, setItemToRemove] =
-    useState(null);
-
-  const [showClearModal, setShowClearModal] =
-    useState(false);
-
-  const [showLogoutModal, setShowLogoutModal] =
-    useState(false);
+  const [cartItems, setCartItems] =
+    useState(loadCartItems);
 
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, []);
 
   useEffect(() => {
     localStorage.setItem(
-      "fitfusion-cart-items",
+      CART_STORAGE_KEY,
       JSON.stringify(cartItems)
     );
-  }, [cartItems]);
 
-  const selectedItems = useMemo(() => {
-    return cartItems.filter((item) =>
-      selectedItemIds.includes(
-        String(item.id)
+    window.dispatchEvent(
+      new CustomEvent(
+        "fitfusion-cart-updated",
+        {
+          detail: {
+            cart: cartItems,
+            quantity: cartItems.length,
+          },
+        }
       )
     );
-  }, [cartItems, selectedItemIds]);
-
-  const totalCartQuantity = useMemo(() => {
-    return cartItems.reduce(
-      (total, item) =>
-        total + item.quantity,
-      0
-    );
   }, [cartItems]);
 
-  const subtotal = useMemo(() => {
-    return selectedItems.reduce(
-      (total, item) =>
-        total +
-        item.price * item.quantity,
-      0
-    );
-  }, [selectedItems]);
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
 
-  const totalOriginalPrice = useMemo(() => {
-    return selectedItems.reduce(
-      (total, item) =>
-        total +
-        item.originalPrice *
-          item.quantity,
-      0
-    );
-  }, [selectedItems]);
+    const timeout = window.setTimeout(() => {
+      setNotice("");
+    }, 2500);
+
+    return () =>
+      window.clearTimeout(timeout);
+  }, [notice]);
+
+  const cartProductCount =
+    cartItems.length;
+
+  const selectedItems = useMemo(
+    () =>
+      cartItems.filter(
+        (item) => item.selected
+      ),
+    [cartItems]
+  );
+
+  const selectedProductCount =
+    selectedItems.length;
+
+  const subtotal = useMemo(
+    () =>
+      selectedItems.reduce(
+        (total, item) =>
+          total +
+          Number(item.price) *
+            Number(item.quantity),
+        0
+      ),
+    [selectedItems]
+  );
+
+  const originalSubtotal = useMemo(
+    () =>
+      selectedItems.reduce(
+        (total, item) =>
+          total +
+          Number(item.originalPrice) *
+            Number(item.quantity),
+        0
+      ),
+    [selectedItems]
+  );
 
   const productDiscount = Math.max(
     0,
-    totalOriginalPrice - subtotal
+    originalSubtotal - subtotal
   );
+
+  const freeShippingThreshold = 1500;
 
   const shippingFee =
     selectedItems.length === 0
       ? 0
-      : subtotal >= 1500
+      : subtotal >= freeShippingThreshold
         ? 0
         : 80;
 
-  const grandTotal =
-    subtotal + shippingFee;
+  const amountUntilFreeShipping =
+    Math.max(
+      0,
+      freeShippingThreshold - subtotal
+    );
 
-  const allItemsSelected =
+  const total = subtotal + shippingFee;
+
+  const allSelected =
     cartItems.length > 0 &&
-    selectedItemIds.length ===
-      cartItems.length;
+    cartItems.every(
+      (item) => item.selected
+    );
 
-  function displayNotice(message) {
-    setNotice(message);
-
-    setTimeout(() => {
-      setNotice("");
-    }, 2600);
+  function updateItem(itemId, updates) {
+    setCartItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              ...updates,
+            }
+          : item
+      )
+    );
   }
 
-  function toggleItemSelection(itemId) {
-    const normalizedId = String(itemId);
-
-    setSelectedItemIds((currentIds) => {
-      if (
-        currentIds.includes(normalizedId)
-      ) {
-        return currentIds.filter(
-          (id) => id !== normalizedId
-        );
-      }
-
-      return [
-        ...currentIds,
-        normalizedId,
-      ];
-    });
-
-    setError("");
+  function handleToggleItem(itemId) {
+    setCartItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              selected: !item.selected,
+            }
+          : item
+      )
+    );
   }
 
-  function toggleSelectAll() {
-    if (allItemsSelected) {
-      setSelectedItemIds([]);
-    } else {
-      setSelectedItemIds(
-        cartItems.map((item) =>
-          String(item.id)
-        )
-      );
-    }
+  function handleSelectAll() {
+    const shouldSelect = !allSelected;
 
-    setError("");
+    setCartItems((currentItems) =>
+      currentItems.map((item) => ({
+        ...item,
+        selected: shouldSelect,
+      }))
+    );
   }
 
-  function updateQuantity(
+  function handleQuantityChange(
     itemId,
-    nextQuantity
+    change
   ) {
     setCartItems((currentItems) =>
       currentItems.map((item) => {
@@ -317,320 +324,134 @@ function ShoppingCartPage() {
           return item;
         }
 
-        const safeQuantity = Math.min(
-          item.stock,
-          Math.max(
-            1,
-            Number(nextQuantity) || 1
-          )
-        );
+        const nextQuantity =
+          Number(item.quantity) + change;
 
         return {
           ...item,
-          quantity: safeQuantity,
+          quantity: Math.min(
+            MAX_QUANTITY,
+            Math.max(1, nextQuantity)
+          ),
         };
       })
     );
   }
 
-  function updateSize(itemId, size) {
-    setCartItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              size,
-            }
-          : item
-      )
-    );
-
-    setError("");
-  }
-
-  function removeItem() {
-    if (!itemToRemove) {
-      return;
-    }
-
-    const removedId = String(
-      itemToRemove.id
-    );
-
+  function handleRemoveItem(itemId) {
     setCartItems((currentItems) =>
       currentItems.filter(
-        (item) =>
-          String(item.id) !== removedId
+        (item) => item.id !== itemId
       )
     );
 
-    setSelectedItemIds((currentIds) =>
-      currentIds.filter(
-        (id) => id !== removedId
-      )
-    );
-
-    displayNotice(
-      `${itemToRemove.name} was removed from your cart.`
-    );
-
-    setItemToRemove(null);
-  }
-
-  function clearSelectedItems() {
-    const selectedIds = new Set(
-      selectedItemIds
-    );
-
-    setCartItems((currentItems) =>
-      currentItems.filter(
-        (item) =>
-          !selectedIds.has(
-            String(item.id)
-          )
-      )
-    );
-
-    setSelectedItemIds([]);
-    setShowClearModal(false);
-
-    displayNotice(
-      "Selected products were removed from your cart."
+    setNotice(
+      "The product was removed from your cart."
     );
   }
 
-  function viewProduct(item) {
-    localStorage.setItem(
-      "fitfusion-selected-product",
-      JSON.stringify(item)
-    );
-
-    navigate(
-      `/shopper/products/${item.id}`
-    );
-  }
-
-  function viewSeller(item) {
-    navigate(
-      `/shopper/sellers/${item.sellerId}`
-    );
-  }
-
-  function moveToSavedOutfit(item) {
-    let savedOutfits = [];
-
-    try {
-      const storedOutfits =
-        localStorage.getItem(
-          "fitfusion-saved-outfits"
-        );
-
-      const parsedOutfits =
-        storedOutfits
-          ? JSON.parse(storedOutfits)
-          : [];
-
-      savedOutfits = Array.isArray(
-        parsedOutfits
-      )
-        ? parsedOutfits
-        : [];
-    } catch {
-      savedOutfits = [];
-    }
-
-    const newOutfit = {
-      id: `outfit-${Date.now()}`,
-      name: `${item.name} Outfit`,
-      occasion: "Casual",
-      description:
-        "Created from a shopping cart product.",
-      avatarView: "front",
-      createdAt: new Date().toISOString(),
-      products: [
-        {
-          ...item,
-          quantity: 1,
-        },
-      ],
-    };
-
-    localStorage.setItem(
-      "fitfusion-saved-outfits",
-      JSON.stringify([
-        ...savedOutfits,
-        newOutfit,
-      ])
-    );
-
-    displayNotice(
-      `${item.name} was added to Saved Outfits.`
-    );
-  }
-
-  function proceedToCheckout() {
-    setError("");
-
+  function handleRemoveSelected() {
     if (selectedItems.length === 0) {
-      setError(
-        "Please select at least one product before proceeding to checkout."
+      setNotice(
+        "Please select a product to remove."
       );
 
       return;
     }
 
-    const itemWithoutSize =
-      selectedItems.find(
-        (item) => !item.size
-      );
+    setCartItems((currentItems) =>
+      currentItems.filter(
+        (item) => !item.selected
+      )
+    );
 
-    if (itemWithoutSize) {
-      setError(
-        `Please select a size for ${itemWithoutSize.name}.`
-      );
+    setNotice(
+      "Selected products were removed."
+    );
+  }
 
-      return;
-    }
-
-    const unavailableItem =
-      selectedItems.find(
-        (item) =>
-          item.stock <= 0 ||
-          item.quantity > item.stock
-      );
-
-    if (unavailableItem) {
-      setError(
-        `${unavailableItem.name} does not have enough available stock.`
+  function handleCheckout() {
+    if (selectedItems.length === 0) {
+      setNotice(
+        "Please select at least one product before checkout."
       );
 
       return;
     }
-
-    const checkoutData = {
-      items: selectedItems,
-      subtotal,
-      discount: productDiscount,
-      shippingFee,
-      total: grandTotal,
-      createdAt:
-        new Date().toISOString(),
-    };
 
     localStorage.setItem(
-      "fitfusion-checkout-items",
-      JSON.stringify(checkoutData)
+      CHECKOUT_STORAGE_KEY,
+      JSON.stringify(selectedItems)
     );
 
     navigate("/shopper/checkout");
   }
 
-  function confirmLogout() {
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
-
-    navigate("/login");
-  }
-
   return (
     <main className="shopping-cart-page">
-      <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
-
-        <nav className="shopper-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="shopper-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="shopper-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="shopper-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="shopper-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="shopper-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="shopper-nav-link"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="shopper-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="shopper-logout-button"
-          onClick={() =>
-            setShowLogoutModal(true)
-          }
+      {notice && (
+        <div
+          className="shopping-cart-toast"
+          role="status"
         >
-          Logout
-        </button>
-      </aside>
+          {notice}
+        </div>
+      )}
 
-      <section className="shopping-cart-content">
-        <header className="shopping-cart-header">
+      <div className="shopping-cart-toolbar">
+        <Link
+          to="/shopper/catalog"
+          className="shopping-cart-back"
+        >
+          ← Continue Shopping
+        </Link>
+
+        <div
+          className="shopping-cart-count"
+          aria-label={`${cartProductCount} products in cart`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+            <circle cx="10" cy="20" r="1" />
+            <circle cx="18" cy="20" r="1" />
+          </svg>
+
+          <strong>{cartProductCount}</strong>
+        </div>
+      </div>
+
+      <div className="shopping-cart-content">
+        <section className="shopping-cart-intro">
           <div>
-            <button
-              type="button"
-              className="shopping-cart-back-button"
-              onClick={() =>
-                navigate("/shopper/catalog")
-              }
-            >
-              ← Continue Shopping
-            </button>
+            <p>YOUR SELECTED PRODUCTS</p>
 
-            <h1>Shopping Cart</h1>
+            <h1>
+              Review your shopping bag
+            </h1>
 
-            <p>
-              Review your products before
-              proceeding to checkout.
-            </p>
+            <span>
+              Select the products you want
+              included in your checkout.
+            </span>
           </div>
 
-          <div className="shopping-cart-header-actions">
-            <div className="shopping-cart-count">
+          <div className="shopping-cart-item-badge">
+            <strong>{cartProductCount}</strong>
+
+            <span>
+              {cartProductCount === 1
+                ? "item in cart"
+                : "items in cart"}
+            </span>
+          </div>
+        </section>
+
+        {cartItems.length === 0 ? (
+          <section className="shopping-cart-empty">
+            <div className="shopping-cart-empty-icon">
               <svg
                 viewBox="0 0 24 24"
                 aria-hidden="true"
@@ -639,759 +460,380 @@ function ShoppingCartPage() {
                 <circle cx="10" cy="20" r="1" />
                 <circle cx="18" cy="20" r="1" />
               </svg>
-
-              <span>
-                {totalCartQuantity}
-              </span>
             </div>
 
-            <div className="shopping-cart-role">
-              REGISTERED SHOPPER
-            </div>
-          </div>
-        </header>
+            <h2>Your shopping cart is empty</h2>
 
-        <div className="shopping-cart-body">
-          {notice && (
-            <div
-              className="shopping-cart-notice"
-              role="status"
+            <p>
+              Browse the catalog and add products
+              you would like to purchase.
+            </p>
+
+            <button
+              type="button"
+              className="shopping-cart-primary-button"
+              onClick={() =>
+                navigate("/shopper/catalog")
+              }
             >
-              {notice}
-            </div>
-          )}
-
-          <section className="shopping-cart-introduction">
-            <div>
-              <p>YOUR SELECTED PRODUCTS</p>
-
-              <h2>
-                Review your shopping bag
-              </h2>
-
-              <span>
-                Select the products you want
-                included in your checkout.
-              </span>
-            </div>
-
-            <div className="shopping-cart-item-summary">
-              <strong>
-                {totalCartQuantity}
-              </strong>
-
-              <span>
-                {totalCartQuantity === 1
-                  ? "item"
-                  : "items"}{" "}
-                in cart
-              </span>
-            </div>
+              Browse Catalog
+            </button>
           </section>
+        ) : (
+          <div className="shopping-cart-grid">
+            <section className="shopping-cart-products-card">
+              <div className="shopping-cart-selection-bar">
+                <label className="shopping-cart-check-label">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                  />
 
-          {cartItems.length > 0 ? (
-            <div className="shopping-cart-layout">
-              <section className="shopping-cart-items-card">
-                <div className="shopping-cart-selection-bar">
-                  <label>
+                  <span>
+                    Select all (
+                    {cartItems.length})
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  className="shopping-cart-remove-selected"
+                  onClick={
+                    handleRemoveSelected
+                  }
+                >
+                  Remove Selected
+                </button>
+              </div>
+
+              <div className="shopping-cart-product-list">
+                {cartItems.map((item) => (
+                  <article
+                    className="shopping-cart-product"
+                    key={item.id}
+                  >
                     <input
                       type="checkbox"
-                      checked={
-                        allItemsSelected
+                      className="shopping-cart-product-checkbox"
+                      checked={item.selected}
+                      onChange={() =>
+                        handleToggleItem(
+                          item.id
+                        )
                       }
-                      onChange={
-                        toggleSelectAll
-                      }
+                      aria-label={`Select ${item.name}`}
                     />
 
-                    <span>
-                      Select all (
-                      {cartItems.length})
-                    </span>
-                  </label>
+                    <button
+                      type="button"
+                      className="shopping-cart-product-image"
+                      onClick={() =>
+                        navigate(
+                          `/shopper/products/${item.productId}`
+                        )
+                      }
+                      aria-label={`View ${item.name}`}
+                    >
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                        />
+                      ) : (
+                        <span aria-hidden="true">
+                          {item.name.charAt(0)}
+                        </span>
+                      )}
 
-                  <button
-                    type="button"
-                    disabled={
-                      selectedItemIds.length ===
-                      0
-                    }
-                    onClick={() =>
-                      setShowClearModal(true)
-                    }
-                  >
-                    Remove Selected
-                  </button>
-                </div>
-
-                <div className="shopping-cart-items-list">
-                  {cartItems.map((item) => {
-                    const isSelected =
-                      selectedItemIds.includes(
-                        String(item.id)
-                      );
-
-                    const lineTotal =
-                      item.price *
-                      item.quantity;
-
-                    const discount =
-                      item.originalPrice >
-                      item.price
-                        ? Math.round(
-                            ((item.originalPrice -
-                              item.price) /
-                              item.originalPrice) *
+                      {item.originalPrice >
+                        item.price && (
+                        <small>
+                          -
+                          {Math.round(
+                            (1 -
+                              item.price /
+                                item.originalPrice) *
                               100
-                          )
-                        : 0;
+                          )}
+                          %
+                        </small>
+                      )}
+                    </button>
 
-                    return (
-                      <article
-                        key={item.id}
-                        className={
-                          isSelected
-                            ? "shopping-cart-item selected"
-                            : "shopping-cart-item"
+                    <div className="shopping-cart-product-info">
+                      <Link
+                        to={`/shopper/sellers/${item.sellerId}`}
+                        className="shopping-cart-seller"
+                      >
+                        {item.sellerName} →
+                      </Link>
+
+                      <button
+                        type="button"
+                        className="shopping-cart-product-name"
+                        onClick={() =>
+                          navigate(
+                            `/shopper/products/${item.productId}`
+                          )
                         }
                       >
-                        <label className="shopping-cart-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={
-                              isSelected
-                            }
-                            onChange={() =>
-                              toggleItemSelection(
-                                item.id
-                              )
-                            }
-                            aria-label={`Select ${item.name}`}
-                          />
-                        </label>
+                        {item.name}
+                      </button>
+
+                      <p>{item.category}</p>
+
+                      <div className="shopping-cart-price">
+                        <strong>
+                          {formatCurrency(
+                            item.price
+                          )}
+                        </strong>
+
+                        {item.originalPrice >
+                          item.price && (
+                          <del>
+                            {formatCurrency(
+                              item.originalPrice
+                            )}
+                          </del>
+                        )}
+                      </div>
+
+                      <div className="shopping-cart-product-total">
+                        <span>Item total</span>
+
+                        <strong>
+                          {formatCurrency(
+                            item.price *
+                              item.quantity
+                          )}
+                        </strong>
 
                         <button
                           type="button"
-                          className={`shopping-cart-product-image ${item.colorClass}`}
                           onClick={() =>
-                            viewProduct(item)
+                            handleRemoveItem(
+                              item.id
+                            )
                           }
-                          aria-label={`View ${item.name}`}
                         >
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                            />
-                          ) : (
-                            <div className="shopping-cart-garment">
-                              <span />
-                              <span />
-                            </div>
-                          )}
-
-                          {discount > 0 && (
-                            <small>
-                              -{discount}%
-                            </small>
-                          )}
+                          Remove
                         </button>
+                      </div>
+                    </div>
 
-                        <div className="shopping-cart-product-information">
-                          <button
-                            type="button"
-                            className="shopping-cart-seller"
-                            onClick={() =>
-                              viewSeller(item)
-                            }
-                          >
-                            {item.sellerName} →
-                          </button>
+                    <div className="shopping-cart-options">
+                      <label>
+                        <span>Size</span>
 
-                          <button
-                            type="button"
-                            className="shopping-cart-product-name"
-                            onClick={() =>
-                              viewProduct(item)
-                            }
-                          >
-                            {item.name}
-                          </button>
-
-                          <p>{item.category}</p>
-
-                          <div className="shopping-cart-price">
-                            <strong>
-                              ₱
-                              {item.price.toLocaleString(
-                                "en-PH"
-                              )}
-                            </strong>
-
-                            {item.originalPrice >
-                              item.price && (
-                              <del>
-                                ₱
-                                {item.originalPrice.toLocaleString(
-                                  "en-PH"
-                                )}
-                              </del>
-                            )}
-                          </div>
-
-                          <div className="shopping-cart-mobile-actions">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                moveToSavedOutfit(
-                                  item
-                                )
-                              }
-                            >
-                              Save as Outfit
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setItemToRemove(
-                                  item
-                                )
-                              }
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="shopping-cart-options">
-                          <label>
-                            <span>Size</span>
-
-                            <select
-                              value={item.size}
-                              onChange={(event) =>
-                                updateSize(
-                                  item.id,
+                        <select
+                          value={item.size}
+                          onChange={(event) =>
+                            updateItem(
+                              item.id,
+                              {
+                                size:
                                   event.target
-                                    .value
-                                )
+                                    .value,
                               }
-                              className={
-                                !item.size
-                                  ? "cart-field-error"
-                                  : ""
-                              }
-                            >
-                              <option value="">
-                                Select
+                            )
+                          }
+                        >
+                          {item.sizes.map(
+                            (size) => (
+                              <option
+                                key={size}
+                                value={size}
+                              >
+                                {size}
                               </option>
+                            )
+                          )}
+                        </select>
+                      </label>
 
-                              {item.availableSizes.map(
-                                (size) => (
-                                  <option
-                                    key={size}
-                                    value={size}
-                                  >
-                                    {size}
-                                  </option>
-                                )
-                              )}
-                            </select>
-                          </label>
+                      <label>
+                        <span>Color</span>
 
-                          <div className="shopping-cart-color">
-                            <span>Color</span>
-                            <strong>
-                              {item.color}
-                            </strong>
-                          </div>
-
-                          <label>
-                            <span>Quantity</span>
-
-                            <div className="shopping-cart-quantity">
-                              <button
-                                type="button"
-                                disabled={
-                                  item.quantity <=
-                                  1
-                                }
-                                onClick={() =>
-                                  updateQuantity(
-                                    item.id,
-                                    item.quantity -
-                                      1
-                                  )
-                                }
+                        <select
+                          value={item.color}
+                          onChange={(event) =>
+                            updateItem(
+                              item.id,
+                              {
+                                color:
+                                  event.target
+                                    .value,
+                              }
+                            )
+                          }
+                        >
+                          {item.colors.map(
+                            (color) => (
+                              <option
+                                key={color}
+                                value={color}
                               >
-                                −
-                              </button>
+                                {color}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </label>
 
-                              <strong>
-                                {item.quantity}
-                              </strong>
+                      <div className="shopping-cart-quantity-section">
+                        <span>Quantity</span>
 
-                              <button
-                                type="button"
-                                disabled={
-                                  item.quantity >=
-                                  item.stock
-                                }
-                                onClick={() =>
-                                  updateQuantity(
-                                    item.id,
-                                    item.quantity +
-                                      1
-                                  )
-                                }
-                              >
-                                +
-                              </button>
-                            </div>
-                          </label>
-
-                          <small>
-                            {item.stock} available
-                          </small>
-                        </div>
-
-                        <div className="shopping-cart-item-total">
-                          <span>Item total</span>
+                        <div className="shopping-cart-quantity">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleQuantityChange(
+                                item.id,
+                                -1
+                              )
+                            }
+                            disabled={
+                              item.quantity <= 1
+                            }
+                            aria-label={`Decrease quantity of ${item.name}`}
+                          >
+                            −
+                          </button>
 
                           <strong>
-                            ₱
-                            {lineTotal.toLocaleString(
-                              "en-PH"
-                            )}
+                            {item.quantity}
                           </strong>
 
                           <button
                             type="button"
                             onClick={() =>
-                              moveToSavedOutfit(
-                                item
+                              handleQuantityChange(
+                                item.id,
+                                1
                               )
                             }
-                          >
-                            Save as Outfit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setItemToRemove(
-                                item
-                              )
+                            disabled={
+                              item.quantity >=
+                              MAX_QUANTITY
                             }
+                            aria-label={`Increase quantity of ${item.name}`}
                           >
-                            Remove
+                            +
                           </button>
                         </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <aside className="shopping-cart-summary-card">
-                <div className="shopping-cart-summary-heading">
-                  <p>ORDER SUMMARY</p>
-
-                  <h2>
-                    Selected Products
-                  </h2>
-
-                  <span>
-                    {selectedItems.length}{" "}
-                    {selectedItems.length === 1
-                      ? "product"
-                      : "products"}
-                  </span>
-                </div>
-
-                <div className="shopping-cart-summary-rows">
-                  <div>
-                    <span>Subtotal</span>
-
-                    <strong>
-                      ₱
-                      {subtotal.toLocaleString(
-                        "en-PH"
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Product discount
-                    </span>
-
-                    <strong className="cart-discount">
-                      -₱
-                      {productDiscount.toLocaleString(
-                        "en-PH"
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Shipping fee</span>
-
-                    <strong>
-                      {shippingFee === 0 &&
-                      selectedItems.length >
-                        0
-                        ? "FREE"
-                        : `₱${shippingFee.toLocaleString(
-                            "en-PH"
-                          )}`}
-                    </strong>
-                  </div>
-                </div>
-
-                {selectedItems.length > 0 &&
-                  shippingFee > 0 && (
-                    <div className="shopping-cart-shipping-message">
-                      Add ₱
-                      {(
-                        1500 - subtotal
-                      ).toLocaleString(
-                        "en-PH"
-                      )}{" "}
-                      more to receive free
-                      shipping.
+                      </div>
                     </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <aside className="shopping-cart-summary-card">
+              <p className="shopping-cart-summary-label">
+                ORDER SUMMARY
+              </p>
+
+              <h2>Selected Products</h2>
+
+              <p className="shopping-cart-selected-count">
+                {selectedProductCount}{" "}
+                {selectedProductCount === 1
+                  ? "product"
+                  : "products"}
+              </p>
+
+              <div className="shopping-cart-summary-divider" />
+
+              <div className="shopping-cart-summary-row">
+                <span>Subtotal</span>
+
+                <strong>
+                  {formatCurrency(
+                    originalSubtotal
                   )}
+                </strong>
+              </div>
 
-                <div className="shopping-cart-grand-total">
-                  <span>Total</span>
+              <div className="shopping-cart-summary-row discount">
+                <span>Product discount</span>
 
-                  <strong>
-                    ₱
-                    {grandTotal.toLocaleString(
-                      "en-PH"
-                    )}
-                  </strong>
-                </div>
+                <strong>
+                  −
+                  {formatCurrency(
+                    productDiscount
+                  )}
+                </strong>
+              </div>
 
-                {error && (
-                  <div
-                    className="shopping-cart-error"
-                    role="alert"
-                  >
-                    {error}
+              <div className="shopping-cart-summary-row">
+                <span>Shipping fee</span>
+
+                <strong>
+                  {shippingFee === 0 &&
+                  selectedItems.length > 0
+                    ? "FREE"
+                    : formatCurrency(
+                        shippingFee
+                      )}
+                </strong>
+              </div>
+
+              <div className="shopping-cart-summary-divider" />
+
+              {selectedItems.length > 0 &&
+                amountUntilFreeShipping > 0 && (
+                  <div className="shopping-cart-shipping-notice">
+                    Add{" "}
+                    <strong>
+                      {formatCurrency(
+                        amountUntilFreeShipping
+                      )}
+                    </strong>{" "}
+                    more to receive free
+                    shipping.
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  className="shopping-cart-checkout-button"
-                  onClick={
-                    proceedToCheckout
-                  }
-                >
-                  Proceed to Checkout
-                </button>
+              {selectedItems.length > 0 &&
+                amountUntilFreeShipping ===
+                  0 && (
+                  <div className="shopping-cart-shipping-notice qualified">
+                    Your order qualifies for free
+                    shipping.
+                  </div>
+                )}
 
-                <button
-                  type="button"
-                  className="shopping-cart-continue-button"
-                  onClick={() =>
-                    navigate(
-                      "/shopper/catalog"
-                    )
-                  }
-                >
-                  Continue Shopping
-                </button>
+              <div className="shopping-cart-summary-total">
+                <span>Total</span>
 
-                <p className="shopping-cart-disclaimer">
-                  This prototype does not process
-                  real payments. Product prices,
-                  sizes and availability are
-                  managed by sellers.
-                </p>
-              </aside>
-            </div>
-          ) : (
-            <section className="shopping-cart-empty">
-              <div className="shopping-cart-empty-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                  <circle
-                    cx="10"
-                    cy="20"
-                    r="1"
-                  />
-                  <circle
-                    cx="18"
-                    cy="20"
-                    r="1"
-                  />
-                </svg>
+                <strong>
+                  {formatCurrency(total)}
+                </strong>
               </div>
 
-              <p>YOUR CART IS EMPTY</p>
-
-              <h2>
-                Find something that fits your
-                style
-              </h2>
-
-              <span>
-                Browse clothing from registered
-                sellers and try products on your
-                2D avatar.
-              </span>
-
-              <div className="shopping-cart-empty-actions">
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      "/shopper/catalog"
-                    )
-                  }
-                >
-                  Browse Catalog
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      "/shopper/saved-outfits"
-                    )
-                  }
-                >
-                  View Saved Outfits
-                </button>
-              </div>
-            </section>
-          )}
-
-          {cartItems.length > 0 && (
-            <section className="shopping-cart-assurance">
-              <article>
-                <div>✓</div>
-
-                <div>
-                  <strong>
-                    Seller-managed sizes
-                  </strong>
-
-                  <span>
-                    Available sizes come from
-                    each product listing.
-                  </span>
-                </div>
-              </article>
-
-              <article>
-                <div>☆</div>
-
-                <div>
-                  <strong>
-                    Try before checkout
-                  </strong>
-
-                  <span>
-                    Preview clothing using your
-                    2D avatar.
-                  </span>
-                </div>
-              </article>
-
-              <article>
-                <div>₱</div>
-
-                <div>
-                  <strong>
-                    Mock payment only
-                  </strong>
-
-                  <span>
-                    No real payment will be
-                    charged in this prototype.
-                  </span>
-                </div>
-              </article>
-            </section>
-          )}
-        </div>
-      </section>
-
-      {itemToRemove && (
-        <div
-          className="shopping-cart-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setItemToRemove(null);
-            }
-          }}
-        >
-          <section
-            className="shopping-cart-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="remove-cart-title"
-          >
-            <div className="shopping-cart-modal-icon danger">
-              ×
-            </div>
-
-            <h2 id="remove-cart-title">
-              Remove this product?
-            </h2>
-
-            <p>
-              “{itemToRemove.name}” will be
-              removed from your shopping cart.
-            </p>
-
-            <div className="shopping-cart-modal-actions">
               <button
                 type="button"
-                className="cart-modal-secondary"
-                onClick={() =>
-                  setItemToRemove(null)
+                className="shopping-cart-checkout-button"
+                onClick={handleCheckout}
+                disabled={
+                  selectedItems.length === 0
                 }
               >
-                Keep Product
+                Proceed to Checkout
               </button>
 
-              <button
-                type="button"
-                className="cart-modal-danger"
-                onClick={removeItem}
+              <Link
+                to="/shopper/catalog"
+                className="shopping-cart-continue-link"
               >
-                Remove
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showClearModal && (
-        <div
-          className="shopping-cart-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowClearModal(false);
-            }
-          }}
-        >
-          <section
-            className="shopping-cart-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="clear-cart-title"
-          >
-            <div className="shopping-cart-modal-icon danger">
-              ×
-            </div>
-
-            <h2 id="clear-cart-title">
-              Remove selected products?
-            </h2>
-
-            <p>
-              {selectedItemIds.length} selected{" "}
-              {selectedItemIds.length === 1
-                ? "product"
-                : "products"}{" "}
-              will be removed from your cart.
-            </p>
-
-            <div className="shopping-cart-modal-actions">
-              <button
-                type="button"
-                className="cart-modal-secondary"
-                onClick={() =>
-                  setShowClearModal(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="cart-modal-danger"
-                onClick={
-                  clearSelectedItems
-                }
-              >
-                Remove Selected
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showLogoutModal && (
-        <div
-          className="shopping-cart-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowLogoutModal(false);
-            }
-          }}
-        >
-          <section
-            className="shopping-cart-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cart-logout-title"
-          >
-            <div className="shopping-cart-modal-icon">
-              ↪
-            </div>
-
-            <h2 id="cart-logout-title">
-              Log out?
-            </h2>
-
-            <p>
-              Your cart will remain saved on
-              this browser, but you will need to
-              log in again to continue.
-            </p>
-
-            <div className="shopping-cart-modal-actions">
-              <button
-                type="button"
-                className="cart-modal-secondary"
-                onClick={() =>
-                  setShowLogoutModal(false)
-                }
-              >
-                Stay
-              </button>
-
-              <button
-                type="button"
-                className="cart-modal-primary"
-                onClick={confirmLogout}
-              >
-                Logout
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+                Continue Shopping
+              </Link>
+            </aside>
+          </div>
+        )}
+      </div>
     </main>
   );
 }

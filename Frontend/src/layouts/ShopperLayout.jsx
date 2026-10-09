@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import {
   Link,
   Outlet,
@@ -8,7 +7,6 @@ import {
 } from "react-router-dom";
 
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
-
 import "./ShopperLayout.css";
 
 const navigationItems = [
@@ -35,8 +33,6 @@ const navigationItems = [
       "/shopper/products",
       "/shopper/sellers",
       "/shopper/store",
-      "/shopper/cart",
-      "/shopper/checkout",
     ],
   },
   {
@@ -69,34 +65,25 @@ function ShopperLayout() {
   ] = useState(false);
 
   function isCurrentPage(matches) {
-    return matches.some((path) => {
-      return (
+    return matches.some(
+      (path) =>
         pathname === path ||
         pathname.startsWith(`${path}/`)
-      );
-    });
-  }
-
-  function openLogoutModal() {
-    setShowLogoutModal(true);
-  }
-
-  function closeLogoutModal() {
-    setShowLogoutModal(false);
+    );
   }
 
   function handleLogout() {
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
     sessionStorage.removeItem(
-      "fitfusion-current-user"
+      "registeredAccount"
     );
 
     localStorage.removeItem(
       "fitfusion-current-user"
     );
 
-    closeLogoutModal();
+    setShowLogoutModal(false);
 
     navigate("/login", {
       replace: true,
@@ -109,7 +96,7 @@ function ShopperLayout() {
         <Link
           to="/shopper/dashboard"
           className="unified-sidebar-logo"
-          aria-label="Go to shopper dashboard"
+          aria-label="Open shopper dashboard"
         >
           <img
             src={fitFusionLogo}
@@ -122,7 +109,7 @@ function ShopperLayout() {
           aria-label="Shopper navigation"
         >
           {navigationItems.map((item) => {
-            const isActive = isCurrentPage(
+            const active = isCurrentPage(
               item.matches
             );
 
@@ -131,12 +118,12 @@ function ShopperLayout() {
                 key={item.to}
                 to={item.to}
                 className={
-                  isActive
+                  active
                     ? "unified-shopper-link active"
                     : "unified-shopper-link"
                 }
                 aria-current={
-                  isActive ? "page" : undefined
+                  active ? "page" : undefined
                 }
               >
                 {item.label}
@@ -148,64 +135,64 @@ function ShopperLayout() {
         <button
           type="button"
           className="unified-shopper-logout"
-          onClick={openLogoutModal}
+          onClick={() =>
+            setShowLogoutModal(true)
+          }
         >
           Logout
         </button>
       </aside>
 
-      <div className="shopper-shell-content">
+      <section className="shopper-layout-content">
         <Outlet />
-      </div>
+      </section>
 
       {showLogoutModal && (
         <div
-          className="unified-logout-backdrop"
+          className="shopper-logout-overlay"
           role="presentation"
           onMouseDown={(event) => {
             if (
-              event.target ===
-              event.currentTarget
+              event.target === event.currentTarget
             ) {
-              closeLogoutModal();
+              setShowLogoutModal(false);
             }
           }}
         >
           <section
-            className="unified-logout-modal"
+            className="shopper-logout-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="unified-logout-title"
+            aria-labelledby="shopper-logout-title"
           >
-            <div
-              className="unified-logout-icon"
-              aria-hidden="true"
-            >
-              ↪
-            </div>
+            <p className="shopper-logout-label">
+              CONFIRM LOGOUT
+            </p>
 
-            <p>END SESSION</p>
-
-            <h2 id="unified-logout-title">
-              Log out of FitFusion?
+            <h2 id="shopper-logout-title">
+              Leave your shopper account?
             </h2>
 
-            <span>
+            <p>
               You will need to log in again to
-              access your registered shopper
-              account.
-            </span>
+              access your saved outfits, cart, and
+              order history.
+            </p>
 
-            <div className="unified-logout-actions">
+            <div className="shopper-logout-actions">
               <button
                 type="button"
-                onClick={closeLogoutModal}
+                className="shopper-logout-cancel"
+                onClick={() =>
+                  setShowLogoutModal(false)
+                }
               >
                 Cancel
               </button>
 
               <button
                 type="button"
+                className="shopper-logout-confirm"
                 onClick={handleLogout}
               >
                 Log Out

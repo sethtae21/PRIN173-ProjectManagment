@@ -1,750 +1,711 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../css/SellerProductListingsPage.css";
 
 const defaultProducts = [
   {
-    id: "product-001",
-    name: "Camel Linen Shirt",
-    description: "Relaxed linen tailoring",
-    category: "Tops",
-    size: "M",
-    color: "Camel",
-    price: 750,
-    uploadDate: "02 Sep 2026",
-    status: "Active",
-    rejectionReason: "",
-  },
-  {
-    id: "product-002",
+    id: "ivory-coat",
     name: "Ivory Coat",
-    description: "Structured ivory outerwear",
     category: "Outerwear",
-    size: "L",
-    color: "Ivory",
     price: 1850,
-    uploadDate: "01 Sep 2026",
+    color: "Ivory",
     status: "Active",
-    rejectionReason: "",
   },
   {
-    id: "product-003",
+    id: "gold-dress",
     name: "Gold Dress",
-    description: "Elegant gold evening dress",
     category: "Dresses",
-    size: "S",
-    color: "Gold",
     price: 1450,
-    uploadDate: "31 Aug 2026",
+    color: "Gold",
     status: "Rejected",
-    rejectionReason:
-      "The rear-view image does not clearly show the complete garment.",
   },
   {
-    id: "product-004",
+    id: "black-sneakers",
     name: "Black Sneakers",
-    description: "Minimal everyday sneakers",
     category: "Footwear",
-    size: "39",
-    color: "Black",
     price: 1100,
-    uploadDate: "30 Aug 2026",
+    color: "Black",
     status: "Active",
-    rejectionReason: "",
   },
 ];
+
+function normalizeProduct(product, index) {
+  return {
+    id:
+      product.id ||
+      product.productId ||
+      `seller-product-${index + 1}`,
+
+    name:
+      product.name ||
+      product.productName ||
+      "Unnamed Product",
+
+    category:
+      product.category ||
+      "Uncategorized",
+
+    price:
+      Number(product.price) || 0,
+
+    color:
+      product.color ||
+      product.dominantColor ||
+      "Not specified",
+
+    status:
+      product.status ||
+      product.validationStatus ||
+      "Active",
+  };
+}
+
+function getInitialProducts() {
+  const savedProducts = localStorage.getItem(
+    "fitfusion-seller-products"
+  );
+
+  if (!savedProducts) {
+    return defaultProducts;
+  }
+
+  try {
+    const parsedProducts =
+      JSON.parse(savedProducts);
+
+    if (
+      !Array.isArray(parsedProducts) ||
+      parsedProducts.length === 0
+    ) {
+      return defaultProducts;
+    }
+
+    return parsedProducts.map(normalizeProduct);
+  } catch {
+    return defaultProducts;
+  }
+}
+
+function formatPrice(price) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(price);
+}
 
 function SellerProductListingsPage() {
   const navigate = useNavigate();
 
-  const [products, setProducts] = useState(() => {
-    const storedProducts = localStorage.getItem(
-      "fitfusion-seller-products"
-    );
+  const [products, setProducts] = useState(
+    getInitialProducts
+  );
 
-    if (!storedProducts) {
-      return defaultProducts;
-    }
-
-    try {
-      const parsedProducts = JSON.parse(storedProducts);
-
-      return Array.isArray(parsedProducts)
-        ? parsedProducts
-        : defaultProducts;
-    } catch {
-      return defaultProducts;
-    }
-  });
-
-  const [selectedProduct, setSelectedProduct] =
-    useState(null);
-
-  const [modalType, setModalType] = useState(null);
-  const [successMessage, setSuccessMessage] =
+  const [searchTerm, setSearchTerm] =
     useState("");
 
-  const [editForm, setEditForm] = useState({
-    name: "",
-    description: "",
-    category: "",
-    size: "",
-    color: "",
-    price: "",
-  });
+  const [statusFilter, setStatusFilter] =
+    useState("All");
 
-  useEffect(() => {
+  const filteredProducts = useMemo(() => {
+    const search =
+      searchTerm.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesSearch =
+        !search ||
+        product.name
+          .toLowerCase()
+          .includes(search) ||
+        product.category
+          .toLowerCase()
+          .includes(search) ||
+        product.color
+          .toLowerCase()
+          .includes(search);
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        product.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [products, searchTerm, statusFilter]);
+
+  function handleDelete(product) {
+    const confirmed = window.confirm(
+      `Delete ${product.name}? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const updatedProducts = products.filter(
+      (currentProduct) =>
+        currentProduct.id !== product.id
+    );
+
+    setProducts(updatedProducts);
+
     localStorage.setItem(
       "fitfusion-seller-products",
-      JSON.stringify(products)
+      JSON.stringify(updatedProducts)
     );
-  }, [products]);
-
-  function openViewModal(product) {
-    setSelectedProduct(product);
-    setModalType("view");
-  }
-
-  function openEditModal(product) {
-    setSelectedProduct(product);
-
-    setEditForm({
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      size: product.size,
-      color: product.color,
-      price: String(product.price),
-    });
-
-    setModalType("edit");
-  }
-
-  function openDeleteModal(product) {
-    setSelectedProduct(product);
-    setModalType("delete");
-  }
-
-  function closeModal() {
-    setSelectedProduct(null);
-    setModalType(null);
-  }
-
-  function handleEditChange(event) {
-    const { name, value } = event.target;
-
-    setEditForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
-    }));
-  }
-
-  function handleSaveChanges(event) {
-    event.preventDefault();
-
-    if (!selectedProduct) {
-      return;
-    }
-
-    const numericPrice = Number(editForm.price);
-
-    if (
-      !editForm.name.trim() ||
-      !editForm.category.trim() ||
-      !editForm.size.trim() ||
-      !editForm.color.trim() ||
-      !Number.isFinite(numericPrice) ||
-      numericPrice <= 0
-    ) {
-      return;
-    }
-
-    setProducts((currentProducts) =>
-      currentProducts.map((product) =>
-        product.id === selectedProduct.id
-          ? {
-              ...product,
-              name: editForm.name.trim(),
-              description: editForm.description.trim(),
-              category: editForm.category.trim(),
-              size: editForm.size.trim(),
-              color: editForm.color.trim(),
-              price: numericPrice,
-              status:
-                product.status === "Rejected"
-                  ? "Pending"
-                  : product.status,
-              rejectionReason:
-                product.status === "Rejected"
-                  ? ""
-                  : product.rejectionReason,
-            }
-          : product
-      )
-    );
-
-    closeModal();
-
-    setSuccessMessage(
-      "Product information was updated successfully."
-    );
-
-    window.setTimeout(() => {
-      setSuccessMessage("");
-    }, 3500);
-  }
-
-  function handleDeleteProduct() {
-    if (!selectedProduct) {
-      return;
-    }
-
-    setProducts((currentProducts) =>
-      currentProducts.filter(
-        (product) =>
-          product.id !== selectedProduct.id
-      )
-    );
-
-    closeModal();
-
-    setSuccessMessage(
-      "The product listing was deleted."
-    );
-
-    window.setTimeout(() => {
-      setSuccessMessage("");
-    }, 3500);
-  }
-
-  function formatPrice(price) {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(price);
   }
 
   return (
-    <main className="seller-listings-page">
-      <header className="seller-listings-header">
-        <div>
-          <h1>22 — SELLER LISTINGS</h1>
+    <>
+      <style>{`
+        .spl-page,
+        .spl-page * {
+          box-sizing: border-box;
+        }
 
-          <p>
-            List, view, edit, and delete owned catalog
-            products
-          </p>
-        </div>
+        .spl-page {
+          width: 100%;
+          min-height: 100vh;
+          padding: 46px 40px 70px;
+          background:
+            radial-gradient(
+              circle at right center,
+              rgba(181, 126, 32, 0.18),
+              transparent 43%
+            ),
+            linear-gradient(
+              135deg,
+              #f2efe8,
+              #fffdf9 52%,
+              #eee8de
+            );
+          color: #17130f;
+        }
 
-        <span className="seller-listings-role">
-          SELLER
-        </span>
-      </header>
+        .spl-container {
+          width: min(1160px, 100%);
+          margin: 0 auto;
+        }
 
-      <div className="seller-listings-content">
-        <section className="seller-listings-introduction">
-          <div>
-            <p className="seller-listings-eyebrow">
-              MY LISTINGS
-            </p>
+        .spl-introduction {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 30px;
+          width: 100%;
+          margin-bottom: 28px;
+        }
 
-            <h2>Seller-owned products</h2>
+        .spl-introduction-text {
+          min-width: 0;
+        }
 
-            <p>
-              Only the authenticated seller&apos;s items
-              are displayed.
-            </p>
-          </div>
+        .spl-eyebrow {
+          margin: 0 0 11px;
+          color: #9a6a1d;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
 
-          <button
-            type="button"
-            className="seller-add-product-button"
-            onClick={() =>
-              navigate("/seller/products/upload")
-            }
-          >
-            Upload New Catalog
-          </button>
-        </section>
+        .spl-introduction h1 {
+          margin: 0 0 12px;
+          color: #17130f;
+          font-size: clamp(32px, 4vw, 42px);
+          line-height: 1.15;
+        }
 
-        {successMessage && (
-          <div
-            className="seller-listings-success"
-            role="status"
-          >
-            {successMessage}
-          </div>
-        )}
+        .spl-description {
+          margin: 0;
+          color: #5c554c;
+          font-size: 14px;
+          line-height: 1.6;
+        }
 
-        <section className="seller-listings-summary">
-          <article>
-            <span>Total Listings</span>
-            <strong>{products.length}</strong>
-          </article>
+        .spl-upload-button {
+          flex: 0 0 auto;
+          min-width: 190px;
+          min-height: 50px;
+          padding: 12px 24px;
+          background: linear-gradient(
+            135deg,
+            #17130f,
+            #8e641f 55%,
+            #d7af4b
+          );
+          border: 1px solid #b57e20;
+          border-radius: 10px;
+          color: #fffdf9;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+        }
 
-          <article>
-            <span>Active</span>
-            <strong>
-              {
-                products.filter(
-                  (product) =>
-                    product.status === "Active"
-                ).length
+        .spl-upload-button:hover {
+          box-shadow: 0 8px 20px
+            rgba(142, 100, 31, 0.22);
+          transform: translateY(-1px);
+        }
+
+        .spl-toolbar {
+          display: grid;
+          grid-template-columns:
+            minmax(260px, 1fr)
+            minmax(210px, 280px);
+          gap: 20px;
+          width: 100%;
+          margin-bottom: 20px;
+          padding: 22px;
+          background: #fffdf9;
+          border: 1px solid #e2d8c7;
+          border-radius: 14px;
+          box-shadow: 0 10px 25px
+            rgba(74, 48, 12, 0.05);
+        }
+
+        .spl-field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          width: 100%;
+        }
+
+        .spl-field span {
+          color: #29251f;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .spl-field input,
+        .spl-field select {
+          position: static;
+          display: block;
+          width: 100%;
+          min-height: 46px;
+          margin: 0;
+          padding: 10px 13px;
+          background: #f8f5ef;
+          border: 1px solid #ccb990;
+          border-radius: 8px;
+          color: #29251f;
+          font: inherit;
+          font-size: 13px;
+          outline: none;
+        }
+
+        .spl-field input:focus,
+        .spl-field select:focus {
+          border-color: #8e641f;
+          box-shadow: 0 0 0 3px
+            rgba(181, 126, 32, 0.13);
+        }
+
+        .spl-table-card {
+          width: 100%;
+          overflow: hidden;
+          background: #fffdf9;
+          border: 1px solid #e2d8c7;
+          border-radius: 16px;
+          box-shadow: 0 16px 38px
+            rgba(74, 48, 12, 0.08);
+        }
+
+        .spl-table-wrapper {
+          width: 100%;
+          overflow-x: auto;
+        }
+
+        .spl-table {
+          width: 100%;
+          min-width: 850px;
+          border-collapse: collapse;
+        }
+
+        .spl-table th {
+          padding: 18px 20px;
+          background: #f8f5ef;
+          border-bottom: 1px solid #e2d8c7;
+          color: #5c554c;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          text-align: left;
+          text-transform: uppercase;
+        }
+
+        .spl-table td {
+          padding: 20px;
+          border-bottom: 1px solid #e9dfcf;
+          color: #29251f;
+          font-size: 13px;
+          vertical-align: middle;
+        }
+
+        .spl-table tbody tr:last-child td {
+          border-bottom: 0;
+        }
+
+        .spl-table tbody tr:hover {
+          background: #fffbf1;
+        }
+
+        .spl-product {
+          display: flex;
+          min-width: 230px;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .spl-product-image {
+          display: grid;
+          flex: 0 0 58px;
+          width: 58px;
+          height: 58px;
+          place-items: center;
+          background: linear-gradient(
+            145deg,
+            #f6e7b7,
+            #d7af4b
+          );
+          border: 1px solid #d2be91;
+          border-radius: 10px;
+          color: #17130f;
+          font-size: 21px;
+          font-weight: 800;
+        }
+
+        .spl-product-information {
+          display: flex;
+          min-width: 0;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .spl-product-information strong {
+          color: #17130f;
+          font-size: 13px;
+        }
+
+        .spl-product-information span {
+          color: #5c554c;
+          font-size: 11px;
+        }
+
+        .spl-status {
+          display: inline-flex;
+          min-width: 84px;
+          min-height: 31px;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        .spl-status-active {
+          background: #f6e7b7;
+          color: #704b11;
+        }
+
+        .spl-status-rejected {
+          background: #f4ded9;
+          color: #8b3b31;
+        }
+
+        .spl-actions {
+          display: flex;
+          min-width: 245px;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .spl-action-button,
+        .spl-delete-button {
+          position: static;
+          min-width: 70px;
+          min-height: 38px;
+          margin: 0;
+          padding: 8px 15px;
+          border-radius: 8px;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .spl-action-button {
+          background: #fffdf9;
+          border: 1px solid #b57e20;
+          color: #8e641f;
+        }
+
+        .spl-action-button:hover {
+          background: #17130f;
+          color: #fffdf9;
+        }
+
+        .spl-delete-button {
+          background: #fffdf9;
+          border: 1px solid #8b3b31;
+          color: #8b3b31;
+        }
+
+        .spl-delete-button:hover {
+          background: #8b3b31;
+          color: #fffdf9;
+        }
+
+        .spl-empty-state {
+          padding: 60px 24px;
+          text-align: center;
+        }
+
+        .spl-empty-state h2 {
+          margin: 0 0 10px;
+          color: #17130f;
+        }
+
+        .spl-empty-state p {
+          margin: 0 0 20px;
+          color: #5c554c;
+        }
+
+        .spl-clear-button {
+          min-height: 42px;
+          padding: 9px 18px;
+          background: #fffdf9;
+          border: 1px solid #b57e20;
+          border-radius: 8px;
+          color: #8e641f;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        @media (max-width: 800px) {
+          .spl-page {
+            padding: 30px 20px 55px;
+          }
+
+          .spl-introduction {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .spl-upload-button {
+            width: 100%;
+          }
+
+          .spl-toolbar {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
+      <section className="spl-page">
+        <div className="spl-container">
+          <section className="spl-introduction">
+            <div className="spl-introduction-text">
+              <p className="spl-eyebrow">
+                Product Management
+              </p>
+
+              <h1>Your product listings</h1>
+
+              <p className="spl-description">
+                Review, edit, and manage the products
+                uploaded to your store.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="spl-upload-button"
+              onClick={() =>
+                navigate("/seller/upload-catalog")
               }
-            </strong>
-          </article>
+            >
+              Upload Products
+            </button>
+          </section>
 
-          <article>
-            <span>Pending</span>
-            <strong>
-              {
-                products.filter(
-                  (product) =>
-                    product.status === "Pending"
-                ).length
-              }
-            </strong>
-          </article>
+          <section className="spl-toolbar">
+            <label className="spl-field">
+              <span>Search listings</span>
 
-          <article>
-            <span>Rejected</span>
-            <strong>
-              {
-                products.filter(
-                  (product) =>
-                    product.status === "Rejected"
-                ).length
-              }
-            </strong>
-          </article>
-        </section>
+              <input
+                type="search"
+                value={searchTerm}
+                placeholder="Search product, category, or color"
+                onChange={(event) =>
+                  setSearchTerm(event.target.value)
+                }
+              />
+            </label>
 
-        <section className="seller-listings-card">
-          {products.length > 0 ? (
-            <div className="seller-listings-table-wrapper">
-              <table className="seller-listings-table">
+            <label className="spl-field">
+              <span>Validation status</span>
+
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value)
+                }
+              >
+                <option value="All">
+                  All statuses
+                </option>
+
+                <option value="Active">
+                  Active
+                </option>
+
+                <option value="Rejected">
+                  Rejected
+                </option>
+              </select>
+            </label>
+          </section>
+
+          <section className="spl-table-card">
+            <div className="spl-table-wrapper">
+              <table className="spl-table">
                 <thead>
                   <tr>
-                    <th>Item</th>
+                    <th>Product</th>
                     <th>Category</th>
-                    <th>Upload Date</th>
+                    <th>Price</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id}>
-                      <td>
-                        <div className="seller-listing-item">
-                          <div className="seller-product-thumbnail">
-                            <span>
+                  {filteredProducts.map(
+                    (product) => (
+                      <tr key={product.id}>
+                        <td>
+                          <div className="spl-product">
+                            <div
+                              className="spl-product-image"
+                              aria-hidden="true"
+                            >
                               {product.name
                                 .charAt(0)
                                 .toUpperCase()}
-                            </span>
+                            </div>
+
+                            <div className="spl-product-information">
+                              <strong>
+                                {product.name}
+                              </strong>
+
+                              <span>
+                                {product.color}
+                              </span>
+                            </div>
                           </div>
+                        </td>
 
-                          <div>
-                            <strong>
-                              {product.name}
-                            </strong>
+                        <td>
+                          {product.category}
+                        </td>
 
-                            <span>
-                              {formatPrice(
-                                product.price
-                              )}
-                            </span>
+                        <td>
+                          {formatPrice(
+                            product.price
+                          )}
+                        </td>
+
+                        <td>
+                          <span
+                            className={
+                              product.status ===
+                              "Rejected"
+                                ? "spl-status spl-status-rejected"
+                                : "spl-status spl-status-active"
+                            }
+                          >
+                            {product.status}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="spl-actions">
+                            <button
+                              type="button"
+                              className="spl-action-button"
+                              onClick={() =>
+                                navigate(
+                                  `/seller/listings/${product.id}`
+                                )
+                              }
+                            >
+                              View
+                            </button>
+
+                            <button
+                              type="button"
+                              className="spl-action-button"
+                              onClick={() =>
+                                navigate(
+                                  `/seller/listings/${product.id}/edit`
+                                )
+                              }
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              className="spl-delete-button"
+                              onClick={() =>
+                                handleDelete(
+                                  product
+                                )
+                              }
+                            >
+                              Delete
+                            </button>
                           </div>
-                        </div>
-                      </td>
-
-                      <td>{product.category}</td>
-
-                      <td>{product.uploadDate}</td>
-
-                      <td>
-                        <span
-                          className={`seller-status-badge seller-status-${product.status.toLowerCase()}`}
-                        >
-                          {product.status}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div className="seller-listing-actions">
-                          <button
-                            type="button"
-                            className="seller-view-button"
-                            onClick={() =>
-                              openViewModal(product)
-                            }
-                          >
-                            View
-                          </button>
-
-                          <button
-                            type="button"
-                            className="seller-edit-button"
-                            onClick={() =>
-                              openEditModal(product)
-                            }
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            className="seller-delete-button"
-                            onClick={() =>
-                              openDeleteModal(product)
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="seller-listings-empty">
-              <div className="seller-listings-empty-icon">
-                +
-              </div>
 
-              <h3>No product listings yet</h3>
-
-              <p>
-                Upload a completed CSV catalog and product
-                images to create your first listings.
-              </p>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/seller/products/upload")
-                }
-              >
-                Upload Catalog
-              </button>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {modalType === "view" && selectedProduct && (
-        <ModalOverlay onClose={closeModal}>
-          <section className="seller-product-modal">
-            <div className="seller-modal-header">
-              <div>
-                <p>PRODUCT DETAILS</p>
-                <h2>{selectedProduct.name}</h2>
-              </div>
-
-              <button
-                type="button"
-                className="seller-modal-close"
-                onClick={closeModal}
-                aria-label="Close product details"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="seller-product-preview">
-              <div className="seller-product-preview-image">
-                <span>
-                  {selectedProduct.name
-                    .charAt(0)
-                    .toUpperCase()}
-                </span>
-              </div>
-
-              <div className="seller-product-details">
-                <DetailRow
-                  label="Description"
-                  value={selectedProduct.description}
-                />
-
-                <DetailRow
-                  label="Category"
-                  value={selectedProduct.category}
-                />
-
-                <DetailRow
-                  label="Size"
-                  value={selectedProduct.size}
-                />
-
-                <DetailRow
-                  label="Color"
-                  value={selectedProduct.color}
-                />
-
-                <DetailRow
-                  label="Price"
-                  value={formatPrice(
-                    selectedProduct.price
-                  )}
-                />
-
-                <DetailRow
-                  label="Upload Date"
-                  value={selectedProduct.uploadDate}
-                />
-
-                <DetailRow
-                  label="Status"
-                  value={selectedProduct.status}
-                />
-              </div>
-            </div>
-
-            {selectedProduct.status === "Rejected" && (
-              <div className="seller-rejection-notice">
-                <strong>Validation issue</strong>
+            {filteredProducts.length === 0 && (
+              <div className="spl-empty-state">
+                <h2>No products found</h2>
 
                 <p>
-                  {selectedProduct.rejectionReason}
+                  Try a different search term or
+                  validation status.
                 </p>
+
+                <button
+                  type="button"
+                  className="spl-clear-button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("All");
+                  }}
+                >
+                  Clear Filters
+                </button>
               </div>
             )}
-
-            <div className="seller-modal-actions">
-              <button
-                type="button"
-                className="seller-modal-secondary"
-                onClick={closeModal}
-              >
-                Close
-              </button>
-
-              <button
-                type="button"
-                className="seller-modal-primary"
-                onClick={() =>
-                  openEditModal(selectedProduct)
-                }
-              >
-                Edit Product
-              </button>
-            </div>
           </section>
-        </ModalOverlay>
-      )}
-
-      {modalType === "edit" && selectedProduct && (
-        <ModalOverlay onClose={closeModal}>
-          <form
-            className="seller-product-modal"
-            onSubmit={handleSaveChanges}
-          >
-            <div className="seller-modal-header">
-              <div>
-                <p>EDIT LISTING</p>
-                <h2>{selectedProduct.name}</h2>
-              </div>
-
-              <button
-                type="button"
-                className="seller-modal-close"
-                onClick={closeModal}
-                aria-label="Close edit form"
-              >
-                ×
-              </button>
-            </div>
-
-            {selectedProduct.status === "Rejected" && (
-              <div className="seller-rejection-notice">
-                <strong>Reason for rejection</strong>
-
-                <p>
-                  {selectedProduct.rejectionReason}
-                </p>
-
-                <span>
-                  Saving corrected information will return
-                  this listing to Pending status.
-                </span>
-              </div>
-            )}
-
-            <div className="seller-edit-grid">
-              <label className="seller-edit-field seller-edit-field-full">
-                <span>Product Name</span>
-
-                <input
-                  type="text"
-                  name="name"
-                  value={editForm.name}
-                  onChange={handleEditChange}
-                  required
-                />
-              </label>
-
-              <label className="seller-edit-field seller-edit-field-full">
-                <span>Description</span>
-
-                <textarea
-                  name="description"
-                  value={editForm.description}
-                  onChange={handleEditChange}
-                  rows="3"
-                />
-              </label>
-
-              <label className="seller-edit-field">
-                <span>Category</span>
-
-                <select
-                  name="category"
-                  value={editForm.category}
-                  onChange={handleEditChange}
-                  required
-                >
-                  <option value="">Select category</option>
-                  <option value="Tops">Tops</option>
-                  <option value="Bottoms">Bottoms</option>
-                  <option value="Dresses">Dresses</option>
-                  <option value="Outerwear">
-                    Outerwear
-                  </option>
-                  <option value="Footwear">
-                    Footwear
-                  </option>
-                </select>
-              </label>
-
-              <label className="seller-edit-field">
-                <span>Size</span>
-
-                <input
-                  type="text"
-                  name="size"
-                  value={editForm.size}
-                  onChange={handleEditChange}
-                  required
-                />
-              </label>
-
-              <label className="seller-edit-field">
-                <span>Color</span>
-
-                <input
-                  type="text"
-                  name="color"
-                  value={editForm.color}
-                  onChange={handleEditChange}
-                  required
-                />
-              </label>
-
-              <label className="seller-edit-field">
-                <span>Price</span>
-
-                <input
-                  type="number"
-                  name="price"
-                  min="1"
-                  step="0.01"
-                  value={editForm.price}
-                  onChange={handleEditChange}
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="seller-modal-actions">
-              <button
-                type="button"
-                className="seller-modal-secondary"
-                onClick={closeModal}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="seller-modal-primary"
-              >
-                Save Changes
-              </button>
-            </div>
-          </form>
-        </ModalOverlay>
-      )}
-
-      {modalType === "delete" &&
-        selectedProduct && (
-          <ModalOverlay onClose={closeModal}>
-            <section className="seller-delete-modal">
-              <div className="seller-delete-icon">
-                !
-              </div>
-
-              <h2>Delete product listing?</h2>
-
-              <p>
-                You are about to permanently delete{" "}
-                <strong>
-                  {selectedProduct.name}
-                </strong>
-                . This action cannot be undone.
-              </p>
-
-              <div className="seller-modal-actions">
-                <button
-                  type="button"
-                  className="seller-modal-secondary"
-                  onClick={closeModal}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  className="seller-confirm-delete-button"
-                  onClick={handleDeleteProduct}
-                >
-                  Delete Product
-                </button>
-              </div>
-            </section>
-          </ModalOverlay>
-        )}
-    </main>
-  );
-}
-
-function DetailRow({ label, value }) {
-  return (
-    <div className="seller-detail-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function ModalOverlay({ children, onClose }) {
-  function handleOverlayClick(event) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
-
-  return (
-    <div
-      className="seller-modal-overlay"
-      onMouseDown={handleOverlayClick}
-      role="presentation"
-    >
-      {children}
-    </div>
+        </div>
+      </section>
+    </>
   );
 }
 

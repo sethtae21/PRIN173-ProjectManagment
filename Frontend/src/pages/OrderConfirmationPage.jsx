@@ -1,397 +1,460 @@
-import { useMemo } from "react";
 import {
-  NavLink,
+  useLocation,
   useNavigate,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/OrderConfirmationPage.css";
 
-function readStoredValue(key, fallback) {
-  try {
-    const value =
-      localStorage.getItem(key);
+const LAST_ORDER_STORAGE_KEY =
+  "fitfusion-last-order";
 
-    if (!value) {
-      return fallback;
-    }
+const fallbackOrder = {
+  id: "FF-07865527",
+  placedAt: "October 9, 2026",
+  status: "Processing",
 
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}
+  customer: {
+    fullName: "Karol Dein Tamo",
+    email: "shopper@example.com",
+    contactNumber: "09123456789",
 
-function formatPrice(value) {
+    address: {
+      street: "123 Sample Street",
+      city: "Makati City",
+      province: "Metro Manila",
+      postalCode: "1200",
+    },
+  },
+
+  paymentMethod: "Cash on Delivery",
+  shippingFee: 0,
+  productDiscount: 200,
+  originalSubtotal: 1699,
+  total: 1499,
+
+  items: [
+    {
+      id: "001-M-Beige",
+      productId: "001",
+      name: "Classic Beige Blazer",
+      sellerName: "FitFusion Seller",
+      price: 1499,
+      originalPrice: 1699,
+      quantity: 1,
+      size: "M",
+      color: "Beige",
+      image: "",
+    },
+  ],
+};
+
+function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
-    minimumFractionDigits: 2,
-  }).format(Number(value) || 0);
+    minimumFractionDigits: 0,
+  }).format(Number(value || 0));
 }
 
-function formatDate(value) {
-  if (!value) {
-    return "Not available";
+function loadLastOrder() {
+  try {
+    const storedOrder =
+      localStorage.getItem(
+        LAST_ORDER_STORAGE_KEY
+      );
+
+    if (!storedOrder) {
+      return fallbackOrder;
+    }
+
+    const parsedOrder =
+      JSON.parse(storedOrder);
+
+    if (
+      !parsedOrder ||
+      typeof parsedOrder !== "object"
+    ) {
+      return fallbackOrder;
+    }
+
+    return {
+      ...fallbackOrder,
+      ...parsedOrder,
+
+      customer: {
+        ...fallbackOrder.customer,
+        ...(parsedOrder.customer || {}),
+
+        address: {
+          ...fallbackOrder.customer.address,
+          ...(parsedOrder.customer
+            ?.address || {}),
+        },
+      },
+
+      items:
+        Array.isArray(parsedOrder.items) &&
+        parsedOrder.items.length > 0
+          ? parsedOrder.items
+          : fallbackOrder.items,
+    };
+  } catch {
+    return fallbackOrder;
   }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString("en-PH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
-function formatPaymentMethod(method) {
-  if (method === "cash-on-delivery") {
-    return "Cash on Delivery";
+function formatAddress(address) {
+  if (!address) {
+    return "Delivery address unavailable";
   }
 
-  if (method === "card") {
-    return "Mock Card Payment";
+  if (typeof address === "string") {
+    return address;
   }
 
-  if (method === "e-wallet") {
-    return "Mock E-Wallet Payment";
-  }
-
-  return method || "Not available";
+  return [
+    address.street,
+    address.city,
+    address.province,
+    address.postalCode,
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function OrderConfirmationPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const order = useMemo(
-    () =>
-      readStoredValue(
-        "fitfusion-latest-order",
-        null
-      ),
-    []
-  );
+  const storedOrder = loadLastOrder();
 
-  function handleLogout() {
-    const confirmed = window.confirm(
-      "Are you sure you want to log out?"
+  const order = {
+    ...storedOrder,
+
+    id:
+      location.state?.orderId ||
+      storedOrder.id,
+
+    total:
+      location.state?.total ??
+      storedOrder.total,
+  };
+
+  const items = Array.isArray(order.items)
+    ? order.items
+    : [];
+
+  const productCount = items.length;
+
+  const calculatedOriginalSubtotal =
+    items.reduce(
+      (total, item) =>
+        total +
+        Number(
+          item.originalPrice ||
+            item.price ||
+            0
+        ) *
+          Number(item.quantity || 1),
+      0
     );
 
-    if (!confirmed) {
-      return;
-    }
+  const calculatedSaleSubtotal =
+    items.reduce(
+      (total, item) =>
+        total +
+        Number(item.price || 0) *
+          Number(item.quantity || 1),
+      0
+    );
 
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
+  const originalSubtotal =
+    Number(order.originalSubtotal) ||
+    calculatedOriginalSubtotal;
 
-    navigate("/login");
-  }
+  const productDiscount =
+    order.productDiscount !== undefined
+      ? Number(order.productDiscount)
+      : Math.max(
+          0,
+          originalSubtotal -
+            calculatedSaleSubtotal
+        );
 
-  if (!order) {
-    return (
-      <main className="confirmation-empty-page">
-        <section>
-          <div className="confirmation-empty-icon">
-            !
+  const shippingFee = Number(
+    order.shippingFee || 0
+  );
+
+  const total =
+    order.total !== undefined
+      ? Number(order.total)
+      : calculatedSaleSubtotal +
+        shippingFee;
+
+  return (
+    <main className="order-confirmation-page">
+      <div className="order-confirmation-container">
+        <section className="order-confirmation-success">
+          <div
+            className="order-confirmation-check"
+            aria-hidden="true"
+          >
+            ✓
           </div>
 
-          <p>ORDER NOT FOUND</p>
+          <p>ORDER SUCCESSFUL</p>
 
           <h1>
-            No recent order is available
+            Thank you for your order!
           </h1>
 
           <span>
-            Complete the checkout process before
-            opening the order confirmation page.
+            Your simulated order has been
+            successfully recorded. No real
+            payment was charged.
           </span>
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate("/shopper/catalog")
-            }
-          >
-            Return to Catalog
-          </button>
         </section>
-      </main>
-    );
-  }
 
-  const orderId =
-    order.orderId ||
-    order.orderNumber ||
-    order.id;
+        <section className="order-confirmation-summary-card">
+          <div className="order-confirmation-summary-heading">
+            <div>
+              <p>ORDER SUMMARY</p>
 
-  const delivery = order.deliveryDetails || {};
+              <h2>#{order.id}</h2>
+            </div>
 
-  const deliveryAddress = [
-    delivery.street,
-    delivery.barangay,
-    delivery.province,
-    delivery.postalCode,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  return (
-    <main className="confirmation-page">
-      <aside className="confirmation-sidebar">
-        <div className="confirmation-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
-
-        <nav className="confirmation-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="confirmation-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="confirmation-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="confirmation-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="confirmation-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="confirmation-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="confirmation-nav-link active"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="confirmation-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="confirmation-logout"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
-
-      <section className="confirmation-content">
-        <header className="confirmation-header">
-          <div>
-            <p>17B — ORDER CONFIRMATION</p>
-
-            <span>
-              Mock payment approved and order
-              successfully recorded
+            <span className="order-confirmation-status">
+              {order.status || "Processing"}
             </span>
           </div>
 
-          <div className="confirmation-role">
-            REGISTERED SHOPPER
+          <div className="order-confirmation-details">
+            <div>
+              <span>Order date</span>
+
+              <strong>
+                {order.placedAt ||
+                  new Date().toLocaleDateString(
+                    "en-PH",
+                    {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    }
+                  )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Recipient</span>
+
+              <strong>
+                {order.customer?.fullName ||
+                  order.customer?.name ||
+                  "Shopper"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Contact number</span>
+
+              <strong>
+                {order.customer
+                  ?.contactNumber ||
+                  order.customer?.mobile ||
+                  "Not provided"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Delivery address</span>
+
+              <strong>
+                {formatAddress(
+                  order.customer?.address
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Payment method</span>
+
+              <strong>
+                {order.paymentMethod ||
+                  "Cash on Delivery"}
+              </strong>
+            </div>
           </div>
-        </header>
+        </section>
 
-        <div className="confirmation-body">
-          <section className="confirmation-success">
-            <div className="confirmation-check">
-              ✓
-            </div>
-
-            <p>ORDER SUCCESSFUL</p>
-
-            <h1>Thank you for your order!</h1>
-
-            <span>
-              Your simulated order has been
-              successfully recorded. No real payment
-              was charged.
-            </span>
-          </section>
-
-          <section className="confirmation-card">
-            <div className="confirmation-card-heading">
-              <div>
-                <p>ORDER SUMMARY</p>
-                <h2>{orderId}</h2>
-              </div>
-
-              <span className="confirmation-status">
-                {order.status || "Processing"}
-              </span>
-            </div>
-
-            <div className="confirmation-details">
-              <DetailRow
-                label="Order date"
-                value={formatDate(
-                  order.createdAt || order.date
-                )}
-              />
-
-              <DetailRow
-                label="Recipient"
-                value={
-                  delivery.fullName ||
-                  "Not provided"
-                }
-              />
-
-              <DetailRow
-                label="Delivery address"
-                value={
-                  deliveryAddress ||
-                  "Not provided"
-                }
-              />
-
-              <DetailRow
-                label="Payment method"
-                value={formatPaymentMethod(
-                  order.paymentMethod
-                )}
-              />
-
-              <DetailRow
-                label="Payment status"
-                value={
-                  order.paymentStatus ||
-                  "Recorded"
-                }
-              />
-
-              <DetailRow
-                label="Order total"
-                value={formatPrice(order.total)}
-                emphasized
-              />
-            </div>
-          </section>
-
-          <section className="confirmation-products">
-            <div className="confirmation-section-heading">
+        <section className="order-confirmation-products-card">
+          <div className="order-confirmation-products-heading">
+            <div>
               <p>ORDERED PRODUCTS</p>
+
               <h2>
-                {order.items?.length || 0} product
-                {order.items?.length === 1
-                  ? ""
-                  : "s"}
+                {productCount}{" "}
+                {productCount === 1
+                  ? "product"
+                  : "products"}
               </h2>
             </div>
+          </div>
 
-            <div className="confirmation-product-list">
-              {(order.items || []).map(
-                (item, index) => (
-                  <article
-                    key={
-                      item.cartItemId ||
-                      `${item.id}-${index}`
+          <div className="order-confirmation-products">
+            {items.map((item, index) => (
+              <article
+                className="order-confirmation-product"
+                key={
+                  item.id ||
+                  `${item.productId}-${index}`
+                }
+              >
+                <button
+                  type="button"
+                  className="order-confirmation-product-image"
+                  onClick={() =>
+                    navigate(
+                      `/shopper/products/${
+                        item.productId ||
+                        item.id
+                      }`
+                    )
+                  }
+                  aria-label={`View ${item.name}`}
+                >
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                    />
+                  ) : (
+                    <strong>
+                      {(
+                        item.name || "Product"
+                      ).charAt(0)}
+                    </strong>
+                  )}
+
+                  <small>
+                    ×
+                    {Number(
+                      item.quantity || 1
+                    )}
+                  </small>
+                </button>
+
+                <div className="order-confirmation-product-copy">
+                  <span>
+                    {item.sellerName ||
+                      "FitFusion Seller"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/shopper/products/${
+                          item.productId ||
+                          item.id
+                        }`
+                      )
                     }
                   >
-                    <div className="confirmation-product-image">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                        />
-                      ) : (
-                        <span>
-                          {item.name
-                            ?.charAt(0)
-                            .toUpperCase() || "P"}
-                        </span>
-                      )}
-                    </div>
+                    {item.name}
+                  </button>
 
-                    <div className="confirmation-product-info">
-                      <strong>
-                        {item.name ||
-                          "FitFusion Product"}
-                      </strong>
+                  <small>
+                    Size: {item.size || "M"}
+                  </small>
 
-                      <span>
-                        Size:{" "}
-                        {item.selectedSize ||
-                          item.size ||
-                          "Default"}
-                      </span>
+                  <small>
+                    Color:{" "}
+                    {item.color || "Default"}
+                  </small>
+                </div>
 
-                      <span>
-                        Color:{" "}
-                        {item.selectedColor ||
-                          item.color ||
-                          "Default"}
-                      </span>
+                <div className="order-confirmation-product-price">
+                  <span>Item total</span>
 
-                      <span>
-                        Quantity:{" "}
-                        {Number(item.quantity) || 1}
-                      </span>
-                    </div>
+                  <strong>
+                    {formatCurrency(
+                      Number(
+                        item.price || 0
+                      ) *
+                        Number(
+                          item.quantity || 1
+                        )
+                    )}
+                  </strong>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
 
-                    <strong className="confirmation-product-price">
-                      {formatPrice(
-                        Number(item.price || 0) *
-                          Number(
-                            item.quantity || 1
-                          )
-                      )}
-                    </strong>
-                  </article>
-                )
-              )}
+        <section className="order-confirmation-bottom-grid">
+          <article className="order-confirmation-payment-card">
+            <div className="order-confirmation-payment-row">
+              <span>Subtotal</span>
+
+              <strong>
+                {formatCurrency(
+                  originalSubtotal
+                )}
+              </strong>
             </div>
-          </section>
 
-          <div className="confirmation-actions">
+            <div className="order-confirmation-payment-row discount">
+              <span>Product discount</span>
+
+              <strong>
+                −
+                {formatCurrency(
+                  productDiscount
+                )}
+              </strong>
+            </div>
+
+            <div className="order-confirmation-payment-row">
+              <span>Shipping fee</span>
+
+              <strong>
+                {shippingFee === 0
+                  ? "FREE"
+                  : formatCurrency(
+                      shippingFee
+                    )}
+              </strong>
+            </div>
+
+            <div className="order-confirmation-total">
+              <span>Total</span>
+
+              <strong>
+                {formatCurrency(total)}
+              </strong>
+            </div>
+          </article>
+
+          <article className="order-confirmation-actions-card">
+            <p>NEXT STEPS</p>
+
             <button
               type="button"
-              className="confirmation-secondary"
+              className="order-confirmation-primary-button"
               onClick={() =>
-                navigate("/shopper/catalog")
+                navigate(
+                  `/shopper/orders/${order.id}`
+                )
               }
             >
-              Continue Shopping
+              View Order Details
             </button>
 
             <button
               type="button"
-              className="confirmation-outline"
+              className="order-confirmation-secondary-button"
               onClick={() =>
                 navigate("/shopper/orders")
               }
@@ -401,46 +464,22 @@ function OrderConfirmationPage() {
 
             <button
               type="button"
-              className="confirmation-primary"
-              onClick={() => {
-                localStorage.setItem(
-                  "fitfusion-selected-order",
-                  JSON.stringify(order)
-                );
-
-                navigate(
-                  `/shopper/orders/${orderId}`
-                );
-              }}
+              className="order-confirmation-text-button"
+              onClick={() =>
+                navigate("/shopper/catalog")
+              }
             >
-              View Order Details
+              Continue Shopping
             </button>
-          </div>
-        </div>
-      </section>
+          </article>
+        </section>
+
+        <p className="order-confirmation-note">
+          Keep your order number for reference:
+          <strong> #{order.id}</strong>
+        </p>
+      </div>
     </main>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-  emphasized = false,
-}) {
-  return (
-    <div className="confirmation-detail-row">
-      <span>{label}</span>
-
-      <strong
-        className={
-          emphasized
-            ? "confirmation-emphasized"
-            : ""
-        }
-      >
-        {value}
-      </strong>
-    </div>
   );
 }
 

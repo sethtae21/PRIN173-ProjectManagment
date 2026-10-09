@@ -5,284 +5,173 @@ import {
 } from "react";
 
 import {
-  NavLink,
+  Link,
   useNavigate,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/CheckoutPage.css";
 
-function readStoredValue(key, fallback) {
+const CART_STORAGE_KEY = "fitfusion-cart";
+const CHECKOUT_STORAGE_KEY =
+  "fitfusion-checkout-items";
+const ORDERS_STORAGE_KEY =
+  "fitfusion-orders";
+
+const fallbackItems = [
+  {
+    id: "001-M-Beige",
+    productId: "001",
+    name: "Classic Beige Blazer",
+    category: "Clothing",
+    sellerId: "fitfusion-seller",
+    sellerName: "FitFusion Seller",
+    price: 1499,
+    originalPrice: 1699,
+    quantity: 1,
+    size: "M",
+    color: "Beige",
+    image: "",
+  },
+];
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
+function readStoredArray(key) {
   try {
     const storedValue =
       localStorage.getItem(key);
 
     if (!storedValue) {
-      return fallback;
+      return [];
     }
 
-    return JSON.parse(storedValue);
+    const parsedValue =
+      JSON.parse(storedValue);
+
+    return Array.isArray(parsedValue)
+      ? parsedValue
+      : [];
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-function normalizeCheckoutData(value) {
-  if (Array.isArray(value)) {
-    return {
-      items: value,
-      subtotal: value.reduce(
+function loadCheckoutItems() {
+  const checkoutItems = readStoredArray(
+    CHECKOUT_STORAGE_KEY
+  );
+
+  if (checkoutItems.length > 0) {
+    return checkoutItems;
+  }
+
+  const selectedCartItems =
+    readStoredArray(
+      CART_STORAGE_KEY
+    ).filter(
+      (item) => item.selected !== false
+    );
+
+  if (selectedCartItems.length > 0) {
+    return selectedCartItems;
+  }
+
+  return fallbackItems;
+}
+
+function createOrderNumber() {
+  const randomPart = Math.floor(
+    10000000 + Math.random() * 90000000
+  );
+
+  return `FF-${randomPart}`;
+}
+
+function CheckoutPage() {
+  const navigate = useNavigate();
+
+  const [checkoutItems] = useState(
+    loadCheckoutItems
+  );
+
+  const [showConfirmation, setShowConfirmation] =
+    useState(false);
+
+  const [errors, setErrors] = useState({});
+
+  const [form, setForm] = useState({
+    fullName: "Karol Dein Tamo",
+    email: "seth@gmail.com",
+    contactNumber: "09123456789",
+    street: "",
+    city: "",
+    province: "",
+    postalCode: "",
+    paymentMethod: "Cash on Delivery",
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      CHECKOUT_STORAGE_KEY,
+      JSON.stringify(checkoutItems)
+    );
+  }, [checkoutItems]);
+
+  const productCount = checkoutItems.length;
+
+  const originalSubtotal = useMemo(
+    () =>
+      checkoutItems.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.originalPrice ||
+              item.price ||
+              0
+          ) *
+            Number(item.quantity || 1),
+        0
+      ),
+    [checkoutItems]
+  );
+
+  const discountedSubtotal = useMemo(
+    () =>
+      checkoutItems.reduce(
         (total, item) =>
           total +
           Number(item.price || 0) *
             Number(item.quantity || 1),
         0
       ),
-      discount: 0,
-      shippingFee: 0,
-      total: 0,
-    };
-  }
-
-  if (
-    value &&
-    Array.isArray(value.items)
-  ) {
-    return {
-      items: value.items,
-      subtotal:
-        Number(value.subtotal) || 0,
-      discount:
-        Number(value.discount) || 0,
-      shippingFee:
-        Number(value.shippingFee) || 0,
-      total: Number(value.total) || 0,
-    };
-  }
-
-  return {
-    items: [],
-    subtotal: 0,
-    discount: 0,
-    shippingFee: 0,
-    total: 0,
-  };
-}
-
-function loadAccountInformation() {
-  const registeredAccount =
-    readStoredValue(
-      "registeredAccount",
-      {}
-    );
-
-  const currentUser = readStoredValue(
-    "fitfusion-current-user",
-    {}
+    [checkoutItems]
   );
 
-  const account = {
-    ...registeredAccount,
-    ...currentUser,
-  };
-
-  return {
-    fullName:
-      account.fullName ||
-      account.name ||
-      account.username ||
-      "",
-    email: account.email || "",
-    phone:
-      account.phone ||
-      account.contactNumber ||
-      "",
-    street:
-      account.street ||
-      account.streetAddress ||
-      "",
-    barangay:
-      account.barangay ||
-      account.city ||
-      "",
-    province:
-      account.province || "",
-    postalCode:
-      account.postalCode ||
-      account.zipCode ||
-      "",
-  };
-}
-
-function CheckoutPage() {
-  const navigate = useNavigate();
-
-  const storedCheckout =
-    normalizeCheckoutData(
-      readStoredValue(
-        "fitfusion-checkout-items",
-        null
-      )
-    );
-
-  const [checkoutData] =
-    useState(storedCheckout);
-
-  const [deliveryDetails, setDeliveryDetails] =
-    useState(loadAccountInformation);
-
-  const [paymentMethod, setPaymentMethod] =
-    useState("cash-on-delivery");
-
-  const [cardDetails, setCardDetails] =
-    useState({
-      cardholderName: "",
-      cardNumber: "",
-      expiryDate: "",
-      securityCode: "",
-    });
-
-  const [walletDetails, setWalletDetails] =
-    useState({
-      walletType: "GCash",
-      mobileNumber: "",
-    });
-
-  const [deliveryNotes, setDeliveryNotes] =
-    useState("");
-
-  const [acceptedTerms, setAcceptedTerms] =
-    useState(false);
-
-  const [errors, setErrors] = useState({});
-  const [generalError, setGeneralError] =
-    useState("");
-
-  const [showOrderModal, setShowOrderModal] =
-    useState(false);
-
-  const [showLogoutModal, setShowLogoutModal] =
-    useState(false);
-
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
-
-  useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, []);
-
-  const subtotal = useMemo(() => {
-    if (checkoutData.subtotal > 0) {
-      return checkoutData.subtotal;
-    }
-
-    return checkoutData.items.reduce(
-      (total, item) =>
-        total +
-        Number(item.price || 0) *
-          Number(item.quantity || 1),
-      0
-    );
-  }, [checkoutData]);
-
-  const discount = Math.max(
+  const productDiscount = Math.max(
     0,
-    checkoutData.discount
+    originalSubtotal -
+      discountedSubtotal
   );
 
   const shippingFee =
-    checkoutData.items.length === 0
-      ? 0
-      : Number(
-          checkoutData.shippingFee
-        ) || 0;
+    discountedSubtotal >= 1500 ? 0 : 80;
 
   const total =
-    checkoutData.total > 0
-      ? checkoutData.total
-      : subtotal + shippingFee;
+    discountedSubtotal + shippingFee;
 
-  const cartCount = useMemo(() => {
-    const cartItems = readStoredValue(
-      "fitfusion-cart-items",
-      []
-    );
-
-    if (!Array.isArray(cartItems)) {
-      return 0;
-    }
-
-    return cartItems.reduce(
-      (count, item) =>
-        count +
-        (Number(item.quantity) || 1),
-      0
-    );
-  }, []);
-
-  function updateDeliveryField(event) {
+  function handleInputChange(event) {
     const { name, value } = event.target;
 
-    setDeliveryDetails(
-      (currentDetails) => ({
-        ...currentDetails,
-        [name]: value,
-      })
-    );
-
-    if (errors[name]) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [name]: "",
-      }));
-    }
-
-    setGeneralError("");
-  }
-
-  function updateCardField(event) {
-    const { name, value } = event.target;
-
-    let formattedValue = value;
-
-    if (name === "cardNumber") {
-      formattedValue = value
-        .replace(/\D/g, "")
-        .slice(0, 16)
-        .replace(/(.{4})/g, "$1 ")
-        .trim();
-    }
-
-    if (name === "securityCode") {
-      formattedValue = value
-        .replace(/\D/g, "")
-        .slice(0, 4);
-    }
-
-    if (name === "expiryDate") {
-      const numbers = value
-        .replace(/\D/g, "")
-        .slice(0, 4);
-
-      formattedValue =
-        numbers.length > 2
-          ? `${numbers.slice(
-              0,
-              2
-            )}/${numbers.slice(2)}`
-          : numbers;
-    }
-
-    setCardDetails(
-      (currentDetails) => ({
-        ...currentDetails,
-        [name]: formattedValue,
-      })
-    );
+    setForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }));
 
     if (errors[name]) {
       setErrors((currentErrors) => ({
@@ -292,1470 +181,786 @@ function CheckoutPage() {
     }
   }
 
-  function updateWalletField(event) {
-    const { name, value } = event.target;
+  function validateForm() {
+    const nextErrors = {};
 
-    const formattedValue =
-      name === "mobileNumber"
-        ? value
-            .replace(/\D/g, "")
-            .slice(0, 11)
-        : value;
-
-    setWalletDetails(
-      (currentDetails) => ({
-        ...currentDetails,
-        [name]: formattedValue,
-      })
-    );
-
-    if (errors.mobileNumber) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        mobileNumber: "",
-      }));
-    }
-  }
-
-  function selectPaymentMethod(method) {
-    setPaymentMethod(method);
-    setGeneralError("");
-
-    setErrors((currentErrors) => {
-      const updatedErrors = {
-        ...currentErrors,
-      };
-
-      delete updatedErrors.cardholderName;
-      delete updatedErrors.cardNumber;
-      delete updatedErrors.expiryDate;
-      delete updatedErrors.securityCode;
-      delete updatedErrors.mobileNumber;
-
-      return updatedErrors;
-    });
-  }
-
-  function validateCheckout() {
-    const validationErrors = {};
-
-    if (
-      !deliveryDetails.fullName.trim()
-    ) {
-      validationErrors.fullName =
+    if (!form.fullName.trim()) {
+      nextErrors.fullName =
         "Please enter the recipient's full name.";
     }
 
-    if (
-      !deliveryDetails.email.trim()
-    ) {
-      validationErrors.email =
+    if (!form.email.trim()) {
+      nextErrors.email =
         "Please enter your email address.";
     } else if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        deliveryDetails.email
+        form.email
       )
     ) {
-      validationErrors.email =
+      nextErrors.email =
         "Please enter a valid email address.";
     }
 
-    if (
-      !deliveryDetails.phone.trim()
-    ) {
-      validationErrors.phone =
-        "Please enter a contact number.";
+    if (!form.contactNumber.trim()) {
+      nextErrors.contactNumber =
+        "Please enter your contact number.";
     } else if (
       !/^(09|\+639)\d{9}$/.test(
-        deliveryDetails.phone.replace(
+        form.contactNumber.replace(
           /\s/g,
           ""
         )
       )
     ) {
-      validationErrors.phone =
+      nextErrors.contactNumber =
         "Use a valid Philippine mobile number.";
     }
 
-    if (
-      !deliveryDetails.street.trim()
-    ) {
-      validationErrors.street =
-        "Please enter the house number and street.";
+    if (!form.street.trim()) {
+      nextErrors.street =
+        "Please enter your street or building address.";
     }
 
-    if (
-      !deliveryDetails.barangay.trim()
-    ) {
-      validationErrors.barangay =
-        "Please enter the barangay or city.";
+    if (!form.city.trim()) {
+      nextErrors.city =
+        "Please enter your barangay or city.";
     }
 
-    if (
-      !deliveryDetails.province.trim()
-    ) {
-      validationErrors.province =
-        "Please enter the province.";
+    if (!form.province.trim()) {
+      nextErrors.province =
+        "Please enter your province.";
     }
 
-    if (
-      !deliveryDetails.postalCode.trim()
-    ) {
-      validationErrors.postalCode =
-        "Please enter the postal code.";
+    if (!form.postalCode.trim()) {
+      nextErrors.postalCode =
+        "Please enter your postal code.";
     } else if (
-      !/^\d{4}$/.test(
-        deliveryDetails.postalCode
-      )
+      !/^\d{4}$/.test(form.postalCode)
     ) {
-      validationErrors.postalCode =
-        "The postal code must contain four digits.";
+      nextErrors.postalCode =
+        "Postal code must contain 4 digits.";
     }
 
-    if (paymentMethod === "card") {
-      if (
-        !cardDetails.cardholderName.trim()
-      ) {
-        validationErrors.cardholderName =
-          "Please enter the cardholder name.";
-      }
-
-      const cardNumbers =
-        cardDetails.cardNumber.replace(
-          /\s/g,
-          ""
-        );
-
-      if (!cardNumbers) {
-        validationErrors.cardNumber =
-          "Please enter a card number.";
-      } else if (
-        !/^\d{16}$/.test(cardNumbers)
-      ) {
-        validationErrors.cardNumber =
-          "The card number must contain 16 digits.";
-      }
-
-      if (
-        !/^(0[1-9]|1[0-2])\/\d{2}$/.test(
-          cardDetails.expiryDate
-        )
-      ) {
-        validationErrors.expiryDate =
-          "Use the MM/YY format.";
-      }
-
-      if (
-        !/^\d{3,4}$/.test(
-          cardDetails.securityCode
-        )
-      ) {
-        validationErrors.securityCode =
-          "Enter a valid 3 or 4-digit security code.";
-      }
-    }
-
-    if (paymentMethod === "e-wallet") {
-      if (
-        !/^09\d{9}$/.test(
-          walletDetails.mobileNumber
-        )
-      ) {
-        validationErrors.mobileNumber =
-          "Enter a valid 11-digit mobile number.";
-      }
-    }
-
-    if (!acceptedTerms) {
-      validationErrors.terms =
-        "Please confirm that the order information is correct.";
-    }
-
-    if (
-      checkoutData.items.length === 0
-    ) {
-      validationErrors.items =
-        "Your checkout does not contain any products.";
-    }
-
-    setErrors(validationErrors);
+    setErrors(nextErrors);
 
     return (
-      Object.keys(validationErrors)
-        .length === 0
+      Object.keys(nextErrors).length === 0
     );
   }
 
-  function prepareOrder(event) {
+  function handleReviewOrder(event) {
     event.preventDefault();
-    setGeneralError("");
 
-    if (!validateCheckout()) {
-      setGeneralError(
-        "Please correct the highlighted checkout information."
-      );
+    if (!validateForm()) {
+      const firstError =
+        document.querySelector(
+          ".checkout-field-error"
+        );
 
-      window.scrollTo({
-        top: 0,
+      firstError?.scrollIntoView({
         behavior: "smooth",
+        block: "center",
       });
 
       return;
     }
 
-    setShowOrderModal(true);
+    setShowConfirmation(true);
   }
 
-  function placeOrder() {
-    setIsSubmitting(true);
+  function removePurchasedItemsFromCart() {
+    const currentCart = readStoredArray(
+      CART_STORAGE_KEY
+    );
 
-    const orderNumber = `FF-${Date.now()
-      .toString()
-      .slice(-8)}`;
+    const remainingCart =
+      currentCart.filter((cartItem) => {
+        return !checkoutItems.some(
+          (checkoutItem) =>
+            String(
+              checkoutItem.productId ??
+                checkoutItem.id
+            ) ===
+              String(
+                cartItem.productId ??
+                  cartItem.id
+              ) &&
+            checkoutItem.size ===
+              cartItem.size &&
+            checkoutItem.color ===
+              cartItem.color
+        );
+      });
+
+    localStorage.setItem(
+      CART_STORAGE_KEY,
+      JSON.stringify(remainingCart)
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(
+        "fitfusion-cart-updated",
+        {
+          detail: {
+            cart: remainingCart,
+            quantity:
+              remainingCart.length,
+          },
+        }
+      )
+    );
+  }
+
+  function handleConfirmOrder() {
+    const orderNumber =
+      createOrderNumber();
 
     const newOrder = {
       id: orderNumber,
-      orderId: orderNumber,
-      orderNumber,
-      date: new Date().toISOString(),
-      createdAt:
-        new Date().toISOString(),
+      placedAt:
+        new Date().toLocaleDateString(
+          "en-PH",
+          {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }
+        ),
       status: "Processing",
-      paymentStatus:
-        paymentMethod ===
-        "cash-on-delivery"
-          ? "To Pay"
-          : "Mock Paid",
-      paymentMethod,
-      deliveryDetails,
-      deliveryNotes,
-      items: checkoutData.items,
-      subtotal,
-      discount,
+      customer: {
+        fullName: form.fullName,
+        email: form.email,
+        contactNumber:
+          form.contactNumber,
+        address: {
+          street: form.street,
+          city: form.city,
+          province: form.province,
+          postalCode: form.postalCode,
+        },
+      },
+      paymentMethod:
+        form.paymentMethod,
+      items: checkoutItems,
+      originalSubtotal,
+      productDiscount,
       shippingFee,
       total,
     };
 
     const existingOrders =
-      readStoredValue(
-        "fitfusion-orders",
-        []
+      readStoredArray(
+        ORDERS_STORAGE_KEY
       );
 
-    const updatedOrders =
-      Array.isArray(existingOrders)
-        ? [newOrder, ...existingOrders]
-        : [newOrder];
-
     localStorage.setItem(
-      "fitfusion-orders",
-      JSON.stringify(updatedOrders)
+      ORDERS_STORAGE_KEY,
+      JSON.stringify([
+        newOrder,
+        ...existingOrders,
+      ])
     );
 
     localStorage.setItem(
-      "fitfusion-latest-order",
+      "fitfusion-last-order",
       JSON.stringify(newOrder)
     );
 
-    /*
-      Remove purchased items from the
-      shopping cart.
-    */
-    const existingCart =
-      readStoredValue(
-        "fitfusion-cart-items",
-        []
-      );
-
-    if (Array.isArray(existingCart)) {
-      const purchasedIds = new Set(
-        checkoutData.items.map((item) =>
-          String(
-            item.id || item.productId
-          )
-        )
-      );
-
-      const remainingCart =
-        existingCart.filter(
-          (item) =>
-            !purchasedIds.has(
-              String(
-                item.id ||
-                  item.productId
-              )
-            )
-        );
-
-      localStorage.setItem(
-        "fitfusion-cart-items",
-        JSON.stringify(remainingCart)
-      );
-    }
+    removePurchasedItemsFromCart();
 
     localStorage.removeItem(
-      "fitfusion-checkout-items"
+      CHECKOUT_STORAGE_KEY
     );
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setShowOrderModal(false);
+    setShowConfirmation(false);
 
-      navigate(
-        "/shopper/order-confirmation"
-      );
-    }, 700);
-  }
-
-  function confirmLogout() {
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-
-    localStorage.removeItem(
-      "fitfusion-current-user"
+    navigate(
+      "/shopper/order-confirmation",
+      {
+        replace: true,
+        state: {
+          orderId: orderNumber,
+          total,
+        },
+      }
     );
-
-    navigate("/login");
   }
 
   return (
     <main className="checkout-page">
-      <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
-
-        <nav className="shopper-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="shopper-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="shopper-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="shopper-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className={() =>
-              "shopper-nav-link active"
-            }
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="shopper-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="shopper-nav-link"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="shopper-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
+      <div className="checkout-toolbar">
+        <Link
+          to="/shopper/cart"
+          className="checkout-return-link"
+        >
+          ← Return to Shopping Cart
+        </Link>
 
         <button
           type="button"
-          className="shopper-logout-button"
+          className="checkout-cart-count"
           onClick={() =>
-            setShowLogoutModal(true)
+            navigate("/shopper/cart")
           }
+          aria-label={`Shopping cart with ${productCount} products`}
         >
-          Logout
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+            <circle cx="10" cy="20" r="1" />
+            <circle cx="18" cy="20" r="1" />
+          </svg>
+
+          <strong>{productCount}</strong>
         </button>
-      </aside>
+      </div>
 
-      <section className="checkout-content">
-        <header className="checkout-header">
+      <div className="checkout-content">
+        <section className="checkout-introduction">
           <div>
-            <button
-              type="button"
-              className="checkout-back-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
-            >
-              ← Return to Shopping Cart
-            </button>
+            <p>SECURE MOCK CHECKOUT</p>
 
-            <h1>Checkout</h1>
+            <h1>Complete your order</h1>
 
-            <p>
-              Confirm your delivery and payment
-              information.
-            </p>
+            <span>
+              Review your information before
+              submitting the simulated order.
+            </span>
           </div>
 
-          <div className="checkout-header-actions">
-            <button
-              type="button"
-              className="checkout-cart-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
-              </svg>
-
-              <span>{cartCount}</span>
-            </button>
-
-            <div className="checkout-role">
-              REGISTERED SHOPPER
+          <div className="checkout-progress">
+            <div className="complete">
+              <strong>1</strong>
+              <span>Cart</span>
             </div>
-          </div>
-        </header>
 
-        <div className="checkout-body">
-          <section className="checkout-introduction">
+            <div className="active">
+              <strong>2</strong>
+              <span>Checkout</span>
+            </div>
+
             <div>
-              <p>SECURE MOCK CHECKOUT</p>
-
-              <h2>
-                Complete your order
-              </h2>
-
-              <span>
-                Review your information before
-                submitting the simulated order.
-              </span>
+              <strong>3</strong>
+              <span>Confirmed</span>
             </div>
+          </div>
+        </section>
 
-            <div className="checkout-steps">
-              <div className="completed">
+        <form
+          className="checkout-grid"
+          onSubmit={handleReviewOrder}
+          noValidate
+        >
+          <div className="checkout-form-column">
+            <section className="checkout-form-card">
+              <div className="checkout-card-heading">
                 <strong>1</strong>
-                <span>Cart</span>
-              </div>
 
-              <div className="active">
-                <strong>2</strong>
-                <span>Checkout</span>
-              </div>
-
-              <div>
-                <strong>3</strong>
-                <span>Confirmed</span>
-              </div>
-            </div>
-          </section>
-
-          {generalError && (
-            <div
-              className="checkout-general-error"
-              role="alert"
-            >
-              {generalError}
-            </div>
-          )}
-
-          {checkoutData.items.length > 0 ? (
-            <form
-              className="checkout-layout"
-              onSubmit={prepareOrder}
-              noValidate
-            >
-              <div className="checkout-form-column">
-                <section className="checkout-section-card">
-                  <div className="checkout-section-heading">
-                    <div className="checkout-section-number">
-                      1
-                    </div>
-
-                    <div>
-                      <p>DELIVERY INFORMATION</p>
-                      <h3>
-                        Recipient and contact
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="checkout-form-grid">
-                    <label className="checkout-field full-width">
-                      <span>Full Name *</span>
-
-                      <input
-                        type="text"
-                        name="fullName"
-                        value={
-                          deliveryDetails.fullName
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.fullName
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="Juan Dela Cruz"
-                      />
-
-                      {errors.fullName && (
-                        <small>
-                          {errors.fullName}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field">
-                      <span>
-                        Email Address *
-                      </span>
-
-                      <input
-                        type="email"
-                        name="email"
-                        value={
-                          deliveryDetails.email
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.email
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="name@example.com"
-                      />
-
-                      {errors.email && (
-                        <small>
-                          {errors.email}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field">
-                      <span>
-                        Contact Number *
-                      </span>
-
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={
-                          deliveryDetails.phone
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.phone
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="09123456789"
-                      />
-
-                      {errors.phone && (
-                        <small>
-                          {errors.phone}
-                        </small>
-                      )}
-                    </label>
-                  </div>
-                </section>
-
-                <section className="checkout-section-card">
-                  <div className="checkout-section-heading">
-                    <div className="checkout-section-number">
-                      2
-                    </div>
-
-                    <div>
-                      <p>DELIVERY ADDRESS</p>
-                      <h3>
-                        Where should we deliver?
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="checkout-form-grid">
-                    <label className="checkout-field full-width">
-                      <span>
-                        House Number and Street *
-                      </span>
-
-                      <input
-                        type="text"
-                        name="street"
-                        value={
-                          deliveryDetails.street
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.street
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="123 Rizal Street"
-                      />
-
-                      {errors.street && (
-                        <small>
-                          {errors.street}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field">
-                      <span>
-                        Barangay / City *
-                      </span>
-
-                      <input
-                        type="text"
-                        name="barangay"
-                        value={
-                          deliveryDetails.barangay
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.barangay
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="Barangay San Antonio, Makati"
-                      />
-
-                      {errors.barangay && (
-                        <small>
-                          {errors.barangay}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field">
-                      <span>Province *</span>
-
-                      <input
-                        type="text"
-                        name="province"
-                        value={
-                          deliveryDetails.province
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.province
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="Metro Manila"
-                      />
-
-                      {errors.province && (
-                        <small>
-                          {errors.province}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field">
-                      <span>Postal Code *</span>
-
-                      <input
-                        type="text"
-                        name="postalCode"
-                        value={
-                          deliveryDetails.postalCode
-                        }
-                        onChange={
-                          updateDeliveryField
-                        }
-                        className={
-                          errors.postalCode
-                            ? "field-error"
-                            : ""
-                        }
-                        placeholder="1203"
-                        maxLength={4}
-                      />
-
-                      {errors.postalCode && (
-                        <small>
-                          {errors.postalCode}
-                        </small>
-                      )}
-                    </label>
-
-                    <label className="checkout-field full-width">
-                      <span>
-                        Delivery Notes
-                      </span>
-
-                      <textarea
-                        value={deliveryNotes}
-                        onChange={(event) =>
-                          setDeliveryNotes(
-                            event.target.value
-                          )
-                        }
-                        rows={3}
-                        maxLength={180}
-                        placeholder="Add landmarks or delivery instructions."
-                      />
-
-                      <em>
-                        {deliveryNotes.length}
-                        /180
-                      </em>
-                    </label>
-                  </div>
-                </section>
-
-                <section className="checkout-section-card">
-                  <div className="checkout-section-heading">
-                    <div className="checkout-section-number">
-                      3
-                    </div>
-
-                    <div>
-                      <p>PAYMENT METHOD</p>
-                      <h3>
-                        Select a mock payment
-                        option
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="checkout-payment-options">
-                    <label
-                      className={
-                        paymentMethod ===
-                        "cash-on-delivery"
-                          ? "checkout-payment-option active"
-                          : "checkout-payment-option"
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        checked={
-                          paymentMethod ===
-                          "cash-on-delivery"
-                        }
-                        onChange={() =>
-                          selectPaymentMethod(
-                            "cash-on-delivery"
-                          )
-                        }
-                      />
-
-                      <div className="checkout-payment-icon">
-                        ₱
-                      </div>
-
-                      <div>
-                        <strong>
-                          Cash on Delivery
-                        </strong>
-
-                        <span>
-                          Pay when the order is
-                          delivered.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label
-                      className={
-                        paymentMethod === "card"
-                          ? "checkout-payment-option active"
-                          : "checkout-payment-option"
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        checked={
-                          paymentMethod === "card"
-                        }
-                        onChange={() =>
-                          selectPaymentMethod(
-                            "card"
-                          )
-                        }
-                      />
-
-                      <div className="checkout-payment-icon">
-                        ▣
-                      </div>
-
-                      <div>
-                        <strong>
-                          Debit or Credit Card
-                        </strong>
-
-                        <span>
-                          Prototype payment only.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label
-                      className={
-                        paymentMethod ===
-                        "e-wallet"
-                          ? "checkout-payment-option active"
-                          : "checkout-payment-option"
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        checked={
-                          paymentMethod ===
-                          "e-wallet"
-                        }
-                        onChange={() =>
-                          selectPaymentMethod(
-                            "e-wallet"
-                          )
-                        }
-                      />
-
-                      <div className="checkout-payment-icon">
-                        ◈
-                      </div>
-
-                      <div>
-                        <strong>
-                          E-Wallet
-                        </strong>
-
-                        <span>
-                          Simulated GCash or Maya.
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {paymentMethod === "card" && (
-                    <div className="checkout-conditional-fields">
-                      <p>
-                        MOCK CARD INFORMATION
-                      </p>
-
-                      <div className="checkout-form-grid">
-                        <label className="checkout-field full-width">
-                          <span>
-                            Cardholder Name *
-                          </span>
-
-                          <input
-                            type="text"
-                            name="cardholderName"
-                            value={
-                              cardDetails.cardholderName
-                            }
-                            onChange={
-                              updateCardField
-                            }
-                            className={
-                              errors.cardholderName
-                                ? "field-error"
-                                : ""
-                            }
-                            placeholder="JUAN DELA CRUZ"
-                          />
-
-                          {errors.cardholderName && (
-                            <small>
-                              {
-                                errors.cardholderName
-                              }
-                            </small>
-                          )}
-                        </label>
-
-                        <label className="checkout-field full-width">
-                          <span>
-                            Card Number *
-                          </span>
-
-                          <input
-                            type="text"
-                            name="cardNumber"
-                            value={
-                              cardDetails.cardNumber
-                            }
-                            onChange={
-                              updateCardField
-                            }
-                            className={
-                              errors.cardNumber
-                                ? "field-error"
-                                : ""
-                            }
-                            placeholder="1234 5678 9012 3456"
-                            inputMode="numeric"
-                          />
-
-                          {errors.cardNumber && (
-                            <small>
-                              {
-                                errors.cardNumber
-                              }
-                            </small>
-                          )}
-                        </label>
-
-                        <label className="checkout-field">
-                          <span>
-                            Expiration *
-                          </span>
-
-                          <input
-                            type="text"
-                            name="expiryDate"
-                            value={
-                              cardDetails.expiryDate
-                            }
-                            onChange={
-                              updateCardField
-                            }
-                            className={
-                              errors.expiryDate
-                                ? "field-error"
-                                : ""
-                            }
-                            placeholder="MM/YY"
-                            inputMode="numeric"
-                          />
-
-                          {errors.expiryDate && (
-                            <small>
-                              {
-                                errors.expiryDate
-                              }
-                            </small>
-                          )}
-                        </label>
-
-                        <label className="checkout-field">
-                          <span>
-                            Security Code *
-                          </span>
-
-                          <input
-                            type="password"
-                            name="securityCode"
-                            value={
-                              cardDetails.securityCode
-                            }
-                            onChange={
-                              updateCardField
-                            }
-                            className={
-                              errors.securityCode
-                                ? "field-error"
-                                : ""
-                            }
-                            placeholder="123"
-                            inputMode="numeric"
-                          />
-
-                          {errors.securityCode && (
-                            <small>
-                              {
-                                errors.securityCode
-                              }
-                            </small>
-                          )}
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentMethod ===
-                    "e-wallet" && (
-                    <div className="checkout-conditional-fields">
-                      <p>
-                        MOCK E-WALLET INFORMATION
-                      </p>
-
-                      <div className="checkout-form-grid">
-                        <label className="checkout-field">
-                          <span>E-Wallet *</span>
-
-                          <select
-                            name="walletType"
-                            value={
-                              walletDetails.walletType
-                            }
-                            onChange={
-                              updateWalletField
-                            }
-                          >
-                            <option value="GCash">
-                              GCash
-                            </option>
-
-                            <option value="Maya">
-                              Maya
-                            </option>
-                          </select>
-                        </label>
-
-                        <label className="checkout-field">
-                          <span>
-                            Mobile Number *
-                          </span>
-
-                          <input
-                            type="tel"
-                            name="mobileNumber"
-                            value={
-                              walletDetails.mobileNumber
-                            }
-                            onChange={
-                              updateWalletField
-                            }
-                            className={
-                              errors.mobileNumber
-                                ? "field-error"
-                                : ""
-                            }
-                            placeholder="09123456789"
-                            inputMode="numeric"
-                          />
-
-                          {errors.mobileNumber && (
-                            <small>
-                              {
-                                errors.mobileNumber
-                              }
-                            </small>
-                          )}
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              <aside className="checkout-summary-card">
-                <div className="checkout-summary-heading">
-                  <p>ORDER REVIEW</p>
-
-                  <h3>Your products</h3>
-
-                  <span>
-                    {
-                      checkoutData.items
-                        .length
-                    }{" "}
-                    {checkoutData.items
-                      .length === 1
-                      ? "product"
-                      : "products"}
-                  </span>
+                <div>
+                  <p>
+                    DELIVERY INFORMATION
+                  </p>
+
+                  <h2>
+                    Recipient and contact
+                  </h2>
                 </div>
+              </div>
 
-                <div className="checkout-products">
-                  {checkoutData.items.map(
-                    (item, index) => (
-                      <article
-                        key={
-                          item.id ||
-                          item.productId ||
-                          index
-                        }
-                      >
-                        <div
-                          className={`checkout-product-image ${
-                            item.colorClass ||
-                            "beige"
-                          }`}
-                        >
-                          {item.image ||
-                          item.imageUrl ? (
-                            <img
-                              src={
-                                item.image ||
-                                item.imageUrl
-                              }
-                              alt={
-                                item.name ||
-                                item.productName
-                              }
-                            />
-                          ) : (
-                            <span>
-                              {(item.category ||
-                                "C")
-                                .slice(0, 1)
-                                .toUpperCase()}
-                            </span>
-                          )}
+              <div className="checkout-fields-grid">
+                <label className="checkout-full-field">
+                  <span>Full Name *</span>
 
-                          <small>
-                            ×
-                            {Number(
-                              item.quantity
-                            ) || 1}
-                          </small>
-                        </div>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={form.fullName}
+                    onChange={
+                      handleInputChange
+                    }
+                    aria-invalid={
+                      Boolean(
+                        errors.fullName
+                      )
+                    }
+                  />
 
-                        <div>
-                          <span>
-                            {item.sellerName ||
-                              item.storeName ||
-                              "FitFusion Seller"}
-                          </span>
-
-                          <strong>
-                            {item.name ||
-                              item.productName}
-                          </strong>
-
-                          <p>
-                            Size:{" "}
-                            {item.size ||
-                              item.selectedSize ||
-                              "Not selected"}
-                            <br />
-                            Color:{" "}
-                            {item.color ||
-                              item.selectedColor ||
-                              "Default"}
-                          </p>
-                        </div>
-
-                        <b>
-                          ₱
-                          {(
-                            Number(
-                              item.price
-                            ) *
-                            (Number(
-                              item.quantity
-                            ) || 1)
-                          ).toLocaleString(
-                            "en-PH"
-                          )}
-                        </b>
-                      </article>
-                    )
+                  {errors.fullName && (
+                    <small className="checkout-field-error">
+                      {errors.fullName}
+                    </small>
                   )}
-                </div>
+                </label>
 
-                <div className="checkout-price-breakdown">
-                  <div>
-                    <span>Subtotal</span>
+                <label>
+                  <span>Email Address *</span>
 
-                    <strong>
-                      ₱
-                      {subtotal.toLocaleString(
-                        "en-PH"
-                      )}
-                    </strong>
-                  </div>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={
+                      handleInputChange
+                    }
+                    aria-invalid={
+                      Boolean(errors.email)
+                    }
+                  />
 
-                  <div>
-                    <span>
-                      Product discount
-                    </span>
+                  {errors.email && (
+                    <small className="checkout-field-error">
+                      {errors.email}
+                    </small>
+                  )}
+                </label>
 
-                    <strong className="checkout-discount">
-                      -₱
-                      {discount.toLocaleString(
-                        "en-PH"
-                      )}
-                    </strong>
-                  </div>
+                <label>
+                  <span>Contact Number *</span>
 
-                  <div>
-                    <span>Shipping fee</span>
-
-                    <strong>
-                      {shippingFee === 0
-                        ? "FREE"
-                        : `₱${shippingFee.toLocaleString(
-                            "en-PH"
-                          )}`}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="checkout-total">
-                  <span>Total</span>
-
-                  <strong>
-                    ₱
-                    {total.toLocaleString(
-                      "en-PH"
+                  <input
+                    type="tel"
+                    name="contactNumber"
+                    value={
+                      form.contactNumber
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    placeholder="09XXXXXXXXX"
+                    aria-invalid={Boolean(
+                      errors.contactNumber
                     )}
-                  </strong>
-                </div>
+                  />
 
+                  {errors.contactNumber && (
+                    <small className="checkout-field-error">
+                      {
+                        errors.contactNumber
+                      }
+                    </small>
+                  )}
+                </label>
+              </div>
+            </section>
+
+            <section className="checkout-form-card">
+              <div className="checkout-card-heading">
+                <strong>2</strong>
+
+                <div>
+                  <p>DELIVERY ADDRESS</p>
+
+                  <h2>
+                    Where should we deliver?
+                  </h2>
+                </div>
+              </div>
+
+              <div className="checkout-fields-grid">
+                <label className="checkout-full-field">
+                  <span>
+                    Street, Building, or Unit *
+                  </span>
+
+                  <input
+                    type="text"
+                    name="street"
+                    value={form.street}
+                    onChange={
+                      handleInputChange
+                    }
+                    placeholder="Unit, building, street"
+                    aria-invalid={
+                      Boolean(errors.street)
+                    }
+                  />
+
+                  {errors.street && (
+                    <small className="checkout-field-error">
+                      {errors.street}
+                    </small>
+                  )}
+                </label>
+
+                <label>
+                  <span>
+                    Barangay / City *
+                  </span>
+
+                  <input
+                    type="text"
+                    name="city"
+                    value={form.city}
+                    onChange={
+                      handleInputChange
+                    }
+                    placeholder="Barangay or city"
+                    aria-invalid={
+                      Boolean(errors.city)
+                    }
+                  />
+
+                  {errors.city && (
+                    <small className="checkout-field-error">
+                      {errors.city}
+                    </small>
+                  )}
+                </label>
+
+                <label>
+                  <span>Province *</span>
+
+                  <input
+                    type="text"
+                    name="province"
+                    value={form.province}
+                    onChange={
+                      handleInputChange
+                    }
+                    placeholder="Province"
+                    aria-invalid={Boolean(
+                      errors.province
+                    )}
+                  />
+
+                  {errors.province && (
+                    <small className="checkout-field-error">
+                      {errors.province}
+                    </small>
+                  )}
+                </label>
+
+                <label>
+                  <span>Postal Code *</span>
+
+                  <input
+                    type="text"
+                    name="postalCode"
+                    value={form.postalCode}
+                    onChange={
+                      handleInputChange
+                    }
+                    maxLength="4"
+                    inputMode="numeric"
+                    placeholder="0000"
+                    aria-invalid={Boolean(
+                      errors.postalCode
+                    )}
+                  />
+
+                  {errors.postalCode && (
+                    <small className="checkout-field-error">
+                      {errors.postalCode}
+                    </small>
+                  )}
+                </label>
+              </div>
+            </section>
+
+            <section className="checkout-form-card">
+              <div className="checkout-card-heading">
+                <strong>3</strong>
+
+                <div>
+                  <p>PAYMENT METHOD</p>
+
+                  <h2>
+                    Select your payment
+                  </h2>
+                </div>
+              </div>
+
+              <div className="checkout-payment-options">
                 <label
                   className={
-                    errors.terms
-                      ? "checkout-terms error"
-                      : "checkout-terms"
+                    form.paymentMethod ===
+                    "Cash on Delivery"
+                      ? "selected"
+                      : ""
                   }
                 >
                   <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={(event) => {
-                      setAcceptedTerms(
-                        event.target.checked
-                      );
-
-                      if (errors.terms) {
-                        setErrors(
-                          (currentErrors) => ({
-                            ...currentErrors,
-                            terms: "",
-                          })
-                        );
-                      }
-                    }}
+                    type="radio"
+                    name="paymentMethod"
+                    value="Cash on Delivery"
+                    checked={
+                      form.paymentMethod ===
+                      "Cash on Delivery"
+                    }
+                    onChange={
+                      handleInputChange
+                    }
                   />
 
-                  <span>
-                    I confirm that the order,
-                    delivery address and payment
-                    information are correct.
-                  </span>
+                  <div>
+                    <strong>
+                      Cash on Delivery
+                    </strong>
+
+                    <span>
+                      Pay when your products
+                      arrive.
+                    </span>
+                  </div>
                 </label>
 
-                {errors.terms && (
-                  <p className="checkout-terms-error">
-                    {errors.terms}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  className="checkout-place-order-button"
-                >
-                  Review and Place Order
-                </button>
-
-                <button
-                  type="button"
-                  className="checkout-return-cart-button"
-                  onClick={() =>
-                    navigate("/shopper/cart")
+                <label
+                  className={
+                    form.paymentMethod ===
+                    "Mock E-Wallet"
+                      ? "selected"
+                      : ""
                   }
                 >
-                  Return to Cart
-                </button>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="Mock E-Wallet"
+                    checked={
+                      form.paymentMethod ===
+                      "Mock E-Wallet"
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                  />
 
-                <p className="checkout-prototype-warning">
-                  Prototype only. No real payment
-                  or delivery will be processed.
-                </p>
-              </aside>
-            </form>
-          ) : (
-            <section className="checkout-empty">
-              <div>!</div>
+                  <div>
+                    <strong>
+                      Mock E-Wallet
+                    </strong>
 
-              <p>NO CHECKOUT PRODUCTS</p>
-
-              <h2>
-                Your checkout is currently empty
-              </h2>
-
-              <span>
-                Return to your shopping cart and
-                select at least one product
-                before proceeding.
-              </span>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/shopper/cart")
-                }
-              >
-                Return to Shopping Cart
-              </button>
+                    <span>
+                      Simulation only. No real
+                      payment is processed.
+                    </span>
+                  </div>
+                </label>
+              </div>
             </section>
-          )}
-        </div>
-      </section>
+          </div>
 
-      {showOrderModal && (
-        <div
-          className="checkout-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-                event.currentTarget &&
-              !isSubmitting
-            ) {
-              setShowOrderModal(false);
-            }
-          }}
-        >
-          <section
-            className="checkout-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="checkout-confirm-title"
-          >
-            <div className="checkout-modal-icon">
-              ✓
+          <aside className="checkout-order-review">
+            <p className="checkout-review-label">
+              ORDER REVIEW
+            </p>
+
+            <h2>Your products</h2>
+
+            <span>
+              {productCount}{" "}
+              {productCount === 1
+                ? "product"
+                : "products"}
+            </span>
+
+            <div className="checkout-divider" />
+
+            <div className="checkout-products">
+              {checkoutItems.map(
+                (item, index) => (
+                  <article
+                    className="checkout-product"
+                    key={
+                      item.id ||
+                      `${item.productId}-${index}`
+                    }
+                  >
+                    <div className="checkout-product-image">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                        />
+                      ) : (
+                        <strong>
+                          {(
+                            item.name ||
+                            "Product"
+                          ).charAt(0)}
+                        </strong>
+                      )}
+
+                      <small>
+                        ×
+                        {Number(
+                          item.quantity || 1
+                        )}
+                      </small>
+                    </div>
+
+                    <div className="checkout-product-copy">
+                      <span>
+                        {item.sellerName ||
+                          "FitFusion Seller"}
+                      </span>
+
+                      <strong>
+                        {item.name}
+                      </strong>
+
+                      <small>
+                        Size:{" "}
+                        {item.size || "M"}
+                      </small>
+
+                      <small>
+                        Color:{" "}
+                        {item.color ||
+                          "Default"}
+                      </small>
+                    </div>
+
+                    <strong className="checkout-product-price">
+                      {formatCurrency(
+                        Number(
+                          item.price || 0
+                        ) *
+                          Number(
+                            item.quantity ||
+                              1
+                          )
+                      )}
+                    </strong>
+                  </article>
+                )
+              )}
             </div>
 
-            <h2 id="checkout-confirm-title">
-              Confirm mock order
-            </h2>
+            <div className="checkout-divider" />
 
-            <p>
-              You are about to submit an order
-              worth{" "}
+            <div className="checkout-summary-row">
+              <span>Subtotal</span>
+
               <strong>
-                ₱
-                {total.toLocaleString(
-                  "en-PH"
+                {formatCurrency(
+                  originalSubtotal
                 )}
               </strong>
-              . No real payment will be charged.
+            </div>
+
+            <div className="checkout-summary-row discount">
+              <span>Product discount</span>
+
+              <strong>
+                −
+                {formatCurrency(
+                  productDiscount
+                )}
+              </strong>
+            </div>
+
+            <div className="checkout-summary-row">
+              <span>Shipping fee</span>
+
+              <strong>
+                {shippingFee === 0
+                  ? "FREE"
+                  : formatCurrency(
+                      shippingFee
+                    )}
+              </strong>
+            </div>
+
+            <div className="checkout-divider" />
+
+            <div className="checkout-total">
+              <span>Total</span>
+
+              <strong>
+                {formatCurrency(total)}
+              </strong>
+            </div>
+
+            <button
+              type="submit"
+              className="checkout-place-order-button"
+            >
+              Review and Place Order
+            </button>
+
+            <p className="checkout-prototype-note">
+              This is a simulated checkout. No
+              real payment will be charged.
             </p>
+          </aside>
+        </form>
+      </div>
 
-            <div className="checkout-modal-review">
-              <span>Recipient</span>
-              <strong>
-                {deliveryDetails.fullName}
-              </strong>
-
-              <span>Payment</span>
-              <strong>
-                {paymentMethod ===
-                "cash-on-delivery"
-                  ? "Cash on Delivery"
-                  : paymentMethod ===
-                      "card"
-                    ? "Mock Card Payment"
-                    : `${walletDetails.walletType} Mock Payment`}
-              </strong>
-
-              <span>Products</span>
-              <strong>
-                {
-                  checkoutData.items
-                    .length
-                }
-              </strong>
-            </div>
-
-            <div className="checkout-modal-actions">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() =>
-                  setShowOrderModal(false)
-                }
-              >
-                Review Again
-              </button>
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={placeOrder}
-              >
-                {isSubmitting
-                  ? "Submitting..."
-                  : "Confirm Order"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showLogoutModal && (
+      {showConfirmation && (
         <div
           className="checkout-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowLogoutModal(false);
-            }
-          }}
+          role="presentation"
+          onMouseDown={() =>
+            setShowConfirmation(false)
+          }
         >
           <section
-            className="checkout-modal"
+            className="checkout-confirmation-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="checkout-logout-title"
+            aria-labelledby="confirm-order-title"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
           >
-            <div className="checkout-modal-icon">
-              ↪
-            </div>
+            <p>CONFIRM ORDER</p>
 
-            <h2 id="checkout-logout-title">
-              Log out?
+            <h2 id="confirm-order-title">
+              Place this mock order?
             </h2>
 
-            <p>
-              Your unfinished checkout
-              information may be lost.
-            </p>
+            <span>
+              Please confirm that the delivery
+              information and selected products
+              are correct.
+            </span>
+
+            <div className="checkout-modal-summary">
+              <div>
+                <span>Products</span>
+
+                <strong>
+                  {productCount}
+                </strong>
+              </div>
+
+              <div>
+                <span>Payment</span>
+
+                <strong>
+                  {form.paymentMethod}
+                </strong>
+              </div>
+
+              <div>
+                <span>Total</span>
+
+                <strong>
+                  {formatCurrency(total)}
+                </strong>
+              </div>
+            </div>
 
             <div className="checkout-modal-actions">
               <button
                 type="button"
+                className="checkout-cancel-button"
                 onClick={() =>
-                  setShowLogoutModal(false)
+                  setShowConfirmation(false)
                 }
               >
-                Stay
+                Cancel
               </button>
 
               <button
                 type="button"
-                onClick={confirmLogout}
+                className="checkout-confirm-button"
+                onClick={handleConfirmOrder}
               >
-                Logout
+                Confirm Order
               </button>
             </div>
           </section>

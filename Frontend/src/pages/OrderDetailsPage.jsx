@@ -1,1282 +1,603 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useState } from "react";
 
 import {
-  NavLink,
+  Link,
   useNavigate,
   useParams,
 } from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./css/OrderDetailsPage.css";
 
-const fallbackOrder = {
-  id: "FF-10261001",
-  orderId: "FF-10261001",
-  orderNumber: "FF-10261001",
-  createdAt: "2026-10-01T08:30:00.000Z",
+const CART_STORAGE_KEY = "fitfusion-cart";
+const MAX_CART_QUANTITY = 10;
+
+const sampleOrder = {
+  id: "FF-38252027",
+  placedAt: "October 8, 2026",
   status: "Processing",
-  paymentStatus: "To Pay",
-  paymentMethod: "cash-on-delivery",
-  subtotal: 1598,
-  discount: 200,
-  shippingFee: 0,
-  total: 1598,
-  deliveryNotes:
-    "Please contact me when the rider arrives.",
-  deliveryDetails: {
-    fullName: "Karol Dein Tamo",
-    email: "karol@example.com",
-    phone: "09123456789",
-    street: "123 Rizal Street",
-    barangay:
-      "Barangay San Antonio, Makati City",
-    province: "Metro Manila",
-    postalCode: "1203",
+
+  customer: {
+    name: "Karol Shopper",
+    mobile: "+63 912 345 6789",
+    address: "Makati City, Metro Manila",
   },
+
+  paymentMethod: "Cash on Delivery",
+  shippingMethod: "Standard Delivery",
+  shippingFee: 0,
+
   items: [
     {
-      id: "luna-1",
-      name: "Classic Beige Top",
-      sellerId: "luna-clothing",
-      sellerName: "Luna Clothing",
-      category: "Tops",
-      price: 699,
-      originalPrice: 799,
-      quantity: 1,
-      size: "M",
+      id: "001",
+      productId: "001",
+      name: "Modern Structured Blazer",
+      category: "Outerwear",
+      sellerId: "maison-moderne",
+      sellerName: "Maison Moderne",
+      price: 1899,
+      originalPrice: 2299,
+      quantity: 8,
+      size: "2XL",
       color: "Beige",
-      colorClass: "beige",
+      sizes: ["S", "M", "L", "XL", "2XL"],
+      colors: ["Beige", "Black", "Brown"],
+      image: "",
     },
     {
-      id: "urban-1",
-      name: "High-Waist Denim Pants",
-      sellerId: "urban-threads",
-      sellerName: "Urban Threads",
-      category: "Bottoms",
+      id: "002",
+      productId: "002",
+      name: "Classic Linen Blouse",
+      category: "Tops",
+      sellerId: "aurelia-studio",
+      sellerName: "Aurelia Studio",
       price: 899,
       originalPrice: 1099,
       quantity: 1,
-      size: "M",
-      color: "Blue",
-      colorClass: "denim",
+      size: "S",
+      color: "Ivory",
+      sizes: ["XS", "S", "M", "L"],
+      colors: ["Ivory", "White", "Beige"],
+      image: "",
     },
   ],
 };
 
-const trackingSteps = [
-  {
-    id: "Processing",
-    title: "Order Confirmed",
-    description:
-      "The seller is preparing your products.",
-  },
-  {
-    id: "Shipped",
-    title: "Order Shipped",
-    description:
-      "Your order has been handed to the courier.",
-  },
-  {
-    id: "Out for Delivery",
-    title: "Out for Delivery",
-    description:
-      "Your order is on the way to your address.",
-  },
-  {
-    id: "Delivered",
-    title: "Order Delivered",
-    description:
-      "The order was delivered successfully.",
-  },
-];
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+  }).format(value);
+}
 
-function readStoredValue(key, fallback) {
+function readCart() {
   try {
-    const storedValue =
-      localStorage.getItem(key);
+    const storedCart = localStorage.getItem(
+      CART_STORAGE_KEY
+    );
 
-    if (!storedValue) {
-      return fallback;
+    if (!storedCart) {
+      return [];
     }
 
-    return JSON.parse(storedValue);
-  } catch {
-    return fallback;
-  }
-}
+    const parsedCart = JSON.parse(storedCart);
 
-function normalizeOrder(order, orderId) {
-  const products = Array.isArray(order?.items)
-    ? order.items
-    : Array.isArray(order?.products)
-      ? order.products
+    return Array.isArray(parsedCart)
+      ? parsedCart
       : [];
-
-  return {
-    id:
-      order?.id ||
-      order?.orderId ||
-      orderId ||
-      fallbackOrder.id,
-    orderId:
-      order?.orderId ||
-      order?.id ||
-      orderId ||
-      fallbackOrder.orderId,
-    orderNumber:
-      order?.orderNumber ||
-      order?.orderId ||
-      order?.id ||
-      orderId ||
-      fallbackOrder.orderNumber,
-    createdAt:
-      order?.createdAt ||
-      order?.date ||
-      new Date().toISOString(),
-    status: order?.status || "Processing",
-    paymentStatus:
-      order?.paymentStatus || "To Pay",
-    paymentMethod:
-      order?.paymentMethod ||
-      "cash-on-delivery",
-    subtotal:
-      Number(order?.subtotal) || 0,
-    discount:
-      Number(order?.discount) || 0,
-    shippingFee:
-      Number(order?.shippingFee) || 0,
-    total: Number(order?.total) || 0,
-    deliveryDetails:
-      order?.deliveryDetails || {},
-    deliveryNotes:
-      order?.deliveryNotes || "",
-    items: products.map((item, index) => ({
-      id:
-        item?.id ||
-        item?.productId ||
-        `order-item-${index + 1}`,
-      name:
-        item?.name ||
-        item?.productName ||
-        `Product ${index + 1}`,
-      sellerId:
-        item?.sellerId ||
-        item?.storeId ||
-        "luna-clothing",
-      sellerName:
-        item?.sellerName ||
-        item?.storeName ||
-        "FitFusion Seller",
-      category:
-        item?.category || "Clothing",
-      price: Number(item?.price) || 0,
-      originalPrice:
-        Number(item?.originalPrice) ||
-        Number(item?.price) ||
-        0,
-      quantity:
-        Number(item?.quantity) || 1,
-      size:
-        item?.size ||
-        item?.selectedSize ||
-        "",
-      color:
-        item?.color ||
-        item?.selectedColor ||
-        "Default",
-      image:
-        item?.image ||
-        item?.imageUrl ||
-        "",
-      colorClass:
-        item?.colorClass || "beige",
-    })),
-  };
+  } catch {
+    return [];
+  }
 }
 
-function loadOrder(orderId) {
-  const storedOrders =
-    readStoredValue(
-      "fitfusion-orders",
-      []
-    );
+function saveCart(cart) {
+  localStorage.setItem(
+    CART_STORAGE_KEY,
+    JSON.stringify(cart)
+  );
 
-  if (Array.isArray(storedOrders)) {
-    const matchingOrder =
-      storedOrders.find(
-        (order) =>
-          String(
-            order.id ||
-              order.orderId ||
-              order.orderNumber
-          ) === String(orderId)
-      );
-
-    if (matchingOrder) {
-      return normalizeOrder(
-        matchingOrder,
-        orderId
-      );
-    }
-  }
-
-  const selectedOrder =
-    readStoredValue(
-      "fitfusion-selected-order",
-      null
-    );
-
-  if (selectedOrder) {
-    return normalizeOrder(
-      selectedOrder,
-      orderId
-    );
-  }
-
-  const latestOrder =
-    readStoredValue(
-      "fitfusion-latest-order",
-      null
-    );
-
-  if (latestOrder) {
-    return normalizeOrder(
-      latestOrder,
-      orderId
-    );
-  }
-
-  return normalizeOrder(
-    {
-      ...fallbackOrder,
-      id:
-        orderId ||
-        fallbackOrder.id,
-      orderId:
-        orderId ||
-        fallbackOrder.orderId,
-      orderNumber:
-        orderId ||
-        fallbackOrder.orderNumber,
-    },
-    orderId
+  window.dispatchEvent(
+    new CustomEvent(
+      "fitfusion-cart-updated",
+      {
+        detail: {
+          cart,
+          quantity: cart.length,
+        },
+      }
+    )
   );
 }
 
-function formatDate(dateValue, includeTime = false) {
-  const date = new Date(dateValue);
+function addItemsToCart(items) {
+  const currentCart = readCart();
+  const nextCart = [...currentCart];
 
-  if (Number.isNaN(date.getTime())) {
-    return "Date unavailable";
-  }
+  items.forEach((orderItem) => {
+    const existingIndex =
+      nextCart.findIndex(
+        (cartItem) =>
+          String(
+            cartItem.productId ??
+              cartItem.id
+          ) ===
+            String(
+              orderItem.productId ??
+                orderItem.id
+            ) &&
+          cartItem.size ===
+            orderItem.size &&
+          cartItem.color ===
+            orderItem.color
+      );
 
-  const options = {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  };
+    if (existingIndex >= 0) {
+      const existingItem =
+        nextCart[existingIndex];
 
-  if (includeTime) {
-    options.hour = "numeric";
-    options.minute = "2-digit";
-  }
+      nextCart[existingIndex] = {
+        ...existingItem,
+        quantity: Math.min(
+          MAX_CART_QUANTITY,
+          Number(
+            existingItem.quantity || 1
+          ) +
+            Number(
+              orderItem.quantity || 1
+            )
+        ),
+        selected: true,
+      };
 
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    options
-  ).format(date);
-}
+      return;
+    }
 
-function formatPaymentMethod(method) {
-  if (method === "cash-on-delivery") {
-    return "Cash on Delivery";
-  }
+    nextCart.push({
+      id: `${orderItem.productId}-${orderItem.size}-${orderItem.color}`,
+      productId: orderItem.productId,
+      name: orderItem.name,
+      category: orderItem.category,
+      sellerId: orderItem.sellerId,
+      sellerName: orderItem.sellerName,
+      price: Number(orderItem.price),
+      originalPrice: Number(
+        orderItem.originalPrice ||
+          orderItem.price
+      ),
+      quantity: Math.min(
+        MAX_CART_QUANTITY,
+        Number(orderItem.quantity || 1)
+      ),
+      size: orderItem.size,
+      color: orderItem.color,
+      sizes: orderItem.sizes,
+      colors: orderItem.colors,
+      image: orderItem.image || "",
+      selected: true,
+    });
+  });
 
-  if (method === "card") {
-    return "Debit or Credit Card";
-  }
-
-  if (method === "e-wallet") {
-    return "E-Wallet";
-  }
-
-  return method || "Not specified";
+  saveCart(nextCart);
 }
 
 function OrderDetailsPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
 
-  const [order, setOrder] = useState(() =>
-    loadOrder(orderId)
-  );
+  const [orderStatus, setOrderStatus] =
+    useState(sampleOrder.status);
 
   const [notice, setNotice] = useState("");
+
   const [showCancelModal, setShowCancelModal] =
     useState(false);
 
-  const [showRatingModal, setShowRatingModal] =
-    useState(false);
+  const order = {
+    ...sampleOrder,
+    id: orderId || sampleOrder.id,
+    status: orderStatus,
+  };
 
-  const [showLogoutModal, setShowLogoutModal] =
-    useState(false);
-
-  const [rating, setRating] = useState(0);
-  const [review, setReview] = useState("");
-  const [ratingError, setRatingError] =
-    useState("");
-
-  useEffect(() => {
-    const loadedOrder =
-      loadOrder(orderId);
-
-    setOrder(loadedOrder);
-
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, [orderId]);
-
-  const cartCount = useMemo(() => {
-    const cartItems =
-      readStoredValue(
-        "fitfusion-cart-items",
-        []
-      );
-
-    if (!Array.isArray(cartItems)) {
-      return 0;
-    }
-
-    return cartItems.reduce(
+  const originalSubtotal =
+    order.items.reduce(
       (total, item) =>
         total +
-        (Number(item.quantity) || 1),
+        Number(item.originalPrice) *
+          Number(item.quantity),
       0
     );
-  }, [notice]);
 
-  const calculatedSubtotal = useMemo(() => {
-    if (order.subtotal > 0) {
-      return order.subtotal;
-    }
-
-    return order.items.reduce(
+  const discountedSubtotal =
+    order.items.reduce(
       (total, item) =>
         total +
-        item.price * item.quantity,
+        Number(item.price) *
+          Number(item.quantity),
       0
     );
-  }, [order]);
 
-  const calculatedTotal =
-    order.total > 0
-      ? order.total
-      : calculatedSubtotal +
-        order.shippingFee;
+  const productDiscount =
+    originalSubtotal - discountedSubtotal;
 
-  const currentTrackingIndex =
-    useMemo(() => {
-      if (
-        order.status === "Cancelled"
-      ) {
-        return -1;
-      }
+  const total =
+    discountedSubtotal +
+    Number(order.shippingFee || 0);
 
-      return trackingSteps.findIndex(
-        (step) =>
-          step.id === order.status
-      );
-    }, [order.status]);
+  const canCancelOrder =
+    orderStatus === "Processing" ||
+    orderStatus === "To Ship";
 
-  function displayNotice(message) {
+  function showNotice(message) {
     setNotice(message);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       setNotice("");
-    }, 2700);
+    }, 2500);
   }
 
-  function updateStoredOrder(updatedOrder) {
-    const storedOrders =
-      readStoredValue(
-        "fitfusion-orders",
-        []
-      );
+  function handleBuyAgain(item) {
+    addItemsToCart([item]);
 
-    let updatedOrders = [];
-
-    if (Array.isArray(storedOrders)) {
-      const orderExists =
-        storedOrders.some(
-          (storedOrder) =>
-            String(
-              storedOrder.id ||
-                storedOrder.orderId
-            ) ===
-            String(updatedOrder.orderId)
-        );
-
-      if (orderExists) {
-        updatedOrders = storedOrders.map(
-          (storedOrder) =>
-            String(
-              storedOrder.id ||
-                storedOrder.orderId
-            ) ===
-            String(updatedOrder.orderId)
-              ? updatedOrder
-              : storedOrder
-        );
-      } else {
-        updatedOrders = [
-          updatedOrder,
-          ...storedOrders,
-        ];
-      }
-    } else {
-      updatedOrders = [updatedOrder];
-    }
-
-    localStorage.setItem(
-      "fitfusion-orders",
-      JSON.stringify(updatedOrders)
+    showNotice(
+      `${item.name} was added to your cart.`
     );
 
-    localStorage.setItem(
-      "fitfusion-selected-order",
-      JSON.stringify(updatedOrder)
-    );
+    window.setTimeout(() => {
+      navigate("/shopper/cart");
+    }, 500);
   }
 
-  function cancelOrder() {
-    const updatedOrder = {
-      ...order,
-      status: "Cancelled",
-      paymentStatus:
-        order.paymentStatus ===
-        "Mock Paid"
-          ? "Mock Refund Pending"
-          : "Cancelled",
-      cancelledAt:
-        new Date().toISOString(),
-    };
+  function handleBuyAllAgain() {
+    addItemsToCart(order.items);
 
-    setOrder(updatedOrder);
-    updateStoredOrder(updatedOrder);
+    showNotice(
+      "All products were added to your cart."
+    );
+
+    window.setTimeout(() => {
+      navigate("/shopper/cart");
+    }, 500);
+  }
+
+  function handleCancelOrder() {
+    setOrderStatus("Cancelled");
     setShowCancelModal(false);
 
-    displayNotice(
-      `Order ${order.orderNumber} was cancelled.`
+    showNotice(
+      "Your order has been cancelled."
     );
-  }
-
-  function buyAgain() {
-    const storedCart =
-      readStoredValue(
-        "fitfusion-cart-items",
-        []
-      );
-
-    const updatedCart = Array.isArray(
-      storedCart
-    )
-      ? [...storedCart]
-      : [];
-
-    order.items.forEach((orderItem) => {
-      const existingIndex =
-        updatedCart.findIndex(
-          (cartItem) =>
-            String(
-              cartItem.id ||
-                cartItem.productId
-            ) === String(orderItem.id) &&
-            (cartItem.size ||
-              cartItem.selectedSize) ===
-              orderItem.size &&
-            (cartItem.color ||
-              cartItem.selectedColor) ===
-              orderItem.color
-        );
-
-      if (existingIndex >= 0) {
-        updatedCart[existingIndex] = {
-          ...updatedCart[existingIndex],
-          quantity:
-            (Number(
-              updatedCart[existingIndex]
-                .quantity
-            ) || 1) +
-            orderItem.quantity,
-        };
-      } else {
-        updatedCart.push({
-          ...orderItem,
-        });
-      }
-    });
-
-    localStorage.setItem(
-      "fitfusion-cart-items",
-      JSON.stringify(updatedCart)
-    );
-
-    displayNotice(
-      `${order.items.length} ${
-        order.items.length === 1
-          ? "product was"
-          : "products were"
-      } added to your cart.`
-    );
-  }
-
-  function openProduct(item) {
-    localStorage.setItem(
-      "fitfusion-selected-product",
-      JSON.stringify(item)
-    );
-
-    navigate(
-      `/shopper/products/${item.id}`
-    );
-  }
-
-  function submitRating(event) {
-    event.preventDefault();
-
-    if (rating === 0) {
-      setRatingError(
-        "Please select a star rating."
-      );
-
-      return;
-    }
-
-    const storedReviews =
-      readStoredValue(
-        "fitfusion-product-reviews",
-        []
-      );
-
-    const newReview = {
-      id: `review-${Date.now()}`,
-      orderId: order.orderId,
-      rating,
-      review: review.trim(),
-      createdAt:
-        new Date().toISOString(),
-      products: order.items.map(
-        (item) => ({
-          id: item.id,
-          name: item.name,
-        })
-      ),
-    };
-
-    const updatedReviews =
-      Array.isArray(storedReviews)
-        ? [newReview, ...storedReviews]
-        : [newReview];
-
-    localStorage.setItem(
-      "fitfusion-product-reviews",
-      JSON.stringify(updatedReviews)
-    );
-
-    const updatedOrder = {
-      ...order,
-      reviewed: true,
-      rating,
-    };
-
-    setOrder(updatedOrder);
-    updateStoredOrder(updatedOrder);
-
-    setShowRatingModal(false);
-    setRatingError("");
-    setReview("");
-
-    displayNotice(
-      "Thank you! Your prototype review was submitted."
-    );
-  }
-
-  function confirmLogout() {
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
-
-    navigate("/login");
   }
 
   return (
     <main className="order-details-page">
-      <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
+      {notice && (
+        <div
+          className="order-details-toast"
+          role="status"
+        >
+          {notice}
+        </div>
+      )}
+
+      <div className="order-details-container">
+        <div className="order-details-back-row">
+          <Link
+            to="/shopper/orders"
+            className="order-details-back-link"
+          >
+            ← Return to Order History
+          </Link>
         </div>
 
-        <nav className="shopper-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="shopper-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="shopper-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="shopper-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="shopper-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="shopper-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className={() =>
-              "shopper-nav-link active"
-            }
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="shopper-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="shopper-logout-button"
-          onClick={() =>
-            setShowLogoutModal(true)
-          }
-        >
-          Logout
-        </button>
-      </aside>
-
-      <section className="order-details-content">
-        <header className="order-details-header">
+        <section className="order-details-heading">
           <div>
-            <button
-              type="button"
-              className="order-details-back"
-              onClick={() =>
-                navigate("/shopper/orders")
-              }
-            >
-              ← Back to Order History
-            </button>
+            <p className="order-details-eyebrow">
+              ORDER DETAILS
+            </p>
 
-            <h1>Order Details</h1>
+            <h1>Order #{order.id}</h1>
 
             <p>
-              Review your products, payment and
-              delivery information.
+              Placed on {order.placedAt}
             </p>
           </div>
 
-          <div className="order-details-header-actions">
+          <span
+            className={`order-details-status ${orderStatus
+              .toLowerCase()
+              .replaceAll(" ", "-")}`}
+          >
+            {orderStatus}
+          </span>
+        </section>
+
+        <section className="order-details-information">
+          <article>
+            <span>DELIVERY INFORMATION</span>
+
+            <strong>
+              {order.customer.name}
+            </strong>
+
+            <p>{order.customer.mobile}</p>
+
+            <p>{order.customer.address}</p>
+          </article>
+
+          <article>
+            <span>PAYMENT METHOD</span>
+
+            <strong>
+              {order.paymentMethod}
+            </strong>
+
+            <p>
+              No real payment is processed in
+              this prototype.
+            </p>
+          </article>
+
+          <article>
+            <span>SHIPPING METHOD</span>
+
+            <strong>
+              {order.shippingMethod}
+            </strong>
+
+            <p>
+              Your order will be prepared by
+              the seller.
+            </p>
+          </article>
+        </section>
+
+        <section className="order-details-products-card">
+          <div className="order-details-products-heading">
+            <div>
+              <p>ORDERED PRODUCTS</p>
+
+              <h2>
+                {order.items.length}{" "}
+                {order.items.length === 1
+                  ? "product"
+                  : "products"}
+              </h2>
+            </div>
+
             <button
               type="button"
-              className="order-details-cart-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
+              className="order-details-outline-button"
+              onClick={handleBuyAllAgain}
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
-              </svg>
-
-              <span>{cartCount}</span>
+              Buy All Again
             </button>
-
-            <div className="order-details-role">
-              REGISTERED SHOPPER
-            </div>
           </div>
-        </header>
 
-        <div className="order-details-body">
-          {notice && (
-            <div
-              className="order-details-notice"
-              role="status"
-            >
-              {notice}
-            </div>
-          )}
-
-          <section className="order-details-overview">
-            <div>
-              <p>ORDER NUMBER</p>
-
-              <h2>{order.orderNumber}</h2>
-
-              <span>
-                Placed on{" "}
-                {formatDate(
-                  order.createdAt,
-                  true
-                )}
-              </span>
-            </div>
-
-            <div className="order-details-overview-actions">
-              <span
-                className={`order-details-status status-${order.status
-                  .toLowerCase()
-                  .replace(/\s+/g, "-")}`}
+          <div className="order-details-products-list">
+            {order.items.map((item) => (
+              <article
+                className="order-details-product-row"
+                key={`${item.productId}-${item.size}-${item.color}`}
               >
-                {order.status}
-              </span>
-
-              <button
-                type="button"
-                onClick={() =>
-                  window.print()
-                }
-              >
-                Print Order
-              </button>
-            </div>
-          </section>
-
-          <section className="order-tracking-card">
-            <div className="order-details-section-heading">
-              <div>
-                <p>ORDER PROGRESS</p>
-                <h3>Delivery status</h3>
-              </div>
-
-              <span>
-                Last updated today
-              </span>
-            </div>
-
-            {order.status === "Cancelled" ? (
-              <div className="order-cancelled-message">
-                <div>×</div>
-
-                <div>
-                  <strong>
-                    This order was cancelled
-                  </strong>
-
-                  <span>
-                    No further delivery updates
-                    will be provided.
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="order-tracking-steps">
-                {trackingSteps.map(
-                  (step, index) => {
-                    const isComplete =
-                      index <
-                      currentTrackingIndex;
-
-                    const isActive =
-                      index ===
-                      currentTrackingIndex;
-
-                    return (
-                      <article
-                        key={step.id}
-                        className={
-                          isComplete
-                            ? "completed"
-                            : isActive
-                              ? "active"
-                              : ""
-                        }
-                      >
-                        <div className="order-tracking-marker">
-                          {isComplete
-                            ? "✓"
-                            : index + 1}
-                        </div>
-
-                        <div>
-                          <strong>
-                            {step.title}
-                          </strong>
-
-                          <span>
-                            {step.description}
-                          </span>
-                        </div>
-                      </article>
-                    );
+                <button
+                  type="button"
+                  className="order-details-product-image"
+                  onClick={() =>
+                    navigate(
+                      `/shopper/products/${item.productId}`
+                    )
                   }
-                )}
-              </div>
-            )}
-          </section>
-
-          <div className="order-details-information-grid">
-            <section className="order-information-card">
-              <div className="order-details-section-heading">
-                <div>
-                  <p>DELIVERY INFORMATION</p>
-                  <h3>Delivery address</h3>
-                </div>
-              </div>
-
-              <div className="order-information-content">
-                <strong>
-                  {order.deliveryDetails
-                    .fullName ||
-                    "Registered Shopper"}
-                </strong>
-
-                <p>
-                  {order.deliveryDetails
-                    .street ||
-                    "Address unavailable"}
-                  <br />
-
-                  {order.deliveryDetails
-                    .barangay || ""}
-                  {order.deliveryDetails
-                    .barangay &&
-                  order.deliveryDetails
-                    .province
-                    ? ", "
-                    : ""}
-
-                  {order.deliveryDetails
-                    .province || ""}
-
-                  {order.deliveryDetails
-                    .postalCode && (
-                    <>
-                      <br />
-                      Postal Code:{" "}
-                      {
-                        order
-                          .deliveryDetails
-                          .postalCode
-                      }
-                    </>
-                  )}
-                </p>
-
-                <span>
-                  Contact:{" "}
-                  {order.deliveryDetails
-                    .phone ||
-                    "Not provided"}
-                </span>
-
-                <span>
-                  Email:{" "}
-                  {order.deliveryDetails
-                    .email ||
-                    "Not provided"}
-                </span>
-
-                {order.deliveryNotes && (
-                  <div className="order-delivery-notes">
-                    <b>Delivery Notes</b>
-
-                    <span>
-                      {order.deliveryNotes}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="order-information-card">
-              <div className="order-details-section-heading">
-                <div>
-                  <p>PAYMENT INFORMATION</p>
-                  <h3>Payment summary</h3>
-                </div>
-              </div>
-
-              <div className="order-payment-information">
-                <div>
-                  <span>Payment Method</span>
-
-                  <strong>
-                    {formatPaymentMethod(
-                      order.paymentMethod
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Payment Status</span>
-
-                  <strong>
-                    {order.paymentStatus}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Order Total</span>
-
-                  <strong>
-                    ₱
-                    {calculatedTotal.toLocaleString(
-                      "en-PH"
-                    )}
-                  </strong>
-                </div>
-              </div>
-
-              <p className="order-payment-warning">
-                This is a simulated order. No
-                actual payment transaction was
-                processed.
-              </p>
-            </section>
-          </div>
-
-          <section className="order-products-card">
-            <div className="order-details-section-heading">
-              <div>
-                <p>ORDERED PRODUCTS</p>
-
-                <h3>
-                  {order.items.length}{" "}
-                  {order.items.length === 1
-                    ? "product"
-                    : "products"}
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={buyAgain}
-              >
-                Buy All Again
-              </button>
-            </div>
-
-            <div className="order-products-list">
-              {order.items.map((item) => (
-                <article
-                  key={item.id}
-                  className="order-product"
+                  aria-label={`View ${item.name}`}
                 >
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                    />
+                  ) : (
+                    <span aria-hidden="true">
+                      {item.name.charAt(0)}
+                    </span>
+                  )}
+
+                  <small>
+                    ×{item.quantity}
+                  </small>
+                </button>
+
+                <div className="order-details-product-information">
+                  <Link
+                    to={`/shopper/sellers/${item.sellerId}`}
+                    className="order-details-seller-link"
+                  >
+                    {item.sellerName} →
+                  </Link>
+
                   <button
                     type="button"
-                    className={`order-product-image ${item.colorClass}`}
+                    className="order-details-product-name"
                     onClick={() =>
-                      openProduct(item)
+                      navigate(
+                        `/shopper/products/${item.productId}`
+                      )
                     }
                   >
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                      />
-                    ) : (
-                      <span>
-                        {item.category
-                          .slice(0, 1)
-                          .toUpperCase()}
-                      </span>
-                    )}
-
-                    <small>
-                      ×{item.quantity}
-                    </small>
+                    {item.name}
                   </button>
 
-                  <div className="order-product-information">
-                    <button
-                      type="button"
-                      className="order-product-seller"
-                      onClick={() =>
-                        navigate(
-                          `/shopper/sellers/${item.sellerId}`
-                        )
-                      }
-                    >
-                      {item.sellerName} →
-                    </button>
+                  <p>{item.category}</p>
 
-                    <button
-                      type="button"
-                      className="order-product-name"
-                      onClick={() =>
-                        openProduct(item)
-                      }
-                    >
-                      {item.name}
-                    </button>
+                  <div className="order-details-product-options">
+                    <span>
+                      Size: {item.size}
+                    </span>
 
-                    <p>{item.category}</p>
+                    <span>
+                      Color: {item.color}
+                    </span>
 
-                    <div className="order-product-variations">
-                      <span>
-                        Size:{" "}
-                        {item.size || "N/A"}
-                      </span>
-
-                      <span>
-                        Color: {item.color}
-                      </span>
-
-                      <span>
-                        Quantity:{" "}
-                        {item.quantity}
-                      </span>
-                    </div>
+                    <span>
+                      Quantity: {item.quantity}
+                    </span>
                   </div>
+                </div>
 
-                  <div className="order-product-price">
-                    <span>Price</span>
+                <div className="order-details-product-price">
+                  <span>Price</span>
 
-                    <strong>
-                      ₱
-                      {item.price.toLocaleString(
-                        "en-PH"
-                      )}
-                    </strong>
+                  <strong>
+                    {formatCurrency(
+                      item.price
+                    )}
+                  </strong>
 
-                    <small>
-                      Item total: ₱
-                      {(
-                        item.price *
+                  <small>
+                    Item total:{" "}
+                    {formatCurrency(
+                      item.price *
                         item.quantity
-                      ).toLocaleString(
-                        "en-PH"
-                      )}
-                    </small>
-                  </div>
+                    )}
+                  </small>
+                </div>
 
-                  <div className="order-product-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openProduct(item)
-                      }
-                    >
-                      View Product
-                    </button>
+                <div className="order-details-product-actions">
+                  <button
+                    type="button"
+                    className="order-details-outline-button"
+                    onClick={() =>
+                      navigate(
+                        `/shopper/products/${item.productId}`
+                      )
+                    }
+                  >
+                    View Product
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const productOrder = {
-                          ...order,
-                          items: [item],
-                        };
+                  <button
+                    type="button"
+                    className="order-details-dark-button"
+                    onClick={() =>
+                      handleBuyAgain(item)
+                    }
+                  >
+                    Buy Again
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
 
-                        const originalOrder =
-                          order;
+        <section className="order-details-bottom-grid">
+          <article className="order-details-payment-card">
+            <div className="order-details-payment-row">
+              <span>Subtotal</span>
 
-                        setOrder(
-                          productOrder
-                        );
-
-                        setTimeout(() => {
-                          buyAgain();
-                          setOrder(
-                            originalOrder
-                          );
-                        }, 0);
-                      }}
-                    >
-                      Buy Again
-                    </button>
-                  </div>
-                </article>
-              ))}
+              <strong>
+                {formatCurrency(
+                  originalSubtotal
+                )}
+              </strong>
             </div>
-          </section>
 
-          <div className="order-details-bottom-grid">
-            <section className="order-total-card">
-              <div>
-                <span>Subtotal</span>
+            <div className="order-details-payment-row discount">
+              <span>Product Discount</span>
 
-                <strong>
-                  ₱
-                  {calculatedSubtotal.toLocaleString(
-                    "en-PH"
-                  )}
-                </strong>
-              </div>
+              <strong>
+                −
+                {formatCurrency(
+                  productDiscount
+                )}
+              </strong>
+            </div>
 
-              <div>
-                <span>Product Discount</span>
+            <div className="order-details-payment-row">
+              <span>Shipping Fee</span>
 
-                <strong className="order-discount">
-                  -₱
-                  {order.discount.toLocaleString(
-                    "en-PH"
-                  )}
-                </strong>
-              </div>
+              <strong>
+                {order.shippingFee === 0
+                  ? "FREE"
+                  : formatCurrency(
+                      order.shippingFee
+                    )}
+              </strong>
+            </div>
 
-              <div>
-                <span>Shipping Fee</span>
+            <div className="order-details-payment-total">
+              <span>Total</span>
 
-                <strong>
-                  {order.shippingFee === 0
-                    ? "FREE"
-                    : `₱${order.shippingFee.toLocaleString(
-                        "en-PH"
-                      )}`}
-                </strong>
-              </div>
+              <strong>
+                {formatCurrency(total)}
+              </strong>
+            </div>
+          </article>
 
-              <div className="order-grand-total">
-                <span>Total</span>
+          <article className="order-details-actions-card">
+            <p>ORDER ACTIONS</p>
 
-                <strong>
-                  ₱
-                  {calculatedTotal.toLocaleString(
-                    "en-PH"
-                  )}
-                </strong>
-              </div>
-            </section>
-
-            <section className="order-details-actions-card">
-              <p>ORDER ACTIONS</p>
-
-              {order.status ===
-                "Processing" && (
-                <button
-                  type="button"
-                  className="order-cancel-button"
-                  onClick={() =>
-                    setShowCancelModal(true)
-                  }
-                >
-                  Cancel Order
-                </button>
-              )}
-
-              {order.status ===
-                "Delivered" && (
-                <button
-                  type="button"
-                  className="order-rate-button"
-                  onClick={() =>
-                    setShowRatingModal(true)
-                  }
-                >
-                  {order.reviewed
-                    ? `Rated ${order.rating}/5`
-                    : "Rate This Order"}
-                </button>
-              )}
-
+            {canCancelOrder && (
               <button
                 type="button"
-                className="order-buy-again-button"
-                onClick={buyAgain}
-              >
-                Buy Again
-              </button>
-
-              <button
-                type="button"
-                className="order-contact-button"
+                className="order-details-cancel-button"
                 onClick={() =>
-                  displayNotice(
-                    "Customer support messaging will be connected to the backend later."
-                  )
+                  setShowCancelModal(true)
                 }
               >
-                Contact Support
+                Cancel Order
               </button>
-            </section>
-          </div>
-        </div>
-      </section>
+            )}
+
+            <button
+              type="button"
+              className="order-details-buy-all-button"
+              onClick={handleBuyAllAgain}
+            >
+              Buy Again
+            </button>
+
+            <Link
+              to="/shopper/orders"
+              className="order-details-history-button"
+            >
+              Return to Order History
+            </Link>
+          </article>
+        </section>
+      </div>
 
       {showCancelModal && (
         <div
           className="order-details-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowCancelModal(false);
-            }
-          }}
+          role="presentation"
+          onMouseDown={() =>
+            setShowCancelModal(false)
+          }
         >
           <section
             className="order-details-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="order-cancel-title"
+            aria-labelledby="cancel-order-title"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
           >
-            <div className="order-details-modal-icon danger">
-              !
-            </div>
+            <p>CONFIRM ORDER CANCELLATION</p>
 
-            <h2 id="order-cancel-title">
+            <h2 id="cancel-order-title">
               Cancel this order?
             </h2>
 
-            <p>
-              Order{" "}
-              <strong>
-                {order.orderNumber}
-              </strong>{" "}
-              will be cancelled. This action
-              cannot be undone in the prototype.
-            </p>
+            <span>
+              This will cancel order #
+              {order.id}. You may purchase the
+              products again later.
+            </span>
 
             <div className="order-details-modal-actions">
               <button
                 type="button"
-                className="order-details-modal-secondary"
+                className="order-details-outline-button"
                 onClick={() =>
                   setShowCancelModal(false)
                 }
@@ -1286,157 +607,10 @@ function OrderDetailsPage() {
 
               <button
                 type="button"
-                className="order-details-modal-danger"
-                onClick={cancelOrder}
+                className="order-details-cancel-button"
+                onClick={handleCancelOrder}
               >
-                Cancel Order
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showRatingModal && (
-        <div
-          className="order-details-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowRatingModal(false);
-            }
-          }}
-        >
-          <form
-            className="order-details-modal"
-            onSubmit={submitRating}
-          >
-            <div className="order-details-modal-icon">
-              ★
-            </div>
-
-            <h2>Rate your order</h2>
-
-            <p>
-              Tell us about your experience with
-              the products in this order.
-            </p>
-
-            <div className="order-rating-stars">
-              {[1, 2, 3, 4, 5].map(
-                (star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className={
-                      star <= rating
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() => {
-                      setRating(star);
-                      setRatingError("");
-                    }}
-                    aria-label={`${star} stars`}
-                  >
-                    ★
-                  </button>
-                )
-              )}
-            </div>
-
-            {ratingError && (
-              <span className="order-rating-error">
-                {ratingError}
-              </span>
-            )}
-
-            <label className="order-review-field">
-              <span>
-                Review (optional)
-              </span>
-
-              <textarea
-                value={review}
-                onChange={(event) =>
-                  setReview(
-                    event.target.value
-                  )
-                }
-                placeholder="Share your experience with the products, sizes, and seller."
-                maxLength={300}
-                rows={4}
-              />
-
-              <small>
-                {review.length}/300
-              </small>
-            </label>
-
-            <div className="order-details-modal-actions">
-              <button
-                type="button"
-                className="order-details-modal-secondary"
-                onClick={() =>
-                  setShowRatingModal(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="order-details-modal-primary"
-              >
-                Submit Review
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showLogoutModal && (
-        <div
-          className="order-details-modal-backdrop"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowLogoutModal(false);
-            }
-          }}
-        >
-          <section className="order-details-modal">
-            <div className="order-details-modal-icon">
-              ↪
-            </div>
-
-            <h2>Log out?</h2>
-
-            <p>
-              You will need to log in again to
-              access your order information.
-            </p>
-
-            <div className="order-details-modal-actions">
-              <button
-                type="button"
-                className="order-details-modal-secondary"
-                onClick={() =>
-                  setShowLogoutModal(false)
-                }
-              >
-                Stay
-              </button>
-
-              <button
-                type="button"
-                className="order-details-modal-primary"
-                onClick={confirmLogout}
-              >
-                Logout
+                Confirm Cancellation
               </button>
             </div>
           </section>
