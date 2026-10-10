@@ -1,93 +1,34 @@
+
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
 import "../css/SellerSignupPage.css";
 
 const provinces = [
-  "Abra",
-  "Agusan del Norte",
-  "Agusan del Sur",
-  "Aklan",
-  "Albay",
-  "Antique",
-  "Apayao",
-  "Aurora",
-  "Basilan",
-  "Bataan",
-  "Batanes",
-  "Batangas",
-  "Benguet",
-  "Biliran",
-  "Bohol",
-  "Bukidnon",
-  "Bulacan",
-  "Cagayan",
-  "Camarines Norte",
-  "Camarines Sur",
-  "Camiguin",
-  "Capiz",
-  "Catanduanes",
-  "Cavite",
-  "Cebu",
-  "Cotabato",
-  "Davao de Oro",
-  "Davao del Norte",
-  "Davao del Sur",
-  "Davao Occidental",
-  "Davao Oriental",
-  "Dinagat Islands",
-  "Eastern Samar",
-  "Guimaras",
-  "Ifugao",
-  "Ilocos Norte",
-  "Ilocos Sur",
-  "Iloilo",
-  "Isabela",
-  "Kalinga",
-  "La Union",
-  "Laguna",
-  "Lanao del Norte",
-  "Lanao del Sur",
-  "Leyte",
-  "Maguindanao del Norte",
-  "Maguindanao del Sur",
-  "Marinduque",
-  "Masbate",
-  "Metro Manila",
-  "Misamis Occidental",
-  "Misamis Oriental",
-  "Mountain Province",
-  "Negros Occidental",
-  "Negros Oriental",
-  "Northern Samar",
-  "Nueva Ecija",
-  "Nueva Vizcaya",
-  "Occidental Mindoro",
-  "Oriental Mindoro",
-  "Palawan",
-  "Pampanga",
-  "Pangasinan",
-  "Quezon",
-  "Quirino",
-  "Rizal",
-  "Romblon",
-  "Samar",
-  "Sarangani",
-  "Siquijor",
-  "Sorsogon",
-  "South Cotabato",
-  "Southern Leyte",
-  "Sultan Kudarat",
-  "Sulu",
-  "Surigao del Norte",
-  "Surigao del Sur",
-  "Tarlac",
-  "Tawi-Tawi",
-  "Zambales",
-  "Zamboanga del Norte",
-  "Zamboanga del Sur",
-  "Zamboanga Sibugay",
+  "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
+  "Albay", "Antique", "Apayao", "Aurora", "Basilan",
+  "Bataan", "Batanes", "Batangas", "Benguet", "Biliran",
+  "Bohol", "Bukidnon", "Bulacan", "Cagayan",
+  "Camarines Norte", "Camarines Sur", "Camiguin",
+  "Capiz", "Catanduanes", "Cavite", "Cebu", "Cotabato",
+  "Davao de Oro", "Davao del Norte", "Davao del Sur",
+  "Davao Occidental", "Davao Oriental", "Dinagat Islands",
+  "Eastern Samar", "Guimaras", "Ifugao", "Ilocos Norte",
+  "Ilocos Sur", "Iloilo", "Isabela", "Kalinga",
+  "La Union", "Laguna", "Lanao del Norte", "Lanao del Sur",
+  "Leyte", "Maguindanao del Norte", "Maguindanao del Sur",
+  "Marinduque", "Masbate", "Metro Manila",
+  "Misamis Occidental", "Misamis Oriental",
+  "Mountain Province", "Negros Occidental",
+  "Negros Oriental", "Northern Samar", "Nueva Ecija",
+  "Nueva Vizcaya", "Occidental Mindoro", "Oriental Mindoro",
+  "Palawan", "Pampanga", "Pangasinan", "Quezon",
+  "Quirino", "Rizal", "Romblon", "Samar", "Sarangani",
+  "Siquijor", "Sorsogon", "South Cotabato",
+  "Southern Leyte", "Sultan Kudarat", "Sulu",
+  "Surigao del Norte", "Surigao del Sur", "Tarlac",
+  "Tawi-Tawi", "Zambales", "Zamboanga del Norte",
+  "Zamboanga del Sur", "Zamboanga Sibugay"
 ];
 
 const initialForm = {
@@ -102,7 +43,7 @@ const initialForm = {
   province: "",
   postalCode: "",
   password: "",
-  confirmPassword: "",
+  confirmPassword: ""
 };
 
 const stepInformation = {
@@ -114,9 +55,9 @@ const stepInformation = {
     secondary:
       "Your Store Name will be assigned automatically to accepted product listings.",
     label: "SELLER ACCOUNT",
-    note: "A middle name may be included in your full name but is optional.",
+    note:
+      "A middle name may be included in your full name but is optional."
   },
-
   2: {
     eyebrow: "STEP 2 OF 3",
     title: "Add your business address.",
@@ -125,9 +66,9 @@ const stepInformation = {
     secondary:
       "Make sure your business address is complete and accurate.",
     label: "SELLER ADDRESS",
-    note: "This address can be updated later from your Store Profile.",
+    note:
+      "This address can be updated later from your Store Profile."
   },
-
   3: {
     eyebrow: "STEP 3 OF 3",
     title: "Secure your seller account.",
@@ -136,8 +77,8 @@ const stepInformation = {
     secondary:
       "Your password and confirmation must match before registration.",
     label: "ACCOUNT SECURITY",
-    note: "All password requirements must turn green.",
-  },
+    note: "All password requirements must turn green."
+  }
 };
 
 function formatProperCase(value) {
@@ -147,7 +88,7 @@ function formatProperCase(value) {
     .toLowerCase()
     .replace(
       /(^|[\s'-])([a-zà-öø-ÿ])/gu,
-      (match, separator, letter) =>
+      (_, separator, letter) =>
         `${separator}${letter.toUpperCase()}`
     );
 }
@@ -211,6 +152,7 @@ function InputField({
         onChange={onChange}
         onBlur={onBlur}
         className={error ? "input-error" : ""}
+        aria-invalid={Boolean(error)}
         {...inputProps}
       />
 
@@ -229,14 +171,11 @@ function SellerSignupPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
-  const [submitError, setSubmitError] =
-    useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [showPassword, setShowPassword] =
-    useState(false);
-
-  const [showConfirmation, setShowConfirmation] =
-    useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const currentInformation = stepInformation[step];
 
@@ -246,7 +185,7 @@ function SellerSignupPage() {
       uppercase: /[A-Z]/.test(form.password),
       lowercase: /[a-z]/.test(form.password),
       number: /\d/.test(form.password),
-      special: /[^A-Za-z0-9]/.test(form.password),
+      special: /[^A-Za-z0-9]/.test(form.password)
     }),
     [form.password]
   );
@@ -263,72 +202,53 @@ function SellerSignupPage() {
     let { value } = event.target;
 
     if (name === "mobile") {
-      value = value
-        .replace(/\D/g, "")
-        .slice(0, 11);
+      value = value.replace(/\D/g, "").slice(0, 11);
     }
 
     if (name === "postalCode") {
-      value = value
-        .replace(/\D/g, "")
-        .slice(0, 4);
+      value = value.replace(/\D/g, "").slice(0, 4);
     }
 
     setForm((current) => ({
       ...current,
-      [name]: value,
+      [name]: value
     }));
 
     setErrors((current) => ({
       ...current,
-      [name]: "",
+      [name]: ""
     }));
 
     setSubmitError("");
   }
 
   function formatFullName() {
-    if (!form.fullName.trim()) {
-      return;
-    }
-
     setForm((current) => ({
       ...current,
-      fullName: formatProperCase(
-        current.fullName
-      ),
+      fullName: formatProperCase(current.fullName)
     }));
   }
 
   function validateStepOne() {
     const nextErrors = {};
 
-    const formattedFullName =
-      formatProperCase(form.fullName);
+    const formattedFullName = formatProperCase(form.fullName);
 
     if (!formattedFullName) {
-      nextErrors.fullName =
-        "Full name is required.";
-    } else if (
-      !isValidFullName(formattedFullName)
-    ) {
+      nextErrors.fullName = "Full name is required.";
+    } else if (!isValidFullName(formattedFullName)) {
       nextErrors.fullName =
         "Full name may contain letters, spaces, apostrophes, periods, and hyphens only.";
     } else if (
-      formattedFullName
-        .split(" ")
-        .filter(Boolean).length < 2
+      formattedFullName.split(" ").filter(Boolean).length < 2
     ) {
       nextErrors.fullName =
         "Please enter at least your first name and surname.";
     }
 
     if (!form.username.trim()) {
-      nextErrors.username =
-        "Username is required.";
-    } else if (
-      form.username.trim().length < 3
-    ) {
+      nextErrors.username = "Username is required.";
+    } else if (form.username.trim().length < 3) {
       nextErrors.username =
         "Username must contain at least 3 characters.";
     }
@@ -336,48 +256,37 @@ function SellerSignupPage() {
     if (!form.storeName.trim()) {
       nextErrors.storeName =
         "Store Name is required for Seller accounts.";
-    } else if (
-      form.storeName.trim().length < 2
-    ) {
+    } else if (form.storeName.trim().length < 2) {
       nextErrors.storeName =
         "Store Name must contain at least 2 characters.";
     }
 
     if (!form.email.trim()) {
-      nextErrors.email =
-        "Email address is required.";
+      nextErrors.email = "Email address is required.";
     } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        form.email
-      )
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
     ) {
-      nextErrors.email =
-        "Please enter a valid email address.";
+      nextErrors.email = "Please enter a valid email address.";
     }
 
     if (!form.mobile) {
-      nextErrors.mobile =
-        "Mobile number is required.";
+      nextErrors.mobile = "Mobile number is required.";
     } else if (!/^\d{11}$/.test(form.mobile)) {
       nextErrors.mobile =
         "Mobile number must contain exactly 11 digits.";
-    } else if (
-      !form.mobile.startsWith("09")
-    ) {
+    } else if (!form.mobile.startsWith("09")) {
       nextErrors.mobile =
         "Philippine mobile number must start with 09.";
     }
 
     setForm((current) => ({
       ...current,
-      fullName: formattedFullName,
+      fullName: formattedFullName
     }));
 
     setErrors(nextErrors);
 
-    return (
-      Object.keys(nextErrors).length === 0
-    );
+    return Object.keys(nextErrors).length === 0;
   }
 
   function validateStepTwo() {
@@ -389,8 +298,7 @@ function SellerSignupPage() {
     }
 
     if (!form.barangay.trim()) {
-      nextErrors.barangay =
-        "Barangay is required.";
+      nextErrors.barangay = "Barangay is required.";
     }
 
     if (!form.city.trim()) {
@@ -406,18 +314,14 @@ function SellerSignupPage() {
     if (!form.postalCode.trim()) {
       nextErrors.postalCode =
         "Postal code is required.";
-    } else if (
-      !/^\d{4}$/.test(form.postalCode)
-    ) {
+    } else if (!/^\d{4}$/.test(form.postalCode)) {
       nextErrors.postalCode =
         "Postal code must contain exactly 4 digits.";
     }
 
     setErrors(nextErrors);
 
-    return (
-      Object.keys(nextErrors).length === 0
-    );
+    return Object.keys(nextErrors).length === 0;
   }
 
   function validateStepThree() {
@@ -438,9 +342,14 @@ function SellerSignupPage() {
 
     setErrors(nextErrors);
 
-    return (
-      Object.keys(nextErrors).length === 0
-    );
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function scrollToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
   }
 
   function handleNext() {
@@ -454,18 +363,13 @@ function SellerSignupPage() {
       valid = validateStepTwo();
     }
 
-    if (!valid) {
-      return;
-    }
+    if (!valid) return;
 
     setErrors({});
+    setSubmitError("");
+    setStep((current) => Math.min(current + 1, 3));
 
-    setStep((current) => current + 1);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    scrollToTop();
   }
 
   function handleBack() {
@@ -475,38 +379,28 @@ function SellerSignupPage() {
     }
 
     setErrors({});
+    setSubmitError("");
 
     setStep((current) => current - 1);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    scrollToTop();
   }
 
   function handleSubmit(event) {
     event.preventDefault();
 
-    if (!validateStepThree()) {
-      return;
-    }
+    if (step !== 3 || isSubmitting) return;
+    if (!validateStepThree()) return;
+
+    setIsSubmitting(true);
+    setSubmitError("");
 
     const sellerAccount = {
       id: `seller-${Date.now()}`,
       role: "seller",
-
-      fullName: formatProperCase(
-        form.fullName
-      ),
-
+      fullName: formatProperCase(form.fullName),
       username: form.username.trim(),
-
       storeName: form.storeName.trim(),
-
-      email: form.email
-        .trim()
-        .toLowerCase(),
-
+      email: form.email.trim().toLowerCase(),
       mobile: form.mobile,
 
       address: {
@@ -514,60 +408,59 @@ function SellerSignupPage() {
         barangay: form.barangay.trim(),
         city: form.city.trim(),
         province: form.province,
-        postalCode:
-          form.postalCode.trim(),
+        postalCode: form.postalCode.trim()
       },
 
-      password: form.password,
-
-      createdAt:
-        new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
 
     try {
-      const users = JSON.parse(
-        localStorage.getItem(
-          "fitfusion-users"
-        ) || "[]"
-      );
+      // Frontend-only registration:
+      // Registration does not require an API or database.
 
-      const accountExists = users.some(
-        (user) =>
-          user.email?.toLowerCase() ===
-            sellerAccount.email ||
-          user.username?.toLowerCase() ===
-            sellerAccount.username.toLowerCase()
-      );
+      let users = [];
 
-      if (accountExists) {
-        setSubmitError(
-          "An account with this email address or username already exists."
+      try {
+        const storedUsers = JSON.parse(
+          localStorage.getItem("fitfusion-users") || "[]"
         );
 
-        return;
+        users = Array.isArray(storedUsers)
+          ? storedUsers
+          : [];
+      } catch {
+        users = [];
       }
 
-      const storeAlreadyExists = users.some(
-        (user) =>
+      // Replace matching mock account records.
+      // This avoids blocking registration during frontend testing.
+      const remainingUsers = users.filter((user) => {
+        const sameEmail =
+          String(user.email || "").toLowerCase() ===
+          sellerAccount.email;
+
+        const sameUsername =
+          String(user.username || "").toLowerCase() ===
+          sellerAccount.username.toLowerCase();
+
+        const sameStore =
           user.role === "seller" &&
-          user.storeName?.toLowerCase() ===
-            sellerAccount.storeName.toLowerCase()
-      );
+          String(user.storeName || "").toLowerCase() ===
+          sellerAccount.storeName.toLowerCase();
 
-      if (storeAlreadyExists) {
-        setSubmitError(
-          "This Store Name is already being used. Please choose another Store Name."
-        );
+        return !sameEmail && !sameUsername && !sameStore;
+      });
 
-        return;
-      }
+      const updatedUsers = [
+        ...remainingUsers,
+        sellerAccount
+      ];
 
+      // Keep the same mock storage keys used by the project.
+      // Never save actual passwords in localStorage.
       localStorage.setItem(
         "fitfusion-users",
-        JSON.stringify([
-          ...users,
-          sellerAccount,
-        ])
+        JSON.stringify(updatedUsers)
       );
 
       localStorage.setItem(
@@ -585,23 +478,25 @@ function SellerSignupPage() {
         JSON.stringify(sellerAccount)
       );
 
-      sessionStorage.setItem(
-        "userRole",
-        "seller"
-      );
+      sessionStorage.setItem("userRole", "seller");
 
       sessionStorage.setItem(
         "userEmail",
         sellerAccount.email
       );
 
+      // Successful frontend registration.
       navigate("/seller/dashboard", {
-        replace: true,
+        replace: true
       });
-    } catch {
+    } catch (error) {
+      console.error("Seller registration failed:", error);
+
       setSubmitError(
         "The Seller account could not be created. Please try again."
       );
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -628,9 +523,7 @@ function SellerSignupPage() {
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/login")
-            }
+            onClick={() => navigate("/login")}
           >
             Log In
           </button>
@@ -644,20 +537,14 @@ function SellerSignupPage() {
               {currentInformation.eyebrow}
             </p>
 
-            <h1>
-              {currentInformation.title}
-            </h1>
+            <h1>{currentInformation.title}</h1>
 
             <p className="seller-register-description">
-              {
-                currentInformation.description
-              }
+              {currentInformation.description}
             </p>
 
             <p className="seller-register-secondary">
-              {
-                currentInformation.secondary
-              }
+              {currentInformation.secondary}
             </p>
           </div>
 
@@ -666,9 +553,7 @@ function SellerSignupPage() {
               {currentInformation.label}
             </strong>
 
-            <p>
-              {currentInformation.note}
-            </p>
+            <p>{currentInformation.note}</p>
           </div>
         </aside>
 
@@ -683,14 +568,12 @@ function SellerSignupPage() {
                 <p>ACCOUNT & STORE</p>
 
                 <h2>
-                  Tell us about your seller
-                  account.
+                  Tell us about your seller account.
                 </h2>
 
                 <span>
-                  The Store Name is required
-                  and will appear with every
-                  accepted listing.
+                  The Store Name is required and will
+                  appear with every accepted listing.
                 </span>
               </div>
 
@@ -753,18 +636,13 @@ function SellerSignupPage() {
                 />
 
                 <div className="seller-register-information">
-                  <strong>
-                    SELLER REQUIREMENT
-                  </strong>
+                  <strong>SELLER REQUIREMENT</strong>
 
                   <p>
-                    Enter your first name,
-                    optional middle name, and
-                    surname in the Full Name
-                    field. Your Store Name will
-                    be assigned automatically
-                    to accepted product
-                    listings.
+                    Enter your first name, optional middle
+                    name, and surname in the Full Name field.
+                    Your Store Name will be assigned
+                    automatically to accepted product listings.
                   </p>
                 </div>
               </div>
@@ -777,13 +655,11 @@ function SellerSignupPage() {
                 <p>BUSINESS ADDRESS</p>
 
                 <h2>
-                  Where is your seller account
-                  located?
+                  Where is your seller account located?
                 </h2>
 
                 <span>
-                  Enter a complete Philippine
-                  business address.
+                  Enter a complete Philippine business address.
                 </span>
               </div>
 
@@ -831,22 +707,21 @@ function SellerSignupPage() {
                         ? "input-error"
                         : ""
                     }
+                    aria-invalid={Boolean(errors.province)}
                     autoComplete="address-level1"
                   >
                     <option value="">
                       Select your province
                     </option>
 
-                    {provinces.map(
-                      (province) => (
-                        <option
-                          key={province}
-                          value={province}
-                        >
-                          {province}
-                        </option>
-                      )
-                    )}
+                    {provinces.map((province) => (
+                      <option
+                        key={province}
+                        value={province}
+                      >
+                        {province}
+                      </option>
+                    ))}
                   </select>
 
                   {errors.province && (
@@ -869,15 +744,11 @@ function SellerSignupPage() {
                 />
 
                 <div className="seller-register-information">
-                  <strong>
-                    ADDRESS INFORMATION
-                  </strong>
+                  <strong>ADDRESS INFORMATION</strong>
 
                   <p>
-                    Your address is associated
-                    with your authenticated
-                    Seller account and Store
-                    Profile.
+                    Your address is associated with
+                    your Seller account and Store Profile.
                   </p>
                 </div>
               </div>
@@ -894,9 +765,8 @@ function SellerSignupPage() {
                 </h2>
 
                 <span>
-                  All password requirements
-                  must be satisfied before
-                  registration.
+                  All password requirements must be
+                  satisfied before registration.
                 </span>
               </div>
 
@@ -929,8 +799,7 @@ function SellerSignupPage() {
                         type="button"
                         onClick={() =>
                           setShowPassword(
-                            (current) =>
-                              !current
+                            (current) => !current
                           )
                         }
                         aria-label={
@@ -939,11 +808,7 @@ function SellerSignupPage() {
                             : "Show password"
                         }
                       >
-                        <EyeIcon
-                          visible={
-                            showPassword
-                          }
-                        />
+                        <EyeIcon visible={showPassword} />
                       </button>
                     </div>
 
@@ -955,9 +820,7 @@ function SellerSignupPage() {
                   </label>
 
                   <label className="seller-register-field">
-                    <span>
-                      Confirm Password *
-                    </span>
+                    <span>Confirm Password *</span>
 
                     <div
                       className={`seller-register-password ${
@@ -973,9 +836,7 @@ function SellerSignupPage() {
                             : "password"
                         }
                         name="confirmPassword"
-                        value={
-                          form.confirmPassword
-                        }
+                        value={form.confirmPassword}
                         onChange={updateField}
                         placeholder="Confirm password"
                         autoComplete="new-password"
@@ -985,8 +846,7 @@ function SellerSignupPage() {
                         type="button"
                         onClick={() =>
                           setShowConfirmation(
-                            (current) =>
-                              !current
+                            (current) => !current
                           )
                         }
                         aria-label={
@@ -996,9 +856,7 @@ function SellerSignupPage() {
                         }
                       >
                         <EyeIcon
-                          visible={
-                            showConfirmation
-                          }
+                          visible={showConfirmation}
                         />
                       </button>
                     </div>
@@ -1019,9 +877,7 @@ function SellerSignupPage() {
 
                     {errors.confirmPassword && (
                       <small className="seller-register-error">
-                        {
-                          errors.confirmPassword
-                        }
+                        {errors.confirmPassword}
                       </small>
                     )}
                   </label>
@@ -1034,46 +890,33 @@ function SellerSignupPage() {
 
                   <ul>
                     <Requirement
-                      passed={
-                        passwordRules.length
-                      }
+                      passed={passwordRules.length}
                     >
                       At least 8 characters
                     </Requirement>
 
                     <Requirement
-                      passed={
-                        passwordRules.uppercase
-                      }
+                      passed={passwordRules.uppercase}
                     >
-                      At least one uppercase
-                      letter
+                      At least one uppercase letter
                     </Requirement>
 
                     <Requirement
-                      passed={
-                        passwordRules.lowercase
-                      }
+                      passed={passwordRules.lowercase}
                     >
-                      At least one lowercase
-                      letter
+                      At least one lowercase letter
                     </Requirement>
 
                     <Requirement
-                      passed={
-                        passwordRules.number
-                      }
+                      passed={passwordRules.number}
                     >
                       At least one number
                     </Requirement>
 
                     <Requirement
-                      passed={
-                        passwordRules.special
-                      }
+                      passed={passwordRules.special}
                     >
-                      At least one special
-                      character
+                      At least one special character
                     </Requirement>
                   </ul>
                 </aside>
@@ -1095,6 +938,7 @@ function SellerSignupPage() {
               type="button"
               className="seller-register-back"
               onClick={handleBack}
+              disabled={isSubmitting}
             >
               Back
             </button>
@@ -1114,8 +958,11 @@ function SellerSignupPage() {
                 <button
                   type="submit"
                   className="seller-register-next"
+                  disabled={isSubmitting}
                 >
-                  Create Seller Account
+                  {isSubmitting
+                    ? "Creating Account..."
+                    : "Create Seller Account"}
                 </button>
               )}
 

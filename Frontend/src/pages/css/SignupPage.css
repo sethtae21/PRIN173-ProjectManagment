@@ -1,26 +1,25 @@
-.shopper-register-page,
-.shopper-register-page * {
+
+.ff-register-page,
+.ff-register-page * {
   box-sizing: border-box;
 }
 
-.shopper-register-page {
+.ff-register-page {
   position: relative;
   min-height: 100vh;
   overflow-x: hidden;
   padding: 25px 28px 55px;
-  background:
-    linear-gradient(
-      135deg,
-      #f2efe8 0%,
-      #fffdf9 52%,
-      #eee8de 100%
-    );
+  background: linear-gradient(
+    135deg,
+    #f2efe8 0%,
+    #fffdf9 52%,
+    #eee8de 100%
+  );
   color: #17130f;
-  font-family:
-    Inter, Arial, Helvetica, sans-serif;
+  font-family: Inter, Arial, Helvetica, sans-serif;
 }
 
-.shopper-register-background {
+.ff-register-background {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -28,27 +27,25 @@
   pointer-events: none;
 }
 
-.shopper-register-background.left {
+.ff-register-background.left {
   left: 0;
-  background:
-    radial-gradient(
-      100% 100% at 0% 50%,
-      rgba(216, 186, 114, 0.34),
-      transparent
-    );
+  background: radial-gradient(
+    100% 100% at 0% 50%,
+    rgba(216, 186, 114, 0.34),
+    transparent
+  );
 }
 
-.shopper-register-background.right {
+.ff-register-background.right {
   right: 0;
-  background:
-    radial-gradient(
-      100% 100% at 100% 50%,
-      rgba(181, 126, 32, 0.23),
-      transparent
-    );
+  background: radial-gradient(
+    100% 100% at 100% 50%,
+    rgba(181, 126, 32, 0.23),
+    transparent
+  );
 }
 
-.shopper-register-header {
+.ff-register-header {
   position: relative;
   z-index: 1;
   display: flex;
@@ -59,7 +56,7 @@
   margin: 0 auto 22px;
 }
 
-.shopper-register-logo {
+.ff-register-logo {
   width: 150px;
   height: 82px;
   padding: 0;
@@ -68,13 +65,13 @@
   cursor: pointer;
 }
 
-.shopper-register-logo img {
+.ff-register-logo img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.shopper-register-header-actions {
+.ff-register-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -82,7 +79,7 @@
   font-size: 12px;
 }
 
-.shopper-register-header-actions button {
+.ff-register-header-actions button {
   min-height: 39px;
   padding: 9px 20px;
   background: #fffdf9;
@@ -94,7 +91,12 @@
   cursor: pointer;
 }
 
-.shopper-register-shell {
+.ff-register-header-actions button:hover {
+  background: #17130f;
+  color: #fffdf9;
+}
+
+.ff-register-shell {
   position: relative;
   z-index: 1;
   display: grid;
@@ -112,25 +114,25 @@
   box-shadow: 0 22px 60px rgba(73, 49, 18, 0.1);
 }
 
-.shopper-register-panel {
+.ff-register-panel {
   display: flex;
+  min-width: 0;
   min-height: 675px;
   flex-direction: column;
   justify-content: space-between;
   padding: 58px 48px;
-  background:
-    linear-gradient(
-      145deg,
-      #17130f,
-      #201b16 55%,
-      #292119
-    );
+  background: linear-gradient(
+    145deg,
+    #17130f,
+    #201b16 55%,
+    #292119
+  );
   border: 1px solid #b57e20;
   border-radius: 24px;
   color: #fffdf9;
 }
 
-.shopper-register-step-label {
+.ff-register-step-label {
   margin: 0 0 25px;
   color: #f6e7b7;
   font-size: 12px;
@@ -138,14 +140,15 @@
   letter-spacing: 0.05em;
 }
 
-.shopper-register-panel h1 {
+.ff-register-panel h1 {
   max-width: 340px;
   margin: 0;
+  color: #fffdf9;
   font-size: clamp(28px, 3vw, 38px);
   line-height: 1.22;
 }
 
-.shopper-register-description {
+.ff-register-description {
   max-width: 330px;
   margin: 40px 0 0;
   color: #fffdf9;
@@ -153,7 +156,7 @@
   line-height: 1.75;
 }
 
-.shopper-register-secondary {
+.ff-register-secondary {
   max-width: 330px;
   margin: 20px 0 0;
   color: #f6e7b7;
@@ -161,41 +164,41 @@
   line-height: 1.7;
 }
 
-.shopper-register-panel-note {
+.ff-register-panel-note {
   padding: 21px;
   border: 1px solid #a97218;
   border-radius: 12px;
 }
 
-.shopper-register-panel-note strong {
+.ff-register-panel-note strong {
   display: block;
   margin-bottom: 12px;
   color: #d7af4b;
   font-size: 11px;
 }
 
-.shopper-register-panel-note p {
+.ff-register-panel-note p {
   margin: 0;
   color: #fffdf9;
   font-size: 12px;
   line-height: 1.65;
 }
 
-.shopper-register-form {
+.ff-register-form {
   display: flex;
   min-width: 0;
   flex-direction: column;
 }
 
-.shopper-register-form-step {
+.ff-register-form-step {
   flex: 1;
 }
 
-.shopper-register-title {
+.ff-register-title {
   margin-bottom: 32px;
 }
 
-.shopper-register-title > p {
+.ff-register-title > p {
   margin: 0 0 14px;
   color: #9a6a1d;
   font-size: 12px;
@@ -203,39 +206,40 @@
   letter-spacing: 0.04em;
 }
 
-.shopper-register-title h2 {
+.ff-register-title h2 {
   margin: 0 0 14px;
+  color: #17130f;
   font-size: clamp(25px, 3vw, 33px);
   line-height: 1.2;
 }
 
-.shopper-register-title span {
+.ff-register-title > span {
   color: #5c554c;
   font-size: 12px;
   line-height: 1.6;
 }
 
-.shopper-register-grid {
+.ff-register-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 25px 30px;
 }
 
-.shopper-register-field {
+.ff-register-field {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 10px;
 }
 
-.shopper-register-field > span {
+.ff-register-field > span {
   color: #29251f;
   font-size: 12px;
   font-weight: 800;
 }
 
-.shopper-register-field input,
-.shopper-register-field select {
+.ff-register-field input,
+.ff-register-field select {
   width: 100%;
   height: 55px;
   padding: 0 17px;
@@ -252,35 +256,39 @@
     box-shadow 0.2s ease;
 }
 
-.shopper-register-field select {
+.ff-register-field input::placeholder {
+  color: #817a70;
+}
+
+.ff-register-field select {
   cursor: pointer;
 }
 
-.shopper-register-field input:focus,
-.shopper-register-field select:focus {
+.ff-register-field input:focus,
+.ff-register-field select:focus {
   background: #fffdf9;
   border-color: #9a6a1d;
   box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.13);
 }
 
-.shopper-register-field input.input-error,
-.shopper-register-field select.input-error,
-.shopper-register-password.input-error {
+.ff-register-field input.input-error,
+.ff-register-field select.input-error,
+.ff-register-password.input-error {
   border-color: #9b382d;
 }
 
-.shopper-register-wide {
+.ff-register-field.wide {
   grid-column: 1 / -1;
 }
 
-.shopper-register-error {
+.ff-register-error {
   display: block;
   color: #9b382d;
   font-size: 11px;
   line-height: 1.4;
 }
 
-.shopper-register-information {
+.ff-register-information {
   grid-column: 1 / -1;
   padding: 17px 20px;
   background: #fff8e7;
@@ -288,21 +296,21 @@
   border-radius: 11px;
 }
 
-.shopper-register-information strong {
+.ff-register-information strong {
   display: block;
   margin-bottom: 9px;
   color: #9a6a1d;
   font-size: 11px;
 }
 
-.shopper-register-information p {
+.ff-register-information p {
   margin: 0;
   color: #5c554c;
   font-size: 12px;
   line-height: 1.6;
 }
 
-.shopper-register-security {
+.ff-register-security {
   display: grid;
   grid-template-columns:
     minmax(0, 1.1fr)
@@ -310,13 +318,13 @@
   gap: 30px;
 }
 
-.shopper-register-password-fields {
+.ff-register-password-fields {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-.shopper-register-password {
+.ff-register-password {
   display: flex;
   width: 100%;
   height: 55px;
@@ -326,29 +334,34 @@
   border-radius: 11px;
 }
 
-.shopper-register-password:focus-within {
+.ff-register-password:focus-within {
   background: #fffdf9;
   border-color: #9a6a1d;
   box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.13);
 }
 
-.shopper-register-password input {
+.ff-register-password input {
   min-width: 0;
   flex: 1;
   height: 100%;
+  padding: 0 17px;
   background: transparent;
   border: 0;
   border-radius: 0;
+  outline: none;
   box-shadow: none;
+  color: #29251f;
+  font: inherit;
+  font-size: 13px;
 }
 
-.shopper-register-password input:focus {
+.ff-register-password input:focus {
   background: transparent;
   border: 0;
   box-shadow: none;
 }
 
-.shopper-register-password button {
+.ff-register-password button {
   display: grid;
   width: 52px;
   flex: 0 0 52px;
@@ -360,11 +373,11 @@
   cursor: pointer;
 }
 
-.shopper-register-password button:hover {
+.ff-register-password button:hover {
   color: #8e641f;
 }
 
-.shopper-register-password svg {
+.ff-register-password svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -374,35 +387,35 @@
   stroke-linejoin: round;
 }
 
-.shopper-password-status {
+.ff-password-status {
   display: block;
   font-size: 11px;
   font-weight: 700;
 }
 
-.shopper-password-status.valid {
+.ff-password-status.valid {
   color: #4b8448;
 }
 
-.shopper-password-status.invalid {
+.ff-password-status.invalid {
   color: #9b382d;
 }
 
-.shopper-register-requirements {
+.ff-register-requirements {
   padding: 24px;
   background: #f8f5ef;
   border: 1px solid #e2d8c7;
   border-radius: 13px;
 }
 
-.shopper-register-requirements > strong {
+.ff-register-requirements > strong {
   display: block;
   margin-bottom: 19px;
   color: #9a6a1d;
   font-size: 11px;
 }
 
-.shopper-register-requirements ul {
+.ff-register-requirements ul {
   display: flex;
   flex-direction: column;
   gap: 13px;
@@ -411,7 +424,7 @@
   list-style: none;
 }
 
-.shopper-register-requirements li {
+.ff-register-requirements li {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -419,7 +432,7 @@
   font-size: 12px;
 }
 
-.shopper-register-requirements li span {
+.ff-register-requirements li span {
   display: grid;
   width: 20px;
   height: 20px;
@@ -432,42 +445,20 @@
   font-weight: 800;
 }
 
-.shopper-register-requirements li p {
+.ff-register-requirements li p {
   margin: 0;
 }
 
-.shopper-register-requirements li.passed {
+.ff-register-requirements li.passed {
   color: #477746;
 }
 
-.shopper-register-requirements li.passed span {
+.ff-register-requirements li.passed span {
   background: #4f8a50;
 }
 
-.shopper-register-terms {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  margin-top: 28px;
-  color: #5c554c;
-  font-size: 12px;
-  line-height: 1.6;
-  cursor: pointer;
-}
-
-.shopper-register-terms input {
-  width: 17px;
-  height: 17px;
-  margin: 1px 0 0;
-  accent-color: #8e641f;
-}
-
-.shopper-register-error.terms {
-  margin: 8px 0 0 28px;
-}
-
-.shopper-register-submit-error {
-  margin-top: 18px;
+.ff-register-submit-error {
+  margin-top: 20px;
   padding: 13px 16px;
   background: #fff1ef;
   border: 1px solid #d59d96;
@@ -476,7 +467,7 @@
   font-size: 12px;
 }
 
-.shopper-register-actions {
+.ff-register-actions {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -486,8 +477,8 @@
   border-top: 1px solid #e2d8c7;
 }
 
-.shopper-register-back,
-.shopper-register-next {
+.ff-register-back,
+.ff-register-next {
   min-height: 53px;
   border-radius: 10px;
   font: inherit;
@@ -499,7 +490,7 @@
     box-shadow 0.2s ease;
 }
 
-.shopper-register-back {
+.ff-register-back {
   min-width: 190px;
   padding: 12px 25px;
   background: #fffdf9;
@@ -507,40 +498,39 @@
   color: #8e641f;
 }
 
-.shopper-register-next {
+.ff-register-next {
   min-width: 235px;
   padding: 12px 25px;
-  background:
-    linear-gradient(
-      135deg,
-      #17130f,
-      #8e641f 55%,
-      #d7af4b
-    );
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
   border: 1.2px solid #b57e20;
   color: #fffdf9;
 }
 
-.shopper-register-back:hover,
-.shopper-register-next:hover {
+.ff-register-back:hover,
+.ff-register-next:hover {
   box-shadow: 0 8px 20px rgba(142, 100, 31, 0.22);
   transform: translateY(-1px);
 }
 
-.shopper-register-next-area {
+.ff-register-next-area {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
 }
 
-.shopper-register-next-area > span {
+.ff-register-next-area > span {
   color: #5c554c;
   font-size: 10px;
 }
 
 @media (max-width: 1050px) {
-  .shopper-register-shell {
+  .ff-register-shell {
     grid-template-columns:
       minmax(260px, 0.7fr)
       minmax(0, 1.3fr);
@@ -548,101 +538,98 @@
     padding: 30px;
   }
 
-  .shopper-register-panel {
+  .ff-register-panel {
     padding: 42px 30px;
   }
 
-  .shopper-register-grid {
+  .ff-register-grid,
+  .ff-register-security {
     grid-template-columns: 1fr;
   }
 
-  .shopper-register-wide,
-  .shopper-register-information {
+  .ff-register-field.wide,
+  .ff-register-information {
     grid-column: auto;
-  }
-
-  .shopper-register-security {
-    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .shopper-register-page {
+  .ff-register-page {
     padding: 16px 14px 35px;
   }
 
-  .shopper-register-header {
+  .ff-register-header {
     min-height: auto;
     margin-bottom: 16px;
   }
 
-  .shopper-register-logo {
+  .ff-register-logo {
     width: 120px;
     height: 70px;
   }
 
-  .shopper-register-header-actions span {
+  .ff-register-header-actions span {
     display: none;
   }
 
-  .shopper-register-shell {
+  .ff-register-shell {
     display: block;
     padding: 18px;
     border-radius: 17px;
   }
 
-  .shopper-register-panel {
+  .ff-register-panel {
     min-height: 310px;
     margin-bottom: 28px;
     padding: 30px 25px;
     border-radius: 17px;
   }
 
-  .shopper-register-panel h1 {
+  .ff-register-panel h1 {
     font-size: 28px;
   }
 
-  .shopper-register-description {
+  .ff-register-description {
     margin-top: 22px;
   }
 
-  .shopper-register-panel-note {
+  .ff-register-panel-note {
     margin-top: 35px;
   }
 
-  .shopper-register-actions {
+  .ff-register-actions {
     align-items: stretch;
     flex-direction: column-reverse;
   }
 
-  .shopper-register-back,
-  .shopper-register-next {
+  .ff-register-back,
+  .ff-register-next {
     width: 100%;
   }
 
-  .shopper-register-next-area {
+  .ff-register-next-area {
     align-items: stretch;
   }
 
-  .shopper-register-next-area > span {
+  .ff-register-next-area > span {
     text-align: right;
   }
 }
 
 @media (max-width: 480px) {
-  .shopper-register-shell {
+  .ff-register-shell {
     padding: 12px;
   }
 
-  .shopper-register-panel {
+  .ff-register-panel {
     padding: 27px 21px;
   }
 
-  .shopper-register-form {
+  .ff-register-form {
     padding: 8px;
   }
 
-  .shopper-register-title h2 {
+  .ff-register-title h2 {
     font-size: 25px;
   }
 }

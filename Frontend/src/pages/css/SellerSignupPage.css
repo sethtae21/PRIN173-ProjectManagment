@@ -1,3 +1,4 @@
+
 .seller-register-page,
 .seller-register-page * {
   box-sizing: border-box;
@@ -8,19 +9,17 @@
   min-height: 100vh;
   overflow-x: hidden;
   padding: 25px 28px 55px;
-  background:
-    linear-gradient(
-      135deg,
-      #f2efe8 0%,
-      #fffdf9 52%,
-      #eee8de 100%
-    );
+  background: linear-gradient(
+    135deg,
+    #f2efe8 0%,
+    #fffdf9 52%,
+    #eee8de 100%
+  );
   color: #17130f;
-  font-family:
-    Inter, Arial, Helvetica, sans-serif;
+  font-family: Inter, Arial, Helvetica, sans-serif;
 }
 
-/* Background lighting */
+/* Background */
 
 .seller-register-background {
   position: fixed;
@@ -32,25 +31,23 @@
 
 .seller-register-background.left {
   left: 0;
-  background:
-    radial-gradient(
-      100% 100% at 0% 50%,
-      rgba(216, 186, 114, 0.34),
-      transparent
-    );
+  background: radial-gradient(
+    100% 100% at 0% 50%,
+    rgba(216, 186, 114, 0.34),
+    transparent
+  );
 }
 
 .seller-register-background.right {
   right: 0;
-  background:
-    radial-gradient(
-      100% 100% at 100% 50%,
-      rgba(181, 126, 32, 0.23),
-      transparent
-    );
+  background: radial-gradient(
+    100% 100% at 100% 50%,
+    rgba(181, 126, 32, 0.23),
+    transparent
+  );
 }
 
-/* Top header */
+/* Header */
 
 .seller-register-header {
   position: relative;
@@ -105,7 +102,7 @@
   color: #fffdf9;
 }
 
-/* Main two-column container */
+/* Main Container */
 
 .seller-register-shell {
   position: relative;
@@ -122,11 +119,10 @@
   background: rgba(255, 253, 249, 0.98);
   border: 1px solid #d2be91;
   border-radius: 22px;
-  box-shadow:
-    0 22px 60px rgba(73, 49, 18, 0.1);
+  box-shadow: 0 22px 60px rgba(73, 49, 18, 0.1);
 }
 
-/* Black information panel */
+/* Information Panel */
 
 .seller-register-panel {
   display: flex;
@@ -135,13 +131,12 @@
   flex-direction: column;
   justify-content: space-between;
   padding: 58px 48px;
-  background:
-    linear-gradient(
-      145deg,
-      #17130f,
-      #201b16 55%,
-      #292119
-    );
+  background: linear-gradient(
+    145deg,
+    #17130f,
+    #201b16 55%,
+    #292119
+  );
   border: 1px solid #b57e20;
   border-radius: 24px;
   color: #fffdf9;
@@ -199,7 +194,7 @@
   line-height: 1.65;
 }
 
-/* Form side */
+/* Form */
 
 .seller-register-form {
   display: flex;
@@ -236,12 +231,11 @@
   line-height: 1.6;
 }
 
-/* Form grid */
+/* Fields */
 
 .seller-register-grid {
   display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 25px 30px;
 }
 
@@ -288,9 +282,7 @@
 .seller-register-field select:focus {
   background: #fffdf9;
   border-color: #9a6a1d;
-  box-shadow:
-    0 0 0 3px
-    rgba(181, 126, 32, 0.13);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.13);
 }
 
 .seller-register-field input.input-error,
@@ -310,7 +302,7 @@
   line-height: 1.4;
 }
 
-/* Information box */
+/* Information */
 
 .seller-register-information {
   grid-column: 1 / -1;
@@ -334,7 +326,7 @@
   line-height: 1.6;
 }
 
-/* Password section */
+/* Password Section */
 
 .seller-register-security {
   display: grid;
@@ -363,9 +355,7 @@
 .seller-register-password:focus-within {
   background: #fffdf9;
   border-color: #9a6a1d;
-  box-shadow:
-    0 0 0 3px
-    rgba(181, 126, 32, 0.13);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.13);
 }
 
 .seller-register-password input {
@@ -429,7 +419,7 @@
   color: #9b382d;
 }
 
-/* Password checklist */
+/* Password Requirements */
 
 .seller-register-requirements {
   padding: 24px;
@@ -487,7 +477,7 @@
   background: #4f8a50;
 }
 
-/* Submission error */
+/* Submission Errors */
 
 .seller-register-submit-error {
   margin-top: 20px;
@@ -499,7 +489,7 @@
   font-size: 12px;
 }
 
-/* Bottom buttons */
+/* Navigation Buttons */
 
 .seller-register-actions {
   display: flex;
@@ -535,23 +525,27 @@
 .seller-register-next {
   min-width: 235px;
   padding: 12px 25px;
-  background:
-    linear-gradient(
-      135deg,
-      #17130f,
-      #8e641f 55%,
-      #d7af4b
-    );
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
   border: 1.2px solid #b57e20;
   color: #fffdf9;
 }
 
 .seller-register-back:hover,
 .seller-register-next:hover {
-  box-shadow:
-    0 8px 20px
-    rgba(142, 100, 31, 0.22);
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.22);
   transform: translateY(-1px);
+}
+
+.seller-register-back:disabled,
+.seller-register-next:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .seller-register-next-area {

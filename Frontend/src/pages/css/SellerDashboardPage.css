@@ -1,3 +1,4 @@
+
 .seller-dashboard-page {
   min-height: 100vh;
   padding: 40px;
@@ -65,17 +66,13 @@
 }
 
 .seller-dashboard-add-button:hover {
-  box-shadow: 0 8px 20px
-    rgba(142, 100, 31, 0.24);
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.24);
   transform: translateY(-1px);
 }
 
 .seller-dashboard-summary {
   display: grid;
-  grid-template-columns: repeat(
-    3,
-    minmax(180px, 1fr)
-  );
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 18px;
   margin-bottom: 25px;
 }
@@ -89,8 +86,7 @@
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 14px;
-  box-shadow: 0 10px 28px
-    rgba(81, 61, 29, 0.06);
+  box-shadow: 0 10px 28px rgba(81, 61, 29, 0.06);
 }
 
 .seller-summary-number {
@@ -127,10 +123,7 @@
 
 .seller-dashboard-actions {
   display: grid;
-  grid-template-columns: repeat(
-    2,
-    minmax(0, 1fr)
-  );
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   margin-bottom: 25px;
 }
@@ -161,8 +154,7 @@
   letter-spacing: 0.07em;
 }
 
-.seller-dashboard-action-card.dark
-  .seller-action-label {
+.seller-dashboard-action-card.dark .seller-action-label {
   color: #d7af4b !important;
 }
 
@@ -220,8 +212,7 @@
 }
 
 .seller-dashboard-action-card button:hover {
-  box-shadow: 0 7px 18px
-    rgba(142, 100, 31, 0.2);
+  box-shadow: 0 7px 18px rgba(142, 100, 31, 0.2);
   transform: translateY(-1px);
 }
 
@@ -230,8 +221,7 @@
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 16px;
-  box-shadow: 0 12px 32px
-    rgba(81, 61, 29, 0.06);
+  box-shadow: 0 12px 32px rgba(81, 61, 29, 0.06);
 }
 
 .seller-listings-heading {
@@ -295,7 +285,9 @@
   background: #fffaf0;
 }
 
-.seller-validation-status {
+/* Updated report status badges */
+
+.seller-report-status {
   display: inline-flex;
   min-width: 78px;
   min-height: 28px;
@@ -307,14 +299,19 @@
   font-weight: 800;
 }
 
-.seller-validation-status.active {
+.seller-report-status.approved {
   background: #17130f;
   color: #f6e7b7;
 }
 
-.seller-validation-status.rejected {
+.seller-report-status.rejected {
   background: #f2dfdc;
   color: #8b3b31;
+}
+
+.seller-report-status.pending {
+  background: #fff1cb;
+  color: #926a1a;
 }
 
 .seller-edit-listing-button {

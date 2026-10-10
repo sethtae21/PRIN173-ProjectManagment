@@ -1,3 +1,4 @@
+
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "../css/SellerDashboardPage.css";
@@ -8,14 +9,14 @@ const fallbackProducts = [
     name: "Classic Beige Blazer",
     category: "Outerwear",
     price: 1899,
-    status: "Active",
+    status: "Approved",
   },
   {
     id: "product-002",
     name: "Black Formal Trousers",
     category: "Bottoms",
     price: 1299,
-    status: "Active",
+    status: "Approved",
   },
   {
     id: "product-003",
@@ -49,23 +50,26 @@ function getSellerProducts() {
 }
 
 function getSellerAccount() {
+  const fallbackAccount = {
+    username: "Seller",
+    storeName: "Maison Aurelia",
+  };
+
   try {
     const storedAccount =
-      localStorage.getItem(
-        "fitfusion-current-user"
-      ) ||
-      sessionStorage.getItem(
-        "registeredAccount"
-      );
+      localStorage.getItem("fitfusion-current-user") ||
+      localStorage.getItem("sellerAccount") ||
+      sessionStorage.getItem("sellerAccount");
 
     if (!storedAccount) {
-      return {
-        username: "Seller",
-        storeName: "Maison Aurelia",
-      };
+      return fallbackAccount;
     }
 
     const account = JSON.parse(storedAccount);
+
+    if (!account || typeof account !== "object") {
+      return fallbackAccount;
+    }
 
     return {
       username:
@@ -77,23 +81,38 @@ function getSellerAccount() {
         "Maison Aurelia",
     };
   } catch {
-    return {
-      username: "Seller",
-      storeName: "Maison Aurelia",
-    };
+    return fallbackAccount;
   }
 }
 
 function normalizeStatus(status) {
   const normalizedStatus = String(
     status || ""
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 
   if (normalizedStatus === "rejected") {
     return "Rejected";
   }
 
-  return "Active";
+  if (
+    normalizedStatus === "approved" ||
+    normalizedStatus === "active" ||
+    normalizedStatus === "accepted"
+  ) {
+    return "Approved";
+  }
+
+  if (
+    normalizedStatus === "pending" ||
+    normalizedStatus === "for review" ||
+    normalizedStatus === "under review"
+  ) {
+    return "Pending";
+  }
+
+  return "Pending";
 }
 
 function SellerDashboardPage() {
@@ -109,9 +128,8 @@ function SellerDashboardPage() {
     []
   );
 
-  const recentProducts = products
-    .slice(0, 5)
-    .map((product, index) => ({
+  const normalizedProducts = products.map(
+    (product, index) => ({
       ...product,
       id:
         product.id ||
@@ -125,20 +143,20 @@ function SellerDashboardPage() {
         "Uncategorized",
       price: Number(product.price || 0),
       status: normalizeStatus(
+        product.reportStatus ??
         product.status
       ),
-    }));
+    })
+  );
 
-  const activeListings = products.filter(
-    (product) =>
-      normalizeStatus(product.status) ===
-      "Active"
+  const recentProducts = normalizedProducts.slice(0, 5);
+
+  const approvedListings = normalizedProducts.filter(
+    (product) => product.status === "Approved"
   ).length;
 
-  const rejectedListings = products.filter(
-    (product) =>
-      normalizeStatus(product.status) ===
-      "Rejected"
+  const rejectedListings = normalizedProducts.filter(
+    (product) => product.status === "Rejected"
   ).length;
 
   return (
@@ -155,7 +173,7 @@ function SellerDashboardPage() {
 
           <p>
             Upload product records, manage your
-            listings, and review validation results.
+            listings, and review product report statuses.
           </p>
         </div>
 
@@ -174,15 +192,15 @@ function SellerDashboardPage() {
         <SummaryCard
           number="01"
           label="Total Listings"
-          value={products.length}
+          value={normalizedProducts.length}
           description="Products uploaded by your store"
         />
 
         <SummaryCard
           number="02"
-          label="Active Listings"
-          value={activeListings}
-          description="Products accepted after validation"
+          label="Approved Listings"
+          value={approvedListings}
+          description="Products approved for listing"
         />
 
         <SummaryCard
@@ -228,10 +246,10 @@ function SellerDashboardPage() {
         />
 
         <DashboardActionCard
-          label="VALIDATION REPORTS"
-          title="Review validation results"
-          description="View accepted and rejected catalog records and correct rejected entries."
-          buttonLabel="View Validation"
+          label="PRODUCT REPORTS"
+          title="Review report statuses"
+          description="View approved, rejected, and pending product records and correct rejected entries."
+          buttonLabel="View Reports"
           buttonStyle="dark"
           onClick={() =>
             navigate("/seller/validation")
@@ -283,60 +301,54 @@ function SellerDashboardPage() {
                   <th>Product</th>
                   <th>Category</th>
                   <th>Price</th>
-                  <th>Validation Status</th>
+                  <th>Report Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {recentProducts.map(
-                  (product) => (
-                    <tr key={product.id}>
-                      <td>
-                        <strong>
-                          {product.name}
-                        </strong>
-                      </td>
+                {recentProducts.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <strong>{product.name}</strong>
+                    </td>
 
-                      <td>
-                        {product.category}
-                      </td>
+                    <td>{product.category}</td>
 
-                      <td>
-                        ₱
-                        {product.price.toLocaleString(
-                          "en-PH",
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          }
-                        )}
-                      </td>
+                    <td>
+                      ₱
+                      {product.price.toLocaleString(
+                        "en-PH",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}
+                    </td>
 
-                      <td>
-                        <span
-                          className={`seller-validation-status ${product.status.toLowerCase()}`}
-                        >
-                          {product.status}
-                        </span>
-                      </td>
+                    <td>
+                      <span
+                        className={`seller-report-status ${product.status.toLowerCase()}`}
+                      >
+                        {product.status}
+                      </span>
+                    </td>
 
-                      <td>
-                        <button
-                          type="button"
-                          className="seller-edit-listing-button"
-                          onClick={() =>
-                            navigate(
-                              `/seller/listings/${product.id}/edit`
-                            )
-                          }
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                )}
+                    <td>
+                      <button
+                        type="button"
+                        className="seller-edit-listing-button"
+                        onClick={() =>
+                          navigate(
+                            `/seller/listings/${product.id}/edit`
+                          )
+                        }
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -386,10 +398,7 @@ function DashboardActionCard({
       <h2>{title}</h2>
       <p>{description}</p>
 
-      <button
-        type="button"
-        onClick={onClick}
-      >
+      <button type="button" onClick={onClick}>
         {buttonLabel}
       </button>
     </article>
