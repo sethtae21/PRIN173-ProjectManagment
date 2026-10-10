@@ -2,6 +2,10 @@
 import { useNavigate } from "react-router-dom";
 import "./css/ShopperDashboard.css";
 
+/* ==========================================
+   STORAGE HELPERS
+========================================== */
+
 function readStoredArray(...keys) {
   for (const key of keys) {
     try {
@@ -15,7 +19,7 @@ function readStoredArray(...keys) {
         }
       }
     } catch {
-      // Continue to the next key.
+      // Continue checking other keys.
     }
   }
 
@@ -42,12 +46,16 @@ function getCurrentShopper() {
         return JSON.parse(savedAccount);
       }
     } catch {
-      // Continue to the next account.
+      // Continue checking other accounts.
     }
   }
 
   return null;
 }
+
+/* ==========================================
+   SHOPPER DASHBOARD
+========================================== */
 
 function ShopperDashboard() {
   const navigate = useNavigate();
@@ -76,8 +84,7 @@ function ShopperDashboard() {
 
   return (
     <main className="shopper-dashboard-page">
-
-      {/* CLEAN HEADER - CART ONLY */}
+      {/* HEADER - MATCHES ORDER HISTORY */}
       <header className="shopper-dashboard-header">
         <div className="shopper-dashboard-top-actions">
           <button
@@ -86,31 +93,22 @@ function ShopperDashboard() {
             onClick={() => navigate("/shopper/cart")}
             aria-label={`Open cart with ${cartItems.length} items`}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="9" cy="20" r="1" />
-              <circle cx="19" cy="20" r="1" />
-              <path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 1.9-1.5L23 6H5" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+              <circle cx="10" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
             </svg>
 
-            <span>{cartItems.length}</span>
+            <strong>{cartItems.length}</strong>
           </button>
         </div>
       </header>
 
-      {/* MAIN DASHBOARD CONTENT */}
+      {/* DASHBOARD CONTENT */}
       <div className="shopper-dashboard-body">
+        {/* WELCOME */}
         <section className="shopper-welcome">
-          <p>
-            WELCOME, {username.toUpperCase()}
-          </p>
+          <p>WELCOME, {username.toUpperCase()}</p>
 
           <h1>Start your first fitting session</h1>
 
@@ -120,6 +118,7 @@ function ShopperDashboard() {
           </span>
         </section>
 
+        {/* FITTING PROFILE CARD */}
         <section className="shopper-start-card">
           <div className="shopper-start-card-content">
             <p className="shopper-card-label">
@@ -168,6 +167,7 @@ function ShopperDashboard() {
           </div>
         </section>
 
+        {/* QUICK ACTIONS */}
         <section className="shopper-quick-actions">
           <DashboardAction
             number="01"
@@ -197,6 +197,7 @@ function ShopperDashboard() {
           />
         </section>
 
+        {/* ACCOUNT OVERVIEW */}
         <section className="shopper-account-status">
           <div className="shopper-status-heading">
             <div>
@@ -267,6 +268,10 @@ function ShopperDashboard() {
   );
 }
 
+/* ==========================================
+   QUICK ACTION COMPONENT
+========================================== */
+
 function DashboardAction({
   number,
   title,
@@ -298,11 +303,11 @@ function DashboardAction({
   );
 }
 
-function StatusRow({
-  label,
-  value,
-  onClick,
-}) {
+/* ==========================================
+   ACCOUNT STATUS COMPONENT
+========================================== */
+
+function StatusRow({ label, value, onClick }) {
   return (
     <button
       type="button"

@@ -1,11 +1,20 @@
+
+/* ==========================================
+   FITFUSION AI - EDIT SAVED OUTFIT
+   COMPLETE UPDATED STYLESHEET
+========================================== */
+
 .edit-outfit-page {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  display: block;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
   background:
     radial-gradient(
       circle at right center,
-      rgba(181, 126, 32, 0.2),
+      rgba(181, 126, 32, 0.16),
       transparent 42%
     ),
     linear-gradient(
@@ -17,133 +26,66 @@
   color: #17130f;
 }
 
-/* Sidebar */
-
-.edit-outfit-page .shopper-sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  height: 100vh;
-  flex-direction: column;
-  padding: 18px;
-  background: linear-gradient(
-    180deg,
-    #f6e7b7,
-    #d7af4b 52%,
-    #b57e20
-  );
+.edit-outfit-page,
+.edit-outfit-page * {
+  box-sizing: border-box;
 }
 
-.edit-outfit-page .shopper-sidebar-logo {
-  display: grid;
-  min-height: 90px;
-  place-items: center;
-  margin-bottom: 15px;
-}
-
-.edit-outfit-page .shopper-sidebar-logo img {
-  width: 140px;
-  height: 76px;
-  object-fit: contain;
-}
-
-.edit-outfit-page .shopper-navigation {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.edit-outfit-page .shopper-nav-link {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: center;
-  padding: 11px 9px;
-  background: rgba(255, 253, 249, 0.57);
-  border: 1px solid #e2c978;
-  border-radius: 9px;
-  color: #29251f;
-  font-size: 13px;
-  text-align: center;
-  text-decoration: none;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.edit-outfit-page .shopper-nav-link:hover {
-  background: rgba(255, 253, 249, 0.86);
-  transform: translateX(2px);
-}
-
-.edit-outfit-page .shopper-nav-link.active {
-  background: linear-gradient(
-    135deg,
-    #17130f,
-    #8e641f 55%,
-    #d7af4b
-  );
-  border-color: #e2c978;
-  color: #fffdf9;
-  font-weight: 700;
-}
-
-.edit-outfit-page .shopper-logout-button {
-  min-height: 48px;
-  margin-top: auto;
-  background: #fffdf9;
-  border: 1.2px solid #b57e20;
-  border-radius: 9px;
-  color: #8e641f;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.edit-outfit-page
-  .shopper-logout-button:hover {
-  background: #17130f;
-  color: #fffdf9;
-}
-
-/* Content and header */
+/* ==========================================
+   CONTENT - SINGLE SIDEBAR
+========================================== */
 
 .edit-outfit-content {
+  width: 100%;
   min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
+
+/* ShopperLayout.jsx supplies the sidebar. */
+
+.edit-outfit-page .shopper-sidebar {
+  display: none;
+}
+
+.edit-outfit-role {
+  display: none;
+}
+
+/* ==========================================
+   HEADER - MATCHES ORDER HISTORY
+========================================== */
 
 .edit-outfit-header {
   display: flex;
-  min-height: 124px;
+  width: 100%;
+  min-height: 100px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 23px 32px;
+  margin: 0;
+  padding: 20px clamp(25px, 4vw, 58px);
   background: rgba(255, 253, 249, 0.97);
   border-bottom: 1px solid #e2d8c7;
 }
 
-.edit-outfit-header h1 {
-  margin: 8px 0 7px;
-  font-size: 27px;
-}
-
-.edit-outfit-header p {
-  margin: 0;
-  color: #5c554c;
-  font-size: 13px;
+.edit-outfit-header > div:first-child {
+  min-width: 0;
 }
 
 .edit-outfit-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
   padding: 0;
   background: transparent;
   border: 0;
   color: #8e641f;
   font: inherit;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -151,24 +93,40 @@
   text-decoration: underline;
 }
 
+/* Hide old header title and subtitle. */
+
+.edit-outfit-header h1,
+.edit-outfit-header > div:first-child > p {
+  display: none;
+}
+
 .edit-outfit-header-actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  gap: 0;
 }
+
+/* ==========================================
+   HEADER CART BUTTON
+========================================== */
 
 .edit-outfit-cart-button {
   display: flex;
-  min-width: 102px;
-  min-height: 48px;
+  min-width: 120px;
+  min-height: 58px;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  background: #f8f5ef;
+  gap: 18px;
+  padding: 0 18px;
+  background: #fffdf9;
   border: 1px solid #d2be91;
-  border-radius: 9px;
-  color: #29251f;
+  border-radius: 10px;
+  color: #17130f;
+  font: inherit;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .edit-outfit-cart-button:hover {
@@ -176,299 +134,332 @@
 }
 
 .edit-outfit-cart-button svg {
-  width: 23px;
-  height: 23px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .edit-outfit-cart-button span {
+  color: #17130f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ==========================================
+   MAIN BODY
+========================================== */
+
+.edit-outfit-body {
+  width: min(1240px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 42px 0 72px;
+}
+
+/* ==========================================
+   NOTICE
+========================================== */
+
+.edit-outfit-notice {
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  background: #f6e7b7;
+  border: 1px solid #d7af4b;
+  border-radius: 10px;
+  color: #6e4b15;
   font-size: 12px;
   font-weight: 700;
 }
 
-.edit-outfit-role {
-  display: grid;
-  min-width: 130px;
-  min-height: 48px;
-  place-items: center;
-  padding: 10px 15px;
-  background: #17130f;
-  border-radius: 9px;
-  color: #f6e7b7;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-}
-
-/* Main body */
-
-.edit-outfit-body {
-  width: min(1240px, calc(100% - 58px));
-  margin: 0 auto;
-  padding: 40px 0 72px;
-}
-
-.edit-outfit-notice {
-  margin-bottom: 22px;
-  padding: 15px 18px;
-  background: #fff8df;
-  border: 1px solid #d7af4b;
-  border-radius: 10px;
-  color: #6f4d17;
-  font-size: 13px;
-  font-weight: 700;
-}
+/* ==========================================
+   INTRODUCTION
+========================================== */
 
 .edit-outfit-introduction {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
+  gap: 25px;
+  margin-bottom: 30px;
 }
 
-.edit-outfit-introduction p {
-  margin: 0 0 10px;
+.edit-outfit-introduction > div:first-child > p {
+  margin: 0 0 12px;
   color: #9a6a1d;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
 .edit-outfit-introduction h2 {
-  margin: 0 0 10px;
-  font-size: clamp(28px, 3vw, 38px);
+  margin: 0 0 14px;
+  color: #17130f;
+  font-size: clamp(30px, 3.5vw, 42px);
+  font-weight: 800;
+  line-height: 1.15;
 }
 
-.edit-outfit-introduction span {
+.edit-outfit-introduction > div:first-child > span {
   color: #5c554c;
   font-size: 13px;
+  line-height: 1.7;
 }
 
+/* ==========================================
+   SAVE STATUS
+========================================== */
+
 .edit-outfit-unsaved-status {
-  display: flex;
+  display: inline-flex;
+  min-height: 38px;
   align-items: center;
-  gap: 9px;
-  padding: 11px 15px;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 9px 15px;
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 999px;
   color: #5c554c;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
 .status-dot {
   width: 9px;
   height: 9px;
-  background: #678451;
+  flex-shrink: 0;
+  background: #668456;
   border-radius: 50%;
 }
 
 .status-dot.changed {
-  background: #c68c26;
-  box-shadow: 0 0 0 4px
-    rgba(198, 140, 38, 0.14);
+  background: #d09a24;
 }
+
+/* ==========================================
+   EDITOR LAYOUT
+========================================== */
 
 .edit-outfit-layout {
   display: grid;
   grid-template-columns:
-    minmax(290px, 0.8fr)
-    minmax(0, 1.8fr);
+    minmax(270px, 0.75fr)
+    minmax(0, 1.25fr);
   align-items: start;
   gap: 28px;
 }
 
-/* Avatar preview */
+.edit-outfit-editor-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ==========================================
+   SHARED CARDS
+========================================== */
 
 .edit-outfit-preview-card,
 .edit-outfit-form-card,
 .edit-outfit-products-card,
 .edit-outfit-summary {
+  min-width: 0;
+  padding: 28px;
   background: #fffdf9;
   border: 1px solid #e2d8c7;
-  border-radius: 16px;
+  border-radius: 17px;
+  box-shadow: 0 10px 28px rgba(83, 55, 13, 0.05);
 }
 
-.edit-outfit-preview-card {
-  position: sticky;
-  top: 24px;
-  padding: 27px;
-}
+/* ==========================================
+   CARD HEADINGS
+========================================== */
 
-.edit-outfit-card-heading {
+.edit-outfit-card-heading,
+.edit-outfit-section-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 15px;
+  margin-bottom: 24px;
 }
 
-.edit-outfit-card-heading p {
-  margin: 0 0 8px;
+.edit-outfit-card-heading p,
+.edit-outfit-section-heading p {
+  margin: 0 0 10px;
   color: #b57e20;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.07em;
 }
 
-.edit-outfit-card-heading h2 {
+.edit-outfit-card-heading h2,
+.edit-outfit-section-heading h2 {
   margin: 0;
-  font-size: 19px;
+  color: #17130f;
+  font-size: 21px;
+  font-weight: 800;
 }
 
 .edit-outfit-card-heading > span {
-  padding: 7px 10px;
+  padding: 8px 11px;
   background: #f6e7b7;
   border-radius: 999px;
-  color: #745019;
-  font-size: 9px;
+  color: #8e641f;
+  font-size: 10px;
   font-weight: 800;
 }
+
+.edit-outfit-section-heading > span {
+  color: #81766a;
+  font-size: 10px;
+  text-align: right;
+}
+
+/* ==========================================
+   AVATAR PREVIEW
+========================================== */
 
 .edit-outfit-avatar-preview {
   position: relative;
   display: flex;
-  height: 390px;
+  width: 100%;
+  min-height: 350px;
   align-items: center;
-  flex-direction: column;
   justify-content: center;
-  margin: 24px 0 18px;
+  flex-direction: column;
   overflow: hidden;
   background:
     radial-gradient(
       circle at center,
-      #fffdf9,
-      #eee5d4
+      rgba(215, 175, 75, 0.16),
+      transparent 55%
+    ),
+    linear-gradient(
+      145deg,
+      #f8f5ef,
+      #eadfc9
     );
-  border: 1px solid #dfcfaf;
-  border-radius: 14px;
-}
-
-.edit-outfit-avatar-preview::before {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  left: 20px;
-  height: 15px;
-  background: rgba(44, 36, 25, 0.1);
-  border-radius: 50%;
-  content: "";
-  filter: blur(5px);
+  border: 1px solid #dfcfad;
+  border-radius: 15px;
 }
 
 .edit-avatar-head {
-  z-index: 1;
-  width: 57px;
-  height: 68px;
-  background: #c88f69;
-  border: 3px solid #29251f;
-  border-radius: 48% 48% 44% 44%;
+  position: relative;
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+  background: linear-gradient(
+    145deg,
+    #e9cda1,
+    #c99c72
+  );
+  border: 2px solid #49341c;
+  border-radius: 45% 45% 43% 43%;
 }
 
 .edit-avatar-neck {
-  z-index: 1;
-  width: 23px;
-  height: 20px;
+  width: 30px;
+  height: 29px;
   margin-top: -3px;
-  background: #c88f69;
-  border-right: 3px solid #29251f;
-  border-left: 3px solid #29251f;
+  background: #d8ad87;
+  border: 2px solid #49341c;
 }
 
 .edit-avatar-body {
-  z-index: 1;
-  width: 145px;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 170px;
+  min-height: 165px;
+  flex-direction: column;
+}
+
+.edit-avatar-top,
+.edit-avatar-bottom {
+  display: grid;
+  min-height: 82px;
+  place-items: center;
+  padding: 12px;
+  overflow: hidden;
+  border: 2px solid #49341c;
+  color: #17130f;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .edit-avatar-top {
-  display: grid;
-  min-height: 112px;
-  place-items: center;
-  padding: 15px;
   background: linear-gradient(
-    135deg,
-    #eadabb,
-    #b99055
+    145deg,
+    #e6c997,
+    #c9a675
   );
-  border: 3px solid #29251f;
-  border-radius: 28px 28px 8px 8px;
-  color: #29251f;
-  font-size: 9px;
-  font-weight: 800;
-  text-align: center;
+  border-radius: 24px 24px 6px 6px;
 }
 
 .edit-avatar-bottom {
-  display: grid;
-  min-height: 96px;
-  place-items: center;
-  padding: 12px;
   background: linear-gradient(
-    135deg,
-    #43556c,
-    #1f2935
+    145deg,
+    #44576b,
+    #292f3b
   );
-  border: 3px solid #29251f;
-  border-top: 0;
-  border-radius: 3px 3px 11px 11px;
+  border-radius: 4px 4px 12px 12px;
   color: #fffdf9;
-  font-size: 9px;
-  font-weight: 800;
-  text-align: center;
 }
 
 .edit-avatar-legs {
-  z-index: 1;
   display: flex;
-  gap: 16px;
+  width: 140px;
+  height: 45px;
+  justify-content: space-between;
+  margin-top: -2px;
 }
 
 .edit-avatar-legs span {
-  width: 33px;
-  height: 77px;
-  background: #c88f69;
-  border: 3px solid #29251f;
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-}
-
-.edit-outfit-avatar-preview.side
-  .edit-avatar-head {
   width: 45px;
-  transform: translateX(5px);
+  height: 45px;
+  background: #292f3b;
+  border: 2px solid #17130f;
+  border-radius: 0 0 10px 10px;
 }
 
-.edit-outfit-avatar-preview.side
-  .edit-avatar-body {
-  width: 105px;
-  transform: translateX(4px);
+.edit-outfit-avatar-preview.side .edit-avatar-head,
+.edit-outfit-avatar-preview.side .edit-avatar-neck,
+.edit-outfit-avatar-preview.side .edit-avatar-body,
+.edit-outfit-avatar-preview.side .edit-avatar-legs {
+  transform: scaleX(0.7);
 }
 
-.edit-outfit-avatar-preview.side
-  .edit-avatar-legs {
-  gap: 7px;
-  transform: translateX(3px);
+.edit-outfit-avatar-preview.rear .edit-avatar-head,
+.edit-outfit-avatar-preview.rear .edit-avatar-neck,
+.edit-outfit-avatar-preview.rear .edit-avatar-body,
+.edit-outfit-avatar-preview.rear .edit-avatar-legs {
+  transform: rotateY(180deg);
 }
 
-.edit-outfit-avatar-preview.rear
-  .edit-avatar-head {
-  border-radius: 50% 50% 42% 42%;
-}
+/* ==========================================
+   AVATAR VIEW BUTTONS
+========================================== */
 
 .edit-outfit-view-buttons {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 9px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .edit-outfit-view-buttons button {
-  min-height: 41px;
-  background: #f8f5ef;
+  min-height: 43px;
+  padding: 10px;
+  background: #fffdf9;
   border: 1px solid #d2be91;
   border-radius: 8px;
   color: #5c554c;
@@ -478,18 +469,19 @@
   cursor: pointer;
 }
 
-.edit-outfit-view-buttons button:hover,
-.edit-outfit-view-buttons button.active {
+.edit-outfit-view-buttons button.active,
+.edit-outfit-view-buttons button:hover {
   background: #17130f;
   color: #fffdf9;
 }
 
 .edit-outfit-studio-button {
   width: 100%;
-  min-height: 48px;
-  margin-top: 14px;
+  min-height: 46px;
+  margin-top: 17px;
+  padding: 10px 16px;
   background: #fffdf9;
-  border: 1.2px solid #b57e20;
+  border: 1px solid #b57e20;
   border-radius: 9px;
   color: #8e641f;
   font: inherit;
@@ -499,68 +491,31 @@
 }
 
 .edit-outfit-studio-button:hover {
-  background: #fff8df;
+  background: #fff8e7;
 }
 
-/* Editor */
-
-.edit-outfit-editor-column {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 23px;
-}
-
-.edit-outfit-form-card,
-.edit-outfit-products-card {
-  padding: 28px;
-}
-
-.edit-outfit-section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 24px;
-}
-
-.edit-outfit-section-heading p {
-  margin: 0 0 7px;
-  color: #b57e20;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-}
-
-.edit-outfit-section-heading h2 {
-  margin: 0;
-  font-size: 21px;
-}
-
-.edit-outfit-section-heading > span {
-  color: #7d756c;
-  font-size: 10px;
-}
+/* ==========================================
+   FORM GRID
+========================================== */
 
 .edit-outfit-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
 }
 
 .edit-outfit-field {
   display: flex;
-  position: relative;
+  min-width: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .edit-outfit-field.full-width {
   grid-column: 1 / -1;
 }
 
-.edit-outfit-field > span,
-.edit-outfit-product-options label > span {
+.edit-outfit-field > span {
   color: #29251f;
   font-size: 11px;
   font-weight: 800;
@@ -568,120 +523,108 @@
 
 .edit-outfit-field input,
 .edit-outfit-field select,
-.edit-outfit-field textarea,
-.edit-outfit-product-options input,
-.edit-outfit-product-options select {
+.edit-outfit-field textarea {
   width: 100%;
+  min-height: 49px;
+  padding: 12px 14px;
   background: #f8f5ef;
-  border: 1px solid #ccb990;
-  border-radius: 8px;
+  border: 1px solid #d2be91;
+  border-radius: 9px;
   color: #29251f;
   font: inherit;
   font-size: 12px;
   outline: none;
 }
 
-.edit-outfit-field input,
-.edit-outfit-field select {
-  min-height: 48px;
-  padding: 0 13px;
-}
-
 .edit-outfit-field textarea {
-  min-height: 105px;
-  padding: 13px;
+  min-height: 112px;
   resize: vertical;
+  line-height: 1.6;
 }
 
 .edit-outfit-field input:focus,
 .edit-outfit-field select:focus,
-.edit-outfit-field textarea:focus,
-.edit-outfit-product-options input:focus,
-.edit-outfit-product-options select:focus {
+.edit-outfit-field textarea:focus {
   border-color: #8e641f;
-  box-shadow: 0 0 0 3px
-    rgba(181, 126, 32, 0.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
 .edit-outfit-field .input-error {
-  border-color: #a33a32;
+  border-color: #a76559;
 }
 
 .edit-outfit-field small {
   align-self: flex-end;
-  color: #867e74;
+  color: #81766a;
   font-size: 9px;
 }
 
 .edit-outfit-field em {
-  color: #a33a32;
+  color: #a33b30;
   font-size: 10px;
   font-style: normal;
-  font-weight: 700;
 }
 
+/* ==========================================
+   SELECTED GARMENTS
+========================================== */
+
 .edit-outfit-add-product {
-  min-height: 42px;
-  padding: 0 17px;
+  min-height: 39px;
+  padding: 9px 15px;
   background: #fffdf9;
   border: 1px solid #b57e20;
   border-radius: 8px;
   color: #8e641f;
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   cursor: pointer;
 }
 
 .edit-outfit-add-product:hover {
-  background: #fff8df;
+  background: #fff8e7;
 }
 
 .edit-outfit-products-error {
-  margin: -8px 0 19px;
-  padding: 11px 13px;
-  background: #fff0ed;
-  border: 1px solid #d79a92;
-  border-radius: 8px;
-  color: #96362f;
+  margin: 0 0 16px;
+  color: #a33b30;
   font-size: 11px;
-  font-weight: 700;
 }
 
 .edit-outfit-products-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .edit-outfit-product {
-  position: relative;
   display: grid;
-  grid-template-columns:
-    92px
-    minmax(140px, 1fr)
-    minmax(220px, 1.25fr)
-    auto;
-  align-items: center;
-  gap: 17px;
-  padding: 16px;
-  background: #fcfaf6;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 18px;
+  padding: 19px;
+  background: #fdfbf7;
   border: 1px solid #e2d8c7;
   border-radius: 12px;
 }
 
+/* ==========================================
+   GARMENT IMAGE
+========================================== */
+
 .edit-outfit-product-image {
   position: relative;
   display: grid;
-  width: 92px;
+  width: 90px;
   height: 105px;
   place-items: center;
   overflow: hidden;
   background: linear-gradient(
-    135deg,
-    #eee2cc,
-    #d4b675
+    145deg,
+    #f2e7d0,
+    #d8bc89
   );
+  border: 1px solid #dfcfad;
   border-radius: 9px;
 }
 
@@ -692,107 +635,142 @@
 }
 
 .edit-outfit-product-image > span {
-  color: rgba(23, 19, 15, 0.66);
-  font-size: 32px;
+  color: #8e641f;
+  font-size: 30px;
   font-weight: 800;
 }
 
 .edit-outfit-product-image small {
   position: absolute;
-  top: 7px;
-  left: 7px;
-  display: grid;
-  width: 21px;
-  height: 21px;
-  place-items: center;
+  right: 5px;
+  bottom: 5px;
+  padding: 4px 6px;
   background: #17130f;
-  border-radius: 50%;
+  border-radius: 5px;
   color: #fffdf9;
   font-size: 9px;
-  font-weight: 800;
+}
+
+/* ==========================================
+   GARMENT DETAILS
+========================================== */
+
+.edit-outfit-product-information {
+  min-width: 0;
 }
 
 .edit-outfit-product-information > span {
   color: #9a6a1d;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .edit-outfit-product-information h3 {
-  margin: 6px 0 7px;
-  font-size: 14px;
-  line-height: 1.35;
+  margin: 7px 0;
+  color: #17130f;
+  font-size: 16px;
+  line-height: 1.3;
 }
 
 .edit-outfit-product-information p {
-  margin: 0 0 9px;
-  color: #6c645b;
-  font-size: 10px;
+  margin: 0 0 10px;
+  color: #756b60;
+  font-size: 11px;
 }
 
 .edit-outfit-product-information strong {
   color: #8e641f;
-  font-size: 14px;
+  font-size: 15px;
 }
+
+/* ==========================================
+   GARMENT OPTIONS
+========================================== */
 
 .edit-outfit-product-options {
   display: grid;
-  grid-template-columns:
-    minmax(70px, 0.7fr)
-    minmax(90px, 1fr)
-    minmax(92px, 0.9fr);
-  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
 }
 
 .edit-outfit-product-options label {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 
-.edit-outfit-product-options input,
-.edit-outfit-product-options select {
-  min-height: 39px;
-  padding: 0 9px;
+.edit-outfit-product-options label > span {
+  color: #493d2d;
+  font-size: 10px;
+  font-weight: 800;
 }
+
+.edit-outfit-product-options select,
+.edit-outfit-product-options input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  background: #fffdf9;
+  border: 1px solid #d2be91;
+  border-radius: 8px;
+  color: #29251f;
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+/* ==========================================
+   QUANTITY CONTROLS
+========================================== */
 
 .edit-outfit-quantity {
   display: grid;
-  grid-template-columns: 30px 1fr 30px;
-  min-height: 39px;
+  grid-template-columns: 34px 1fr 34px;
+  min-height: 40px;
   overflow: hidden;
-  background: #fffdf9;
-  border: 1px solid #ccb990;
+  border: 1px solid #d2be91;
   border-radius: 8px;
 }
 
 .edit-outfit-quantity button {
-  padding: 0;
-  background: #f4ecdd;
+  background: #f8f5ef;
   border: 0;
-  color: #29251f;
+  color: #17130f;
   font-size: 16px;
   cursor: pointer;
 }
 
+.edit-outfit-quantity button:hover:not(:disabled) {
+  background: #f6e7b7;
+}
+
 .edit-outfit-quantity button:disabled {
-  cursor: not-allowed;
   opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .edit-outfit-quantity strong {
   display: grid;
   place-items: center;
+  border-right: 1px solid #d2be91;
+  border-left: 1px solid #d2be91;
   font-size: 11px;
 }
 
+/* ==========================================
+   REMOVE GARMENT
+========================================== */
+
 .edit-outfit-remove-product {
-  align-self: flex-start;
-  padding: 7px 4px;
-  background: transparent;
-  border: 0;
-  color: #9a3b32;
+  grid-column: 1 / -1;
+  justify-self: flex-end;
+  padding: 8px 13px;
+  background: #fffdf9;
+  border: 1px solid #a76559;
+  border-radius: 7px;
+  color: #8b3b31;
   font: inherit;
   font-size: 10px;
   font-weight: 800;
@@ -800,43 +778,40 @@
 }
 
 .edit-outfit-remove-product:hover {
-  text-decoration: underline;
+  background: #faeeeb;
 }
 
+/* ==========================================
+   EMPTY GARMENTS
+========================================== */
+
 .edit-outfit-empty-products {
-  padding: 42px 20px;
-  background: #faf7f1;
-  border: 1px dashed #ccb990;
+  padding: 32px 20px;
+  background: #f8f5ef;
+  border: 1px dashed #d2be91;
   border-radius: 12px;
   text-align: center;
 }
 
 .edit-outfit-empty-products > div {
-  display: grid;
-  width: 47px;
-  height: 47px;
-  place-items: center;
-  margin: 0 auto 13px;
-  background: #f6e7b7;
-  border-radius: 50%;
-  color: #8e641f;
-  font-size: 24px;
+  color: #b57e20;
+  font-size: 35px;
 }
 
 .edit-outfit-empty-products h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 10px 0;
+  font-size: 17px;
 }
 
 .edit-outfit-empty-products p {
-  margin: 0 0 18px;
-  color: #6c645b;
-  font-size: 11px;
+  color: #5c554c;
+  font-size: 12px;
 }
 
 .edit-outfit-empty-products button {
   min-height: 42px;
-  padding: 0 20px;
+  margin-top: 12px;
+  padding: 10px 18px;
   background: #17130f;
   border: 1px solid #b57e20;
   border-radius: 8px;
@@ -847,17 +822,21 @@
   cursor: pointer;
 }
 
-/* Summary and actions */
+/* ==========================================
+   OUTFIT SUMMARY
+========================================== */
 
 .edit-outfit-summary {
-  padding: 21px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .edit-outfit-summary > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 20px;
 }
 
 .edit-outfit-summary span {
@@ -867,35 +846,37 @@
 
 .edit-outfit-summary strong {
   color: #8e641f;
-  font-size: 22px;
+  font-size: 25px;
 }
 
 .edit-outfit-summary p {
-  margin: 12px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid #ebe2d4;
-  color: #82796f;
-  font-size: 10px;
+  margin: 0;
+  color: #81766a;
+  font-size: 11px;
+  line-height: 1.6;
 }
+
+/* ==========================================
+   BOTTOM ACTIONS
+========================================== */
 
 .edit-outfit-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding-top: 5px;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 
 .edit-outfit-actions > div {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-.edit-outfit-delete-button,
-.edit-outfit-cancel-button,
-.edit-outfit-save-button {
-  min-height: 48px;
-  padding: 0 22px;
+.edit-outfit-actions button {
+  min-height: 46px;
+  padding: 11px 18px;
   border-radius: 9px;
   font: inherit;
   font-size: 11px;
@@ -905,8 +886,8 @@
 
 .edit-outfit-delete-button {
   background: #fffdf9;
-  border: 1px solid #b75448;
-  color: #9d382f;
+  border: 1px solid #a76559;
+  color: #8b3b31;
 }
 
 .edit-outfit-cancel-button {
@@ -916,26 +897,19 @@
 }
 
 .edit-outfit-save-button {
-  min-width: 155px;
   background: linear-gradient(
     135deg,
     #17130f,
-    #8e641f 55%,
+    #8e641f 58%,
     #d7af4b
   );
   border: 1px solid #b57e20;
   color: #fffdf9;
 }
 
-.edit-outfit-delete-button:hover,
-.edit-outfit-cancel-button:hover,
-.edit-outfit-save-button:hover {
-  box-shadow: 0 7px 18px
-    rgba(92, 70, 35, 0.16);
-  transform: translateY(-1px);
-}
-
-/* Modal */
+/* ==========================================
+   MODAL BACKDROP
+========================================== */
 
 .edit-outfit-modal-backdrop {
   position: fixed;
@@ -944,65 +918,68 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(17, 14, 11, 0.67);
-  backdrop-filter: blur(4px);
+  background: rgba(23, 19, 15, 0.72);
+  backdrop-filter: blur(5px);
 }
 
 .edit-outfit-modal {
-  width: min(440px, 100%);
-  padding: 34px;
+  width: min(460px, 100%);
+  padding: 38px;
   background: #fffdf9;
-  border: 1px solid #d7af4b;
+  border: 1px solid #d2be91;
   border-radius: 18px;
-  box-shadow: 0 25px 65px
-    rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 65px rgba(0, 0, 0, 0.25);
   text-align: center;
 }
 
 .edit-outfit-modal-icon {
   display: grid;
-  width: 54px;
-  height: 54px;
+  width: 62px;
+  height: 62px;
   place-items: center;
-  margin: 0 auto 18px;
+  margin: 0 auto 20px;
   background: #f6e7b7;
-  border: 1px solid #d7af4b;
   border-radius: 50%;
   color: #8e641f;
-  font-size: 24px;
+  font-size: 29px;
   font-weight: 800;
 }
 
 .edit-outfit-modal-icon.danger {
-  background: #fff0ed;
-  border-color: #cf8279;
-  color: #a53e35;
+  background: #faeeeb;
+  color: #8b3b31;
 }
 
 .edit-outfit-modal h2 {
-  margin: 0 0 10px;
-  font-size: 23px;
+  margin: 0 0 14px;
+  color: #17130f;
+  font-size: 25px;
 }
 
 .edit-outfit-modal p {
   margin: 0;
-  color: #645c53;
-  font-size: 12px;
+  color: #5c554c;
+  font-size: 13px;
   line-height: 1.65;
 }
+
+/* ==========================================
+   MODAL BUTTONS
+========================================== */
 
 .edit-outfit-modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-top: 25px;
+  margin-top: 28px;
 }
 
 .edit-outfit-modal-actions button {
-  min-height: 47px;
-  border-radius: 8px;
+  min-height: 46px;
+  padding: 10px 13px;
+  border-radius: 9px;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -1025,59 +1002,30 @@
 }
 
 .modal-danger-button {
-  background: #993c34;
-  border: 1px solid #7d2a24;
+  background: #2a1714;
+  border: 1px solid #8b3b31;
   color: #fffdf9;
 }
 
-/* Responsive */
+/* ==========================================
+   RESPONSIVE DESIGN
+========================================== */
 
-@media (max-width: 1150px) {
+@media (max-width: 1050px) {
   .edit-outfit-layout {
     grid-template-columns: 1fr;
   }
-
-  .edit-outfit-preview-card {
-    position: static;
-  }
-
-  .edit-outfit-avatar-preview {
-    height: 360px;
-  }
-
-  .edit-outfit-product {
-    grid-template-columns:
-      92px
-      minmax(150px, 1fr)
-      minmax(210px, 1.3fr);
-  }
-
-  .edit-outfit-remove-product {
-    grid-column: 2 / -1;
-  }
 }
 
-@media (max-width: 900px) {
-  .edit-outfit-page {
-    grid-template-columns:
-      155px
-      minmax(0, 1fr);
-  }
-
-  .edit-outfit-page .shopper-sidebar {
-    padding: 12px;
-  }
-
+@media (max-width: 760px) {
   .edit-outfit-header {
-    align-items: flex-start;
-    flex-direction: column;
+    min-height: 100px;
+    padding: 18px 22px;
   }
 
   .edit-outfit-body {
-    width: min(
-      100% - 34px,
-      1240px
-    );
+    width: calc(100% - 30px);
+    padding-top: 30px;
   }
 
   .edit-outfit-introduction {
@@ -1093,118 +1041,67 @@
     grid-column: auto;
   }
 
-  .edit-outfit-product {
-    grid-template-columns: 82px 1fr;
-  }
-
-  .edit-outfit-product-image {
-    width: 82px;
-    height: 96px;
-  }
-
   .edit-outfit-product-options {
-    grid-column: 1 / -1;
-  }
-
-  .edit-outfit-remove-product {
-    grid-column: 1 / -1;
-    justify-self: flex-end;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
-@media (max-width: 700px) {
-  .edit-outfit-page {
-    display: block;
+@media (max-width: 520px) {
+  .edit-outfit-header {
+    min-height: 90px;
+    padding: 16px;
   }
 
-  .edit-outfit-page .shopper-sidebar {
-    position: static;
-    height: auto;
+  .edit-outfit-cart-button {
+    min-width: 94px;
+    min-height: 48px;
+    gap: 12px;
+    padding: 0 12px;
   }
 
-  .edit-outfit-page .shopper-sidebar-logo {
-    min-height: 70px;
+  .edit-outfit-cart-button svg {
+    width: 22px;
+    height: 22px;
   }
 
-  .edit-outfit-page .shopper-navigation {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+  .edit-outfit-body {
+    width: calc(100% - 24px);
   }
 
-  .edit-outfit-page
-    .shopper-logout-button {
-    width: 100%;
-    margin-top: 17px;
-  }
-
-  .edit-outfit-header-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
+  .edit-outfit-preview-card,
   .edit-outfit-form-card,
   .edit-outfit-products-card,
-  .edit-outfit-preview-card {
-    padding: 21px;
+  .edit-outfit-summary {
+    padding: 20px 17px;
+  }
+
+  .edit-outfit-product {
+    grid-template-columns: 75px 1fr;
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .edit-outfit-product-image {
+    width: 75px;
+    height: 90px;
   }
 
   .edit-outfit-product-options {
     grid-template-columns: 1fr;
   }
 
-  .edit-outfit-actions {
-    align-items: stretch;
-    flex-direction: column-reverse;
-  }
-
+  .edit-outfit-actions,
   .edit-outfit-actions > div {
+    width: 100%;
     flex-direction: column;
   }
 
   .edit-outfit-actions button {
     width: 100%;
   }
-}
 
-@media (max-width: 480px) {
-  .edit-outfit-page .shopper-navigation {
-    grid-template-columns: 1fr;
-  }
-
-  .edit-outfit-header {
-    padding: 20px;
-  }
-
-  .edit-outfit-header-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .edit-outfit-cart-button,
-  .edit-outfit-role {
-    width: 100%;
-  }
-
-  .edit-outfit-section-heading {
-    flex-direction: column;
-  }
-
-  .edit-outfit-add-product {
-    width: 100%;
-  }
-
-  .edit-outfit-product {
-    grid-template-columns: 1fr;
-  }
-
-  .edit-outfit-product-image {
-    width: 100%;
-    height: 180px;
-  }
-
-  .edit-outfit-product-options,
-  .edit-outfit-remove-product {
-    grid-column: auto;
+  .edit-outfit-modal {
+    padding: 30px 20px;
   }
 
   .edit-outfit-modal-actions {

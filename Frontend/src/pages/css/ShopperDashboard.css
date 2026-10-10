@@ -4,12 +4,13 @@
    ========================================== */
 
 .shopper-dashboard-page {
+  min-width: 0;
   min-height: 100vh;
   padding-bottom: 70px;
   background:
     radial-gradient(
       circle at right center,
-      rgba(181, 126, 32, 0.2),
+      rgba(181, 126, 32, 0.17),
       transparent 42%
     ),
     linear-gradient(
@@ -27,59 +28,48 @@
 }
 
 /* ==========================================
-   HEADER - CART ONLY
+   HEADER - SAME AS ORDER HISTORY
    ========================================== */
 
 .shopper-dashboard-header {
-  width: 100%;
-  height: 120px;
-  min-height: 120px;
   display: flex;
+  width: 100%;
+  min-height: 100px;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 64px;
-  background: #fffdf9;
-  border-bottom: 1px solid #e6d4b4;
+  justify-content: space-between;
+  padding: 20px clamp(25px, 4vw, 58px);
+  background: rgba(255, 253, 249, 0.97);
+  border-bottom: 1px solid #e2d8c7;
 }
 
 .shopper-dashboard-top-actions {
   display: flex;
   width: 100%;
-  height: 100%;
-  min-height: 0;
   align-items: center;
   justify-content: flex-end;
-  gap: 0;
   padding: 0;
+  margin: 0;
 }
 
 .shopper-dashboard-header .shopper-cart-button {
   display: flex;
-  width: 148px;
-  min-width: 148px;
-  height: 70px;
-  min-height: 70px;
+  min-width: 120px;
+  min-height: 58px;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 18px;
   padding: 0 18px;
   background: #fffdf9;
-  border: 1px solid #dcb975;
-  border-radius: 12px;
-  color: #191512;
+  border: 1px solid #d2be91;
+  border-radius: 10px;
+  color: #17130f;
+  font: inherit;
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .shopper-dashboard-header .shopper-cart-button:hover {
-  background: #fff8e6;
-  border-color: #b98730;
-  box-shadow: 0 8px 18px rgba(142, 100, 31, 0.12);
-  transform: translateY(-1px);
+  background: #fff9e8;
 }
 
 .shopper-dashboard-header .shopper-cart-button svg {
@@ -88,14 +78,14 @@
   flex-shrink: 0;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.shopper-dashboard-header .shopper-cart-button span {
-  font-size: 16px;
-  font-weight: 800;
+.shopper-dashboard-header .shopper-cart-button strong {
+  font-size: 13px;
+  font-weight: 700;
   color: #17130f;
 }
 
@@ -108,6 +98,10 @@
   margin: 0 auto;
   padding-top: 36px;
 }
+
+/* ==========================================
+   WELCOME SECTION
+   ========================================== */
 
 .shopper-welcome {
   margin-bottom: 31px;
@@ -124,16 +118,20 @@
 .shopper-welcome h1 {
   margin: 0 0 13px;
   font-size: clamp(32px, 4vw, 48px);
+  font-weight: 800;
   line-height: 1.15;
+  color: #17130f;
 }
 
-.shopper-welcome span {
+.shopper-welcome > span {
+  display: block;
   color: #5c554c;
   font-size: 12px;
+  line-height: 1.6;
 }
 
 /* ==========================================
-   START CARD
+   START FITTING CARD
    ========================================== */
 
 .shopper-start-card {
@@ -148,7 +146,8 @@
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 17px;
-  box-shadow: 0 13px 32px rgba(83, 55, 13, 0.06);
+  box-shadow: 0 13px 32px
+    rgba(83, 55, 13, 0.06);
 }
 
 .shopper-start-card-content {
@@ -167,7 +166,9 @@
 
 .shopper-start-card h2 {
   margin: 0 0 20px;
+  color: #17130f;
   font-size: clamp(26px, 3vw, 34px);
+  font-weight: 800;
   line-height: 1.25;
 }
 
@@ -178,6 +179,10 @@
   font-size: 13px;
   line-height: 1.7;
 }
+
+/* ==========================================
+   FITTING CARD BUTTONS
+   ========================================== */
 
 .shopper-card-actions {
   display: flex;
@@ -220,7 +225,8 @@
 .shopper-primary-button:hover,
 .shopper-secondary-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.2);
+  box-shadow: 0 8px 20px
+    rgba(142, 100, 31, 0.2);
 }
 
 /* ==========================================
@@ -246,7 +252,8 @@
   position: absolute;
   width: 180px;
   height: 180px;
-  border: 1px solid rgba(246, 231, 183, 0.22);
+  border: 1px solid
+    rgba(246, 231, 183, 0.22);
   border-radius: 50%;
   content: "";
 }
@@ -331,13 +338,15 @@
 .shopper-quick-action:hover {
   transform: translateY(-3px);
   border-color: #d7af4b;
-  box-shadow: 0 10px 22px rgba(83, 55, 13, 0.08);
+  box-shadow: 0 10px 22px
+    rgba(83, 55, 13, 0.08);
 }
 
 .shopper-quick-number {
   display: grid;
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
   place-items: center;
   background: #f6e7b7;
   border: 1px solid #d7af4b;
@@ -347,7 +356,7 @@
   font-weight: 800;
 }
 
-.shopper-quick-action div {
+.shopper-quick-action > div {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -356,6 +365,7 @@
 
 .shopper-quick-action strong {
   font-size: 12px;
+  color: #17130f;
 }
 
 .shopper-quick-action small {
@@ -370,7 +380,7 @@
 }
 
 /* ==========================================
-   ACCOUNT STATUS
+   ACCOUNT OVERVIEW
    ========================================== */
 
 .shopper-account-status {
@@ -398,7 +408,9 @@
 
 .shopper-status-heading h2 {
   margin: 0;
+  color: #17130f;
   font-size: 20px;
+  font-weight: 800;
 }
 
 .shopper-status-heading button {
@@ -417,6 +429,10 @@
 .shopper-status-heading button:hover {
   background: #fff8e7;
 }
+
+/* ==========================================
+   ACCOUNT STATUS ROWS
+   ========================================== */
 
 .shopper-status-row {
   display: grid;
@@ -444,6 +460,7 @@
 
 .shopper-status-row strong {
   font-size: 11px;
+  font-weight: 700;
 }
 
 .shopper-status-row > span:not(.shopper-status-arrow) {
@@ -476,25 +493,6 @@
 }
 
 @media (max-width: 700px) {
-  .shopper-dashboard-header {
-    height: 90px;
-    min-height: 90px;
-    padding: 0 24px;
-  }
-
-  .shopper-dashboard-header .shopper-cart-button {
-    width: 118px;
-    min-width: 118px;
-    height: 56px;
-    min-height: 56px;
-    gap: 16px;
-  }
-
-  .shopper-dashboard-header .shopper-cart-button svg {
-    width: 24px;
-    height: 24px;
-  }
-
   .shopper-dashboard-body {
     width: min(1170px, calc(100% - 30px));
     padding-top: 25px;
@@ -531,5 +529,33 @@
   .shopper-status-arrow {
     grid-column: 2;
     grid-row: 1;
+  }
+}
+
+@media (max-width: 460px) {
+  .shopper-dashboard-header {
+    min-height: 90px;
+    padding: 16px;
+  }
+
+  .shopper-dashboard-header .shopper-cart-button {
+    min-width: 110px;
+    min-height: 52px;
+  }
+
+  .shopper-dashboard-body {
+    width: calc(100% - 28px);
+  }
+
+  .shopper-welcome h1 {
+    font-size: 30px;
+  }
+
+  .shopper-account-status {
+    padding: 22px 18px;
+  }
+
+  .shopper-quick-action {
+    padding: 16px;
   }
 }

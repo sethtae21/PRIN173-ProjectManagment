@@ -1,3 +1,8 @@
+
+/* ==========================================
+   FITFUSION AI - FITTING STUDIO
+========================================== */
+
 .fitting-studio-page {
   min-height: 100vh;
   color: #17130f;
@@ -15,13 +20,18 @@
     );
 }
 
+.fitting-studio-page,
+.fitting-studio-page * {
+  box-sizing: border-box;
+}
+
 .studio-body {
   width: min(1350px, calc(100% - 48px));
   margin: 0 auto;
   padding: 42px 0 70px;
 }
 
-/* Introduction */
+/* INTRODUCTION */
 
 .studio-introduction {
   display: flex;
@@ -73,7 +83,7 @@
   background: #8e641f;
 }
 
-/* Workspace */
+/* WORKSPACE */
 
 .studio-workspace {
   display: grid;
@@ -88,15 +98,16 @@
 .studio-controls-card,
 .studio-avatar-card,
 .studio-equipped-card {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid #e2d8c7;
   border-radius: 16px;
   background: #fffdf9;
-  box-shadow: 0 12px 30px
-    rgba(70, 52, 26, 0.05);
+  box-shadow:
+    0 12px 30px rgba(70, 52, 26, 0.05);
 }
 
-/* Tabs */
+/* TABS */
 
 .studio-panel-tabs {
   display: grid;
@@ -129,7 +140,7 @@
   );
 }
 
-/* Customization */
+/* CUSTOMIZATION */
 
 .studio-customization-panel,
 .studio-recommendations-panel {
@@ -242,7 +253,7 @@
   font-weight: 700;
 }
 
-/* Skin tones */
+/* SKIN TONES */
 
 .studio-skin-section {
   margin-bottom: 26px;
@@ -269,7 +280,7 @@
     0 0 0 4px #d7af4b;
 }
 
-/* Save preset */
+/* SAVE AVATAR PRESET */
 
 .studio-save-preset,
 .studio-registration-button {
@@ -301,15 +312,10 @@
 
 .studio-registration-button:hover {
   color: #fffdf9;
-  background: linear-gradient(
-    135deg,
-    #17130f,
-    #8e641f 60%,
-    #d7af4b
-  );
+  background: #8e641f;
 }
 
-/* Recommendations */
+/* RECOMMENDATIONS */
 
 .studio-recommendation-note {
   margin: 0 0 18px;
@@ -398,7 +404,7 @@
   cursor: pointer;
 }
 
-/* Avatar preview */
+/* AVATAR PREVIEW */
 
 .studio-avatar-card {
   padding: 24px;
@@ -470,6 +476,8 @@
   content: "";
 }
 
+/* AVATAR BODY */
+
 .studio-avatar {
   --avatar-skin: #dca77d;
 
@@ -523,8 +531,7 @@
   background: #29211b;
 }
 
-.studio-avatar.female
-  .studio-avatar-hair {
+.studio-avatar.female .studio-avatar-hair {
   top: 19px;
   left: 62px;
   width: 87px;
@@ -648,7 +655,7 @@
   width: 49px;
 }
 
-/* Clothing layers */
+/* CLOTHING LAYERS */
 
 .equipped-top {
   position: absolute;
@@ -709,7 +716,7 @@
   right: 47px;
 }
 
-/* Avatar information */
+/* AVATAR INFORMATION */
 
 .studio-avatar-summary {
   display: grid;
@@ -736,7 +743,7 @@
   font-size: 10px;
 }
 
-/* Equipped items */
+/* EQUIPPED ITEMS */
 
 .studio-equipped-card {
   padding: 25px;
@@ -818,11 +825,12 @@
   cursor: pointer;
 }
 
-/* Registered shopper actions */
+/* ACTION BUTTONS */
 
 .studio-open-recommendations,
 .studio-save-outfit,
-.studio-select-cart-items {
+.studio-select-cart-items,
+.studio-restricted-action {
   width: 100%;
   min-height: 45px;
   margin-top: 11px;
@@ -858,46 +866,38 @@
   );
 }
 
-/* Guest restricted actions */
-
 .studio-restricted-action {
-  width: 100%;
-  min-height: 45px;
-  margin-top: 11px;
-  padding: 10px 14px;
   border: 1px solid #b57e20;
-  border-radius: 7px;
   color: #8e641f;
   background: #fffdf9;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-
-.studio-restricted-action:first-of-type {
-  margin-top: 18px;
 }
 
 .studio-restricted-action:hover {
   color: #fffdf9;
-  background: linear-gradient(
-    135deg,
-    #17130f,
-    #8e641f 58%,
-    #d7af4b
-  );
-  box-shadow: 0 7px 18px
-    rgba(142, 100, 31, 0.2);
-  transform: translateY(-1px);
+  background: #8e641f;
 }
 
-/* Registration popup */
+/* NOTIFICATION */
+
+.studio-notification {
+  position: fixed;
+  z-index: 2500;
+  right: 24px;
+  bottom: 24px;
+  max-width: min(380px, calc(100% - 48px));
+  padding: 16px 22px;
+  border: 1px solid #d7af4b;
+  border-radius: 10px;
+  color: #fffdf9;
+  background: #17130f;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ==========================================
+   SHARED MODAL BACKDROP
+========================================== */
 
 .studio-modal-backdrop {
   position: fixed;
@@ -910,6 +910,8 @@
   backdrop-filter: blur(4px);
 }
 
+/* REGISTRATION MODAL */
+
 .studio-registration-modal {
   position: relative;
   width: min(470px, 100%);
@@ -917,8 +919,8 @@
   border: 1px solid #d7af4b;
   border-radius: 18px;
   background: #fffdf9;
-  box-shadow: 0 28px 80px
-    rgba(23, 19, 15, 0.38);
+  box-shadow:
+    0 28px 80px rgba(23, 19, 15, 0.38);
   text-align: center;
 }
 
@@ -926,8 +928,10 @@
   position: absolute;
   top: 14px;
   right: 17px;
+  display: grid;
   width: 35px;
   height: 35px;
+  place-items: center;
   border: 0;
   border-radius: 50%;
   color: #5c554c;
@@ -957,7 +961,7 @@
   margin: 0 0 10px;
   color: #9a6a1d;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.12em;
 }
 
@@ -978,17 +982,17 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 27px;
 }
 
 .studio-modal-primary,
 .studio-modal-secondary {
-  min-height: 48px;
-  padding: 10px 16px;
+  min-height: 47px;
+  padding: 11px 15px;
   border-radius: 8px;
   font: inherit;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -998,7 +1002,7 @@
   background: linear-gradient(
     135deg,
     #17130f,
-    #8e641f 60%,
+    #8e641f,
     #d7af4b
   );
 }
@@ -1010,51 +1014,170 @@
 }
 
 .studio-modal-continue {
-  margin-top: 19px;
-  padding: 4px;
+  margin-top: 22px;
+  padding: 8px 12px;
   border: 0;
   color: #5c554c;
   background: transparent;
   font: inherit;
   font-size: 11px;
-  text-decoration: underline;
   cursor: pointer;
 }
 
-/* Notification */
+.studio-modal-continue:hover {
+  text-decoration: underline;
+}
 
-.studio-notification {
-  position: fixed;
-  z-index: 1000;
-  right: 28px;
-  bottom: 28px;
-  max-width: 390px;
-  padding: 16px 20px;
+/* ==========================================
+   SAVE OUTFIT NAME POPUP
+========================================== */
+
+.studio-save-outfit-modal {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 38px;
   border: 1px solid #d7af4b;
-  border-radius: 8px;
-  color: #fffdf9;
-  background: #17130f;
-  box-shadow: 0 18px 44px
-    rgba(23, 19, 15, 0.3);
+  border-radius: 18px;
+  background: #fffdf9;
+  box-shadow:
+    0 28px 80px rgba(23, 19, 15, 0.38);
+}
+
+.studio-save-outfit-modal h2 {
+  margin: 0 0 12px;
+  color: #17130f;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.studio-save-outfit-modal
+  .studio-modal-description {
+  margin-bottom: 25px;
+}
+
+.studio-save-outfit-field {
+  display: block;
+  margin-bottom: 10px;
+  color: #29251f;
   font-size: 12px;
+  font-weight: 800;
+}
+
+.studio-save-outfit-field span {
+  color: #9a4c35;
+}
+
+.studio-save-outfit-input {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid #d2be91;
+  border-radius: 9px;
+  outline: none;
+  background: #f8f5ef;
+  color: #17130f;
+  font: inherit;
+  font-size: 13px;
+}
+
+.studio-save-outfit-input:focus {
+  border-color: #8e641f;
+  box-shadow:
+    0 0 0 3px rgba(181, 126, 32, 0.12);
+}
+
+.studio-save-outfit-input.invalid {
+  border-color: #a76559;
+}
+
+.studio-save-outfit-hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: #81766a;
+  font-size: 11px;
+}
+
+.studio-save-outfit-error {
+  color: #a33b30;
   font-weight: 700;
 }
 
-/* Keyboard focus */
-
-.fitting-studio-page button:focus-visible {
-  outline: 3px solid
-    rgba(181, 126, 32, 0.4);
-  outline-offset: 3px;
+.studio-save-outfit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 26px;
 }
 
-/* Responsive */
+.studio-save-cancel-button,
+.studio-save-confirm-button {
+  min-height: 47px;
+  padding: 11px 15px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
 
-@media (max-width: 1250px) {
+.studio-save-cancel-button {
+  border: 1px solid #d2be91;
+  color: #5c554c;
+  background: #fffdf9;
+}
+
+.studio-save-cancel-button:hover {
+  background: #f8f5ef;
+}
+
+.studio-save-confirm-button {
+  border: 1px solid #b57e20;
+  color: #fffdf9;
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 58%,
+    #d7af4b
+  );
+}
+
+.studio-save-confirm-button:hover {
+  box-shadow:
+    0 8px 20px rgba(142, 100, 31, 0.2);
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 1400px) {
   .studio-workspace {
     grid-template-columns:
-      minmax(280px, 0.85fr)
-      minmax(390px, 1.15fr);
+      minmax(250px, 0.85fr)
+      minmax(320px, 1.15fr)
+      minmax(220px, 0.8fr);
+    gap: 16px;
+  }
+
+  .studio-customization-panel,
+  .studio-recommendations-panel {
+    padding: 20px;
+  }
+
+  .studio-avatar-card,
+  .studio-equipped-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 1150px) {
+  .studio-workspace {
+    grid-template-columns:
+      minmax(280px, 1fr)
+      minmax(340px, 1.2fr);
   }
 
   .studio-equipped-card {
@@ -1062,18 +1185,15 @@
   }
 }
 
-@media (max-width: 850px) {
+@media (max-width: 760px) {
   .studio-body {
-    width: min(
-      calc(100% - 30px),
-      1350px
-    );
+    width: calc(100% - 28px);
     padding-top: 30px;
   }
 
   .studio-introduction {
-    align-items: flex-start;
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .studio-change-gender {
@@ -1087,37 +1207,45 @@
   .studio-equipped-card {
     grid-column: auto;
   }
+
+  .studio-avatar-stage {
+    min-height: 470px;
+  }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 520px) {
   .studio-introduction h1 {
-    font-size: 31px;
+    font-size: 32px;
+  }
+
+  .studio-measurement-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .studio-customization-panel,
   .studio-recommendations-panel,
   .studio-avatar-card,
   .studio-equipped-card {
-    padding: 20px;
+    padding: 18px;
   }
 
-  .studio-measurement-grid {
-    grid-template-columns: 1fr;
+  .studio-registration-modal,
+  .studio-save-outfit-modal {
+    padding: 38px 22px 28px;
   }
 
-  .studio-control-group > div {
+  .studio-modal-actions,
+  .studio-save-outfit-actions {
     grid-template-columns: 1fr;
   }
 
   .studio-avatar-stage {
-    min-height: 480px;
+    min-height: 450px;
   }
 
-  .studio-modal-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .studio-registration-modal {
-    padding: 38px 24px 28px;
+  .studio-notification {
+    right: 12px;
+    bottom: 12px;
+    max-width: calc(100% - 24px);
   }
 }

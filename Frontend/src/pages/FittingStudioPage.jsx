@@ -1,25 +1,13 @@
+
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import "./css/FittingStudioPage.css";
 
 const SKIN_TONES = [
-  {
-    name: "Light",
-    value: "#f1c9a5",
-  },
-  {
-    name: "Warm",
-    value: "#dca77d",
-  },
-  {
-    name: "Medium",
-    value: "#bd8058",
-  },
-  {
-    name: "Deep",
-    value: "#855338",
-  },
+  { name: "Light", value: "#f1c9a5" },
+  { name: "Warm", value: "#dca77d" },
+  { name: "Medium", value: "#bd8058" },
+  { name: "Deep", value: "#855338" },
 ];
 
 const RECOMMENDED_ITEMS = [
@@ -62,27 +50,20 @@ function formatCurrency(amount) {
 
 function readStoredArray(key) {
   try {
-    const storedValue = JSON.parse(
+    const value = JSON.parse(
       localStorage.getItem(key) || "[]"
     );
 
-    return Array.isArray(storedValue)
-      ? storedValue
-      : [];
+    return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
 
 function normalizeGender(value) {
-  if (
-    typeof value === "string" &&
-    value.toLowerCase() === "male"
-  ) {
-    return "Male";
-  }
-
-  return "Female";
+  return String(value).toLowerCase() === "male"
+    ? "Male"
+    : "Female";
 }
 
 function loadAvatar(isGuest) {
@@ -93,9 +74,6 @@ function loadAvatar(isGuest) {
   const genderKey = isGuest
     ? "fitfusion-guest-avatar-gender"
     : "fitfusion-avatar-gender";
-
-  const selectedGender =
-    storage.getItem(genderKey);
 
   let savedPreset = null;
 
@@ -111,41 +89,52 @@ function loadAvatar(isGuest) {
     }
   }
 
-  /*
-   * The gender selected on the previous page
-   * has priority over an older saved preset.
-   */
-  const gender = normalizeGender(
-    selectedGender ||
-      savedPreset?.gender ||
-      "Female"
-  );
-
   return {
-    gender,
-    height:
-      savedPreset?.height || "160",
-    weight:
-      savedPreset?.weight || "55",
-    shoulder:
-      savedPreset?.shoulder || "Average",
-    waist:
-      savedPreset?.waist || "Average",
-    hip:
-      savedPreset?.hip || "Average",
-    cupSize:
-      savedPreset?.cupSize || "B",
-    thigh:
-      savedPreset?.thigh || "Average",
-    skinTone:
-      savedPreset?.skinTone ||
-      "#dca77d",
+    gender: normalizeGender(
+      storage.getItem(genderKey) ||
+        savedPreset?.gender ||
+        "Female"
+    ),
+    height: savedPreset?.height || "160",
+    weight: savedPreset?.weight || "55",
+    shoulder: savedPreset?.shoulder || "Average",
+    waist: savedPreset?.waist || "Average",
+    hip: savedPreset?.hip || "Average",
+    cupSize: savedPreset?.cupSize || "B",
+    thigh: savedPreset?.thigh || "Average",
+    skinTone: savedPreset?.skinTone || "#dca77d",
   };
 }
 
-function FittingStudioPage({
-  isGuest = false,
+function ControlGroup({
+  label,
+  value,
+  options,
+  onChange,
 }) {
+  return (
+    <div className="studio-control-group">
+      <span>{label}</span>
+
+      <div>
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={
+              value === option ? "active" : ""
+            }
+            onClick={() => onChange(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FittingStudioPage({ isGuest = false }) {
   const navigate = useNavigate();
 
   const [avatar, setAvatar] = useState(() =>
@@ -170,6 +159,17 @@ function FittingStudioPage({
     setShowRegistrationModal,
   ] = useState(false);
 
+  const [
+    showSaveOutfitModal,
+    setShowSaveOutfitModal,
+  ] = useState(false);
+
+  const [outfitName, setOutfitName] =
+    useState("");
+
+  const [outfitNameError, setOutfitNameError] =
+    useState("");
+
   const [notification, setNotification] =
     useState("");
 
@@ -186,12 +186,21 @@ function FittingStudioPage({
     : "/shopper";
 
   const isFemale =
-    avatar.gender.toLowerCase() ===
-    "female";
+    avatar.gender.toLowerCase() === "female";
+
+  const avatarClassName = [
+    "studio-avatar",
+    avatar.gender.toLowerCase(),
+    currentView.toLowerCase(),
+    `shoulder-${avatar.shoulder.toLowerCase()}`,
+    `waist-${avatar.waist.toLowerCase()}`,
+    `hip-${avatar.hip.toLowerCase()}`,
+    `thigh-${avatar.thigh.toLowerCase()}`,
+  ].join(" ");
 
   function updateAvatar(field, value) {
-    setAvatar((currentAvatar) => ({
-      ...currentAvatar,
+    setAvatar((current) => ({
+      ...current,
       [field]: value,
     }));
   }
@@ -224,15 +233,9 @@ function FittingStudioPage({
         savedPresets.length + 1
       }`,
       ...avatar,
-
-      /*
-       * Cup size is only stored for
-       * Female avatars.
-       */
       cupSize: isFemale
         ? avatar.cupSize
         : null,
-
       updatedAt: new Date().toISOString(),
     };
 
@@ -260,8 +263,8 @@ function FittingStudioPage({
   }
 
   function tryRecommendedItem(item) {
-    setEquippedItems((currentItems) => ({
-      ...currentItems,
+    setEquippedItems((current) => ({
+      ...current,
       [item.category]: item,
     }));
 
@@ -271,8 +274,8 @@ function FittingStudioPage({
   }
 
   function removeEquippedItem(category) {
-    setEquippedItems((currentItems) => ({
-      ...currentItems,
+    setEquippedItems((current) => ({
+      ...current,
       [category]: null,
     }));
   }
@@ -286,6 +289,10 @@ function FittingStudioPage({
     setActivePanel("recommendations");
   }
 
+  /* =====================================
+     SAVE OUTFIT POPUP
+  ===================================== */
+
   function saveOutfit() {
     if (isGuest) {
       openRegistrationPopup();
@@ -294,9 +301,38 @@ function FittingStudioPage({
 
     if (equippedItemsArray.length === 0) {
       displayNotification(
-        "Try at least one item before saving."
+        "Try at least one clothing item before saving."
       );
+      return;
+    }
 
+    setOutfitName("");
+    setOutfitNameError("");
+    setShowSaveOutfitModal(true);
+  }
+
+  function closeSaveOutfitModal() {
+    setShowSaveOutfitModal(false);
+    setOutfitName("");
+    setOutfitNameError("");
+  }
+
+  function confirmSaveOutfit(event) {
+    event.preventDefault();
+
+    const trimmedName = outfitName.trim();
+
+    if (!trimmedName) {
+      setOutfitNameError(
+        "Please enter an outfit name before saving."
+      );
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setOutfitNameError(
+        "Outfit name must not exceed 50 characters."
+      );
       return;
     }
 
@@ -304,11 +340,25 @@ function FittingStudioPage({
       "fitfusion-saved-outfits"
     );
 
+    const savedProducts =
+      equippedItemsArray.map((item) => ({
+        id: item.id,
+        name: item.name,
+        seller: item.store,
+        category: item.category,
+        color: item.color,
+        size: item.size,
+        price: item.price,
+        quantity: 1,
+        image: item.image || "",
+      }));
+
     const newOutfit = {
       id: `outfit-${Date.now()}`,
-      name: `Saved Outfit ${
-        savedOutfits.length + 1
-      }`,
+      name: trimmedName,
+      occasion: "Casual",
+      description: "",
+      avatarView: currentView.toLowerCase(),
       avatar: {
         ...avatar,
         cupSize: isFemale
@@ -316,22 +366,35 @@ function FittingStudioPage({
           : null,
         view: currentView,
       },
+      products: savedProducts,
       items: equippedItemsArray,
       createdAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(
-      "fitfusion-saved-outfits",
-      JSON.stringify([
-        newOutfit,
-        ...savedOutfits,
-      ])
-    );
+    try {
+      localStorage.setItem(
+        "fitfusion-saved-outfits",
+        JSON.stringify([
+          newOutfit,
+          ...savedOutfits,
+        ])
+      );
 
-    displayNotification(
-      "Your outfit was saved."
-    );
+      closeSaveOutfitModal();
+
+      displayNotification(
+        `"${trimmedName}" was saved successfully!`
+      );
+    } catch {
+      setOutfitNameError(
+        "Unable to save your outfit. Please try again."
+      );
+    }
   }
+
+  /* =====================================
+     CART
+  ===================================== */
 
   function continueToCart() {
     if (isGuest) {
@@ -341,9 +404,8 @@ function FittingStudioPage({
 
     if (equippedItemsArray.length === 0) {
       displayNotification(
-        "Try at least one item first."
+        "Try at least one clothing item first."
       );
-
       return;
     }
 
@@ -362,16 +424,6 @@ function FittingStudioPage({
     );
   }
 
-  const avatarClassName = [
-    "studio-avatar",
-    avatar.gender.toLowerCase(),
-    currentView.toLowerCase(),
-    `shoulder-${avatar.shoulder.toLowerCase()}`,
-    `waist-${avatar.waist.toLowerCase()}`,
-    `hip-${avatar.hip.toLowerCase()}`,
-    `thigh-${avatar.thigh.toLowerCase()}`,
-  ].join(" ");
-
   return (
     <main
       className={`fitting-studio-page ${
@@ -379,6 +431,8 @@ function FittingStudioPage({
       }`}
     >
       <div className="studio-body">
+        {/* INTRODUCTION */}
+
         <section className="studio-introduction">
           <div>
             <p>VIRTUAL FITTING</p>
@@ -389,8 +443,7 @@ function FittingStudioPage({
 
             <span>
               Customize your avatar and switch
-              between Front, Side, and Rear
-              views.
+              between Front, Side, and Rear views.
               {isGuest &&
                 " Your changes are temporary and will be removed when the guest session ends."}
             </span>
@@ -409,7 +462,11 @@ function FittingStudioPage({
           </button>
         </section>
 
+        {/* WORKSPACE */}
+
         <div className="studio-workspace">
+          {/* CUSTOMIZATION PANEL */}
+
           <section className="studio-controls-card">
             {!isGuest && (
               <div className="studio-panel-tabs">
@@ -430,8 +487,7 @@ function FittingStudioPage({
                 <button
                   type="button"
                   className={
-                    activePanel ===
-                    "recommendations"
+                    activePanel === "recommendations"
                       ? "active"
                       : ""
                   }
@@ -451,10 +507,7 @@ function FittingStudioPage({
               <div className="studio-customization-panel">
                 <div className="studio-selected-gender">
                   <span>Selected Gender</span>
-
-                  <strong>
-                    {avatar.gender}
-                  </strong>
+                  <strong>{avatar.gender}</strong>
                 </div>
 
                 <div className="studio-measurement-grid">
@@ -474,7 +527,6 @@ function FittingStudioPage({
                           )
                         }
                       />
-
                       <span>cm</span>
                     </div>
                   </label>
@@ -495,7 +547,6 @@ function FittingStudioPage({
                           )
                         }
                       />
-
                       <span>kg</span>
                     </div>
                   </label>
@@ -526,10 +577,7 @@ function FittingStudioPage({
                     "Curvy",
                   ]}
                   onChange={(value) =>
-                    updateAvatar(
-                      "waist",
-                      value
-                    )
+                    updateAvatar("waist", value)
                   }
                 />
 
@@ -546,7 +594,6 @@ function FittingStudioPage({
                   }
                 />
 
-                {/* Female-only field */}
                 {isFemale && (
                   <ControlGroup
                     label="Cup Size"
@@ -575,10 +622,7 @@ function FittingStudioPage({
                     "Thick",
                   ]}
                   onChange={(value) =>
-                    updateAvatar(
-                      "thigh",
-                      value
-                    )
+                    updateAvatar("thigh", value)
                   }
                 />
 
@@ -641,8 +685,8 @@ function FittingStudioPage({
                 {RECOMMENDED_ITEMS.map(
                   (item) => (
                     <article
-                      className="studio-recommendation-item"
                       key={item.id}
+                      className="studio-recommendation-item"
                     >
                       <div
                         className={`studio-clothing-thumbnail ${item.category}`}
@@ -653,9 +697,7 @@ function FittingStudioPage({
 
                       <div className="studio-recommendation-information">
                         <h3>{item.name}</h3>
-
                         <p>{item.store}</p>
-
                         <strong>
                           {formatCurrency(
                             item.price
@@ -679,6 +721,8 @@ function FittingStudioPage({
               </div>
             )}
           </section>
+
+          {/* AVATAR PREVIEW */}
 
           <section className="studio-avatar-card">
             <div className="studio-view-buttons">
@@ -760,7 +804,6 @@ function FittingStudioPage({
             <div className="studio-avatar-summary">
               <div>
                 <span>Gender</span>
-
                 <strong>
                   {avatar.gender}
                 </strong>
@@ -768,7 +811,6 @@ function FittingStudioPage({
 
               <div>
                 <span>Height</span>
-
                 <strong>
                   {avatar.height} cm
                 </strong>
@@ -776,7 +818,6 @@ function FittingStudioPage({
 
               <div>
                 <span>Weight</span>
-
                 <strong>
                   {avatar.weight} kg
                 </strong>
@@ -784,11 +825,12 @@ function FittingStudioPage({
             </div>
           </section>
 
+          {/* EQUIPPED ITEMS */}
+
           <aside className="studio-equipped-card">
             <h2>EQUIPPED ITEMS</h2>
 
-            {equippedItemsArray.length ===
-            0 ? (
+            {equippedItemsArray.length === 0 ? (
               <div className="studio-empty-equipped">
                 <span aria-hidden="true">
                   ◇
@@ -812,8 +854,8 @@ function FittingStudioPage({
                   ([category, item]) =>
                     item && (
                       <article
-                        className="studio-equipped-item"
                         key={category}
+                        className="studio-equipped-item"
                       >
                         <div>
                           <span>
@@ -891,6 +933,8 @@ function FittingStudioPage({
         </div>
       </div>
 
+      {/* NOTIFICATION */}
+
       {notification && (
         <div
           className="studio-notification"
@@ -900,22 +944,154 @@ function FittingStudioPage({
         </div>
       )}
 
+      {/* =====================================
+          SAVE OUTFIT NAME POPUP
+      ===================================== */}
+
+      {showSaveOutfitModal && !isGuest && (
+        <div
+          className="studio-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeSaveOutfitModal();
+            }
+          }}
+        >
+          <section
+            className="studio-save-outfit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-save-title"
+          >
+            <button
+              type="button"
+              className="studio-modal-close"
+              onClick={closeSaveOutfitModal}
+              aria-label="Close save outfit popup"
+            >
+              ×
+            </button>
+
+            <p className="studio-modal-label">
+              SAVE YOUR LOOK
+            </p>
+
+            <h2 id="studio-save-title">
+              Save Outfit
+            </h2>
+
+            <p className="studio-modal-description">
+              Give your outfit a name so you
+              can easily find it in Saved Outfits.
+            </p>
+
+            <form
+              onSubmit={confirmSaveOutfit}
+              noValidate
+            >
+              <label
+                className="studio-save-outfit-field"
+                htmlFor="studio-outfit-name"
+              >
+                Outfit Name <span>*</span>
+              </label>
+
+              <input
+                id="studio-outfit-name"
+                type="text"
+                className={`studio-save-outfit-input ${
+                  outfitNameError
+                    ? "invalid"
+                    : ""
+                }`}
+                value={outfitName}
+                onChange={(event) => {
+                  setOutfitName(
+                    event.target.value
+                  );
+
+                  setOutfitNameError("");
+                }}
+                placeholder="e.g. Weekend Casual"
+                maxLength={50}
+                autoFocus
+                required
+                aria-invalid={Boolean(
+                  outfitNameError
+                )}
+                aria-describedby={
+                  outfitNameError
+                    ? "studio-outfit-name-error"
+                    : undefined
+                }
+              />
+
+              <div className="studio-save-outfit-hint">
+                {outfitNameError ? (
+                  <span
+                    id="studio-outfit-name-error"
+                    className="studio-save-outfit-error"
+                  >
+                    {outfitNameError}
+                  </span>
+                ) : (
+                  <span>
+                    Required field
+                  </span>
+                )}
+
+                <span>
+                  {outfitName.length}/50
+                </span>
+              </div>
+
+              <div className="studio-save-outfit-actions">
+                <button
+                  type="button"
+                  className="studio-save-cancel-button"
+                  onClick={closeSaveOutfitModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="studio-save-confirm-button"
+                >
+                  Save Outfit
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* REGISTRATION POPUP */}
+
       {showRegistrationModal && (
         <div
           className="studio-modal-backdrop"
           role="presentation"
-          onMouseDown={() =>
-            setShowRegistrationModal(false)
-          }
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setShowRegistrationModal(
+                false
+              );
+            }
+          }}
         >
           <section
             className="studio-registration-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="registration-title"
-            onMouseDown={(event) =>
-              event.stopPropagation()
-            }
           >
             <button
               type="button"
@@ -930,10 +1106,7 @@ function FittingStudioPage({
               ×
             </button>
 
-            <div
-              className="studio-modal-icon"
-              aria-hidden="true"
-            >
+            <div className="studio-modal-icon">
               ◇
             </div>
 
@@ -990,38 +1163,6 @@ function FittingStudioPage({
         </div>
       )}
     </main>
-  );
-}
-
-function ControlGroup({
-  label,
-  value,
-  options,
-  onChange,
-}) {
-  return (
-    <div className="studio-control-group">
-      <span>{label}</span>
-
-      <div>
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            className={
-              value === option
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onChange(option)
-            }
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

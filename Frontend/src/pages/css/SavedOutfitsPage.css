@@ -1,47 +1,72 @@
+
+/* ==========================================
+   FITFUSION AI - SAVED OUTFITS PAGE
+========================================== */
+
 .saved-outfits-page {
+  min-width: 0;
   min-height: 100vh;
   color: #17130f;
+  background:
+    radial-gradient(
+      circle at right center,
+      rgba(181, 126, 32, 0.16),
+      transparent 42%
+    ),
+    linear-gradient(
+      135deg,
+      #f2efe8,
+      #fffdf9 52%,
+      #eee8de
+    );
 }
+
+.saved-outfits-page,
+.saved-outfits-page * {
+  box-sizing: border-box;
+}
+
+/* ==========================================
+   HEADER - MATCHES ORDER HISTORY
+========================================== */
 
 .saved-outfits-top-header {
   display: flex;
-  min-height: 130px;
+  width: 100%;
+  min-height: 100px;
   align-items: center;
   justify-content: flex-end;
-  padding: 25px 44px;
+  margin: 0;
+  padding: 20px clamp(25px, 4vw, 58px);
   background: rgba(255, 253, 249, 0.97);
   border-bottom: 1px solid #e2d8c7;
 }
 
 .saved-outfits-header-cart {
   display: flex;
-  width: 138px;
-  min-height: 61px;
+  min-width: 120px;
+  min-height: 58px;
   align-items: center;
   justify-content: center;
-  gap: 17px;
-  padding: 12px 22px;
+  gap: 18px;
+  padding: 0 18px;
   background: #fffdf9;
-  border: 1.2px solid #b57e20;
-  border-radius: 13px;
+  border: 1px solid #d2be91;
+  border-radius: 10px;
   color: #17130f;
   font: inherit;
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .saved-outfits-header-cart:hover {
-  background: #17130f;
-  color: #fffdf9;
-  transform: translateY(-1px);
+  background: #fff9e8;
 }
 
 .saved-outfits-header-cart svg {
-  width: 25px;
-  height: 25px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -51,16 +76,25 @@
 
 .saved-outfits-header-cart span {
   min-width: 18px;
-  font-size: 14px;
-  font-weight: 800;
+  color: #17130f;
+  font-size: 13px;
+  font-weight: 700;
   text-align: center;
 }
+
+/* ==========================================
+   MAIN CONTENT
+========================================== */
 
 .saved-outfits-content {
   width: min(1240px, calc(100% - 64px));
   margin: 0 auto;
   padding: 42px 0 72px;
 }
+
+/* ==========================================
+   INTRO SECTION
+========================================== */
 
 .saved-outfits-intro {
   display: flex;
@@ -80,7 +114,9 @@
 
 .saved-outfits-intro h1 {
   margin: 0;
+  color: #17130f;
   font-size: clamp(38px, 5vw, 60px);
+  font-weight: 800;
   line-height: 1.05;
 }
 
@@ -91,6 +127,10 @@
   line-height: 1.6;
 }
 
+/* ==========================================
+   CREATE OUTFIT BUTTON
+========================================== */
+
 .saved-outfits-create {
   display: flex;
   min-width: 200px;
@@ -99,13 +139,12 @@
   justify-content: center;
   gap: 7px;
   padding: 12px 22px;
-  background:
-    linear-gradient(
-      135deg,
-      #17130f,
-      #8e641f 58%,
-      #d7af4b
-    );
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 58%,
+    #d7af4b
+  );
   border: 1px solid #b57e20;
   border-radius: 11px;
   color: #fffdf9;
@@ -119,15 +158,17 @@
 }
 
 .saved-outfits-create:hover {
-  box-shadow:
-    0 10px 22px
-    rgba(142, 100, 31, 0.24);
   transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(142, 100, 31, 0.24);
 }
 
 .saved-outfits-create span {
   font-size: 18px;
 }
+
+/* ==========================================
+   SEARCH AND SORT
+========================================== */
 
 .saved-outfits-toolbar {
   display: grid;
@@ -151,8 +192,7 @@
 
 .saved-outfits-search:focus-within {
   border-color: #8e641f;
-  box-shadow: 0 0 0 3px
-    rgba(181, 126, 32, 0.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
 .saved-outfits-search svg {
@@ -177,6 +217,10 @@
   font-size: 14px;
 }
 
+.saved-outfits-search input::placeholder {
+  color: #786f64;
+}
+
 .saved-outfits-sort select {
   width: 100%;
   min-height: 72px;
@@ -188,19 +232,23 @@
   font: inherit;
   font-size: 13px;
   cursor: pointer;
-  outline: 0;
+  outline: none;
 }
 
 .saved-outfits-sort select:focus {
   border-color: #8e641f;
-  box-shadow: 0 0 0 3px
-    rgba(181, 126, 32, 0.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
+
+/* ==========================================
+   RESULT COUNT
+========================================== */
 
 .saved-outfits-result-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
   margin-bottom: 28px;
 }
 
@@ -227,55 +275,73 @@
   cursor: pointer;
 }
 
+/* ==========================================
+   SAVED OUTFITS GRID
+========================================== */
+
 .saved-outfits-grid {
   display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 30px;
 }
 
 .saved-outfit-card {
+  min-width: 0;
   overflow: hidden;
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 22px;
-  box-shadow:
-    0 13px 34px
-    rgba(69, 52, 23, 0.08);
+  box-shadow: 0 13px 34px rgba(69, 52, 23, 0.08);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
 
 .saved-outfit-card:hover {
-  box-shadow:
-    0 19px 43px
-    rgba(69, 52, 23, 0.14);
   transform: translateY(-3px);
+  box-shadow: 0 19px 43px rgba(69, 52, 23, 0.14);
 }
+
+/* ==========================================
+   OUTFIT AVATAR PREVIEW
+========================================== */
 
 .saved-outfit-preview {
   position: relative;
   display: grid;
+  width: 100%;
   height: 390px;
   place-items: center;
   overflow: hidden;
   background-color: #f4ecdf;
   background-image:
     linear-gradient(
-      rgba(181, 126, 32, 0.07)
-        1px,
+      rgba(181, 126, 32, 0.07) 1px,
       transparent 1px
     ),
     linear-gradient(
       90deg,
-      rgba(181, 126, 32, 0.07)
-        1px,
+      rgba(181, 126, 32, 0.07) 1px,
       transparent 1px
     );
   background-size: 38px 38px;
   border-bottom: 1px solid #e2d8c7;
 }
+
+.saved-outfit-avatar {
+  display: block;
+  width: 250px;
+  max-width: 85%;
+  height: 365px;
+  margin-top: 37px;
+  filter: drop-shadow(
+    0 13px 10px rgba(23, 19, 15, 0.13)
+  );
+}
+
+/* ==========================================
+   AVATAR VIEW BUTTONS
+========================================== */
 
 .saved-outfit-view-buttons {
   position: absolute;
@@ -299,24 +365,17 @@
   cursor: pointer;
 }
 
-.saved-outfit-view-buttons
-  button.active {
+.saved-outfit-view-buttons button.active,
+.saved-outfit-view-buttons button:hover {
   background: #17130f;
   border-color: #17130f;
   color: #fffdf9;
   font-weight: 800;
 }
 
-.saved-outfit-avatar {
-  width: 250px;
-  height: 365px;
-  margin-top: 37px;
-  filter:
-    drop-shadow(
-      0 13px 10px
-      rgba(23, 19, 15, 0.13)
-    );
-}
+/* ==========================================
+   OUTFIT INFORMATION
+========================================== */
 
 .saved-outfit-information {
   padding: 27px;
@@ -339,6 +398,7 @@
 
 .saved-outfit-title-row h2 {
   margin: 0;
+  color: #17130f;
   font-size: 24px;
 }
 
@@ -358,6 +418,10 @@
   font-size: 12px;
   line-height: 1.6;
 }
+
+/* ==========================================
+   OUTFIT PRODUCTS
+========================================== */
 
 .saved-outfit-products {
   display: flex;
@@ -384,6 +448,15 @@
   color: #29251f;
 }
 
+.saved-outfit-no-products {
+  color: #756b60;
+  font-size: 11px;
+}
+
+/* ==========================================
+   OUTFIT TOTAL
+========================================== */
+
 .saved-outfit-summary {
   display: flex;
   align-items: center;
@@ -398,8 +471,13 @@
 }
 
 .saved-outfit-summary strong {
+  color: #17130f;
   font-size: 19px;
 }
+
+/* ==========================================
+   OUTFIT ACTION BUTTONS
+========================================== */
 
 .saved-outfit-actions {
   display: grid;
@@ -418,16 +496,18 @@
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .saved-outfit-primary {
-  background:
-    linear-gradient(
-      135deg,
-      #17130f,
-      #8e641f 58%,
-      #d7af4b
-    );
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 58%,
+    #d7af4b
+  );
   border: 1px solid #b57e20;
   color: #fffdf9;
 }
@@ -445,11 +525,13 @@
 }
 
 .saved-outfit-actions button:hover {
-  box-shadow:
-    0 6px 15px
-    rgba(69, 52, 23, 0.14);
   transform: translateY(-1px);
+  box-shadow: 0 6px 15px rgba(69, 52, 23, 0.14);
 }
+
+/* ==========================================
+   EMPTY STATE
+========================================== */
 
 .saved-outfits-empty {
   display: grid;
@@ -501,13 +583,12 @@
   min-height: 47px;
   margin-top: 25px;
   padding: 10px 23px;
-  background:
-    linear-gradient(
-      135deg,
-      #17130f,
-      #8e641f 58%,
-      #d7af4b
-    );
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 58%,
+    #d7af4b
+  );
   border: 1px solid #b57e20;
   border-radius: 9px;
   color: #fffdf9;
@@ -516,6 +597,10 @@
   font-weight: 800;
   cursor: pointer;
 }
+
+/* ==========================================
+   SUCCESS TOAST
+========================================== */
 
 .saved-outfits-toast {
   position: fixed;
@@ -530,10 +615,12 @@
   color: #fffdf9;
   font-size: 12px;
   font-weight: 700;
-  box-shadow:
-    0 17px 45px
-    rgba(0, 0, 0, 0.25);
+  box-shadow: 0 17px 45px rgba(0, 0, 0, 0.25);
 }
+
+/* ==========================================
+   DELETE CONFIRMATION MODAL
+========================================== */
 
 .saved-outfits-modal-backdrop {
   position: fixed;
@@ -553,9 +640,7 @@
   border: 1px solid #d2be91;
   border-radius: 20px;
   text-align: center;
-  box-shadow:
-    0 30px 80px
-    rgba(0, 0, 0, 0.3);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
 }
 
 .saved-outfits-modal-label {
@@ -571,9 +656,7 @@
   font-size: 26px;
 }
 
-.saved-outfits-modal > p:not(
-    .saved-outfits-modal-label
-  ) {
+.saved-outfits-modal > p:not(.saved-outfits-modal-label) {
   margin: 0;
   color: #5c554c;
   font-size: 13px;
@@ -609,7 +692,11 @@
   color: #8e641f;
 }
 
-.sr-only {
+/* ==========================================
+   ACCESSIBILITY
+========================================== */
+
+.saved-outfits-page .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -621,6 +708,10 @@
   white-space: nowrap;
 }
 
+/* ==========================================
+   RESPONSIVE DESIGN
+========================================== */
+
 @media (max-width: 1050px) {
   .saved-outfits-grid {
     grid-template-columns: 1fr;
@@ -628,21 +719,8 @@
 }
 
 @media (max-width: 760px) {
-  .saved-outfits-top-header {
-    min-height: 95px;
-    padding: 18px 20px;
-  }
-
-  .saved-outfits-header-cart {
-    width: 112px;
-    min-height: 52px;
-  }
-
   .saved-outfits-content {
-    width: min(
-      100% - 28px,
-      1240px
-    );
+    width: min(calc(100% - 28px), 1240px);
     padding-top: 30px;
   }
 
@@ -694,5 +772,15 @@
 
   .saved-outfits-modal-actions {
     grid-template-columns: 1fr;
+  }
+
+  .saved-outfits-top-header {
+    min-height: 90px;
+    padding: 16px;
+  }
+
+  .saved-outfits-header-cart {
+    min-width: 110px;
+    min-height: 52px;
   }
 }

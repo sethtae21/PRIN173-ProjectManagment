@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
 import "../css/ChooseRegistrationRolePage.css";
@@ -10,6 +11,7 @@ function ChooseRegistrationRolePage() {
       <div className="role-background role-background-left" />
       <div className="role-background role-background-right" />
 
+      {/* FITFUSION LOGO */}
       <button
         type="button"
         className="role-logo-button"
@@ -23,8 +25,10 @@ function ChooseRegistrationRolePage() {
       </button>
 
       <section className="role-content">
+        {/* PAGE HEADING */}
         <header className="role-heading">
           <p>CREATE YOUR ACCOUNT</p>
+
           <h1>Choose your role</h1>
 
           <span>
@@ -33,7 +37,10 @@ function ChooseRegistrationRolePage() {
           </span>
         </header>
 
+        {/* ROLE SELECTION */}
         <div className="role-card-grid">
+
+          {/* SHOPPER ROLE */}
           <article className="role-card">
             <div className="role-icon role-icon-shopper">
               <svg
@@ -62,6 +69,7 @@ function ChooseRegistrationRolePage() {
             </button>
           </article>
 
+          {/* SELLER ROLE */}
           <article className="role-card">
             <div className="role-icon role-icon-seller">
               <svg
@@ -85,18 +93,20 @@ function ChooseRegistrationRolePage() {
             <button
               type="button"
               className="role-secondary-button"
-              onClick={() => navigate("/seller/signup")}
+              onClick={() => navigate("/signup/seller")}
             >
               Select Seller
             </button>
           </article>
         </div>
 
+        {/* SELLER REGISTRATION NOTE */}
         <p className="role-seller-note">
           Selecting Seller makes the Store Name field
           required during registration.
         </p>
 
+        {/* FOOTER LINKS */}
         <div className="role-footer-links">
           <button
             type="button"

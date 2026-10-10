@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  NavLink,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
 
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import "./css/EditSavedOutfitPage.css";
+
+/* ==========================================
+   DEFAULT OUTFIT
+========================================== */
 
 const defaultOutfit = {
   id: "outfit-1",
@@ -15,7 +14,7 @@ const defaultOutfit = {
   description:
     "A comfortable outfit prepared for casual events and weekend activities.",
   avatarView: "front",
-  createdAt: new Date().toISOString(),
+  createdAt: "2026-10-01",
   products: [
     {
       id: "product-1",
@@ -43,18 +42,9 @@ const defaultOutfit = {
 };
 
 const avatarViews = [
-  {
-    id: "front",
-    label: "Front",
-  },
-  {
-    id: "side",
-    label: "Side",
-  },
-  {
-    id: "rear",
-    label: "Rear",
-  },
+  { id: "front", label: "Front" },
+  { id: "side", label: "Side" },
+  { id: "rear", label: "Rear" },
 ];
 
 const occasionOptions = [
@@ -69,28 +59,18 @@ const occasionOptions = [
 ];
 
 const sizeOptions = [
-  "XXS",
-  "XS",
-  "S",
-  "M",
-  "L",
-  "XL",
-  "2XL",
+  "XXS", "XS", "S", "M", "L", "XL", "2XL",
 ];
+
+/* ==========================================
+   STORAGE HELPERS
+========================================== */
 
 function getStoredItems(key) {
   try {
-    const storedValue = localStorage.getItem(key);
-
-    if (!storedValue) {
-      return [];
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-
-    return Array.isArray(parsedValue)
-      ? parsedValue
-      : [];
+    const value = localStorage.getItem(key);
+    const parsed = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -98,6 +78,7 @@ function getStoredItems(key) {
 
 function normalizeProduct(product, index) {
   return {
+    ...product,
     id:
       product?.id ||
       product?.productId ||
@@ -124,7 +105,10 @@ function normalizeProduct(product, index) {
       product?.color ||
       product?.selectedColor ||
       "Default",
-    quantity: Number(product?.quantity) || 1,
+    quantity: Math.max(
+      1,
+      Number(product?.quantity) || 1
+    ),
     price: Number(product?.price) || 0,
     image:
       product?.image ||
@@ -142,6 +126,7 @@ function normalizeOutfit(outfit) {
     [];
 
   return {
+    ...outfit,
     id:
       outfit?.id ||
       outfit?.outfitId ||
@@ -171,22 +156,39 @@ function normalizeOutfit(outfit) {
   };
 }
 
+function getCartCount() {
+  return getStoredItems("fitfusion-cart").reduce(
+    (total, item) =>
+      total + Math.max(1, Number(item.quantity) || 1),
+    0
+  );
+}
+
+/* ==========================================
+   MAIN COMPONENT
+========================================== */
+
 function EditSavedOutfitPage() {
   const navigate = useNavigate();
   const { outfitId } = useParams();
 
-  const [outfit, setOutfit] =
-    useState(defaultOutfit);
-
+  const [outfit, setOutfit] = useState(defaultOutfit);
   const [originalOutfit, setOriginalOutfit] =
     useState(defaultOutfit);
 
   const [selectedView, setSelectedView] =
     useState("front");
 
+  const [cartCount, setCartCount] =
+    useState(getCartCount);
+
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState(null);
+
+  /* ======================================
+     LOAD SAVED OUTFIT
+  ====================================== */
 
   useEffect(() => {
     const savedOutfits = getStoredItems(
@@ -194,46 +196,46 @@ function EditSavedOutfitPage() {
     );
 
     const selectedOutfit = savedOutfits.find(
-      (savedOutfit) =>
-        String(
-          savedOutfit.id ||
-            savedOutfit.outfitId
-        ) === String(outfitId)
+      (saved) =>
+        String(saved.id || saved.outfitId) ===
+        String(outfitId)
     );
 
     let editingOutfit = null;
 
     try {
-      const storedEditingOutfit =
-        localStorage.getItem(
-          "fitfusion-editing-outfit"
-        );
+      const stored = localStorage.getItem(
+        "fitfusion-editing-outfit"
+      );
 
-      if (storedEditingOutfit) {
-        editingOutfit = JSON.parse(
-          storedEditingOutfit
-        );
+      if (stored) {
+        const parsed = JSON.parse(stored);
+
+        if (
+          String(parsed?.id || parsed?.outfitId) ===
+          String(outfitId)
+        ) {
+          editingOutfit = parsed;
+        }
       }
     } catch {
       editingOutfit = null;
     }
 
-    const resolvedOutfit = normalizeOutfit(
+    const resolved = normalizeOutfit(
       selectedOutfit ||
-        editingOutfit ||
-        {
-          ...defaultOutfit,
-          id:
-            outfitId ||
-            defaultOutfit.id,
-        }
+      editingOutfit ||
+      {
+        ...defaultOutfit,
+        id: outfitId || defaultOutfit.id,
+      }
     );
 
-    setOutfit(resolvedOutfit);
-    setOriginalOutfit(resolvedOutfit);
-    setSelectedView(
-      resolvedOutfit.avatarView || "front"
-    );
+    setOutfit(resolved);
+    setOriginalOutfit(resolved);
+    setSelectedView(resolved.avatarView || "front");
+    setErrors({});
+    setNotice("");
 
     window.scrollTo({
       top: 0,
@@ -242,95 +244,101 @@ function EditSavedOutfitPage() {
     });
   }, [outfitId]);
 
-  const cartCount = useMemo(() => {
-    const cartItems = getStoredItems(
-      "fitfusion-cart-items"
+  /* ======================================
+     CART COUNT
+  ====================================== */
+
+  useEffect(() => {
+    const refreshCart = () => {
+      setCartCount(getCartCount());
+    };
+
+    refreshCart();
+
+    window.addEventListener(
+      "fitfusion-cart-updated",
+      refreshCart
     );
 
-    return cartItems.reduce(
-      (total, item) =>
-        total +
-        (Number(item.quantity) || 1),
-      0
-    );
+    window.addEventListener("storage", refreshCart);
+
+    return () => {
+      window.removeEventListener(
+        "fitfusion-cart-updated",
+        refreshCart
+      );
+      window.removeEventListener("storage", refreshCart);
+    };
   }, []);
 
-  const outfitTotal = useMemo(() => {
-    return outfit.products.reduce(
-      (total, product) =>
-        total +
-        product.price * product.quantity,
-      0
-    );
-  }, [outfit.products]);
+  /* ======================================
+     CALCULATIONS
+  ====================================== */
 
-  const hasChanges = useMemo(() => {
-    return (
+  const outfitTotal = useMemo(
+    () =>
+      outfit.products.reduce(
+        (total, product) =>
+          total +
+          product.price * product.quantity,
+        0
+      ),
+    [outfit.products]
+  );
+
+  const hasChanges = useMemo(
+    () =>
       JSON.stringify(outfit) !==
         JSON.stringify(originalOutfit) ||
-      selectedView !==
-        originalOutfit.avatarView
-    );
-  }, [
-    outfit,
-    originalOutfit,
-    selectedView,
-  ]);
+      selectedView !== originalOutfit.avatarView,
+    [outfit, originalOutfit, selectedView]
+  );
+
+  /* ======================================
+     UPDATE OUTFIT
+  ====================================== */
 
   function updateOutfitField(event) {
     const { name, value } = event.target;
 
-    setOutfit((currentOutfit) => ({
-      ...currentOutfit,
+    setOutfit((current) => ({
+      ...current,
       [name]: value,
     }));
 
-    if (errors[name]) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [name]: "",
-      }));
-    }
+    setErrors((current) => ({
+      ...current,
+      [name]: "",
+    }));
 
     setNotice("");
   }
 
-  function updateProduct(
-    productId,
-    field,
-    value
-  ) {
-    setOutfit((currentOutfit) => ({
-      ...currentOutfit,
-      products:
-        currentOutfit.products.map(
-          (product) =>
-            product.id === productId
-              ? {
-                  ...product,
-                  [field]:
-                    field === "quantity"
-                      ? Math.max(
-                          1,
-                          Number(value) || 1
-                        )
-                      : value,
-                }
-              : product
-        ),
+  function updateProduct(productId, field, value) {
+    setOutfit((current) => ({
+      ...current,
+      products: current.products.map((product) =>
+        product.id === productId
+          ? {
+              ...product,
+              [field]:
+                field === "quantity"
+                  ? Math.max(1, Number(value) || 1)
+                  : value,
+            }
+          : product
+      ),
     }));
 
     setNotice("");
   }
 
   function removeProduct(productId) {
-    setOutfit((currentOutfit) => ({
-      ...currentOutfit,
-      products:
-        currentOutfit.products.filter(
-          (product) =>
-            product.id !== productId
-        ),
+    setOutfit((current) => ({
+      ...current,
+      products: current.products.filter(
+        (product) => product.id !== productId
+      ),
     }));
 
     setNotice(
@@ -338,31 +346,36 @@ function EditSavedOutfitPage() {
     );
   }
 
+  /* ======================================
+     VALIDATION
+  ====================================== */
+
   function validateOutfit() {
-    const validationErrors = {};
+    const nextErrors = {};
 
     if (!outfit.name.trim()) {
-      validationErrors.name =
+      nextErrors.name =
         "Please enter an outfit name.";
     }
 
     if (!outfit.occasion) {
-      validationErrors.occasion =
+      nextErrors.occasion =
         "Please select an occasion.";
     }
 
     if (outfit.products.length === 0) {
-      validationErrors.products =
+      nextErrors.products =
         "Add at least one garment before saving.";
     }
 
-    setErrors(validationErrors);
+    setErrors(nextErrors);
 
-    return (
-      Object.keys(validationErrors).length ===
-      0
-    );
+    return Object.keys(nextErrors).length === 0;
   }
+
+  /* ======================================
+     SAVE CHANGES
+  ====================================== */
 
   function saveOutfit() {
     if (!validateOutfit()) {
@@ -388,30 +401,20 @@ function EditSavedOutfitPage() {
       "fitfusion-saved-outfits"
     );
 
-    const existingIndex =
-      savedOutfits.findIndex(
-        (savedOutfit) =>
-          String(
-            savedOutfit.id ||
-              savedOutfit.outfitId
-          ) === String(updatedOutfit.id)
-      );
+    const existingIndex = savedOutfits.findIndex(
+      (saved) =>
+        String(saved.id || saved.outfitId) ===
+        String(updatedOutfit.id)
+    );
 
-    let updatedOutfits;
-
-    if (existingIndex >= 0) {
-      updatedOutfits = savedOutfits.map(
-        (savedOutfit, index) =>
-          index === existingIndex
-            ? updatedOutfit
-            : savedOutfit
-      );
-    } else {
-      updatedOutfits = [
-        ...savedOutfits,
-        updatedOutfit,
-      ];
-    }
+    const updatedOutfits =
+      existingIndex >= 0
+        ? savedOutfits.map((saved, index) =>
+            index === existingIndex
+              ? updatedOutfit
+              : saved
+          )
+        : [...savedOutfits, updatedOutfit];
 
     localStorage.setItem(
       "fitfusion-saved-outfits",
@@ -427,45 +430,49 @@ function EditSavedOutfitPage() {
     setOutfit(updatedOutfit);
     setNotice("Outfit changes saved.");
 
-    setTimeout(() => {
-      navigate("/shopper/saved-outfits");
-    }, 700);
+    navigate("/shopper/saved-outfits");
   }
 
-  function confirmDiscard() {
-    setOutfit(originalOutfit);
-    setSelectedView(
-      originalOutfit.avatarView || "front"
-    );
-    setErrors({});
-    setNotice(
-      "Your unsaved changes were discarded."
-    );
-    setModal(null);
-  }
+  /* ======================================
+     DELETE OUTFIT
+  ====================================== */
 
   function deleteOutfit() {
     const savedOutfits = getStoredItems(
       "fitfusion-saved-outfits"
     );
 
-    const remainingOutfits =
-      savedOutfits.filter(
-        (savedOutfit) =>
-          String(
-            savedOutfit.id ||
-              savedOutfit.outfitId
-          ) !== String(outfit.id)
-      );
+    const remaining = savedOutfits.filter(
+      (saved) =>
+        String(saved.id || saved.outfitId) !==
+        String(outfit.id)
+    );
 
     localStorage.setItem(
       "fitfusion-saved-outfits",
-      JSON.stringify(remainingOutfits)
+      JSON.stringify(remaining)
     );
 
     localStorage.removeItem(
       "fitfusion-editing-outfit"
     );
+
+    setModal(null);
+    navigate("/shopper/saved-outfits");
+  }
+
+  /* ======================================
+     DISCARD CHANGES
+  ====================================== */
+
+  function confirmDiscard() {
+    setOutfit(originalOutfit);
+    setSelectedView(
+      originalOutfit.avatarView || "front"
+    );
+
+    setErrors({});
+    setModal(null);
 
     navigate("/shopper/saved-outfits");
   }
@@ -479,93 +486,48 @@ function EditSavedOutfitPage() {
     navigate("/shopper/saved-outfits");
   }
 
-  function handleLogout() {
-    setModal("logout");
-  }
+  /* ======================================
+     OPEN FITTING STUDIO
+  ====================================== */
 
-  function confirmLogout() {
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-    localStorage.removeItem(
-      "fitfusion-current-user"
+  function openFittingStudio() {
+    localStorage.setItem(
+      "fitfusion-active-outfit",
+      JSON.stringify({
+        ...outfit,
+        avatarView: selectedView,
+      })
     );
 
-    navigate("/login");
+    navigate("/shopper/fitting-studio/customize");
   }
+
+  function openCatalog() {
+    localStorage.setItem(
+      "fitfusion-editing-outfit",
+      JSON.stringify({
+        ...outfit,
+        avatarView: selectedView,
+      })
+    );
+
+    navigate("/shopper/catalog");
+  }
+
+  /* ======================================
+     RENDER
+  ====================================== */
 
   return (
     <main className="edit-outfit-page">
-      <aside className="shopper-sidebar">
-        <div className="shopper-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
-
-        <nav className="shopper-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="shopper-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="shopper-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="shopper-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="shopper-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className={() =>
-              "shopper-nav-link active"
-            }
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="shopper-nav-link"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="shopper-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="shopper-logout-button"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
+      {/* =====================================
+          NO SIDEBAR HERE
+          ShopperLayout.jsx provides it.
+      ===================================== */}
 
       <section className="edit-outfit-content">
+        {/* HEADER */}
+
         <header className="edit-outfit-header">
           <div>
             <button
@@ -579,8 +541,8 @@ function EditSavedOutfitPage() {
             <h1>Edit Saved Outfit</h1>
 
             <p>
-              Update your outfit details and
-              selected garments.
+              Update your outfit details and selected
+              garments.
             </p>
           </div>
 
@@ -588,9 +550,7 @@ function EditSavedOutfitPage() {
             <button
               type="button"
               className="edit-outfit-cart-button"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
+              onClick={() => navigate("/shopper/cart")}
               aria-label={`Open shopping cart with ${cartCount} items`}
             >
               <svg
@@ -598,28 +558,16 @@ function EditSavedOutfitPage() {
                 aria-hidden="true"
               >
                 <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-
-                <circle
-                  cx="10"
-                  cy="20"
-                  r="1"
-                />
-
-                <circle
-                  cx="18"
-                  cy="20"
-                  r="1"
-                />
+                <circle cx="10" cy="20" r="1" />
+                <circle cx="18" cy="20" r="1" />
               </svg>
 
               <span>{cartCount}</span>
             </button>
-
-            <div className="edit-outfit-role">
-              REGISTERED SHOPPER
-            </div>
           </div>
         </header>
+
+        {/* BODY */}
 
         <div className="edit-outfit-body">
           {notice && (
@@ -631,13 +579,13 @@ function EditSavedOutfitPage() {
             </div>
           )}
 
+          {/* INTRODUCTION */}
+
           <section className="edit-outfit-introduction">
             <div>
               <p>OUTFIT EDITOR</p>
 
-              <h2>
-                Refine your saved look
-              </h2>
+              <h2>Refine your saved look</h2>
 
               <span>
                 Change the outfit details,
@@ -661,7 +609,13 @@ function EditSavedOutfitPage() {
             </div>
           </section>
 
+          {/* EDITOR GRID */}
+
           <div className="edit-outfit-layout">
+            {/* =================================
+                AVATAR PREVIEW
+            ================================= */}
+
             <section className="edit-outfit-preview-card">
               <div className="edit-outfit-card-heading">
                 <div>
@@ -688,8 +642,6 @@ function EditSavedOutfitPage() {
 
                   <div className="edit-avatar-bottom">
                     {outfit.products[1]?.name ||
-                      outfit.products[0]
-                        ?.name ||
                       "No bottom selected"}
                   </div>
                 </div>
@@ -699,6 +651,8 @@ function EditSavedOutfitPage() {
                   <span />
                 </div>
               </div>
+
+              {/* FRONT / SIDE / REAR */}
 
               <div className="edit-outfit-view-buttons">
                 {avatarViews.map((view) => (
@@ -722,22 +676,19 @@ function EditSavedOutfitPage() {
               <button
                 type="button"
                 className="edit-outfit-studio-button"
-                onClick={() => {
-                  localStorage.setItem(
-                    "fitfusion-active-outfit",
-                    JSON.stringify(outfit)
-                  );
-
-                  navigate(
-                    "/shopper/fitting-studio/customize"
-                  );
-                }}
+                onClick={openFittingStudio}
               >
                 Open in Fitting Studio
               </button>
             </section>
 
+            {/* =================================
+                EDITOR COLUMN
+            ================================= */}
+
             <div className="edit-outfit-editor-column">
+              {/* BASIC DETAILS */}
+
               <section className="edit-outfit-form-card">
                 <div className="edit-outfit-section-heading">
                   <div>
@@ -751,6 +702,8 @@ function EditSavedOutfitPage() {
                 </div>
 
                 <div className="edit-outfit-form-grid">
+                  {/* OUTFIT NAME */}
+
                   <label className="edit-outfit-field">
                     <span>Outfit Name *</span>
 
@@ -758,9 +711,7 @@ function EditSavedOutfitPage() {
                       type="text"
                       name="name"
                       value={outfit.name}
-                      onChange={
-                        updateOutfitField
-                      }
+                      onChange={updateOutfitField}
                       className={
                         errors.name
                           ? "input-error"
@@ -779,15 +730,15 @@ function EditSavedOutfitPage() {
                     )}
                   </label>
 
+                  {/* OCCASION */}
+
                   <label className="edit-outfit-field">
                     <span>Occasion *</span>
 
                     <select
                       name="occasion"
                       value={outfit.occasion}
-                      onChange={
-                        updateOutfitField
-                      }
+                      onChange={updateOutfitField}
                       className={
                         errors.occasion
                           ? "input-error"
@@ -811,11 +762,11 @@ function EditSavedOutfitPage() {
                     </select>
 
                     {errors.occasion && (
-                      <em>
-                        {errors.occasion}
-                      </em>
+                      <em>{errors.occasion}</em>
                     )}
                   </label>
+
+                  {/* DESCRIPTION */}
 
                   <label className="edit-outfit-field full-width">
                     <span>
@@ -824,27 +775,23 @@ function EditSavedOutfitPage() {
 
                     <textarea
                       name="description"
-                      value={
-                        outfit.description
-                      }
-                      onChange={
-                        updateOutfitField
-                      }
+                      value={outfit.description}
+                      onChange={updateOutfitField}
                       placeholder="Describe the outfit, styling choices, or where you plan to wear it."
                       maxLength={250}
                       rows={4}
                     />
 
                     <small>
-                      {
-                        outfit.description
-                          .length
-                      }
-                      /250
+                      {outfit.description.length}/250
                     </small>
                   </label>
                 </div>
               </section>
+
+              {/* =================================
+                  SELECTED GARMENTS
+              ================================= */}
 
               <section className="edit-outfit-products-card">
                 <div className="edit-outfit-section-heading">
@@ -853,8 +800,7 @@ function EditSavedOutfitPage() {
 
                     <h2>
                       {outfit.products.length}{" "}
-                      {outfit.products.length ===
-                      1
+                      {outfit.products.length === 1
                         ? "item"
                         : "items"}
                     </h2>
@@ -863,20 +809,7 @@ function EditSavedOutfitPage() {
                   <button
                     type="button"
                     className="edit-outfit-add-product"
-                    onClick={() => {
-                      localStorage.setItem(
-                        "fitfusion-editing-outfit",
-                        JSON.stringify({
-                          ...outfit,
-                          avatarView:
-                            selectedView,
-                        })
-                      );
-
-                      navigate(
-                        "/shopper/catalog"
-                      );
-                    }}
+                    onClick={openCatalog}
                   >
                     + Add Garment
                   </button>
@@ -893,18 +826,16 @@ function EditSavedOutfitPage() {
                     {outfit.products.map(
                       (product, index) => (
                         <article
-                          key={product.id}
+                          key={`${product.id}-${index}`}
                           className="edit-outfit-product"
                         >
+                          {/* GARMENT IMAGE */}
+
                           <div className="edit-outfit-product-image">
                             {product.image ? (
                               <img
-                                src={
-                                  product.image
-                                }
-                                alt={
-                                  product.name
-                                }
+                                src={product.image}
+                                alt={product.name}
                               />
                             ) : (
                               <span>
@@ -914,10 +845,10 @@ function EditSavedOutfitPage() {
                               </span>
                             )}
 
-                            <small>
-                              {index + 1}
-                            </small>
+                            <small>{index + 1}</small>
                           </div>
+
+                          {/* GARMENT DETAILS */}
 
                           <div className="edit-outfit-product-information">
                             <span>
@@ -940,88 +871,87 @@ function EditSavedOutfitPage() {
                             </strong>
                           </div>
 
+                          {/* GARMENT OPTIONS */}
+
                           <div className="edit-outfit-product-options">
+                            {/* SIZE */}
+
                             <label>
                               <span>Size</span>
 
                               <select
-                                value={
-                                  product.size
-                                }
-                                onChange={(
-                                  event
-                                ) =>
+                                value={product.size}
+                                onChange={(event) =>
                                   updateProduct(
                                     product.id,
                                     "size",
-                                    event.target
-                                      .value
+                                    event.target.value
                                   )
                                 }
                               >
-                                {sizeOptions.map(
-                                  (size) => (
-                                    <option
-                                      key={size}
-                                      value={size}
-                                    >
-                                      {size}
-                                    </option>
-                                  )
+                                {!sizeOptions.includes(
+                                  product.size
+                                ) && (
+                                  <option value={product.size}>
+                                    {product.size}
+                                  </option>
                                 )}
+
+                                {sizeOptions.map((size) => (
+                                  <option
+                                    key={size}
+                                    value={size}
+                                  >
+                                    {size}
+                                  </option>
+                                ))}
                               </select>
                             </label>
+
+                            {/* COLOR */}
 
                             <label>
                               <span>Color</span>
 
                               <input
                                 type="text"
-                                value={
-                                  product.color
-                                }
-                                onChange={(
-                                  event
-                                ) =>
+                                value={product.color}
+                                onChange={(event) =>
                                   updateProduct(
                                     product.id,
                                     "color",
-                                    event.target
-                                      .value
+                                    event.target.value
                                   )
                                 }
                                 maxLength={25}
                               />
                             </label>
 
+                            {/* QUANTITY */}
+
                             <label>
-                              <span>
-                                Quantity
-                              </span>
+                              <span>Quantity</span>
 
                               <div className="edit-outfit-quantity">
                                 <button
                                   type="button"
+                                  disabled={
+                                    product.quantity <= 1
+                                  }
                                   onClick={() =>
                                     updateProduct(
                                       product.id,
                                       "quantity",
-                                      product.quantity -
-                                        1
+                                      product.quantity - 1
                                     )
                                   }
-                                  disabled={
-                                    product.quantity <=
-                                    1
-                                  }
+                                  aria-label="Decrease quantity"
                                 >
                                   −
                                 </button>
 
                                 <strong>
-                                  {
-                                    product.quantity
-                                  }
+                                  {product.quantity}
                                 </strong>
 
                                 <button
@@ -1030,10 +960,10 @@ function EditSavedOutfitPage() {
                                     updateProduct(
                                       product.id,
                                       "quantity",
-                                      product.quantity +
-                                        1
+                                      product.quantity + 1
                                     )
                                   }
+                                  aria-label="Increase quantity"
                                 >
                                   +
                                 </button>
@@ -1041,13 +971,13 @@ function EditSavedOutfitPage() {
                             </label>
                           </div>
 
+                          {/* REMOVE GARMENT */}
+
                           <button
                             type="button"
                             className="edit-outfit-remove-product"
                             onClick={() =>
-                              removeProduct(
-                                product.id
-                              )
+                              removeProduct(product.id)
                             }
                             aria-label={`Remove ${product.name}`}
                           >
@@ -1072,17 +1002,17 @@ function EditSavedOutfitPage() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate(
-                          "/shopper/catalog"
-                        )
-                      }
+                      onClick={openCatalog}
                     >
                       Browse Catalog
                     </button>
                   </div>
                 )}
               </section>
+
+              {/* =================================
+                  OUTFIT SUMMARY
+              ================================= */}
 
               <section className="edit-outfit-summary">
                 <div>
@@ -1100,18 +1030,19 @@ function EditSavedOutfitPage() {
 
                 <p>
                   Product availability, prices,
-                  and sizes are supplied by each
-                  seller.
+                  and sizes are supplied by each seller.
                 </p>
               </section>
+
+              {/* =================================
+                  BOTTOM ACTIONS
+              ================================= */}
 
               <div className="edit-outfit-actions">
                 <button
                   type="button"
                   className="edit-outfit-delete-button"
-                  onClick={() =>
-                    setModal("delete")
-                  }
+                  onClick={() => setModal("delete")}
                 >
                   Delete Outfit
                 </button>
@@ -1139,15 +1070,16 @@ function EditSavedOutfitPage() {
         </div>
       </section>
 
+      {/* =====================================
+          CONFIRMATION MODALS
+      ===================================== */}
+
       {modal && (
         <div
           className="edit-outfit-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
+            if (event.target === event.currentTarget) {
               setModal(null);
             }
           }}
@@ -1169,17 +1101,15 @@ function EditSavedOutfitPage() {
                 </h2>
 
                 <p>
-                  Your latest outfit changes
-                  have not been saved.
+                  Your latest outfit changes have
+                  not been saved.
                 </p>
 
                 <div className="edit-outfit-modal-actions">
                   <button
                     type="button"
                     className="modal-secondary-button"
-                    onClick={() =>
-                      setModal(null)
-                    }
+                    onClick={() => setModal(null)}
                   >
                     Continue Editing
                   </button>
@@ -1206,18 +1136,15 @@ function EditSavedOutfitPage() {
                 </h2>
 
                 <p>
-                  “{outfit.name}” will be
-                  permanently removed from your
-                  saved outfits.
+                  “{outfit.name}” will be permanently
+                  removed from your saved outfits.
                 </p>
 
                 <div className="edit-outfit-modal-actions">
                   <button
                     type="button"
                     className="modal-secondary-button"
-                    onClick={() =>
-                      setModal(null)
-                    }
+                    onClick={() => setModal(null)}
                   >
                     Keep Outfit
                   </button>
@@ -1228,43 +1155,6 @@ function EditSavedOutfitPage() {
                     onClick={deleteOutfit}
                   >
                     Delete Outfit
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modal === "logout" && (
-              <>
-                <div className="edit-outfit-modal-icon">
-                  ↪
-                </div>
-
-                <h2 id="edit-outfit-modal-title">
-                  Log out?
-                </h2>
-
-                <p>
-                  Unsaved changes may be lost
-                  when you leave your account.
-                </p>
-
-                <div className="edit-outfit-modal-actions">
-                  <button
-                    type="button"
-                    className="modal-secondary-button"
-                    onClick={() =>
-                      setModal(null)
-                    }
-                  >
-                    Stay
-                  </button>
-
-                  <button
-                    type="button"
-                    className="modal-primary-button"
-                    onClick={confirmLogout}
-                  >
-                    Logout
                   </button>
                 </div>
               </>
