@@ -1,298 +1,578 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import "./css/SavedOutfitsPage.css";
 
-const sampleOutfits = [
+const initialOutfits = [
   {
-    id: "outfit-001",
-    name: "Weekend Casual",
+    id: "golden-weekend",
+    name: "Golden Weekend",
     description:
-      "A comfortable casual combination for relaxed days.",
-    createdAt: "2026-10-01T09:00:00.000Z",
-    topColor: "#d7af4b",
-    bottomColor: "#29251f",
-    skinTone: "#d9a77e",
+      "Warm neutral pieces for a relaxed weekend outfit.",
+    createdAt: "2026-10-08",
+    color: "#d8ad45",
+    pantsColor: "#29251f",
+    skinTone: "#d9a276",
+    gender: "Male",
     products: [
       {
-        id: "product-001",
-        name: "Classic Gold Shirt",
-        price: 799,
+        id: "cream-knit-sweater",
+        name: "Cream Knit Sweater",
+        price: 1599,
+        quantity: 1,
+        selectedSize: "M",
       },
       {
-        id: "product-002",
-        name: "Straight Black Pants",
-        price: 999,
+        id: "black-tailored-trousers",
+        name: "Black Tailored Trousers",
+        price: 1699,
+        quantity: 1,
+        selectedSize: "M",
       },
     ],
   },
   {
-    id: "outfit-002",
-    name: "Elegant Evening",
+    id: "modern-classic",
+    name: "Modern Classic",
     description:
-      "An elegant outfit prepared for formal occasions.",
-    createdAt: "2026-09-29T13:30:00.000Z",
-    topColor: "#17130f",
-    bottomColor: "#8e641f",
-    skinTone: "#efc39b",
+      "A clean combination suitable for casual and smart occasions.",
+    createdAt: "2026-10-06",
+    color: "#d8ad45",
+    pantsColor: "#29251f",
+    skinTone: "#d9a276",
+    gender: "Male",
     products: [
       {
-        id: "product-003",
-        name: "Black Evening Top",
-        price: 1299,
+        id: "modern-oxford-shirt",
+        name: "Modern Oxford Shirt",
+        price: 1499,
+        quantity: 1,
+        selectedSize: "M",
       },
       {
-        id: "product-004",
-        name: "Gold Formal Skirt",
+        id: "black-tailored-trousers",
+        name: "Black Tailored Trousers",
+        price: 1699,
+        quantity: 1,
+        selectedSize: "M",
+      },
+    ],
+  },
+  {
+    id: "soft-ivory",
+    name: "Soft Ivory",
+    description:
+      "An elegant light-colored outfit with a soft neutral finish.",
+    createdAt: "2026-10-04",
+    color: "#eee4d1",
+    pantsColor: "#9b7448",
+    skinTone: "#d9a276",
+    gender: "Female",
+    products: [
+      {
+        id: "ivory-satin-blouse",
+        name: "Ivory Satin Blouse",
         price: 1399,
+        quantity: 1,
+        selectedSize: "S",
+      },
+      {
+        id: "pleated-midi-skirt",
+        name: "Pleated Midi Skirt",
+        price: 1299,
+        quantity: 1,
+        selectedSize: "S",
       },
     ],
   },
   {
-    id: "outfit-003",
-    name: "Neutral Workwear",
+    id: "denim-day",
+    name: "Denim Day",
     description:
-      "A polished neutral outfit suitable for work.",
-    createdAt: "2026-09-25T08:15:00.000Z",
-    topColor: "#eee2cd",
-    bottomColor: "#5c554c",
-    skinTone: "#b97952",
+      "A comfortable denim-inspired outfit for everyday wear.",
+    createdAt: "2026-10-02",
+    color: "#526e86",
+    pantsColor: "#29251f",
+    skinTone: "#d9a276",
+    gender: "Female",
     products: [
       {
-        id: "product-005",
-        name: "Cream Office Blouse",
-        price: 899,
+        id: "classic-denim-jacket",
+        name: "Classic Denim Jacket",
+        price: 2299,
+        quantity: 1,
+        selectedSize: "M",
       },
       {
-        id: "product-006",
-        name: "Tailored Brown Pants",
-        price: 1199,
-      },
-    ],
-  },
-  {
-    id: "outfit-004",
-    name: "Warm Street Style",
-    description:
-      "A warm-toned outfit for an everyday street look.",
-    createdAt: "2026-09-20T16:45:00.000Z",
-    topColor: "#b57e20",
-    bottomColor: "#17130f",
-    skinTone: "#f0c7a1",
-    products: [
-      {
-        id: "product-007",
-        name: "Warm Oversized Top",
-        price: 999,
-      },
-      {
-        id: "product-008",
-        name: "Dark Casual Pants",
-        price: 1099,
+        id: "black-tailored-trousers",
+        name: "Black Tailored Trousers",
+        price: 1699,
+        quantity: 1,
+        selectedSize: "M",
       },
     ],
   },
 ];
 
-function safelyReadArray(key, fallback = []) {
-  try {
-    const storedValue = localStorage.getItem(key);
+function normalizeProduct(
+  product,
+  index,
+) {
+  return {
+    id:
+      product?.id ||
+      `saved-product-${index + 1}`,
 
-    if (!storedValue) {
-      return fallback;
+    name:
+      product?.name ||
+      `Saved Product ${index + 1}`,
+
+    price: Number(product?.price || 0),
+
+    quantity: Math.max(
+      1,
+      Number(product?.quantity || 1),
+    ),
+
+    selectedSize:
+      product?.selectedSize ||
+      product?.size ||
+      "M",
+  };
+}
+
+function normalizeOutfit(
+  outfit,
+  index,
+) {
+  const products = Array.isArray(
+    outfit?.products,
+  )
+    ? outfit.products.map(
+        normalizeProduct,
+      )
+    : [];
+
+  return {
+    id:
+      outfit?.id ||
+      `saved-outfit-${index + 1}`,
+
+    name:
+      outfit?.name ||
+      `Saved Outfit ${index + 1}`,
+
+    description:
+      outfit?.description ||
+      "A saved outfit from your fitting session.",
+
+    createdAt:
+      outfit?.createdAt ||
+      new Date().toISOString(),
+
+    color:
+      outfit?.color ||
+      outfit?.shirtColor ||
+      "#d8ad45",
+
+    pantsColor:
+      outfit?.pantsColor ||
+      "#29251f",
+
+    skinTone:
+      outfit?.skinTone ||
+      "#d9a276",
+
+    gender:
+      outfit?.gender === "Female"
+        ? "Female"
+        : "Male",
+
+    products,
+  };
+}
+
+function getSavedOutfits() {
+  try {
+    const savedOutfits =
+      localStorage.getItem(
+        "fitfusion-saved-outfits",
+      );
+
+    if (!savedOutfits) {
+      return initialOutfits;
     }
 
-    const parsedValue = JSON.parse(storedValue);
+    const parsedOutfits =
+      JSON.parse(savedOutfits);
 
-    return Array.isArray(parsedValue)
-      ? parsedValue
-      : fallback;
-  } catch {
-    return fallback;
+    if (!Array.isArray(parsedOutfits)) {
+      return initialOutfits;
+    }
+
+    if (parsedOutfits.length === 0) {
+      return [];
+    }
+
+    const validOutfits =
+      parsedOutfits.filter(
+        (outfit) =>
+          outfit &&
+          typeof outfit === "object",
+      );
+
+    if (validOutfits.length === 0) {
+      return initialOutfits;
+    }
+
+    return validOutfits.map(
+      normalizeOutfit,
+    );
+  } catch (error) {
+    console.error(
+      "Unable to load saved outfits:",
+      error,
+    );
+
+    return initialOutfits;
   }
 }
 
-function formatPrice(value) {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-  }).format(value);
+function getCartCount() {
+  try {
+    const savedCart =
+      localStorage.getItem(
+        "fitfusion-cart",
+      );
+
+    const cart = savedCart
+      ? JSON.parse(savedCart)
+      : [];
+
+    if (!Array.isArray(cart)) {
+      return 0;
+    }
+
+    return cart.reduce(
+      (total, item) =>
+        total +
+        Math.max(
+          1,
+          Number(item?.quantity || 1),
+        ),
+      0,
+    );
+  } catch {
+    return 0;
+  }
 }
 
 function SavedOutfitsPage() {
   const navigate = useNavigate();
 
-  const [outfits, setOutfits] = useState(() => {
-    const storedOutfits = safelyReadArray(
-      "fitfusion-saved-outfits"
-    );
+  const [outfits, setOutfits] =
+    useState(getSavedOutfits);
 
-    return storedOutfits.length > 0
-      ? storedOutfits
-      : sampleOutfits;
-  });
-
-  const [cartItems, setCartItems] = useState(() =>
-    safelyReadArray("fitfusion-cart")
-  );
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOrder, setSortOrder] =
-    useState("newest");
-  const [selectedViews, setSelectedViews] =
-    useState({});
-  const [outfitToRemove, setOutfitToRemove] =
-    useState(null);
-  const [notification, setNotification] =
+  const [searchText, setSearchText] =
     useState("");
 
-  const displayedOutfits = useMemo(() => {
-    const normalizedSearch =
-      searchTerm.trim().toLowerCase();
+  const [sortOption, setSortOption] =
+    useState("newest");
 
-    const filteredOutfits = outfits.filter(
-      (outfit) => {
-        const productNames = (
-          outfit.products || []
-        )
-          .map((product) => product.name)
-          .join(" ");
+  const [cartCount, setCartCount] =
+    useState(getCartCount);
 
-        return `${outfit.name || ""} ${
-          outfit.description || ""
-        } ${productNames}`
-          .toLowerCase()
-          .includes(normalizedSearch);
-      }
+  const [
+    selectedViews,
+    setSelectedViews,
+  ] = useState({});
+
+  const [
+    outfitToDelete,
+    setOutfitToDelete,
+  ] = useState(null);
+
+  const [message, setMessage] =
+    useState("");
+
+  useEffect(() => {
+    function updateCartCount() {
+      setCartCount(getCartCount());
+    }
+
+    updateCartCount();
+
+    window.addEventListener(
+      "fitfusion-cart-updated",
+      updateCartCount,
     );
 
-    return [...filteredOutfits].sort(
-      (firstOutfit, secondOutfit) => {
-        if (sortOrder === "name") {
-          return (firstOutfit.name || "").localeCompare(
-            secondOutfit.name || ""
+    window.addEventListener(
+      "storage",
+      updateCartCount,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "fitfusion-cart-updated",
+        updateCartCount,
+      );
+
+      window.removeEventListener(
+        "storage",
+        updateCartCount,
+      );
+    };
+  }, []);
+
+  const filteredOutfits = useMemo(() => {
+    const normalizedSearch = String(
+      searchText || "",
+    )
+      .trim()
+      .toLowerCase();
+
+    const filtered = outfits.filter(
+      (outfit) => {
+        const outfitName = String(
+          outfit?.name || "",
+        ).toLowerCase();
+
+        const outfitDescription =
+          String(
+            outfit?.description || "",
+          ).toLowerCase();
+
+        const outfitProducts =
+          Array.isArray(outfit?.products)
+            ? outfit.products
+            : [];
+
+        const productNames =
+          outfitProducts
+            .map((product) =>
+              String(
+                product?.name || "",
+              ),
+            )
+            .join(" ")
+            .toLowerCase();
+
+        return (
+          normalizedSearch.length ===
+            0 ||
+          outfitName.includes(
+            normalizedSearch,
+          ) ||
+          outfitDescription.includes(
+            normalizedSearch,
+          ) ||
+          productNames.includes(
+            normalizedSearch,
+          )
+        );
+      },
+    );
+
+    return [...filtered].sort(
+      (a, b) => {
+        if (sortOption === "name") {
+          return String(
+            a?.name || "",
+          ).localeCompare(
+            String(b?.name || ""),
           );
         }
 
-        const firstDate = new Date(
-          firstOutfit.createdAt || 0
-        ).getTime();
+        const firstDate =
+          new Date(
+            a?.createdAt || 0,
+          ).getTime() || 0;
 
-        const secondDate = new Date(
-          secondOutfit.createdAt || 0
-        ).getTime();
+        const secondDate =
+          new Date(
+            b?.createdAt || 0,
+          ).getTime() || 0;
 
-        if (sortOrder === "oldest") {
-          return firstDate - secondDate;
+        if (sortOption === "oldest") {
+          return (
+            firstDate - secondDate
+          );
         }
 
         return secondDate - firstDate;
-      }
+      },
     );
-  }, [outfits, searchTerm, sortOrder]);
+  }, [
+    outfits,
+    searchText,
+    sortOption,
+  ]);
 
-  function selectView(outfitId, view) {
-    setSelectedViews((currentViews) => ({
-      ...currentViews,
+  function getSelectedView(outfitId) {
+    return (
+      selectedViews[outfitId] ||
+      "front"
+    );
+  }
+
+  function changeOutfitView(
+    outfitId,
+    view,
+  ) {
+    setSelectedViews((current) => ({
+      ...current,
       [outfitId]: view,
     }));
   }
 
-  function confirmRemoveOutfit() {
-    if (!outfitToRemove) {
-      return;
-    }
-
-    const updatedOutfits = outfits.filter(
-      (outfit) =>
-        outfit.id !== outfitToRemove.id
-    );
-
-    setOutfits(updatedOutfits);
+  function saveOutfits(nextOutfits) {
+    setOutfits(nextOutfits);
 
     localStorage.setItem(
       "fitfusion-saved-outfits",
-      JSON.stringify(updatedOutfits)
+      JSON.stringify(nextOutfits),
     );
+  }
 
-    setOutfitToRemove(null);
-    setNotification("The outfit was removed.");
+  function showTemporaryMessage(
+    nextMessage,
+  ) {
+    setMessage(nextMessage);
 
     window.setTimeout(() => {
-      setNotification("");
+      setMessage("");
     }, 2500);
   }
 
-  function addOutfitToCart(outfit) {
-    const products = outfit.products || [];
+  function confirmDeleteOutfit() {
+    if (!outfitToDelete) {
+      return;
+    }
 
-    if (products.length === 0) {
-      setNotification(
-        "This outfit does not contain any products."
+    const nextOutfits = outfits.filter(
+      (outfit) =>
+        outfit.id !== outfitToDelete.id,
+    );
+
+    saveOutfits(nextOutfits);
+    setOutfitToDelete(null);
+
+    showTemporaryMessage(
+      "Outfit removed.",
+    );
+  }
+
+  function addOutfitToCart(outfit) {
+    const outfitProducts =
+      Array.isArray(outfit?.products)
+        ? outfit.products
+        : [];
+
+    if (outfitProducts.length === 0) {
+      showTemporaryMessage(
+        "This saved outfit has no products to add.",
       );
 
       return;
     }
 
-    const newCartItems = products.map(
-      (product) => ({
-        ...product,
-        cartItemId: `${product.id}-${Date.now()}-${Math.random()}`,
-        quantity: 1,
-        sourceOutfitId: outfit.id,
-        sourceOutfitName: outfit.name,
-      })
+    let cart = [];
+
+    try {
+      const savedCart =
+        localStorage.getItem(
+          "fitfusion-cart",
+        );
+
+      cart = savedCart
+        ? JSON.parse(savedCart)
+        : [];
+
+      if (!Array.isArray(cart)) {
+        cart = [];
+      }
+    } catch {
+      cart = [];
+    }
+
+    outfitProducts.forEach(
+      (product, index) => {
+        const normalizedProduct =
+          normalizeProduct(
+            product,
+            index,
+          );
+
+        const existingItem =
+          cart.find(
+            (item) =>
+              item?.id ===
+              normalizedProduct.id,
+          );
+
+        if (existingItem) {
+          cart = cart.map((item) =>
+            item?.id ===
+            normalizedProduct.id
+              ? {
+                  ...item,
+                  quantity:
+                    Number(
+                      item.quantity || 1,
+                    ) +
+                    normalizedProduct.quantity,
+                }
+              : item,
+          );
+        } else {
+          cart.push(normalizedProduct);
+        }
+      },
     );
-
-    const updatedCart = [
-      ...cartItems,
-      ...newCartItems,
-    ];
-
-    setCartItems(updatedCart);
 
     localStorage.setItem(
       "fitfusion-cart",
-      JSON.stringify(updatedCart)
+      JSON.stringify(cart),
     );
 
-    navigate("/shopper/cart");
+    setCartCount(getCartCount());
+
+    window.dispatchEvent(
+      new Event(
+        "fitfusion-cart-updated",
+      ),
+    );
+
+    showTemporaryMessage(
+      `${outfit.name} was added to your cart.`,
+    );
   }
 
   return (
     <main className="saved-outfits-page">
-      {/* No sidebar is rendered here.
-          ShopperLayout provides the only sidebar. */}
-
-      {/* Large page title header removed.
-          Cart and registered-shopper badge remain. */}
-      <div className="saved-outfits-top-actions">
+      <header className="saved-outfits-top-header">
         <button
           type="button"
-          className="saved-outfits-cart-button"
+          className="saved-outfits-header-cart"
           onClick={() =>
             navigate("/shopper/cart")
           }
-          aria-label={`Open cart with ${cartItems.length} items`}
+          aria-label={`Open shopping cart with ${cartCount} items`}
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-            <circle cx="10" cy="20" r="1" />
-            <circle cx="18" cy="20" r="1" />
-          </svg>
+          <CartIcon />
 
-          <span>{cartItems.length}</span>
+          <span>{cartCount}</span>
         </button>
-
-        <div className="saved-outfits-role-badge">
-          REGISTERED SHOPPER
-        </div>
-      </div>
+      </header>
 
       <div className="saved-outfits-content">
-        <section className="saved-outfits-introduction">
+        <section className="saved-outfits-intro">
           <div>
             <p className="saved-outfits-eyebrow">
               YOUR STYLE COLLECTION
@@ -301,228 +581,322 @@ function SavedOutfitsPage() {
             <h1>Your saved outfits</h1>
 
             <p className="saved-outfits-description">
-              Continue fitting, edit an outfit, or
-              prepare its products for your shopping
+              Continue fitting, edit an
+              outfit, or prepare its
+              products for your shopping
               cart.
             </p>
           </div>
 
           <button
             type="button"
-            className="saved-outfits-create-button"
+            className="saved-outfits-create"
             onClick={() =>
               navigate(
-                "/shopper/fitting-studio"
+                "/shopper/fitting-studio",
               )
             }
           >
-            + Create New Outfit
+            <span>+</span>
+            Create New Outfit
           </button>
         </section>
 
-        <section className="saved-outfits-toolbar">
+        <section
+          className="saved-outfits-toolbar"
+          aria-label="Saved outfit filters"
+        >
           <label className="saved-outfits-search">
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m16 16 5 5" />
-            </svg>
+            <SearchIcon />
 
             <input
               type="search"
-              value={searchTerm}
-              onChange={(event) =>
-                setSearchTerm(event.target.value)
-              }
+              value={searchText}
               placeholder="Search saved outfits or products..."
-              aria-label="Search saved outfits"
+              onChange={(event) =>
+                setSearchText(
+                  event.target.value,
+                )
+              }
             />
           </label>
 
-          <select
-            className="saved-outfits-sort"
-            value={sortOrder}
-            onChange={(event) =>
-              setSortOrder(event.target.value)
-            }
-            aria-label="Sort saved outfits"
-          >
-            <option value="newest">
-              Newest First
-            </option>
+          <label className="saved-outfits-sort">
+            <span className="sr-only">
+              Sort outfits
+            </span>
 
-            <option value="oldest">
-              Oldest First
-            </option>
+            <select
+              value={sortOption}
+              onChange={(event) =>
+                setSortOption(
+                  event.target.value,
+                )
+              }
+            >
+              <option value="newest">
+                Newest First
+              </option>
 
-            <option value="name">
-              Outfit Name
-            </option>
-          </select>
+              <option value="oldest">
+                Oldest First
+              </option>
+
+              <option value="name">
+                Name: A to Z
+              </option>
+            </select>
+          </label>
         </section>
 
-        <div className="saved-outfits-result-count">
-          <strong>{displayedOutfits.length}</strong>
+        <div className="saved-outfits-result-row">
+          <p>
+            <strong>
+              {filteredOutfits.length}
+            </strong>{" "}
+            saved{" "}
+            {filteredOutfits.length ===
+            1
+              ? "outfit"
+              : "outfits"}
+          </p>
 
-          <span>
-            {displayedOutfits.length === 1
-              ? "saved outfit"
-              : "saved outfits"}
-          </span>
+          {searchText && (
+            <button
+              type="button"
+              onClick={() =>
+                setSearchText("")
+              }
+            >
+              Clear search
+            </button>
+          )}
         </div>
 
-        {notification && (
-          <div
-            className="saved-outfits-notification"
-            role="status"
-          >
-            {notification}
-          </div>
-        )}
-
-        {displayedOutfits.length > 0 ? (
+        {filteredOutfits.length > 0 ? (
           <section className="saved-outfits-grid">
-            {displayedOutfits.map((outfit) => {
-              const selectedView =
-                selectedViews[outfit.id] ||
-                "front";
+            {filteredOutfits.map(
+              (outfit) => {
+                const selectedView =
+                  getSelectedView(
+                    outfit.id,
+                  );
 
-              return (
-                <article
-                  className="saved-outfit-card"
-                  key={outfit.id}
-                >
-                  <div className="saved-outfit-preview">
-                    <div className="saved-outfit-view-buttons">
-                      {[
-                        "front",
-                        "side",
-                        "rear",
-                      ].map((view) => (
+                const outfitProducts =
+                  Array.isArray(
+                    outfit?.products,
+                  )
+                    ? outfit.products
+                    : [];
+
+                const totalPrice =
+                  outfitProducts.reduce(
+                    (
+                      total,
+                      product,
+                    ) =>
+                      total +
+                      Number(
+                        product?.price ||
+                          0,
+                      ) *
+                        Math.max(
+                          1,
+                          Number(
+                            product?.quantity ||
+                              1,
+                          ),
+                        ),
+                    0,
+                  );
+
+                return (
+                  <article
+                    key={outfit.id}
+                    className="saved-outfit-card"
+                  >
+                    <div className="saved-outfit-preview">
+                      <div className="saved-outfit-view-buttons">
+                        {[
+                          "front",
+                          "side",
+                          "rear",
+                        ].map((view) => (
+                          <button
+                            key={view}
+                            type="button"
+                            className={
+                              selectedView ===
+                              view
+                                ? "active"
+                                : ""
+                            }
+                            onClick={() =>
+                              changeOutfitView(
+                                outfit.id,
+                                view,
+                              )
+                            }
+                          >
+                            {capitalize(view)}
+                          </button>
+                        ))}
+                      </div>
+
+                      <OutfitAvatar
+                        view={selectedView}
+                        shirtColor={
+                          outfit.color
+                        }
+                        pantsColor={
+                          outfit.pantsColor
+                        }
+                        skinTone={
+                          outfit.skinTone
+                        }
+                        gender={
+                          outfit.gender
+                        }
+                      />
+                    </div>
+
+                    <div className="saved-outfit-information">
+                      <div className="saved-outfit-title-row">
+                        <div>
+                          <p className="saved-outfit-label">
+                            SAVED OUTFIT
+                          </p>
+
+                          <h2>
+                            {outfit.name}
+                          </h2>
+                        </div>
+                      </div>
+
+                      <p className="saved-outfit-description">
+                        {outfit.description}
+                      </p>
+
+                      <div className="saved-outfit-products">
+                        {outfitProducts.length >
+                        0 ? (
+                          outfitProducts.map(
+                            (
+                              product,
+                              index,
+                            ) => (
+                              <div
+                                key={
+                                  product.id ||
+                                  `product-${index}`
+                                }
+                                className="saved-outfit-product"
+                              >
+                                <span>
+                                  {
+                                    product.name
+                                  }
+                                </span>
+
+                                <strong>
+                                  {formatCurrency(
+                                    product.price,
+                                  )}
+                                </strong>
+                              </div>
+                            ),
+                          )
+                        ) : (
+                          <p className="saved-outfit-no-products">
+                            No products are
+                            connected to this
+                            saved outfit.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="saved-outfit-summary">
+                        <span>
+                          {
+                            outfitProducts.length
+                          }{" "}
+                          {outfitProducts.length ===
+                          1
+                            ? "product"
+                            : "products"}
+                        </span>
+
+                        <strong>
+                          {formatCurrency(
+                            totalPrice,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div className="saved-outfit-actions">
                         <button
                           type="button"
-                          key={view}
-                          className={
-                            selectedView === view
-                              ? "active"
-                              : ""
-                          }
+                          className="saved-outfit-primary"
                           onClick={() =>
-                            selectView(
-                              outfit.id,
-                              view
+                            addOutfitToCart(
+                              outfit,
                             )
                           }
                         >
-                          {view
-                            .charAt(0)
-                            .toUpperCase() +
-                            view.slice(1)}
+                          Add Outfit to Cart
                         </button>
-                      ))}
-                    </div>
 
-                    <OutfitAvatar
-                      outfit={outfit}
-                      view={selectedView}
-                    />
-                  </div>
+                        <button
+                          type="button"
+                          className="saved-outfit-secondary"
+                          onClick={() =>
+                            navigate(
+                              `/shopper/saved-outfits/${outfit.id}/edit`,
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
 
-                  <div className="saved-outfit-information">
-                    <div className="saved-outfit-title-row">
-                      <div>
-                        <p>SAVED OUTFIT</p>
-                        <h2>{outfit.name}</h2>
+                        <button
+                          type="button"
+                          className="saved-outfit-delete"
+                          onClick={() =>
+                            setOutfitToDelete(
+                              outfit,
+                            )
+                          }
+                        >
+                          Remove
+                        </button>
                       </div>
-
-                      <span>
-                        {(outfit.products || [])
-                          .length}{" "}
-                        {(outfit.products || [])
-                          .length === 1
-                          ? "item"
-                          : "items"}
-                      </span>
                     </div>
-
-                    <p className="saved-outfit-card-description">
-                      {outfit.description}
-                    </p>
-
-                    <div className="saved-outfit-products">
-                      {(outfit.products || []).map(
-                        (product) => (
-                          <div key={product.id}>
-                            <span>
-                              {product.name}
-                            </span>
-
-                            <strong>
-                              {formatPrice(
-                                product.price
-                              )}
-                            </strong>
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    <div className="saved-outfit-actions">
-                      <button
-                        type="button"
-                        className="saved-outfit-primary"
-                        onClick={() =>
-                          addOutfitToCart(outfit)
-                        }
-                      >
-                        Prepare Cart
-                      </button>
-
-                      <button
-                        type="button"
-                        className="saved-outfit-secondary"
-                        onClick={() =>
-                          navigate(
-                            `/shopper/saved-outfits/${outfit.id}/edit`
-                          )
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        className="saved-outfit-remove"
-                        onClick={() =>
-                          setOutfitToRemove(outfit)
-                        }
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                  </article>
+                );
+              },
+            )}
           </section>
         ) : (
-          <section className="saved-outfits-empty-state">
-            <span aria-hidden="true">◇</span>
+          <section className="saved-outfits-empty">
+            <div className="saved-outfits-empty-icon">
+              <HangerIcon />
+            </div>
 
-            <h2>No saved outfits found</h2>
+            <h2>
+              No saved outfits found
+            </h2>
 
             <p>
-              Try another search or create a new
-              outfit in the Fitting Studio.
+              Create an outfit in the
+              Fitting Studio and save it
+              to your collection.
             </p>
 
             <button
               type="button"
               onClick={() =>
                 navigate(
-                  "/shopper/fitting-studio"
+                  "/shopper/fitting-studio",
                 )
               }
             >
@@ -532,55 +906,68 @@ function SavedOutfitsPage() {
         )}
       </div>
 
-      {outfitToRemove && (
+      {message && (
         <div
-          className="saved-outfit-modal-overlay"
+          className="saved-outfits-toast"
+          role="status"
+        >
+          {message}
+        </div>
+      )}
+
+      {outfitToDelete && (
+        <div
+          className="saved-outfits-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (
-              event.target === event.currentTarget
+              event.target ===
+              event.currentTarget
             ) {
-              setOutfitToRemove(null);
+              setOutfitToDelete(null);
             }
           }}
         >
           <section
-            className="saved-outfit-modal"
+            className="saved-outfits-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="remove-outfit-title"
+            aria-labelledby="delete-outfit-title"
           >
-            <p className="saved-outfit-modal-label">
+            <p className="saved-outfits-modal-label">
               REMOVE SAVED OUTFIT
             </p>
 
-            <h2 id="remove-outfit-title">
-              Remove “{outfitToRemove.name}”?
+            <h2 id="delete-outfit-title">
+              Remove{" "}
+              {outfitToDelete.name}?
             </h2>
 
             <p>
-              This outfit will be removed from your
-              saved collection. Products already in
-              your cart will not be affected.
+              This outfit will be removed
+              from your saved collection.
+              This action cannot be undone.
             </p>
 
-            <div className="saved-outfit-modal-actions">
+            <div className="saved-outfits-modal-actions">
               <button
                 type="button"
-                className="saved-outfit-modal-cancel"
-                onClick={() =>
-                  setOutfitToRemove(null)
+                className="saved-outfits-confirm-delete"
+                onClick={
+                  confirmDeleteOutfit
                 }
               >
-                Cancel
+                Remove Outfit
               </button>
 
               <button
                 type="button"
-                className="saved-outfit-modal-confirm"
-                onClick={confirmRemoveOutfit}
+                className="saved-outfits-cancel-delete"
+                onClick={() =>
+                  setOutfitToDelete(null)
+                }
               >
-                Remove Outfit
+                Cancel
               </button>
             </div>
           </section>
@@ -590,45 +977,314 @@ function SavedOutfitsPage() {
   );
 }
 
-function OutfitAvatar({ outfit, view }) {
+function OutfitAvatar({
+  view,
+  shirtColor,
+  pantsColor,
+  skinTone,
+  gender,
+}) {
+  if (view === "side") {
+    return (
+      <svg
+        className="saved-outfit-avatar"
+        viewBox="0 0 260 390"
+        role="img"
+        aria-label="Side view of outfit"
+      >
+        <ellipse
+          cx="134"
+          cy="65"
+          rx="40"
+          ry="49"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M101 45c9-34 74-38 80 2v19h-77Z"
+          fill="#2f2119"
+        />
+
+        <circle
+          cx="158"
+          cy="67"
+          r="3"
+          fill="#29251f"
+        />
+
+        <rect
+          x="121"
+          y="111"
+          width="27"
+          height="35"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M112 143c45-12 66 15 59 117h-68c-7-57-3-96 9-117Z"
+          fill={shirtColor}
+          stroke="#5f492d"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M165 161c21 9 25 28 23 85-1 20-14 28-25 17l-4-90Z"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M110 260h59l8 112h-31l-10-91-5 91H99Z"
+          fill={pantsColor}
+          stroke="#17130f"
+          strokeWidth="3"
+        />
+      </svg>
+    );
+  }
+
+  if (view === "rear") {
+    return (
+      <svg
+        className="saved-outfit-avatar"
+        viewBox="0 0 260 390"
+        role="img"
+        aria-label="Rear view of outfit"
+      >
+        <ellipse
+          cx="130"
+          cy="65"
+          rx="42"
+          ry="49"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M88 51c2-45 84-48 86 0v18H88Z"
+          fill="#2f2119"
+        />
+
+        <rect
+          x="116"
+          y="111"
+          width="28"
+          height="35"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M91 145c17-10 61-10 78 0l7 115H84Z"
+          fill={shirtColor}
+          stroke="#5f492d"
+          strokeWidth="3"
+        />
+
+        <rect
+          x="59"
+          y="158"
+          width="31"
+          height="110"
+          rx="15"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <rect
+          x="170"
+          y="158"
+          width="31"
+          height="110"
+          rx="15"
+          fill={skinTone}
+          stroke="#6d5038"
+          strokeWidth="3"
+        />
+
+        <path
+          d="M86 260h88l9 112h-37l-16-92-16 92H77Z"
+          fill={pantsColor}
+          stroke="#17130f"
+          strokeWidth="3"
+        />
+      </svg>
+    );
+  }
+
   return (
-    <div
-      className={`saved-avatar saved-avatar-${view}`}
-      style={{
-        "--saved-skin":
-          outfit.skinTone || "#d9a77e",
-        "--saved-top":
-          outfit.topColor || "#d7af4b",
-        "--saved-bottom":
-          outfit.bottomColor || "#29251f",
-      }}
-      aria-label={`${outfit.name} ${view} view`}
+    <svg
+      className="saved-outfit-avatar"
+      viewBox="0 0 260 390"
+      role="img"
+      aria-label="Front view of outfit"
     >
-      <span className="saved-avatar-head">
-        <span className="saved-avatar-hair" />
+      <ellipse
+        cx="130"
+        cy="65"
+        rx="42"
+        ry="49"
+        fill={skinTone}
+        stroke="#6d5038"
+        strokeWidth="3"
+      />
 
-        {view !== "rear" && (
-          <span className="saved-avatar-face">
-            <i />
-            {view === "front" && <i />}
-          </span>
-        )}
-      </span>
+      <path
+        d="M88 51c2-45 84-48 86 0v18H88Z"
+        fill="#2f2119"
+      />
 
-      <span className="saved-avatar-neck" />
+      <circle
+        cx="111"
+        cy="69"
+        r="3"
+        fill="#29251f"
+      />
 
-      <span className="saved-avatar-upper">
-        <span className="saved-avatar-left-arm" />
-        <span className="saved-avatar-shirt" />
-        <span className="saved-avatar-right-arm" />
-      </span>
+      <circle
+        cx="149"
+        cy="69"
+        r="3"
+        fill="#29251f"
+      />
 
-      <span className="saved-avatar-lower">
-        <i />
-        <i />
-      </span>
-    </div>
+      <rect
+        x="116"
+        y="111"
+        width="28"
+        height="35"
+        fill={skinTone}
+        stroke="#6d5038"
+        strokeWidth="3"
+      />
+
+      <path
+        d="M91 145c17-10 61-10 78 0l7 115H84Z"
+        fill={shirtColor}
+        stroke="#5f492d"
+        strokeWidth="3"
+      />
+
+      <rect
+        x="59"
+        y="158"
+        width="31"
+        height="110"
+        rx="15"
+        fill={skinTone}
+        stroke="#6d5038"
+        strokeWidth="3"
+      />
+
+      <rect
+        x="170"
+        y="158"
+        width="31"
+        height="110"
+        rx="15"
+        fill={skinTone}
+        stroke="#6d5038"
+        strokeWidth="3"
+      />
+
+      {gender === "Female" && (
+        <path
+          d="M92 232c21 9 55 9 76 0"
+          fill="none"
+          stroke="rgba(255,255,255,.4)"
+          strokeWidth="3"
+        />
+      )}
+
+      <path
+        d="M86 260h88l9 112h-37l-16-92-16 92H77Z"
+        fill={pantsColor}
+        stroke="#17130f"
+        strokeWidth="3"
+      />
+    </svg>
   );
+}
+
+function CartIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+
+      <circle
+        cx="10"
+        cy="20"
+        r="1"
+      />
+
+      <circle
+        cx="18"
+        cy="20"
+        r="1"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        cx="11"
+        cy="11"
+        r="7"
+      />
+
+      <path d="m16 16 5 5" />
+    </svg>
+  );
+}
+
+function HangerIcon() {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+    >
+      <path d="M13.5 8.5a3 3 0 1 1 4.7 2.5L17 12v2l11 8H4l11-8" />
+    </svg>
+  );
+}
+
+function capitalize(value) {
+  const safeValue = String(
+    value || "",
+  );
+
+  return (
+    safeValue.charAt(0).toUpperCase() +
+    safeValue.slice(1)
+  );
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat(
+    "en-PH",
+    {
+      style: "currency",
+      currency: "PHP",
+      maximumFractionDigits: 0,
+    },
+  ).format(Number(value || 0));
 }
 
 export default SavedOutfitsPage;

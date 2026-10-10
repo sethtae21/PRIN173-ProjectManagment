@@ -1,15 +1,14 @@
+
 import { useNavigate } from "react-router-dom";
 import "./css/ShopperDashboard.css";
 
 function readStoredArray(...keys) {
   for (const key of keys) {
     try {
-      const savedValue =
-        localStorage.getItem(key);
+      const savedValue = localStorage.getItem(key);
 
       if (savedValue) {
-        const parsedValue =
-          JSON.parse(savedValue);
+        const parsedValue = JSON.parse(savedValue);
 
         if (Array.isArray(parsedValue)) {
           return parsedValue;
@@ -37,8 +36,7 @@ function getCurrentShopper() {
 
   for (const item of possibleAccounts) {
     try {
-      const savedAccount =
-        item.storage.getItem(item.key);
+      const savedAccount = item.storage.getItem(item.key);
 
       if (savedAccount) {
         return JSON.parse(savedAccount);
@@ -78,37 +76,36 @@ function ShopperDashboard() {
 
   return (
     <main className="shopper-dashboard-page">
-      {/* The large title header was removed.
-          The cart and role badge remain here. */}
 
-      <div className="shopper-dashboard-top-actions">
-        <button
-          type="button"
-          className="shopper-cart-button"
-          onClick={() =>
-            navigate("/shopper/cart")
-          }
-          aria-label={`Open cart with ${
-            cartItems.length
-          } items`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+      {/* CLEAN HEADER - CART ONLY */}
+      <header className="shopper-dashboard-header">
+        <div className="shopper-dashboard-top-actions">
+          <button
+            type="button"
+            className="shopper-cart-button"
+            onClick={() => navigate("/shopper/cart")}
+            aria-label={`Open cart with ${cartItems.length} items`}
           >
-            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-            <circle cx="10" cy="20" r="1" />
-            <circle cx="18" cy="20" r="1" />
-          </svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="9" cy="20" r="1" />
+              <circle cx="19" cy="20" r="1" />
+              <path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 1.9-1.5L23 6H5" />
+            </svg>
 
-          <span>{cartItems.length}</span>
-        </button>
-
-        <div className="shopper-role-badge">
-          REGISTERED SHOPPER
+            <span>{cartItems.length}</span>
+          </button>
         </div>
-      </div>
+      </header>
 
+      {/* MAIN DASHBOARD CONTENT */}
       <div className="shopper-dashboard-body">
         <section className="shopper-welcome">
           <p>
@@ -142,9 +139,7 @@ function ShopperDashboard() {
                 type="button"
                 className="shopper-primary-button"
                 onClick={() =>
-                  navigate(
-                    "/shopper/avatar-presets"
-                  )
+                  navigate("/shopper/avatar-presets")
                 }
               >
                 Use Premade Preset
@@ -154,9 +149,7 @@ function ShopperDashboard() {
                 type="button"
                 className="shopper-secondary-button"
                 onClick={() =>
-                  navigate(
-                    "/shopper/fitting-studio"
-                  )
+                  navigate("/shopper/fitting-studio")
                 }
               >
                 Create Custom Avatar
@@ -190,9 +183,7 @@ function ShopperDashboard() {
             title="Open Fitting Studio"
             description="Customize your avatar and try clothing."
             onClick={() =>
-              navigate(
-                "/shopper/fitting-studio"
-              )
+              navigate("/shopper/fitting-studio")
             }
           />
 
@@ -201,9 +192,7 @@ function ShopperDashboard() {
             title="Saved Outfits"
             description="Review your saved clothing combinations."
             onClick={() =>
-              navigate(
-                "/shopper/saved-outfits"
-              )
+              navigate("/shopper/saved-outfits")
             }
           />
         </section>
@@ -227,13 +216,9 @@ function ShopperDashboard() {
 
           <StatusRow
             label="Avatar presets"
-            value={`${
-              avatarPresets.length
-            } custom • 1 premade`}
+            value={`${avatarPresets.length} custom • 1 premade`}
             onClick={() =>
-              navigate(
-                "/shopper/avatar-presets"
-              )
+              navigate("/shopper/avatar-presets")
             }
           />
 
@@ -249,9 +234,7 @@ function ShopperDashboard() {
                 : "No saved outfits"
             }
             onClick={() =>
-              navigate(
-                "/shopper/saved-outfits"
-              )
+              navigate("/shopper/saved-outfits")
             }
           />
 

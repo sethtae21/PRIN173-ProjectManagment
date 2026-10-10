@@ -1,220 +1,233 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+
 import "./css/AccountManagementPage.css";
 
-function readStoredArray(key) {
-  try {
-    const storedValue = localStorage.getItem(key);
-    const parsedValue = JSON.parse(
-      storedValue || "[]"
-    );
+const defaultAccount = {
+  fullName: "Karol Tamo",
+  username: "dein",
+  email: "karol@gmail.com",
+  mobileNumber: "09123456781",
+  streetAddress: "123 Sample Street",
+  barangayCity: "Makati City",
+  province: "Metro Manila",
+  postalCode: "1200",
+};
 
-    return Array.isArray(parsedValue)
-      ? parsedValue
-      : [];
-  } catch {
-    return [];
+function readStoredAccount() {
+  const storageKeys = [
+    "fitfusion-current-user",
+    "registeredAccount",
+    "fitfusion-shopper-account",
+  ];
+
+  for (const key of storageKeys) {
+    try {
+      const localValue =
+        localStorage.getItem(key);
+
+      const sessionValue =
+        sessionStorage.getItem(key);
+
+      const savedValue =
+        localValue || sessionValue;
+
+      if (savedValue) {
+        const parsedValue =
+          JSON.parse(savedValue);
+
+        if (
+          parsedValue &&
+          typeof parsedValue === "object"
+        ) {
+          return {
+            ...defaultAccount,
+            ...parsedValue,
+          };
+        }
+      }
+    } catch (error) {
+      console.error(
+        `Unable to read ${key}:`,
+        error,
+      );
+    }
   }
-}
 
-function getCurrentUser() {
-  const savedUser =
-    localStorage.getItem(
-      "fitfusion-current-user"
-    ) ||
-    sessionStorage.getItem(
-      "registeredAccount"
-    );
-
-  if (!savedUser) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(savedUser);
-  } catch {
-    return null;
-  }
+  return defaultAccount;
 }
 
 function AccountManagementPage() {
   const navigate = useNavigate();
 
-  const [showDeleteModal, setShowDeleteModal] =
-    useState(false);
-
-  const currentUser = getCurrentUser();
-
-  const cartItems = readStoredArray(
-    "fitfusion-cart"
+  const account = useMemo(
+    () => readStoredAccount(),
+    [],
   );
 
-  const user = {
-    fullName:
-      currentUser?.fullName ||
-      currentUser?.name ||
-      currentUser?.username ||
-      "Registered Shopper",
-    username:
-      currentUser?.username || "shopper",
-    email:
-      currentUser?.email ||
-      "shopper@example.com",
-    mobile:
-      currentUser?.mobile || "Not provided",
-    street:
-      currentUser?.address?.street ||
-      currentUser?.street ||
-      "Not provided",
-    city:
-      currentUser?.address?.city ||
-      currentUser?.city ||
-      "Not provided",
-    province:
-      currentUser?.address?.province ||
-      currentUser?.province ||
-      "Not provided",
-    postalCode:
-      currentUser?.address?.postalCode ||
-      currentUser?.postalCode ||
-      "Not provided",
-  };
+  const fullName =
+    account.fullName ||
+    account.name ||
+    defaultAccount.fullName;
 
-  function handleDeleteAccount() {
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
+  const username =
+    account.username ||
+    defaultAccount.username;
 
-    sessionStorage.removeItem(
-      "registeredAccount"
-    );
+  const email =
+    account.email ||
+    defaultAccount.email;
 
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
+  const mobileNumber =
+    account.mobileNumber ||
+    account.mobile ||
+    account.phone ||
+    defaultAccount.mobileNumber;
 
-    setShowDeleteModal(false);
+  const streetAddress =
+    account.streetAddress ||
+    account.street ||
+    defaultAccount.streetAddress;
 
-    navigate("/", {
-      replace: true,
-    });
-  }
+  const barangayCity =
+    account.barangayCity ||
+    account.city ||
+    account.barangay ||
+    defaultAccount.barangayCity;
+
+  const province =
+    account.province ||
+    defaultAccount.province;
+
+  const postalCode =
+    account.postalCode ||
+    account.zipCode ||
+    defaultAccount.postalCode;
+
+  const completeAddress = [
+    streetAddress,
+    barangayCity,
+    province,
+    postalCode,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
-    <main className="account-management-page">
-      {/* ShopperLayout provides the sidebar. */}
+    <main className="account-page">
+      <section className="account-page-introduction">
+        <p className="account-page-eyebrow">
+          MY ACCOUNT
+        </p>
 
-      <div className="account-top-actions">
-        <button
-          type="button"
-          className="account-cart-button"
-          onClick={() =>
-            navigate("/shopper/cart")
-          }
-        >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-            <circle cx="10" cy="20" r="1" />
-            <circle cx="18" cy="20" r="1" />
-          </svg>
+        <h1>Account Management</h1>
 
-          <span>{cartItems.length}</span>
-        </button>
+        <p className="account-page-description">
+          Keep your personal details,
+          delivery address, and security
+          information up to date.
+        </p>
+      </section>
 
-        <div className="account-role-badge">
-          REGISTERED SHOPPER
-        </div>
-      </div>
+      <section className="account-page-grid">
+        <article className="account-card account-profile-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">
+                PROFILE DETAILS
+              </p>
 
-      <div className="account-management-content">
-        <section className="account-introduction">
-          <p>MY ACCOUNT</p>
-
-          <h1>Account Management</h1>
-
-          <span>
-            Keep your personal details, delivery
-            address, and security information up to
-            date.
-          </span>
-        </section>
-
-        <div className="account-management-grid">
-          <section className="account-profile-card">
-            <div className="account-card-heading">
-              <div>
-                <p>PROFILE DETAILS</p>
-                <h2>Personal information</h2>
-              </div>
-
-              <button
-                type="button"
-                className="account-primary-button"
-                onClick={() =>
-                  navigate(
-                    "/shopper/account/edit#profile"
-                  )
-                }
-              >
-                Edit Profile
-              </button>
+              <h2>
+                Personal information
+              </h2>
             </div>
 
-            <AccountRow
+            <button
+              type="button"
+              className="account-primary-button"
+              onClick={() =>
+                navigate(
+                  "/shopper/account/edit#profile",
+                )
+              }
+            >
+              Edit Profile
+            </button>
+          </div>
+
+          <div className="account-information-list">
+            <InformationRow
               label="Full Name"
-              value={user.fullName}
+              value={fullName}
             />
 
-            <AccountRow
+            <InformationRow
               label="Username"
-              value={user.username}
+              value={username}
             />
 
-            <AccountRow
+            <InformationRow
               label="Email Address"
-              value={user.email}
+              value={email}
             />
 
-            <AccountRow
+            <InformationRow
               label="Mobile Number"
-              value={user.mobile}
+              value={mobileNumber}
             />
-          </section>
+          </div>
+        </article>
 
-          <section className="account-security-card">
-            <p className="account-card-label">
-              ACCOUNT SECURITY
-            </p>
+        <article className="account-card account-security-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">
+                ACCOUNT SECURITY
+              </p>
 
-            <h2>Password and privacy</h2>
+              <h2>
+                Password and privacy
+              </h2>
+            </div>
+          </div>
 
-            <div className="account-security-summary">
-              <div className="account-lock-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <rect
-                    x="5"
-                    y="10"
-                    width="14"
-                    height="11"
-                    rx="2"
-                  />
-                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                </svg>
-              </div>
+          <div className="account-security-information">
+            <div className="account-security-icon">
+              <LockIcon />
+            </div>
 
-              <div>
-                <strong>Password</strong>
+            <div>
+              <strong>Password</strong>
 
-                <p>
-                  Use a strong password that you do
-                  not use for another account.
-                </p>
-              </div>
+              <p>
+                Use a strong password that
+                you do not use for another
+                account.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="account-secondary-button account-full-button"
+            onClick={() =>
+              navigate(
+                "/shopper/account/edit#password",
+              )
+            }
+          >
+            Change Password
+          </button>
+        </article>
+
+        <article className="account-card account-address-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">
+                DELIVERY INFORMATION
+              </p>
+
+              <h2>Delivery address</h2>
             </div>
 
             <button
@@ -222,204 +235,236 @@ function AccountManagementPage() {
               className="account-secondary-button"
               onClick={() =>
                 navigate(
-                  "/shopper/account/edit#password"
+                  "/shopper/account/edit#address",
                 )
               }
             >
-              Change Password
+              Edit Address
             </button>
-          </section>
-
-          <section className="account-address-card">
-            <div className="account-card-heading">
-              <div>
-                <p>DELIVERY ADDRESS</p>
-                <h2>Shipping information</h2>
-              </div>
-
-              <button
-                type="button"
-                className="account-outline-button"
-                onClick={() =>
-                  navigate(
-                    "/shopper/account/edit#address"
-                  )
-                }
-              >
-                Edit Address
-              </button>
-            </div>
-
-            <AccountRow
-              label="House / Street"
-              value={user.street}
-            />
-
-            <AccountRow
-              label="Barangay / City"
-              value={user.city}
-            />
-
-            <AccountRow
-              label="Province"
-              value={user.province}
-            />
-
-            <AccountRow
-              label="Postal Code"
-              value={user.postalCode}
-            />
-          </section>
-
-          <section className="account-links-card">
-            <p className="account-card-label">
-              SHOPPER ACTIVITY
-            </p>
-
-            <h2>Account shortcuts</h2>
-
-            <button
-              type="button"
-              className="account-shortcut"
-              onClick={() =>
-                navigate("/shopper/orders")
-              }
-            >
-              <span>
-                <strong>Order History</strong>
-                <small>
-                  View previous and current orders
-                </small>
-              </span>
-
-              <b aria-hidden="true">→</b>
-            </button>
-
-            <button
-              type="button"
-              className="account-shortcut"
-              onClick={() =>
-                navigate(
-                  "/shopper/saved-outfits"
-                )
-              }
-            >
-              <span>
-                <strong>Saved Outfits</strong>
-                <small>
-                  Manage saved clothing combinations
-                </small>
-              </span>
-
-              <b aria-hidden="true">→</b>
-            </button>
-
-            <button
-              type="button"
-              className="account-shortcut"
-              onClick={() =>
-                navigate(
-                  "/shopper/avatar-presets"
-                )
-              }
-            >
-              <span>
-                <strong>Avatar Presets</strong>
-                <small>
-                  View and update avatar presets
-                </small>
-              </span>
-
-              <b aria-hidden="true">→</b>
-            </button>
-          </section>
-        </div>
-
-        <section className="account-danger-zone">
-          <div>
-            <p>DANGER ZONE</p>
-            <h2>Delete shopper account</h2>
-
-            <span>
-              Account deletion removes your shopper
-              information and locally stored account
-              access.
-            </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              setShowDeleteModal(true)
-            }
-          >
-            Delete Account
-          </button>
-        </section>
-      </div>
-
-      {showDeleteModal && (
-        <div
-          className="account-delete-overlay"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget
-            ) {
-              setShowDeleteModal(false);
-            }
-          }}
-        >
-          <section
-            className="account-delete-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-account-title"
-          >
-            <p>DELETE SHOPPER ACCOUNT</p>
-
-            <h2 id="delete-account-title">
-              Delete your account?
-            </h2>
-
-            <span>
-              This action cannot be undone. Your
-              account information will be removed
-              from this prototype.
-            </span>
-
-            <div className="account-delete-actions">
-              <button
-                type="button"
-                className="account-delete-cancel"
-                onClick={() =>
-                  setShowDeleteModal(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="account-delete-confirm"
-                onClick={handleDeleteAccount}
-              >
-                Delete Account
-              </button>
+          <div className="account-address-content">
+            <div className="account-address-icon">
+              <LocationIcon />
             </div>
-          </section>
-        </div>
-      )}
+
+            <div>
+              <strong>
+                Default delivery address
+              </strong>
+
+              <p>{completeAddress}</p>
+            </div>
+          </div>
+
+          <div className="account-address-details">
+            <InformationRow
+              label="Street Address"
+              value={streetAddress}
+            />
+
+            <InformationRow
+              label="Barangay / City"
+              value={barangayCity}
+            />
+
+            <InformationRow
+              label="Province"
+              value={province}
+            />
+
+            <InformationRow
+              label="Postal Code"
+              value={postalCode}
+            />
+          </div>
+        </article>
+
+        <article className="account-card account-actions-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">
+                ACCOUNT ACTIONS
+              </p>
+
+              <h2>
+                Privacy and account control
+              </h2>
+            </div>
+          </div>
+
+          <div className="account-action-list">
+            <AccountAction
+              icon={<UserIcon />}
+              title="Update account details"
+              description="Edit your name, username, email address, and mobile number."
+              buttonLabel="Manage Profile"
+              onClick={() =>
+                navigate(
+                  "/shopper/account/edit#profile",
+                )
+              }
+            />
+
+            <AccountAction
+              icon={<ShieldIcon />}
+              title="Manage account security"
+              description="Change your password and review the security of your account."
+              buttonLabel="Security Settings"
+              onClick={() =>
+                navigate(
+                  "/shopper/account/edit#password",
+                )
+              }
+            />
+
+            <AccountAction
+              icon={<TrashIcon />}
+              title="Delete shopper account"
+              description="Permanently remove your shopper account and saved information."
+              buttonLabel="Account Deletion"
+              danger
+              onClick={() =>
+                navigate(
+                  "/shopper/account/edit#danger-zone",
+                )
+              }
+            />
+          </div>
+        </article>
+      </section>
     </main>
   );
 }
 
-function AccountRow({ label, value }) {
+function InformationRow({
+  label,
+  value,
+}) {
   return (
     <div className="account-information-row">
       <span>{label}</span>
-      <strong>{value}</strong>
+
+      <strong>{value || "Not provided"}</strong>
     </div>
+  );
+}
+
+function AccountAction({
+  icon,
+  title,
+  description,
+  buttonLabel,
+  danger = false,
+  onClick,
+}) {
+  return (
+    <div
+      className={
+        danger
+          ? "account-action-item danger"
+          : "account-action-item"
+      }
+    >
+      <div className="account-action-icon">
+        {icon}
+      </div>
+
+      <div className="account-action-text">
+        <strong>{title}</strong>
+
+        <p>{description}</p>
+      </div>
+
+      <button
+        type="button"
+        className={
+          danger
+            ? "account-action-button danger"
+            : "account-action-button"
+        }
+        onClick={onClick}
+      >
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <rect
+        x="5"
+        y="10"
+        width="14"
+        height="11"
+        rx="2"
+      />
+
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+
+      <circle
+        cx="12"
+        cy="10"
+        r="2.5"
+      />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="8"
+        r="4"
+      />
+
+      <path d="M4 21c.8-5 3.5-7 8-7s7.2 2 8 7" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M12 3 20 6v5c0 5.2-3.1 8.5-8 10-4.9-1.5-8-4.8-8-10V6l8-3Z" />
+
+      <path d="m9 12 2 2 4-5" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" />
+    </svg>
   );
 }
 
