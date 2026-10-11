@@ -1,7 +1,7 @@
-import { useState } from "react";
 
+import { useEffect, useState } from "react";
 import {
-  Link,
+  NavLink,
   Outlet,
   useLocation,
   useNavigate,
@@ -10,173 +10,373 @@ import {
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import "./SellerLayout.css";
 
-const navigationItems = [
+const sellerNavigation = [
   {
     label: "Dashboard",
-    to: "/seller/dashboard",
-    matches: ["/seller/dashboard"],
+    path: "/seller/dashboard",
+    icon: "dashboard",
   },
   {
     label: "Upload Catalog",
-    to: "/seller/upload-catalog",
-    matches: [
-      "/seller/upload-catalog",
-      "/seller/catalog-upload",
-    ],
+    path: "/seller/catalog-upload",
+    icon: "upload",
   },
   {
-    label: "Listings",
-    to: "/seller/listings",
-    matches: [
-      "/seller/listings",
-      "/seller/products",
-    ],
+    label: "Product Listings",
+    path: "/seller/listings",
+    icon: "products",
   },
   {
-   label: "Reports",
-   to: "/seller/validation",
-   matches: ["/seller/validation"],
+    label: "Product Validation",
+    path: "/seller/report",
+    icon: "validation",
   },
   {
     label: "Store Profile",
-    to: "/seller/store-profile",
-    matches: ["/seller/store-profile"],
+    path: "/seller/store-profile",
+    icon: "store",
   },
 ];
 
+function SellerIcon({ name, size = 21 }) {
+  const props = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
+  };
+
+  switch (name) {
+    case "dashboard":
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      );
+
+    case "upload":
+      return (
+        <svg {...props}>
+          <path d="M12 16V3" />
+          <path d="m7 8 5-5 5 5" />
+          <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+        </svg>
+      );
+
+    case "products":
+      return (
+        <svg {...props}>
+          <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" />
+          <path d="M3 7.5 12 12l9-4.5" />
+          <path d="M12 12v9" />
+        </svg>
+      );
+
+    case "validation":
+      return (
+        <svg {...props}>
+          <path d="M12 3 20 6v5c0 5-3 8.5-8 10-5-1.5-8-5-8-10V6z" />
+          <path d="m9 12 2 2 4-5" />
+        </svg>
+      );
+
+    case "store":
+      return (
+        <svg {...props}>
+          <path d="M3 10h18l-1.5-6h-15z" />
+          <path d="M5 10v10h14V10" />
+          <path d="M9 20v-7h6v7" />
+          <path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+        </svg>
+      );
+
+    case "logout":
+      return (
+        <svg {...props}>
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+          <path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6" />
+        </svg>
+      );
+
+    case "menu":
+      return (
+        <svg {...props}>
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      );
+
+    case "close":
+      return (
+        <svg {...props}>
+          <path d="M5 5l14 14M19 5 5 19" />
+        </svg>
+      );
+
+    default:
+      return null;
+  }
+}
+
 function SellerLayout() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
 
-  const [showLogoutModal, setShowLogoutModal] =
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] =
     useState(false);
 
-  function isCurrentPage(matches) {
-    return matches.some(
-      (path) =>
-        pathname === path ||
-        pathname.startsWith(`${path}/`)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen && !logoutModalOpen) return;
+
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = oldOverflow;
+    };
+  }, [sidebarOpen, logoutModalOpen]);
+
+  function isNavigationActive(path) {
+    const pathname = location.pathname;
+
+    if (path === "/seller/store-profile") {
+      return (
+        pathname === "/seller/store-profile" ||
+        pathname === "/seller/profile" ||
+        pathname === "/seller/account" ||
+        pathname.startsWith("/seller/account/") ||
+        pathname.startsWith("/seller/store-profile/")
+      );
+    }
+
+    if (path === "/seller/report") {
+      return (
+        pathname === "/seller/report" ||
+        pathname === "/seller/validation"
+      );
+    }
+
+    if (path === "/seller/catalog-upload") {
+      return (
+        pathname === "/seller/catalog-upload" ||
+        pathname === "/seller/upload-catalog"
+      );
+    }
+
+    return (
+      pathname === path ||
+      pathname.startsWith(`${path}/`)
     );
+  }
+
+  function closeLogoutModal() {
+    setLogoutModalOpen(false);
   }
 
   function handleLogout() {
+    setLogoutModalOpen(false);
+    setSidebarOpen(false);
+
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
+    sessionStorage.removeItem("sellerAccount");
     sessionStorage.removeItem("registeredAccount");
 
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
+    // Keep seller profiles and products saved.
+    localStorage.removeItem("fitfusion-current-user");
 
-    setShowLogoutModal(false);
-
-    navigate("/login", {
-      replace: true,
-    });
+    navigate("/login", { replace: true });
   }
 
   return (
-    <div className="seller-shell">
-      <aside className="unified-seller-sidebar">
-        <Link
-          to="/seller/dashboard"
-          className="unified-seller-logo"
-          aria-label="Go to seller dashboard"
-        >
+    <div className="seller-layout">
+      {/* MOBILE MENU TOGGLE */}
+      <button
+        type="button"
+        className="seller-layout-mobile-toggle"
+        aria-label={
+          sidebarOpen
+            ? "Close seller menu"
+            : "Open seller menu"
+        }
+        aria-expanded={sidebarOpen}
+        aria-controls="seller-layout-sidebar"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <SellerIcon
+          name={sidebarOpen ? "close" : "menu"}
+          size={22}
+        />
+      </button>
+
+      {/* MOBILE OVERLAY */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="seller-layout-overlay"
+          aria-label="Close seller navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR */}
+      <aside
+        id="seller-layout-sidebar"
+        className={`seller-layout-sidebar ${
+          sidebarOpen ? "open" : ""
+        }`}
+      >
+        {/* LOGO AREA */}
+        <div className="seller-layout-brand">
           <img
             src={fitFusionLogo}
             alt="FitFusion AI"
+            className="seller-layout-logo"
           />
-        </Link>
+        </div>
 
-        <nav
-          className="unified-seller-navigation"
-          aria-label="Seller navigation"
-        >
-          {navigationItems.map((item) => {
-            const active = isCurrentPage(
-              item.matches
-            );
+        {/* MAIN MENU */}
+        <div className="seller-layout-sidebar-section">
+          <p className="seller-layout-section-label">
+            MAIN MENU
+          </p>
 
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={
-                  active
-                    ? "unified-seller-link active"
-                    : "unified-seller-link"
-                }
-                aria-current={
-                  active ? "page" : undefined
-                }
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+          <nav
+            className="seller-layout-navigation"
+            aria-label="Seller main navigation"
+          >
+            {sellerNavigation.map((item) => {
+              const isActive =
+                isNavigationActive(item.path);
 
-        <button
-          type="button"
-          className="unified-seller-logout"
-          onClick={() =>
-            setShowLogoutModal(true)
-          }
-        >
-          Logout
-        </button>
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={`seller-layout-nav-link ${
+                    isActive ? "active" : ""
+                  }`}
+                  aria-current={
+                    isActive ? "page" : undefined
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <span className="seller-layout-nav-icon">
+                    <SellerIcon name={item.icon} />
+                  </span>
+
+                  <span className="seller-layout-nav-text">
+                    {item.label}
+                  </span>
+
+                  {isActive && (
+                    <span
+                      className="seller-layout-active-arrow"
+                      aria-hidden="true"
+                    >
+                      ›
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* LOWER SIDEBAR AREA */}
+        <div className="seller-layout-sidebar-bottom">
+          <button
+            type="button"
+            className="seller-layout-logout"
+            onClick={() => setLogoutModalOpen(true)}
+          >
+            <span className="seller-layout-nav-icon">
+              <SellerIcon name="logout" />
+            </span>
+
+            <span className="seller-layout-nav-text">
+              Logout
+            </span>
+          </button>
+        </div>
+
+        {/* FOOTER */}
+        <div className="seller-layout-sidebar-footer">
+          <strong>FITFUSION AI</strong>
+          <span>Fashion meets technology</span>
+        </div>
       </aside>
 
-      <main className="seller-layout-content">
+      {/* MAIN CONTENT */}
+      <main className="seller-layout-main">
         <Outlet />
       </main>
 
-      {showLogoutModal && (
+      {/* LOGOUT CONFIRMATION */}
+      {logoutModalOpen && (
         <div
-          className="seller-logout-overlay"
-          role="presentation"
+          className="seller-layout-modal-overlay"
           onMouseDown={(event) => {
             if (
-              event.target ===
-              event.currentTarget
+              event.target === event.currentTarget
             ) {
-              setShowLogoutModal(false);
+              closeLogoutModal();
             }
           }}
         >
           <section
-            className="seller-logout-modal"
+            className="seller-layout-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="seller-logout-title"
           >
-            <h2 id="seller-logout-title">
-              Log out?
-            </h2>
+            <div className="seller-layout-modal-icon">
+              <SellerIcon name="logout" size={27} />
+            </div>
 
-            <p>
-              Are you sure you want to end your
-              seller session?
+            <p className="seller-layout-modal-eyebrow">
+              ACCOUNT SESSION
             </p>
 
-            <div className="seller-logout-actions">
+            <h2 id="seller-logout-title">
+              Logout of FitFusion AI?
+            </h2>
+
+            <p className="seller-layout-modal-description">
+              Are you sure you want to log out of
+              your seller account? Your store
+              information and product listings
+              will remain saved.
+            </p>
+
+            <div className="seller-layout-modal-actions">
               <button
                 type="button"
-                className="seller-logout-cancel"
-                onClick={() =>
-                  setShowLogoutModal(false)
-                }
+                className="seller-layout-modal-cancel"
+                onClick={closeLogoutModal}
               >
                 Cancel
               </button>
 
               <button
                 type="button"
-                className="seller-logout-confirm"
+                className="seller-layout-modal-confirm"
                 onClick={handleLogout}
               >
-                Confirm Logout
+                Yes, Logout
               </button>
             </div>
           </section>

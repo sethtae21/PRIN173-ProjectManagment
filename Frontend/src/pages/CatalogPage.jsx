@@ -3,11 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./css/CatalogPage.css";
 
-/* ==========================================
-   PRODUCT DATA
-   Matches ProductDetailsPage
-========================================== */
-
 const products = [
   {
     id: "product-001",
@@ -103,7 +98,8 @@ const products = [
     colors: ["Gold"],
     sizes: ["XS", "S", "M", "L"],
     stock: 15,
-    description: "A graceful midi dress for elegant everyday styling.",
+    description:
+      "A graceful midi dress for elegant everyday styling.",
   },
   {
     id: "cream-knit-sweater",
@@ -119,7 +115,8 @@ const products = [
     colors: ["Cream"],
     sizes: ["S", "M", "L", "XL"],
     stock: 20,
-    description: "A comfortable knit sweater for everyday outfits.",
+    description:
+      "A comfortable knit sweater for everyday outfits.",
   },
   {
     id: "pleated-midi-skirt",
@@ -135,7 +132,8 @@ const products = [
     colors: ["Brown"],
     sizes: ["XS", "S", "M", "L"],
     stock: 18,
-    description: "A classic pleated skirt for versatile styling.",
+    description:
+      "A classic pleated skirt for versatile styling.",
   },
   {
     id: "classic-denim-jacket",
@@ -151,7 +149,8 @@ const products = [
     colors: ["Blue"],
     sizes: ["S", "M", "L", "XL"],
     stock: 16,
-    description: "A classic denim jacket for casual layering.",
+    description:
+      "A classic denim jacket for casual layering.",
   },
 ];
 
@@ -162,17 +161,6 @@ const categories = [
   "Dresses",
   "Outerwear",
 ];
-
-const genders = [
-  "All",
-  "Women",
-  "Men",
-  "Unisex",
-];
-
-/* ==========================================
-   HELPERS
-========================================== */
 
 function readCart() {
   try {
@@ -210,10 +198,6 @@ function productDetailsData(product) {
   };
 }
 
-/* ==========================================
-   CATALOG
-========================================== */
-
 function CatalogPage({ isGuest = false }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -222,12 +206,16 @@ function CatalogPage({ isGuest = false }) {
     isGuest || location.pathname.startsWith("/guest");
 
   const [searchText, setSearchText] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedGender, setSelectedGender] = useState("All");
-  const [sortOption, setSortOption] = useState("featured");
-  const [cartCount, setCartCount] = useState(getCartCount);
-  const [showRegistrationModal, setShowRegistrationModal] =
-    useState(false);
+  const [selectedCategory, setSelectedCategory] =
+    useState("All");
+  const [sortOption, setSortOption] =
+    useState("featured");
+  const [cartCount, setCartCount] =
+    useState(getCartCount);
+  const [
+    showRegistrationModal,
+    setShowRegistrationModal,
+  ] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
   useEffect(() => {
@@ -262,35 +250,25 @@ function CatalogPage({ isGuest = false }) {
         selectedCategory === "All" ||
         product.category === selectedCategory;
 
-      const matchesGender =
-        selectedGender === "All" ||
-        product.gender === selectedGender;
-
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesGender
-      );
+      return matchesSearch && matchesCategory;
     });
 
     return [...filtered].sort((a, b) => {
-      if (sortOption === "price-low")
+      if (sortOption === "price-low") {
         return a.price - b.price;
+      }
 
-      if (sortOption === "price-high")
+      if (sortOption === "price-high") {
         return b.price - a.price;
+      }
 
-      if (sortOption === "rating")
+      if (sortOption === "rating") {
         return b.rating - a.rating;
+      }
 
       return 0;
     });
-  }, [
-    searchText,
-    selectedCategory,
-    selectedGender,
-    sortOption,
-  ]);
+  }, [searchText, selectedCategory, sortOption]);
 
   function showGuestRestriction(action) {
     setModalAction(action);
@@ -327,12 +305,16 @@ function CatalogPage({ isGuest = false }) {
       })
     );
 
-    navigate(`/shopper/sellers/${product.sellerId}`);
+    navigate(
+      `/shopper/sellers/${product.sellerId}`
+    );
   }
 
   function addToCart(product) {
     if (guestMode) {
-      showGuestRestriction("add products to your cart");
+      showGuestRestriction(
+        "add products to your cart"
+      );
       return;
     }
 
@@ -347,7 +329,9 @@ function CatalogPage({ isGuest = false }) {
       nextCart[existingIndex] = {
         ...nextCart[existingIndex],
         quantity:
-          Number(nextCart[existingIndex].quantity || 1) + 1,
+          Number(
+            nextCart[existingIndex].quantity || 1
+          ) + 1,
       };
     } else {
       nextCart.push({
@@ -376,20 +360,19 @@ function CatalogPage({ isGuest = false }) {
   function clearFilters() {
     setSearchText("");
     setSelectedCategory("All");
-    setSelectedGender("All");
     setSortOption("featured");
   }
 
   return (
     <main className="catalog-page">
-      {/* HEADER - SAME AS ORDER HISTORY */}
-
       {!guestMode && (
         <header className="catalog-top-header">
           <button
             type="button"
             className="catalog-header-cart"
-            onClick={() => navigate("/shopper/cart")}
+            onClick={() =>
+              navigate("/shopper/cart")
+            }
             aria-label={`Open shopping cart with ${cartCount} items`}
           >
             <CartIcon />
@@ -399,8 +382,6 @@ function CatalogPage({ isGuest = false }) {
       )}
 
       <div className="catalog-main-content">
-        {/* SEARCH AND FILTERS */}
-
         <section className="catalog-toolbar">
           <label className="catalog-search">
             <SearchIcon />
@@ -419,32 +400,19 @@ function CatalogPage({ isGuest = false }) {
             <select
               value={selectedCategory}
               onChange={(event) =>
-                setSelectedCategory(event.target.value)
+                setSelectedCategory(
+                  event.target.value
+                )
               }
             >
               {categories.map((category) => (
-                <option key={category} value={category}>
+                <option
+                  key={category}
+                  value={category}
+                >
                   {category === "All"
                     ? "All Categories"
                     : category}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="catalog-filter-field">
-            <span>Gender</span>
-            <select
-              value={selectedGender}
-              onChange={(event) =>
-                setSelectedGender(event.target.value)
-              }
-            >
-              {genders.map((gender) => (
-                <option key={gender} value={gender}>
-                  {gender === "All"
-                    ? "All Genders"
-                    : gender}
                 </option>
               ))}
             </select>
@@ -458,8 +426,12 @@ function CatalogPage({ isGuest = false }) {
                 setSortOption(event.target.value)
               }
             >
-              <option value="featured">Featured</option>
-              <option value="rating">Highest Rating</option>
+              <option value="featured">
+                Featured
+              </option>
+              <option value="rating">
+                Highest Rating
+              </option>
               <option value="price-low">
                 Price: Low to High
               </option>
@@ -470,11 +442,12 @@ function CatalogPage({ isGuest = false }) {
           </label>
         </section>
 
-        {/* RESULT COUNT */}
-
         <div className="catalog-result-row">
           <p>
-            Showing <strong>{filteredProducts.length}</strong>{" "}
+            Showing{" "}
+            <strong>
+              {filteredProducts.length}
+            </strong>{" "}
             {filteredProducts.length === 1
               ? "product"
               : "products"}
@@ -482,7 +455,7 @@ function CatalogPage({ isGuest = false }) {
 
           {(searchText ||
             selectedCategory !== "All" ||
-            selectedGender !== "All") && (
+            sortOption !== "featured") && (
             <button
               type="button"
               onClick={clearFilters}
@@ -491,8 +464,6 @@ function CatalogPage({ isGuest = false }) {
             </button>
           )}
         </div>
-
-        {/* PRODUCTS */}
 
         {filteredProducts.length > 0 ? (
           <section className="catalog-product-grid">
@@ -541,6 +512,7 @@ function CatalogPage({ isGuest = false }) {
                     <strong>
                       {product.rating.toFixed(1)}
                     </strong>
+
                     {product.ratingsCount && (
                       <small>
                         ({product.ratingsCount})
@@ -551,7 +523,9 @@ function CatalogPage({ isGuest = false }) {
                   <div className="catalog-product-footer">
                     <div className="catalog-price-group">
                       <strong className="catalog-price">
-                        {formatCurrency(product.price)}
+                        {formatCurrency(
+                          product.price
+                        )}
                       </strong>
 
                       {product.originalPrice && (
@@ -577,7 +551,9 @@ function CatalogPage({ isGuest = false }) {
                   <button
                     type="button"
                     className="catalog-cart-action"
-                    onClick={() => addToCart(product)}
+                    onClick={() =>
+                      addToCart(product)
+                    }
                   >
                     {guestMode
                       ? "Register to Add to Cart"
@@ -596,7 +572,8 @@ function CatalogPage({ isGuest = false }) {
             <h2>No products found</h2>
 
             <p>
-              Try another search term or clear your filters.
+              Try another search term or clear
+              your filters.
             </p>
 
             <button
@@ -608,8 +585,6 @@ function CatalogPage({ isGuest = false }) {
           </section>
         )}
       </div>
-
-      {/* GUEST RESTRICTION MODAL */}
 
       {showRegistrationModal && (
         <div
@@ -650,15 +625,17 @@ function CatalogPage({ isGuest = false }) {
 
             <p>
               Guest users may browse the catalog.
-              Please create an account or log in
-              to {modalAction}.
+              Please create an account or log in to{" "}
+              {modalAction}.
             </p>
 
             <div className="catalog-modal-actions">
               <button
                 type="button"
                 className="catalog-modal-primary"
-                onClick={() => navigate("/signup")}
+                onClick={() =>
+                  navigate("/signup")
+                }
               >
                 Create Account
               </button>
@@ -666,7 +643,9 @@ function CatalogPage({ isGuest = false }) {
               <button
                 type="button"
                 className="catalog-modal-secondary"
-                onClick={() => navigate("/login")}
+                onClick={() =>
+                  navigate("/login")
+                }
               >
                 Log In
               </button>
@@ -687,10 +666,6 @@ function CatalogPage({ isGuest = false }) {
     </main>
   );
 }
-
-/* ==========================================
-   ICONS
-========================================== */
 
 function CartIcon() {
   return (

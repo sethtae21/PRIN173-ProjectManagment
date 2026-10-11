@@ -1,121 +1,219 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
 
-import {
-  NavLink,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./css/EditAccountPage.css";
+
+const PROVINCES = [
+  "Abra",
+  "Agusan del Norte",
+  "Agusan del Sur",
+  "Aklan",
+  "Albay",
+  "Antique",
+  "Apayao",
+  "Aurora",
+  "Basilan",
+  "Bataan",
+  "Batanes",
+  "Batangas",
+  "Benguet",
+  "Biliran",
+  "Bohol",
+  "Bukidnon",
+  "Bulacan",
+  "Cagayan",
+  "Camarines Norte",
+  "Camarines Sur",
+  "Camiguin",
+  "Capiz",
+  "Catanduanes",
+  "Cavite",
+  "Cebu",
+  "Cotabato",
+  "Davao de Oro",
+  "Davao del Norte",
+  "Davao del Sur",
+  "Davao Occidental",
+  "Davao Oriental",
+  "Dinagat Islands",
+  "Eastern Samar",
+  "Guimaras",
+  "Ifugao",
+  "Ilocos Norte",
+  "Ilocos Sur",
+  "Iloilo",
+  "Isabela",
+  "Kalinga",
+  "La Union",
+  "Laguna",
+  "Lanao del Norte",
+  "Lanao del Sur",
+  "Leyte",
+  "Maguindanao del Norte",
+  "Maguindanao del Sur",
+  "Marinduque",
+  "Masbate",
+  "Metro Manila",
+  "Misamis Occidental",
+  "Misamis Oriental",
+  "Mountain Province",
+  "Negros Occidental",
+  "Negros Oriental",
+  "Northern Samar",
+  "Nueva Ecija",
+  "Nueva Vizcaya",
+  "Occidental Mindoro",
+  "Oriental Mindoro",
+  "Palawan",
+  "Pampanga",
+  "Pangasinan",
+  "Quezon",
+  "Quirino",
+  "Rizal",
+  "Romblon",
+  "Samar",
+  "Sarangani",
+  "Siquijor",
+  "Sorsogon",
+  "South Cotabato",
+  "Southern Leyte",
+  "Sultan Kudarat",
+  "Sulu",
+  "Surigao del Norte",
+  "Surigao del Sur",
+  "Tarlac",
+  "Tawi-Tawi",
+  "Zambales",
+  "Zamboanga del Norte",
+  "Zamboanga del Sur",
+  "Zamboanga Sibugay",
+];
 
 const DEFAULT_ACCOUNT = {
   username: "karolshopper",
   fullName: "Karol Dein Tamo",
-  firstName: "Karol",
-  lastName: "Tamo",
   email: "karol@example.com",
-  phone: "09123456789",
-  address: "123 Rizal Street",
-  barangay: "Barangay San Antonio, Makati City",
-  barangayCity:
-    "Barangay San Antonio, Makati City",
-  city: "",
-  province: "Metro Manila",
-  postalCode: "1203",
-  password: "Password123!",
+  mobile: "09123456789",
+  address: {
+    street: "123 Rizal Street",
+    barangay: "San Antonio",
+    city: "Makati City",
+    province: "Metro Manila",
+    postalCode: "1203",
+  },
 };
 
-function normalizeAccount(rawAccount = {}) {
-  const rawAddress = rawAccount.address;
+const emptyPassword = {
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+};
 
-  const addressObject =
-    rawAddress &&
-    typeof rawAddress === "object"
-      ? rawAddress
+function properCase(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(
+      /(^|[\s'-])([a-zà-öø-ÿ])/gu,
+      (_, separator, letter) =>
+        separator + letter.toUpperCase()
+    );
+}
+
+function normalizeAccount(raw = {}) {
+  const source =
+    raw && typeof raw === "object" ? raw : {};
+
+  const address =
+    source.address &&
+    typeof source.address === "object"
+      ? source.address
       : {};
 
-  const street =
-    typeof rawAddress === "string"
-      ? rawAddress
-      : addressObject.street ||
-        addressObject.houseStreet ||
-        addressObject.houseNumberStreet ||
-        addressObject.addressLine ||
-        rawAccount.street ||
-        rawAccount.houseStreet ||
-        "";
+  const combinedBarangayCity =
+    source.barangayCity ||
+    (typeof source.barangay === "string"
+      ? source.barangay
+      : "");
 
-  const separateBarangay =
-    rawAccount.barangay ||
-    addressObject.barangay ||
-    "";
+  const combinedParts = String(combinedBarangayCity)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
 
-  const separateCity =
-    rawAccount.city ||
-    addressObject.city ||
-    "";
+  const legacyBarangay =
+    combinedParts.length > 1
+      ? combinedParts.slice(0, -1).join(", ")
+      : "";
 
-  const barangayCity =
-    rawAccount.barangayCity ||
-    addressObject.barangayCity ||
-    [separateBarangay, separateCity]
-      .filter(Boolean)
-      .join(", ");
-
-  const province =
-    rawAccount.province ||
-    addressObject.province ||
-    "";
-
-  const postalCode =
-    rawAccount.postalCode ||
-    addressObject.postalCode ||
-    addressObject.zipCode ||
-    "";
-
-  const generatedFullName =
-    rawAccount.fullName ||
-    [
-      rawAccount.firstName,
-      rawAccount.middleName,
-      rawAccount.lastName,
-    ]
-      .filter(Boolean)
-      .join(" ");
+  const legacyCity =
+    combinedParts.length > 1
+      ? combinedParts[combinedParts.length - 1]
+      : combinedParts[0] || "";
 
   return {
     ...DEFAULT_ACCOUNT,
-    ...rawAccount,
+    ...source,
+
+    username:
+      source.username ||
+      DEFAULT_ACCOUNT.username,
 
     fullName:
-      generatedFullName ||
+      source.fullName ||
+      [
+        source.firstName,
+        source.middleName,
+        source.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ") ||
       DEFAULT_ACCOUNT.fullName,
 
-    address:
-      street || DEFAULT_ACCOUNT.address,
+    email:
+      source.email ||
+      DEFAULT_ACCOUNT.email,
 
-    barangay:
-      barangayCity ||
-      DEFAULT_ACCOUNT.barangay,
+    mobile:
+      source.mobile ||
+      source.mobileNumber ||
+      source.phone ||
+      DEFAULT_ACCOUNT.mobile,
 
-    barangayCity:
-      barangayCity ||
-      DEFAULT_ACCOUNT.barangayCity,
+    address: {
+      street:
+        address.street ||
+        source.streetAddress ||
+        source.street ||
+        (typeof source.address === "string"
+          ? source.address
+          : "") ||
+        DEFAULT_ACCOUNT.address.street,
 
-    city: "",
+      barangay:
+        address.barangay ||
+        legacyBarangay ||
+        DEFAULT_ACCOUNT.address.barangay,
 
-    province:
-      province || DEFAULT_ACCOUNT.province,
+      city:
+        address.city ||
+        source.city ||
+        legacyCity ||
+        DEFAULT_ACCOUNT.address.city,
 
-    postalCode: String(
-      postalCode ||
-        DEFAULT_ACCOUNT.postalCode
-    ),
+      province:
+        address.province ||
+        source.province ||
+        DEFAULT_ACCOUNT.address.province,
+
+      postalCode: String(
+        address.postalCode ||
+        source.postalCode ||
+        source.zipCode ||
+        DEFAULT_ACCOUNT.address.postalCode
+      ),
+    },
   };
 }
 
@@ -123,47 +221,269 @@ function readStoredAccount() {
   const keys = [
     "fitfusion-current-user",
     "registeredAccount",
+    "fitfusion-shopper-account",
   ];
 
   for (const key of keys) {
-    const storedValue =
-      localStorage.getItem(key) ||
-      sessionStorage.getItem(key);
-
-    if (!storedValue) {
-      continue;
-    }
-
     try {
-      const parsedAccount =
-        JSON.parse(storedValue);
+      const saved =
+        localStorage.getItem(key) ||
+        sessionStorage.getItem(key);
 
-      return normalizeAccount(parsedAccount);
+      if (!saved) continue;
+
+      const parsed = JSON.parse(saved);
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        String(parsed.role || "shopper").toLowerCase() !==
+          "seller"
+      ) {
+        return normalizeAccount(parsed);
+      }
     } catch {
-      // Continue checking the next storage key.
+      // Continue checking the remaining storage keys.
     }
   }
 
   return normalizeAccount(DEFAULT_ACCOUNT);
 }
 
-function saveStoredAccount(account) {
-  const normalizedAccount =
-    normalizeAccount(account);
+function createProfileData(account) {
+  const normalized = normalizeAccount(account);
+
+  return {
+    username: normalized.username,
+    fullName: normalized.fullName,
+    email: normalized.email,
+    mobile: normalized.mobile,
+    street: normalized.address.street,
+    barangay: normalized.address.barangay,
+    city: normalized.address.city,
+    province: normalized.address.province,
+    postalCode: normalized.address.postalCode,
+  };
+}
+
+function saveStoredAccount(account, previousAccount) {
+  const normalized = normalizeAccount(account);
+  const serialized = JSON.stringify(normalized);
 
   localStorage.setItem(
     "fitfusion-current-user",
-    JSON.stringify(normalizedAccount)
+    serialized
   );
 
   localStorage.setItem(
     "registeredAccount",
-    JSON.stringify(normalizedAccount)
+    serialized
+  );
+
+  localStorage.setItem(
+    "fitfusion-shopper-account",
+    serialized
   );
 
   sessionStorage.setItem(
     "registeredAccount",
-    JSON.stringify(normalizedAccount)
+    serialized
+  );
+
+  try {
+    const storedUsers = JSON.parse(
+      localStorage.getItem("fitfusion-users") || "[]"
+    );
+
+    if (Array.isArray(storedUsers)) {
+      const previousEmail = String(
+        previousAccount.email || ""
+      ).toLowerCase();
+
+      const updatedUsers = storedUsers.map((user) => {
+        const sameId =
+          normalized.id &&
+          user.id === normalized.id;
+
+        const sameEmail =
+          String(user.email || "").toLowerCase() ===
+          previousEmail;
+
+        if (
+          String(user.role || "shopper").toLowerCase() !==
+          "seller" &&
+          (sameId || sameEmail)
+        ) {
+          return {
+            ...user,
+            ...normalized,
+          };
+        }
+
+        return user;
+      });
+
+      localStorage.setItem(
+        "fitfusion-users",
+        JSON.stringify(updatedUsers)
+      );
+    }
+  } catch {
+    // The primary account has already been saved.
+  }
+
+  window.dispatchEvent(
+    new Event("fitfusion-account-updated")
+  );
+}
+
+function FormField({
+  label,
+  name,
+  value,
+  error,
+  onChange,
+  type = "text",
+  full = false,
+  ...props
+}) {
+  return (
+    <label
+      className={`edit-account-field ${
+        full ? "edit-account-full-field" : ""
+      }`}
+    >
+      <span>
+        {label} <strong>*</strong>
+      </span>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        className={error ? "input-error" : ""}
+        aria-invalid={Boolean(error)}
+        {...props}
+      />
+
+      {error && (
+        <small className="edit-account-error">
+          {error}
+        </small>
+      )}
+    </label>
+  );
+}
+
+function ProvinceField({
+  value,
+  error,
+  onChange,
+}) {
+  return (
+    <label className="edit-account-field">
+      <span>
+        Province <strong>*</strong>
+      </span>
+
+      <select
+        name="province"
+        value={value}
+        onChange={onChange}
+        className={error ? "input-error" : ""}
+        aria-invalid={Boolean(error)}
+        autoComplete="address-level1"
+      >
+        <option value="">
+          Select your province
+        </option>
+
+        {PROVINCES.map((province) => (
+          <option
+            key={province}
+            value={province}
+          >
+            {province}
+          </option>
+        ))}
+      </select>
+
+      {error && (
+        <small className="edit-account-error">
+          {error}
+        </small>
+      )}
+    </label>
+  );
+}
+
+function PasswordField({
+  label,
+  name,
+  value,
+  error,
+  onChange,
+  visible,
+  onToggle,
+  autoComplete,
+}) {
+  return (
+    <div className="edit-account-field">
+      <label htmlFor={`edit-${name}`}>
+        {label} <strong>*</strong>
+      </label>
+
+      <div
+        className={`edit-account-password-input ${
+          error ? "input-error" : ""
+        }`}
+      >
+        <input
+          id={`edit-${name}`}
+          type={visible ? "text" : "password"}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder="Enter password"
+          autoComplete={autoComplete}
+        />
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={
+            visible
+              ? `Hide ${label}`
+              : `Show ${label}`
+          }
+        >
+          {visible ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {error && (
+        <small className="edit-account-error">
+          {error}
+        </small>
+      )}
+    </div>
+  );
+}
+
+function PasswordRule({ passed, label }) {
+  return (
+    <div
+      className={`edit-account-rule ${
+        passed ? "passed" : ""
+      }`}
+    >
+      <span aria-hidden="true">
+        {passed ? "✓" : "○"}
+      </span>
+      <p>{label}</p>
+    </div>
   );
 }
 
@@ -176,61 +496,26 @@ function EditAccountPage() {
   );
 
   const [step, setStep] = useState(
-    window.location.hash === "#password"
-      ? 2
-      : 1
+    location.hash === "#password" ? 2 : 1
   );
 
-  const [profileData, setProfileData] =
-    useState(() => {
-      const storedAccount =
-        readStoredAccount();
+  const [profileData, setProfileData] = useState(
+    () => createProfileData(readStoredAccount())
+  );
 
-      return {
-        username:
-          storedAccount.username || "",
-
-        fullName:
-          storedAccount.fullName || "",
-
-        email:
-          storedAccount.email || "",
-
-        phone:
-          storedAccount.phone || "",
-
-        address:
-          typeof storedAccount.address ===
-          "string"
-            ? storedAccount.address
-            : "",
-
-        barangay:
-          storedAccount.barangayCity ||
-          storedAccount.barangay ||
-          "",
-
-        province:
-          storedAccount.province || "",
-
-        postalCode: String(
-          storedAccount.postalCode || ""
-        ),
-      };
-    });
-
-  const [passwordData, setPasswordData] =
-    useState({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+  const [passwordData, setPasswordData] = useState(
+    emptyPassword
+  );
 
   const [profileErrors, setProfileErrors] =
     useState({});
 
   const [passwordErrors, setPasswordErrors] =
     useState({});
+
+  const [notice, setNotice] = useState("");
+  const [noticeType, setNoticeType] =
+    useState("info");
 
   const [showPasswords, setShowPasswords] =
     useState({
@@ -239,14 +524,10 @@ function EditAccountPage() {
       confirmPassword: false,
     });
 
-  const [notice, setNotice] = useState("");
-
   useEffect(() => {
-    if (location.hash === "#password") {
-      setStep(2);
-    } else {
-      setStep(1);
-    }
+    setStep(
+      location.hash === "#password" ? 2 : 1
+    );
   }, [location.hash]);
 
   const passwordRules = useMemo(
@@ -254,20 +535,17 @@ function EditAccountPage() {
       minimumLength:
         passwordData.newPassword.length >= 8,
 
-      uppercase: /[A-Z]/.test(
-        passwordData.newPassword
-      ),
+      uppercase:
+        /[A-Z]/.test(passwordData.newPassword),
 
-      lowercase: /[a-z]/.test(
-        passwordData.newPassword
-      ),
+      lowercase:
+        /[a-z]/.test(passwordData.newPassword),
 
-      number: /\d/.test(
-        passwordData.newPassword
-      ),
+      number:
+        /\d/.test(passwordData.newPassword),
 
       specialCharacter:
-        /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(
+        /[^A-Za-z0-9]/.test(
           passwordData.newPassword
         ),
     }),
@@ -292,21 +570,33 @@ function EditAccountPage() {
 
     window.scrollTo({
       top: 0,
-      left: 0,
       behavior: "smooth",
     });
   }
 
   function handleProfileChange(event) {
-    const { name, value } = event.target;
+    const { name } = event.target;
+    let { value } = event.target;
 
-    setProfileData((currentData) => ({
-      ...currentData,
+    if (name === "mobile") {
+      value = value
+        .replace(/\D/g, "")
+        .slice(0, 11);
+    }
+
+    if (name === "postalCode") {
+      value = value
+        .replace(/\D/g, "")
+        .slice(0, 4);
+    }
+
+    setProfileData((current) => ({
+      ...current,
       [name]: value,
     }));
 
-    setProfileErrors((currentErrors) => ({
-      ...currentErrors,
+    setProfileErrors((current) => ({
+      ...current,
       [name]: "",
     }));
 
@@ -316,80 +606,78 @@ function EditAccountPage() {
   function validateProfile() {
     const errors = {};
 
-    const username = String(
-      profileData.username || ""
-    ).trim();
+    const fullName = properCase(
+      profileData.fullName
+    );
 
-    const fullName = String(
-      profileData.fullName || ""
-    ).trim();
-
-    const email = String(
-      profileData.email || ""
-    ).trim();
-
-    const phone = String(
-      profileData.phone || ""
-    ).replace(/\s/g, "");
-
-    const address = String(
-      profileData.address || ""
-    ).trim();
-
-    const barangay = String(
-      profileData.barangay || ""
-    ).trim();
-
-    const province = String(
-      profileData.province || ""
-    ).trim();
-
-    const postalCode = String(
-      profileData.postalCode || ""
-    ).trim();
-
-    if (username.length < 3) {
+    if (
+      profileData.username.trim().length < 3
+    ) {
       errors.username =
         "Username must contain at least 3 characters.";
     }
 
     if (!fullName) {
       errors.fullName =
-        "Please enter your complete name.";
+        "Full name is required.";
+    } else if (
+      !/^[A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]+$/u.test(fullName)
+    ) {
+      errors.fullName =
+        "Full name may only contain letters, spaces, apostrophes, periods, and hyphens.";
+    } else if (
+      fullName.split(" ").filter(Boolean).length < 2
+    ) {
+      errors.fullName =
+        "Please enter at least your first name and surname.";
     }
 
     if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        email
+        profileData.email.trim()
       )
     ) {
       errors.email =
         "Please enter a valid email address.";
     }
 
-    if (!/^09\d{9}$/.test(phone)) {
-      errors.phone =
+    if (
+      !/^09\d{9}$/.test(profileData.mobile)
+    ) {
+      errors.mobile =
         "Enter an 11-digit mobile number beginning with 09.";
     }
 
-    if (!address) {
-      errors.address =
+    if (!profileData.street.trim()) {
+      errors.street =
         "Please enter your house number and street.";
     }
 
-    if (!barangay) {
+    if (!profileData.barangay.trim()) {
       errors.barangay =
-        "Please enter your barangay and city.";
+        "Please enter your barangay.";
     }
 
-    if (!province) {
+    if (!profileData.city.trim()) {
+      errors.city =
+        "Please enter your city or municipality.";
+    }
+
+    if (!profileData.province) {
       errors.province =
-        "Please enter your province.";
+        "Please select your province.";
+    } else if (
+      !PROVINCES.includes(profileData.province)
+    ) {
+      errors.province =
+        "Please select a valid Philippine province.";
     }
 
-    if (!/^\d{4}$/.test(postalCode)) {
+    if (
+      !/^\d{4}$/.test(profileData.postalCode)
+    ) {
       errors.postalCode =
-        "Postal code must contain exactly 4 numbers.";
+        "Postal code must contain exactly 4 digits.";
     }
 
     setProfileErrors(errors);
@@ -401,184 +689,134 @@ function EditAccountPage() {
     event.preventDefault();
 
     if (!validateProfile()) {
+      setNoticeType("error");
       setNotice(
         "Please correct the highlighted profile fields."
       );
-
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "smooth",
-      });
-
       return;
     }
 
-    const cleanedFullName = String(
+    const fullName = properCase(
       profileData.fullName
-    ).trim();
-
-    const nameParts =
-      cleanedFullName.split(/\s+/);
-
-    const updatedAccount =
-      normalizeAccount({
-        ...account,
-
-        username: String(
-          profileData.username
-        ).trim(),
-
-        fullName: cleanedFullName,
-
-        firstName:
-          nameParts[0] || "",
-
-        lastName:
-          nameParts.length > 1
-            ? nameParts.slice(1).join(" ")
-            : "",
-
-        email: String(
-          profileData.email
-        ).trim(),
-
-        phone: String(
-          profileData.phone
-        ).replace(/\s/g, ""),
-
-        address: String(
-          profileData.address
-        ).trim(),
-
-        barangay: String(
-          profileData.barangay
-        ).trim(),
-
-        barangayCity: String(
-          profileData.barangay
-        ).trim(),
-
-        city: "",
-
-        province: String(
-          profileData.province
-        ).trim(),
-
-        postalCode: String(
-          profileData.postalCode
-        ).trim(),
-      });
-
-    saveStoredAccount(updatedAccount);
-    setAccount(updatedAccount);
-
-    setStep(2);
-
-    navigate(
-      "/shopper/account/edit#password",
-      { replace: true }
     );
 
-    setNotice(
-      "Profile saved successfully. You may now update your password."
-    );
+    const nameParts = fullName.split(/\s+/);
 
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "smooth",
-    });
+    const address = {
+      street: profileData.street.trim(),
+      barangay: profileData.barangay.trim(),
+      city: profileData.city.trim(),
+      province: profileData.province,
+      postalCode: profileData.postalCode,
+    };
+
+    const updatedAccount = {
+      ...account,
+      username: profileData.username.trim(),
+      fullName,
+      firstName: nameParts[0] || "",
+      email: profileData.email
+        .trim()
+        .toLowerCase(),
+      mobile: profileData.mobile,
+      mobileNumber: profileData.mobile,
+      phone: profileData.mobile,
+      address,
+      street: address.street,
+      streetAddress: address.street,
+      barangay: address.barangay,
+      city: address.city,
+      barangayCity: [
+        address.barangay,
+        address.city,
+      ].join(", "),
+      province: address.province,
+      postalCode: address.postalCode,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      saveStoredAccount(
+        updatedAccount,
+        account
+      );
+
+      setAccount(updatedAccount);
+
+      setProfileData(
+        createProfileData(updatedAccount)
+      );
+
+      changeStep(2);
+
+      setNoticeType("success");
+      setNotice(
+        "Profile saved successfully. You may now proceed to account security."
+      );
+    } catch (error) {
+      console.error(
+        "Profile update failed:",
+        error
+      );
+
+      setNoticeType("error");
+      setNotice(
+        "Unable to save your profile. Please try again."
+      );
+    }
   }
 
   function resetProfile() {
-    const storedAccount =
+    const savedAccount =
       readStoredAccount();
 
-    setProfileData({
-      username:
-        storedAccount.username || "",
-
-      fullName:
-        storedAccount.fullName || "",
-
-      email:
-        storedAccount.email || "",
-
-      phone:
-        storedAccount.phone || "",
-
-      address:
-        typeof storedAccount.address ===
-        "string"
-          ? storedAccount.address
-          : "",
-
-      barangay:
-        storedAccount.barangayCity ||
-        storedAccount.barangay ||
-        "",
-
-      province:
-        storedAccount.province || "",
-
-      postalCode: String(
-        storedAccount.postalCode || ""
-      ),
-    });
+    setAccount(savedAccount);
+    setProfileData(
+      createProfileData(savedAccount)
+    );
 
     setProfileErrors({});
+    setNoticeType("info");
     setNotice("Profile fields were reset.");
   }
 
   function handlePasswordChange(event) {
     const { name, value } = event.target;
 
-    setPasswordData((currentData) => ({
-      ...currentData,
+    setPasswordData((current) => ({
+      ...current,
       [name]: value,
     }));
 
-    setPasswordErrors((currentErrors) => ({
-      ...currentErrors,
+    setPasswordErrors((current) => ({
+      ...current,
       [name]: "",
     }));
 
     setNotice("");
   }
 
-  function togglePassword(fieldName) {
-    setShowPasswords((currentState) => ({
-      ...currentState,
-      [fieldName]:
-        !currentState[fieldName],
+  function togglePassword(name) {
+    setShowPasswords((current) => ({
+      ...current,
+      [name]: !current[name],
     }));
   }
 
   function validatePassword() {
     const errors = {};
 
-    const savedPassword =
-      account.password ||
-      DEFAULT_ACCOUNT.password;
-
     if (!passwordData.currentPassword) {
       errors.currentPassword =
-        "Enter your current password.";
-    } else if (
-      passwordData.currentPassword !==
-      savedPassword
-    ) {
-      errors.currentPassword =
-        "The current password you entered is incorrect.";
+        "Please enter your current password.";
     }
 
     if (!passwordData.newPassword) {
       errors.newPassword =
-        "Enter your new password.";
+        "Please enter a new password.";
     } else if (!passwordRequirementsPassed) {
       errors.newPassword =
-        "Your new password must meet all five password requirements.";
+        "Your new password must meet all five requirements.";
     } else if (
       passwordData.newPassword ===
       passwordData.currentPassword
@@ -589,13 +827,13 @@ function EditAccountPage() {
 
     if (!passwordData.confirmPassword) {
       errors.confirmPassword =
-        "Confirm your new password.";
+        "Please confirm your new password.";
     } else if (
       passwordData.confirmPassword !==
       passwordData.newPassword
     ) {
       errors.confirmPassword =
-        "The passwords do not match. Enter the same new password again.";
+        "The new password and confirmation do not match.";
     }
 
     setPasswordErrors(errors);
@@ -607,144 +845,39 @@ function EditAccountPage() {
     event.preventDefault();
 
     if (!validatePassword()) {
+      setNoticeType("error");
       setNotice(
         "Please correct the highlighted password fields."
       );
-
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "smooth",
-      });
-
       return;
     }
 
-    const updatedAccount =
-      normalizeAccount({
-        ...account,
-        password:
-          passwordData.newPassword,
-      });
-
-    saveStoredAccount(updatedAccount);
-    setAccount(updatedAccount);
+    // Frontend-only validation.
+    // Actual credential verification and password
+    // changes must be performed by the backend.
+    setNoticeType("info");
+    setNotice(
+      "Password validation passed. Actual password changes will become available after backend authentication is integrated."
+    );
 
     setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
+      ...emptyPassword,
     });
 
     setPasswordErrors({});
-
-    setNotice(
-      "Your password was updated successfully."
-    );
-
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "smooth",
-    });
   }
 
   function clearPasswordForm() {
     setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
+      ...emptyPassword,
     });
 
     setPasswordErrors({});
     setNotice("");
   }
 
-  function handleLogout() {
-    const confirmed = window.confirm(
-      "Are you sure you want to log out?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    sessionStorage.removeItem("userRole");
-    sessionStorage.removeItem("userEmail");
-
-    navigate("/login");
-  }
-
   return (
     <main className="edit-account-page">
-      <aside className="edit-account-sidebar">
-        <div className="edit-account-sidebar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
-
-        <nav className="edit-account-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="edit-account-nav-link"
-          >
-            Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="edit-account-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
-
-          <NavLink
-            to="/shopper/avatar-presets"
-            className="edit-account-nav-link"
-          >
-            Avatar Presets
-          </NavLink>
-
-          <NavLink
-            to="/shopper/catalog"
-            className="edit-account-nav-link"
-          >
-            Catalog
-          </NavLink>
-
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="edit-account-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="edit-account-nav-link"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="edit-account-nav-link active"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="edit-account-logout"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
-
       <section className="edit-account-content">
         <header className="edit-account-header">
           <div>
@@ -761,25 +894,23 @@ function EditAccountPage() {
             <h1>Edit Account</h1>
 
             <p>
-              Update your personal information and
-              account security one step at a time.
+              Update your personal information
+              and account security one step
+              at a time.
             </p>
-          </div>
-
-          <div className="edit-account-role">
-            REGISTERED SHOPPER
           </div>
         </header>
 
         <div className="edit-account-body">
+          {/* STEP PROGRESS */}
           <section className="edit-account-progress">
             <button
               type="button"
-              className={
+              className={`edit-account-step ${
                 step === 1
-                  ? "edit-account-step active"
-                  : "edit-account-step completed"
-              }
+                  ? "active"
+                  : "completed"
+              }`}
               onClick={() => changeStep(1)}
             >
               <span>1</span>
@@ -793,20 +924,16 @@ function EditAccountPage() {
             </button>
 
             <div
-              className={
-                step === 2
-                  ? "edit-account-progress-line active"
-                  : "edit-account-progress-line"
-              }
+              className={`edit-account-progress-line ${
+                step === 2 ? "active" : ""
+              }`}
             />
 
             <button
               type="button"
-              className={
-                step === 2
-                  ? "edit-account-step active"
-                  : "edit-account-step"
-              }
+              className={`edit-account-step ${
+                step === 2 ? "active" : ""
+              }`}
               onClick={() => changeStep(2)}
             >
               <span>2</span>
@@ -822,17 +949,18 @@ function EditAccountPage() {
 
           {notice && (
             <div
-              className={
-                notice.includes("successfully")
-                  ? "edit-account-notice success"
-                  : "edit-account-notice"
+              className={`edit-account-notice ${noticeType}`}
+              role={
+                noticeType === "error"
+                  ? "alert"
+                  : "status"
               }
-              role="status"
             >
               {notice}
             </div>
           )}
 
+          {/* STEP 1: PROFILE AND ADDRESS */}
           {step === 1 && (
             <form
               className="edit-account-card"
@@ -848,7 +976,7 @@ function EditAccountPage() {
                   </h2>
 
                   <span>
-                    Enter your personal and delivery
+                    Update your personal and delivery
                     information before continuing to
                     account security.
                   </span>
@@ -883,6 +1011,14 @@ function EditAccountPage() {
                     value={profileData.fullName}
                     error={profileErrors.fullName}
                     onChange={handleProfileChange}
+                    onBlur={() =>
+                      setProfileData((current) => ({
+                        ...current,
+                        fullName: properCase(
+                          current.fullName
+                        ),
+                      }))
+                    }
                     placeholder="Enter complete name"
                     autoComplete="name"
                   />
@@ -900,9 +1036,10 @@ function EditAccountPage() {
 
                   <FormField
                     label="Mobile Number"
-                    name="phone"
-                    value={profileData.phone}
-                    error={profileErrors.phone}
+                    name="mobile"
+                    type="tel"
+                    value={profileData.mobile}
+                    error={profileErrors.mobile}
                     onChange={handleProfileChange}
                     placeholder="09XXXXXXXXX"
                     autoComplete="tel"
@@ -920,36 +1057,41 @@ function EditAccountPage() {
                 </p>
 
                 <div className="edit-account-form-grid">
-                  <div className="edit-account-full-field">
-                    <FormField
-                      label="House Number and Street"
-                      name="address"
-                      value={profileData.address}
-                      error={profileErrors.address}
-                      onChange={handleProfileChange}
-                      placeholder="Enter house number and street"
-                      autoComplete="street-address"
-                    />
-                  </div>
+                  <FormField
+                    label="House Number and Street"
+                    name="street"
+                    value={profileData.street}
+                    error={profileErrors.street}
+                    onChange={handleProfileChange}
+                    placeholder="Enter house number and street"
+                    autoComplete="address-line1"
+                    full
+                  />
 
                   <FormField
-                    label="Barangay / City"
+                    label="Barangay"
                     name="barangay"
                     value={profileData.barangay}
                     error={profileErrors.barangay}
                     onChange={handleProfileChange}
-                    placeholder="Enter barangay and city"
-                    autoComplete="address-level2"
+                    placeholder="Enter barangay"
+                    autoComplete="address-line2"
                   />
 
                   <FormField
-                    label="Province"
-                    name="province"
+                    label="City / Municipality"
+                    name="city"
+                    value={profileData.city}
+                    error={profileErrors.city}
+                    onChange={handleProfileChange}
+                    placeholder="Enter city or municipality"
+                    autoComplete="address-level2"
+                  />
+
+                  <ProvinceField
                     value={profileData.province}
                     error={profileErrors.province}
                     onChange={handleProfileChange}
-                    placeholder="Enter province"
-                    autoComplete="address-level1"
                   />
 
                   <FormField
@@ -980,12 +1122,15 @@ function EditAccountPage() {
                   className="edit-account-primary-button"
                 >
                   Save and Continue
-                  <span aria-hidden="true">→</span>
+                  <span aria-hidden="true">
+                    →
+                  </span>
                 </button>
               </div>
             </form>
           )}
 
+          {/* STEP 2: ACCOUNT SECURITY */}
           {step === 2 && (
             <form
               className="edit-account-card"
@@ -995,11 +1140,12 @@ function EditAccountPage() {
               <div className="edit-account-card-heading">
                 <div>
                   <p>STEP 2 OF 2</p>
+
                   <h2>Account Security</h2>
 
                   <span>
-                    Enter your current password and
-                    create a secure new password.
+                    Enter your current password
+                    and create a secure new password.
                   </span>
                 </div>
 
@@ -1038,7 +1184,9 @@ function EditAccountPage() {
                   value={passwordData.newPassword}
                   error={passwordErrors.newPassword}
                   onChange={handlePasswordChange}
-                  visible={showPasswords.newPassword}
+                  visible={
+                    showPasswords.newPassword
+                  }
                   onToggle={() =>
                     togglePassword("newPassword")
                   }
@@ -1079,16 +1227,12 @@ function EditAccountPage() {
                   />
 
                   <PasswordRule
-                    passed={
-                      passwordRules.uppercase
-                    }
+                    passed={passwordRules.uppercase}
                     label="One uppercase letter"
                   />
 
                   <PasswordRule
-                    passed={
-                      passwordRules.lowercase
-                    }
+                    passed={passwordRules.lowercase}
                     label="One lowercase letter"
                   />
 
@@ -1110,9 +1254,11 @@ function EditAccountPage() {
                 <span>i</span>
 
                 <p>
-                  Use a password that you do not use
-                  for another account. Password changes
-                  take effect immediately.
+                  Password changes require backend
+                  authentication. During frontend
+                  development, this form validates
+                  password requirements without
+                  storing credentials.
                 </p>
               </div>
 
@@ -1137,7 +1283,7 @@ function EditAccountPage() {
                   type="submit"
                   className="edit-account-primary-button"
                 >
-                  Update Password
+                  Validate Password
                 </button>
               </div>
             </form>
@@ -1145,109 +1291,6 @@ function EditAccountPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function FormField({
-  label,
-  name,
-  type = "text",
-  value,
-  error,
-  onChange,
-  placeholder,
-  autoComplete,
-  maxLength,
-  inputMode,
-}) {
-  return (
-    <label className="edit-account-field">
-      <span>
-        {label} <strong>*</strong>
-      </span>
-
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        maxLength={maxLength}
-        inputMode={inputMode}
-        className={error ? "input-error" : ""}
-      />
-
-      {error && (
-        <small className="edit-account-error">
-          {error}
-        </small>
-      )}
-    </label>
-  );
-}
-
-function PasswordField({
-  label,
-  name,
-  value,
-  error,
-  onChange,
-  visible,
-  onToggle,
-  autoComplete,
-}) {
-  return (
-    <label className="edit-account-field edit-account-password-field">
-      <span>
-        {label} <strong>*</strong>
-      </span>
-
-      <div
-        className={
-          error
-            ? "edit-account-password-input input-error"
-            : "edit-account-password-input"
-        }
-      >
-        <input
-          type={visible ? "text" : "password"}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder="Enter password"
-          autoComplete={autoComplete}
-        />
-
-        <button
-          type="button"
-          onClick={onToggle}
-        >
-          {visible ? "Hide" : "Show"}
-        </button>
-      </div>
-
-      {error && (
-        <small className="edit-account-error">
-          {error}
-        </small>
-      )}
-    </label>
-  );
-}
-
-function PasswordRule({ passed, label }) {
-  return (
-    <div
-      className={
-        passed
-          ? "edit-account-rule passed"
-          : "edit-account-rule"
-      }
-    >
-      <span>{passed ? "✓" : "○"}</span>
-      <p>{label}</p>
-    </div>
   );
 }
 

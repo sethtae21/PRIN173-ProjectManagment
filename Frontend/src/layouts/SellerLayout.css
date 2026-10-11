@@ -1,16 +1,420 @@
+
 /* =========================================
-   SELLER LAYOUT
+   FITFUSION AI - SELLER LAYOUT
+   MATCHES SHOPPER AND GUEST SIDEBAR
 ========================================= */
 
-.seller-shell {
+.seller-layout,
+.seller-layout * {
+  box-sizing: border-box;
+}
+
+.seller-layout {
+  --seller-sidebar-width: 270px;
+
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns:
+    var(--seller-sidebar-width) minmax(0, 1fr);
+
+  width: 100%;
   min-height: 100vh;
+
+  background: #f7f4ed;
+  color: #17130f;
+
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+/* =========================================
+   SIDEBAR CONTAINER
+========================================= */
+
+.seller-layout-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  display: flex;
+  flex-direction: column;
+
+  width: var(--seller-sidebar-width);
+  height: 100vh;
+  min-height: 0;
+
+  padding: 18px 17px 18px;
+
+  background: linear-gradient(
+    180deg,
+    #fff9e9 0%,
+    #faedc8 23%,
+    #f4dfa7 47%,
+    #e8c879 73%,
+    #d9ae56 100%
+  );
+
+  border-right: 1px solid #d4b46e;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(142, 100, 31, 0.3) transparent;
+}
+
+/* =========================================
+   LOGO
+========================================= */
+
+.seller-layout-brand {
+  display: flex;
+  flex: 0 0 132px;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  min-height: 132px;
+
+  margin: 0 0 22px;
+  padding: 5px 8px 16px;
+
+  border-bottom: 1px solid rgba(
+    142,
+    100,
+    31,
+    0.15
+  );
+}
+
+.seller-layout-logo {
+  display: block;
+
+  width: min(173px, 100%);
+  max-height: 95px;
+
+  height: auto;
+  object-fit: contain;
+}
+
+/* =========================================
+   SIDEBAR MENU SECTION
+========================================= */
+
+.seller-layout-sidebar-section {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.seller-layout-section-label {
+  margin: 0 0 13px;
+  padding: 0 15px;
+
+  color: #946f2a;
+  font-size: 11px;
+  font-weight: 800;
+
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+}
+
+/* =========================================
+   NAVIGATION LIST
+========================================= */
+
+.seller-layout-navigation {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+  width: 100%;
+}
+
+/* =========================================
+   NAVIGATION LINKS
+========================================= */
+
+.seller-layout-nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 15px;
+
+  width: 100%;
+  min-height: 53px;
+
+  padding: 13px 16px;
+
+  background: transparent;
+
+  border: 1px solid transparent;
+  border-radius: 11px;
+
+  color: #4f4535;
+
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* =========================================
+   NAVIGATION ICONS
+========================================= */
+
+.seller-layout-nav-icon {
+  display: inline-flex;
+  flex: 0 0 22px;
+
+  align-items: center;
+  justify-content: center;
+
+  width: 22px;
+  height: 22px;
+
+  color: #99732f;
+}
+
+.seller-layout-nav-icon svg {
+  display: block;
+
+  width: 21px;
+  height: 21px;
+}
+
+/* =========================================
+   NAVIGATION LABELS
+========================================= */
+
+.seller-layout-nav-text {
+  display: block;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================
+   NAVIGATION HOVER
+========================================= */
+
+.seller-layout-nav-link:hover {
+  background: rgba(255, 253, 249, 0.38);
+  color: #17130f;
+
+  transform: translateX(2px);
+}
+
+/* =========================================
+   ACTIVE MENU
+========================================= */
+
+.seller-layout-nav-link.active,
+.seller-layout-nav-link.active:hover {
+  background: linear-gradient(
+    110deg,
+    #17130f 0%,
+    #533718 40%,
+    #a77d30 100%
+  );
+
+  border: 1px solid rgba(
+    181,
+    126,
+    32,
+    0.5
+  );
+
+  border-radius: 11px;
+
+  color: #fffdf9;
+  font-weight: 800;
+
+  box-shadow:
+    0 6px 16px rgba(72, 49, 15, 0.19);
+
+  transform: none;
+}
+
+.seller-layout-nav-link.active
+.seller-layout-nav-icon {
+  color: #f7e4b7;
+}
+
+.seller-layout-nav-link.active
+.seller-layout-nav-text {
+  color: #fffdf9;
+}
+
+.seller-layout-active-arrow {
+  flex-shrink: 0;
+
+  margin-left: auto;
+
+  color: #fffdf9;
+
+  font-size: 23px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* =========================================
+   BOTTOM SIDEBAR
+   PUSH LOGOUT TOWARD THE BOTTOM
+========================================= */
+
+.seller-layout-sidebar-bottom {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+
+  width: 100%;
+
+  margin-top: auto;
+  padding: 15px 0 0;
+
+  border-top: 1px solid rgba(
+    142,
+    100,
+    31,
+    0.17
+  );
+}
+
+/* =========================================
+   LOGOUT - SAME AS SHOPPER
+========================================= */
+
+.seller-layout-logout {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 15px;
+
+  width: 100%;
+  min-height: 53px;
+
+  padding: 13px 16px;
+
+  background: transparent;
+
+  border: 1px solid transparent;
+  border-radius: 11px;
+
+  color: #4f4535;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+
+  text-align: left;
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.seller-layout-logout
+.seller-layout-nav-icon {
+  color: #99732f;
+}
+
+.seller-layout-logout
+.seller-layout-nav-text {
+  color: #4f4535;
+}
+
+.seller-layout-logout:hover {
+  background: rgba(
+    255,
+    253,
+    249,
+    0.38
+  );
+
+  color: #17130f;
+}
+
+.seller-layout-logout:hover
+.seller-layout-nav-icon,
+.seller-layout-logout:hover
+.seller-layout-nav-text {
+  color: #17130f;
+}
+
+/* =========================================
+   FOOTER
+   SAME AS SHOPPER / GUEST
+========================================= */
+
+.seller-layout-sidebar-footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  width: 100%;
+
+  margin-top: 31px;
+  padding: 9px 0 0;
+
+  text-align: center;
+}
+
+.seller-layout-sidebar-footer strong {
+  color: #82602e;
+
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.19em;
+  line-height: 1.5;
+}
+
+.seller-layout-sidebar-footer span {
+  color: #937342;
+
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* =========================================
+   MAIN CONTENT
+========================================= */
+
+.seller-layout-main {
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+
   background:
     radial-gradient(
       circle at right center,
-      rgba(181, 126, 32, 0.2),
-      transparent 42%
+      rgba(181, 126, 32, 0.12),
+      transparent 43%
     ),
     linear-gradient(
       135deg,
@@ -18,260 +422,210 @@
       #fffdf9 52%,
       #eee8de
     );
-  color: #17130f;
+
+  overflow-x: clip;
+}
+
+.seller-layout-main > * {
+  min-width: 0;
 }
 
 /* =========================================
-   SIDEBAR
+   MOBILE CONTROLS
 ========================================= */
 
-.unified-seller-sidebar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  height: 100vh;
-  flex-direction: column;
-  padding: 18px;
-  background: linear-gradient(
-    180deg,
-    #f6e7b7 0%,
-    #d7af4b 52%,
-    #b57e20 100%
-  );
-  border-right: 1px solid rgba(142, 100, 31, 0.25);
-  box-shadow: 6px 0 22px rgba(92, 63, 15, 0.08);
+.seller-layout-mobile-toggle {
+  display: none;
+}
+
+.seller-layout-overlay {
+  display: none;
 }
 
 /* =========================================
-   LOGO
+   LOGOUT MODAL OVERLAY
 ========================================= */
 
-.unified-seller-logo {
-  display: grid;
-  min-height: 90px;
-  place-items: center;
-  margin-bottom: 18px;
-  border-radius: 12px;
-  text-decoration: none;
-}
+.seller-layout-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
 
-.unified-seller-logo img {
-  display: block;
-  width: 140px;
-  height: 76px;
-  object-fit: contain;
-}
-
-.unified-seller-logo:hover {
-  background: rgba(255, 253, 249, 0.18);
-}
-
-/* =========================================
-   NAVIGATION
-========================================= */
-
-.unified-seller-navigation {
   display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-
-.unified-seller-link {
-  display: flex;
-  min-height: 50px;
   align-items: center;
   justify-content: center;
-  padding: 11px 10px;
-  background: rgba(255, 253, 249, 0.57);
-  border: 1px solid #e2c978;
-  border-radius: 9px;
-  color: #29251f;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-  text-align: center;
-  text-decoration: none;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
 
-.unified-seller-link:hover {
-  background: rgba(255, 253, 249, 0.88);
-  border-color: #b57e20;
-  box-shadow: 0 6px 15px rgba(92, 63, 15, 0.12);
-  transform: translateX(2px);
-}
+  padding: 20px;
 
-.unified-seller-link.active {
-  background: linear-gradient(
-    135deg,
-    #17130f 0%,
-    #8e641f 55%,
-    #d7af4b 100%
+  background: rgba(
+    23,
+    19,
+    15,
+    0.7
   );
-  border-color: #e2c978;
-  box-shadow: 0 7px 17px rgba(56, 38, 12, 0.22);
-  color: #fffdf9;
-  font-weight: 700;
-}
 
-/* =========================================
-   LOGOUT BUTTON
-========================================= */
-
-.unified-seller-logout {
-  min-height: 48px;
-  margin-top: auto;
-  padding: 11px 15px;
-  background: #fffdf9;
-  border: 1.2px solid #b57e20;
-  border-radius: 9px;
-  color: #8e641f;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-
-.unified-seller-logout:hover {
-  background: #17130f;
-  color: #fffdf9;
-  box-shadow: 0 7px 17px rgba(56, 38, 12, 0.2);
-  transform: translateY(-1px);
-}
-
-/* =========================================
-   PAGE CONTENT
-========================================= */
-
-.seller-layout-content {
-  min-width: 0;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/*
-  This prevents pages inside SellerLayout from
-  creating another full-width sidebar layout.
-*/
-
-.seller-layout-content > * {
-  min-width: 0;
+  backdrop-filter: blur(4px);
 }
 
 /* =========================================
    LOGOUT MODAL
 ========================================= */
 
-.seller-logout-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(23, 19, 15, 0.67);
-  backdrop-filter: blur(4px);
-}
-
-.seller-logout-modal {
+.seller-layout-modal {
   width: min(430px, 100%);
-  padding: 34px;
+  max-height: calc(100dvh - 40px);
+
+  overflow-y: auto;
+
+  padding: 35px;
+
   background: #fffdf9;
+
   border: 1px solid #d2be91;
   border-radius: 18px;
-  box-shadow: 0 24px 65px rgba(23, 19, 15, 0.28);
-  text-align: center;
+
+  box-shadow:
+    0 25px 70px rgba(23, 19, 15, 0.25);
 }
 
-.seller-logout-modal h2 {
-  margin: 0 0 12px;
-  color: #17130f;
-  font-size: 25px;
-  line-height: 1.25;
-}
-
-.seller-logout-modal p {
-  margin: 0;
-  color: #5c554c;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.seller-logout-actions {
+.seller-layout-modal-icon {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 28px;
-}
 
-.seller-logout-cancel,
-.seller-logout-confirm {
-  min-height: 46px;
-  padding: 10px 18px;
-  border-radius: 9px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
+  width: 56px;
+  height: 56px;
 
-.seller-logout-cancel {
-  background: #fffdf9;
-  border: 1.2px solid #b57e20;
-  color: #8e641f;
-}
+  place-items: center;
+  margin-bottom: 22px;
 
-.seller-logout-confirm {
   background: linear-gradient(
     135deg,
     #17130f,
-    #8e641f 55%,
-    #d7af4b
+    #8e641f
   );
-  border: 1.2px solid #b57e20;
+
+  border-radius: 50%;
   color: #fffdf9;
 }
 
-.seller-logout-cancel:hover,
-.seller-logout-confirm:hover {
-  box-shadow: 0 7px 17px rgba(92, 63, 15, 0.18);
-  transform: translateY(-1px);
+.seller-layout-modal-eyebrow {
+  margin: 0 0 10px;
+
+  color: #b57e20;
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.seller-layout-modal h2 {
+  margin: 0 0 12px;
+
+  color: #17130f;
+  font-size: 25px;
+  line-height: 1.3;
+}
+
+.seller-layout-modal-description {
+  margin: 0;
+
+  color: #5c554c;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* =========================================
+   MODAL BUTTONS
+========================================= */
+
+.seller-layout-modal-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 22px;
+
+  border-top: 1px solid #e2d8c7;
+}
+
+.seller-layout-modal-cancel,
+.seller-layout-modal-confirm {
+  min-height: 45px;
+
+  padding: 11px 16px;
+
+  border-radius: 9px;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.seller-layout-modal-cancel {
+  background: #fffdf9;
+
+  border: 1px solid #b57e20;
+  color: #8e641f;
+}
+
+.seller-layout-modal-cancel:hover {
+  background: #fff5d7;
+}
+
+.seller-layout-modal-confirm {
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 65%,
+    #d7af4b
+  );
+
+  border: 1px solid #b57e20;
+  color: #fffdf9;
+}
+
+.seller-layout-modal-confirm:hover {
+  box-shadow:
+    0 7px 18px rgba(142, 100, 31, 0.2);
+}
+
+/* =========================================
+   ACCESSIBILITY
+========================================= */
+
+.seller-layout button:focus-visible,
+.seller-layout a:focus-visible {
+  outline: 3px solid #b57e20;
+  outline-offset: 3px;
 }
 
 /* =========================================
    TABLET
 ========================================= */
 
-@media (max-width: 980px) {
-  .seller-shell {
-    grid-template-columns: 155px minmax(0, 1fr);
+@media (max-width: 1050px) {
+  .seller-layout {
+    --seller-sidebar-width: 250px;
   }
 
-  .unified-seller-sidebar {
-    padding: 12px;
+  .seller-layout-sidebar {
+    padding: 18px 13px;
   }
 
-  .unified-seller-logo img {
-    width: 120px;
+  .seller-layout-nav-link {
+    gap: 12px;
+    padding: 12px 13px;
   }
 
-  .unified-seller-link {
-    padding: 10px 7px;
-    font-size: 11px;
+  .seller-layout-logo {
+    width: 163px;
   }
 }
 
@@ -280,57 +634,104 @@
 ========================================= */
 
 @media (max-width: 700px) {
-  .seller-shell {
+  .seller-layout {
     display: block;
+    min-height: 100vh;
   }
 
-  .unified-seller-sidebar {
-    position: static;
-    width: 100%;
-    height: auto;
-    padding: 12px;
+  .seller-layout-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+
+    z-index: 1200;
+
+    width: min(270px, 86vw);
+    height: 100dvh;
+
+    padding: 70px 17px 24px;
+
+    transform: translateX(-105%);
+    transition: transform 0.25s ease;
   }
 
-  .unified-seller-logo {
-    min-height: 68px;
-    margin-bottom: 12px;
+  .seller-layout-sidebar.open {
+    transform: translateX(0);
   }
 
-  .unified-seller-logo img {
-    width: 125px;
-    height: 62px;
-  }
+  .seller-layout-mobile-toggle {
+    position: fixed;
+    top: 17px;
+    left: 17px;
 
-  .unified-seller-navigation {
+    z-index: 1300;
+
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
+
+    width: 43px;
+    height: 43px;
+    place-items: center;
+
+    background: #fffdf9;
+
+    border: 1px solid #d2be91;
+    border-radius: 11px;
+
+    color: #8e641f;
+
+    box-shadow:
+      0 5px 15px rgba(41, 37, 31, 0.12);
+
+    cursor: pointer;
   }
 
-  .unified-seller-link {
-    min-height: 44px;
-  }
+  .seller-layout-overlay {
+    position: fixed;
+    inset: 0;
 
-  .unified-seller-logout {
+    z-index: 1100;
+
+    display: block;
     width: 100%;
-    margin-top: 12px;
+    height: 100%;
+
+    background: rgba(23, 19, 15, 0.5);
+
+    border: 0;
+    cursor: pointer;
   }
 
-  .seller-layout-content {
-    min-height: auto;
+  .seller-layout-brand {
+    flex-basis: 130px;
+    min-height: 130px;
+  }
+
+  .seller-layout-main {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  .seller-layout-modal {
+    padding: 28px 23px;
   }
 }
 
 @media (max-width: 430px) {
-  .unified-seller-navigation {
-    grid-template-columns: 1fr;
+  .seller-layout-modal h2 {
+    font-size: 22px;
   }
 
-  .seller-logout-modal {
-    padding: 27px 20px;
-  }
-
-  .seller-logout-actions {
+  .seller-layout-modal-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seller-layout-sidebar,
+  .seller-layout-nav-link,
+  .seller-layout-logout,
+  .seller-layout-modal-cancel,
+  .seller-layout-modal-confirm {
+    transition: none;
   }
 }

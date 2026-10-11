@@ -1,8 +1,4 @@
 
-/* ==========================================
-   FITFUSION AI - CATALOG
-========================================== */
-
 .catalog-page {
   min-height: 100vh;
   min-width: 0;
@@ -26,9 +22,7 @@
   box-sizing: border-box;
 }
 
-/* ==========================================
-   HEADER - ORDER HISTORY STYLE
-========================================== */
+/* HEADER */
 
 .catalog-top-header {
   display: flex;
@@ -75,9 +69,7 @@
   font-weight: 700;
 }
 
-/* ==========================================
-   MAIN CONTENT
-========================================== */
+/* MAIN CONTENT */
 
 .catalog-main-content {
   width: min(1240px, calc(100% - 64px));
@@ -85,15 +77,13 @@
   padding: 42px 0 72px;
 }
 
-/* ==========================================
-   FILTER TOOLBAR
-========================================== */
+/* FILTER TOOLBAR - THREE CONTROLS */
 
 .catalog-toolbar {
   display: grid;
   grid-template-columns:
     minmax(260px, 2.3fr)
-    repeat(3, minmax(145px, 0.9fr));
+    repeat(2, minmax(145px, 0.9fr));
   gap: 20px;
   margin-bottom: 28px;
   padding: 30px;
@@ -116,7 +106,7 @@
 
 .catalog-search:focus-within {
   border-color: #8e641f;
-  box-shadow: 0 0 0 3px rgba(181,126,32,.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
 .catalog-search svg {
@@ -173,12 +163,10 @@
 
 .catalog-filter-field select:focus {
   border-color: #8e641f;
-  box-shadow: 0 0 0 3px rgba(181,126,32,.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
-/* ==========================================
-   RESULTS
-========================================== */
+/* RESULTS */
 
 .catalog-result-row {
   display: flex;
@@ -213,9 +201,7 @@
   text-decoration: underline;
 }
 
-/* ==========================================
-   PRODUCT GRID
-========================================== */
+/* PRODUCT GRID */
 
 .catalog-product-grid {
   display: grid;
@@ -229,23 +215,20 @@
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 20px;
-  box-shadow: 0 10px 28px rgba(69,52,23,.07);
+  box-shadow: 0 10px 28px rgba(69, 52, 23, 0.07);
   transition:
-    transform .25s ease,
-    border-color .25s ease,
-    box-shadow .25s ease;
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .catalog-product-card:hover {
   transform: translateY(-5px);
   border-color: #c9a85f;
-  box-shadow: 0 18px 38px rgba(69,52,23,.15);
+  box-shadow: 0 18px 38px rgba(69, 52, 23, 0.15);
 }
 
-/* ==========================================
-   GARMENT PREVIEW
-   SAME STYLE AS PRODUCT DETAILS
-========================================== */
+/* GARMENT PREVIEW */
 
 .catalog-product-preview {
   position: relative;
@@ -258,7 +241,7 @@
   background:
     radial-gradient(
       circle at center,
-      rgba(215,175,75,.22),
+      rgba(215, 175, 75, 0.22),
       transparent 48%
     ),
     linear-gradient(
@@ -283,9 +266,9 @@
   font-size: clamp(110px, 12vw, 165px);
   line-height: 1.2;
   filter: drop-shadow(
-    0 24px 18px rgba(40,28,14,.16)
+    0 24px 18px rgba(40, 28, 14, 0.16)
   );
-  transition: transform .25s ease;
+  transition: transform 0.25s ease;
 }
 
 .catalog-product-card:hover .catalog-product-emoji {
@@ -297,24 +280,22 @@
   right: 18px;
   bottom: 14px;
   padding: 7px 10px;
-  background: rgba(23,19,15,.7);
+  background: rgba(23, 19, 15, 0.7);
   border-radius: 20px;
   color: #fffdf9;
   content: "View";
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   opacity: 0;
-  transition: opacity .2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .catalog-product-preview:hover::after {
   opacity: 1;
 }
 
-/* ==========================================
-   PRODUCT CONTENT
-========================================== */
+/* PRODUCT CONTENT */
 
 .catalog-product-content {
   padding: 22px;
@@ -391,9 +372,7 @@
   font-size: 10px;
 }
 
-/* ==========================================
-   PRODUCT PRICE
-========================================== */
+/* PRODUCT PRICE */
 
 .catalog-product-footer {
   display: flex;
@@ -436,9 +415,7 @@
   text-decoration: underline;
 }
 
-/* ==========================================
-   ADD TO CART
-========================================== */
+/* ADD TO CART */
 
 .catalog-cart-action {
   width: 100%;
@@ -459,18 +436,16 @@
   font-weight: 800;
   cursor: pointer;
   transition:
-    transform .2s ease,
-    box-shadow .2s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .catalog-cart-action:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 17px rgba(142,100,31,.22);
+  box-shadow: 0 8px 17px rgba(142, 100, 31, 0.22);
 }
 
-/* ==========================================
-   EMPTY STATE
-========================================== */
+/* EMPTY STATE */
 
 .catalog-empty-state {
   display: grid;
@@ -528,9 +503,7 @@
   cursor: pointer;
 }
 
-/* ==========================================
-   GUEST REGISTRATION MODAL
-========================================== */
+/* GUEST REGISTRATION MODAL */
 
 .catalog-modal-backdrop {
   position: fixed;
@@ -539,7 +512,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(23,19,15,.7);
+  background: rgba(23, 19, 15, 0.7);
   backdrop-filter: blur(5px);
 }
 
@@ -550,7 +523,7 @@
   background: #fffdf9;
   border: 1px solid #d2be91;
   border-radius: 22px;
-  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
   text-align: center;
 }
 
@@ -572,7 +545,7 @@
   color: #9a6a1d;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: .12em;
+  letter-spacing: 0.12em;
 }
 
 .catalog-modal h2 {
@@ -639,17 +612,17 @@
   text-decoration: underline;
 }
 
-/* ==========================================
-   RESPONSIVE DESIGN
-========================================== */
+/* RESPONSIVE DESIGN */
 
 @media (max-width: 1200px) {
   .catalog-product-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
   }
 
   .catalog-toolbar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
   }
 
   .catalog-search {
@@ -659,17 +632,24 @@
 
 @media (max-width: 900px) {
   .catalog-main-content {
-    width: min(calc(100% - 36px), 1240px);
+    width: min(
+      calc(100% - 36px),
+      1240px
+    );
   }
 
   .catalog-product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 650px) {
   .catalog-main-content {
-    width: min(calc(100% - 24px), 1240px);
+    width: min(
+      calc(100% - 24px),
+      1240px
+    );
     padding-top: 25px;
   }
 

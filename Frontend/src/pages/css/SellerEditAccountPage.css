@@ -1,0 +1,76 @@
+
+/* =========================================
+   FITFUSION AI - SELLER EDIT ACCOUNT
+   Reuses the Shopper Edit Account design
+========================================= */
+
+@import "./EditAccountPage.css";
+
+.seller-edit-account-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+}
+
+/* Ensure the Seller layout provides the only sidebar. */
+
+.seller-edit-account-page .edit-account-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Match the shared gold, white, and black theme. */
+
+.seller-edit-account-page .edit-account-header {
+  background: rgba(255, 253, 249, 0.97);
+  border-bottom: 1px solid #e2d8c7;
+}
+
+.seller-edit-account-page .edit-account-body {
+  width: min(850px, calc(100% - 60px));
+  margin: 0 auto;
+  padding: 40px 0 70px;
+}
+
+.seller-edit-account-page .edit-account-card {
+  background: #fffdf9;
+  border: 1px solid #e2d8c7;
+  border-radius: 17px;
+}
+
+/* Province dropdown */
+
+.seller-edit-account-page .edit-account-field select {
+  display: block;
+  width: 100%;
+  min-height: 53px;
+  padding: 13px 15px;
+  background: #f8f5ef;
+  border: 1px solid #ccb990;
+  border-radius: 9px;
+  color: #17130f;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.seller-edit-account-page .edit-account-field select:focus {
+  border-color: #b57e20;
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
+}
+
+.seller-edit-account-page .edit-account-field select.input-error {
+  border-color: #b54a32;
+}
+
+@media (max-width: 700px) {
+  .seller-edit-account-page .edit-account-body {
+    width: min(100% - 28px, 850px);
+    padding: 30px 0 50px;
+  }
+
+  .seller-edit-account-page .edit-account-header {
+    padding: 75px 20px 22px;
+  }
+}

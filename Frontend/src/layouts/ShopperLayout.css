@@ -1,29 +1,55 @@
+
+/* ==========================================
+   FITFUSION AI - SHOPPER LAYOUT
+   MODERN DASHBOARD SIDEBAR
+========================================== */
+
+.shopper-shell,
+.shopper-shell * {
+  box-sizing: border-box;
+}
+
 .shopper-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 250px minmax(0, 1fr);
   min-height: 100vh;
   background: #f2efe8;
 }
+
+/* ==========================================
+   SIDEBAR
+========================================== */
 
 .unified-shopper-sidebar {
   position: sticky;
   top: 0;
   z-index: 20;
+
   display: flex;
   height: 100vh;
   height: 100dvh;
-  min-height: 600px;
+  min-height: 0;
   flex-direction: column;
+
   overflow-y: auto;
-  padding: 16px 18px;
+  overflow-x: hidden;
+
+  padding: 20px 15px 18px;
+
   background: linear-gradient(
     180deg,
-    #f6e7b7 0%,
-    #d7af4b 52%,
-    #b57e20 100%
+    #fff9ea 0%,
+    #f6e7b7 43%,
+    #edcf86 72%,
+    #d6ad53 100%
   );
-  border-right: 1px solid
-    rgba(142, 100, 31, 0.28);
+
+  border-right: 1px solid rgba(142, 100, 31, 0.24);
+
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(142, 100, 31, 0.32)
+    transparent;
 }
 
 .unified-shopper-sidebar::-webkit-scrollbar {
@@ -31,45 +57,111 @@
 }
 
 .unified-shopper-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(23, 19, 15, 0.25);
+  background: rgba(142, 100, 31, 0.32);
   border-radius: 999px;
 }
 
+/* ==========================================
+   BRAND LOGO
+========================================== */
+
 .unified-sidebar-logo {
-  display: grid;
+  display: flex;
   flex: 0 0 auto;
-  min-height: 92px;
-  place-items: center;
+
+  width: 100%;
+  min-height: 100px;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 10px;
   margin-bottom: 12px;
-  border-radius: 10px;
+
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+
+  text-decoration: none;
 }
 
 .unified-sidebar-logo img {
-  width: 150px;
-  height: 78px;
+  display: block;
+  width: 165px;
+  max-width: 100%;
+  height: 85px;
   object-fit: contain;
 }
+
+.unified-sidebar-divider {
+  width: 100%;
+  height: 1px;
+  flex-shrink: 0;
+  margin: 8px 0 18px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(142, 100, 31, 0.35),
+    transparent
+  );
+}
+
+/* ==========================================
+   SECTION HEADING
+========================================== */
+
+.unified-sidebar-section-heading {
+  padding: 0 15px;
+  margin-bottom: 12px;
+}
+
+.unified-sidebar-section-heading span {
+  color: #93702c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+/* ==========================================
+   NAVIGATION
+========================================== */
 
 .unified-shopper-navigation {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
+  width: 100%;
 }
 
+/* FLAT NAVIGATION LINKS */
+
 .unified-shopper-link {
+  position: relative;
+
   display: flex;
-  min-height: 48px;
+  width: 100%;
+  min-height: 47px;
+
   align-items: center;
-  justify-content: center;
-  padding: 10px;
-  background: rgba(255, 253, 249, 0.68);
-  border: 1px solid rgba(226, 201, 120, 0.9);
-  border-radius: 9px;
-  color: #29251f;
+  justify-content: flex-start;
+  gap: 13px;
+
+  padding: 11px 14px;
+
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  color: #51422e;
   font-size: 12px;
-  text-align: center;
+  font-weight: 600;
+  text-align: left;
   text-decoration: none;
+
+  cursor: pointer;
+
   transition:
     background 0.2s ease,
     color 0.2s ease,
@@ -77,38 +169,137 @@
     box-shadow 0.2s ease;
 }
 
-.unified-shopper-link:hover {
-  background: rgba(255, 253, 249, 0.92);
-  transform: translateX(2px);
+/* ICONS */
+
+.unified-shopper-link-icon {
+  display: flex;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+
+  align-items: center;
+  justify-content: center;
+
+  color: #947028;
 }
+
+.unified-shopper-link-icon svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+
+/* NAVIGATION TEXT */
+
+.unified-shopper-link-label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+/* HOVER */
+
+.unified-shopper-link:hover:not(.active) {
+  background: rgba(255, 253, 249, 0.48);
+  color: #17130f;
+  transform: translateX(3px);
+}
+
+.unified-shopper-link:hover:not(.active)
+.unified-shopper-link-icon {
+  color: #8e641f;
+}
+
+/* ACTIVE PAGE */
 
 .unified-shopper-link.active {
   background: linear-gradient(
-    135deg,
+    110deg,
     #17130f 0%,
-    #8e641f 58%,
-    #d7af4b 100%
+    #4c341a 48%,
+    #b58931 100%
   );
-  border-color: #e2c978;
-  box-shadow: 0 8px 18px
-    rgba(72, 48, 14, 0.15);
+
+  border-color: rgba(215, 175, 75, 0.5);
+
+  box-shadow:
+    0 6px 16px rgba(72, 48, 14, 0.2);
+
   color: #fffdf9;
   font-weight: 800;
 }
 
-.unified-shopper-logout {
-  flex: 0 0 auto;
-  min-height: 47px;
+.unified-shopper-link.active
+.unified-shopper-link-icon {
+  color: #f6e7b7;
+}
+
+.unified-shopper-link.active
+.unified-shopper-link-label {
+  color: #fffdf9;
+}
+
+/* ACTIVE INDICATOR */
+
+.unified-shopper-active-indicator {
+  display: flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  color: #f6e7b7;
+}
+
+/* KEYBOARD ACCESSIBILITY */
+
+.unified-shopper-link:focus-visible,
+.unified-shopper-logout:focus-visible,
+.shopper-mobile-toggle:focus-visible {
+  outline: 3px solid #8e641f;
+  outline-offset: 3px;
+}
+
+/* ==========================================
+   BOTTOM SIDEBAR
+========================================== */
+
+.unified-shopper-sidebar-bottom {
+  display: flex;
+  flex-direction: column;
   margin-top: auto;
-  padding: 11px 15px;
-  background: #fffdf9;
-  border: 1px solid #b57e20;
-  border-radius: 9px;
-  color: #8e641f;
+  padding-top: 24px;
+}
+
+.unified-shopper-sidebar-bottom
+.unified-sidebar-divider {
+  margin-bottom: 12px;
+}
+
+/* LOGOUT AS A NAVIGATION ITEM */
+
+.unified-shopper-logout {
+  display: flex;
+  width: 100%;
+  min-height: 47px;
+
+  align-items: center;
+  justify-content: flex-start;
+  gap: 13px;
+
+  padding: 11px 14px;
+
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  color: #51422e;
+
   font: inherit;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+
   cursor: pointer;
+
   transition:
     background 0.2s ease,
     color 0.2s ease,
@@ -116,25 +307,100 @@
 }
 
 .unified-shopper-logout:hover {
-  background: #17130f;
-  color: #fffdf9;
-  transform: translateY(-1px);
+  background: rgba(255, 253, 249, 0.55);
+  color: #17130f;
+  transform: translateX(3px);
 }
+
+.unified-shopper-logout:hover
+.unified-shopper-link-icon {
+  color: #17130f;
+}
+
+/* FOOTER */
+
+.unified-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+
+  margin-top: 20px;
+  padding: 12px 5px 2px;
+
+  text-align: center;
+}
+
+.unified-sidebar-footer span {
+  color: #7c571c;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+}
+
+.unified-sidebar-footer small {
+  color: #866d43;
+  font-size: 9px;
+}
+
+/* ==========================================
+   PAGE CONTENT
+========================================== */
 
 .shopper-layout-content {
   min-width: 0;
   min-height: 100vh;
+  background: #f2efe8;
 }
 
-/* LOGOUT MODAL */
+/* ==========================================
+   MOBILE MENU BUTTON
+========================================== */
+
+.shopper-mobile-toggle {
+  display: none;
+
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 105;
+
+  width: 44px;
+  height: 44px;
+
+  align-items: center;
+  justify-content: center;
+
+  background: #fffdf9;
+  border: 1px solid #d2be91;
+  border-radius: 10px;
+
+  color: #8e641f;
+
+  box-shadow:
+    0 5px 15px rgba(23, 19, 15, 0.12);
+
+  cursor: pointer;
+}
+
+.shopper-mobile-backdrop {
+  display: none;
+}
+
+/* ==========================================
+   LOGOUT CONFIRMATION MODAL
+========================================== */
 
 .shopper-logout-overlay {
   position: fixed;
   z-index: 1000;
   inset: 0;
+
   display: grid;
   place-items: center;
+
   padding: 20px;
+
   background: rgba(23, 19, 15, 0.68);
   backdrop-filter: blur(4px);
 }
@@ -142,11 +408,13 @@
 .shopper-logout-modal {
   width: min(430px, 100%);
   padding: 35px;
+
   background: #fffdf9;
   border: 1px solid #d2be91;
   border-radius: 17px;
-  box-shadow: 0 24px 70px
-    rgba(23, 19, 15, 0.3);
+
+  box-shadow:
+    0 24px 70px rgba(23, 19, 15, 0.3);
 }
 
 .shopper-logout-label {
@@ -163,9 +431,8 @@
   font-size: 25px;
 }
 
-.shopper-logout-modal > p:not(
-    .shopper-logout-label
-  ) {
+.shopper-logout-modal
+> p:not(.shopper-logout-label) {
   margin: 0;
   color: #5c554c;
   font-size: 12px;
@@ -184,9 +451,11 @@
   min-height: 44px;
   padding: 10px 20px;
   border-radius: 8px;
+
   font: inherit;
   font-size: 11px;
   font-weight: 800;
+
   cursor: pointer;
 }
 
@@ -194,6 +463,10 @@
   background: #fffdf9;
   border: 1px solid #b57e20;
   color: #8e641f;
+}
+
+.shopper-logout-cancel:hover {
+  background: #fff8e7;
 }
 
 .shopper-logout-confirm {
@@ -206,42 +479,140 @@
   color: #fffdf9;
 }
 
-@media (max-width: 850px) {
+.shopper-logout-confirm:hover {
+  box-shadow:
+    0 6px 15px rgba(142, 100, 31, 0.25);
+}
+
+/* ==========================================
+   TABLET
+========================================== */
+
+@media (max-width: 1050px) {
   .shopper-shell {
-    grid-template-columns: 180px minmax(0, 1fr);
+    grid-template-columns:
+      220px minmax(0, 1fr);
   }
 
   .unified-shopper-sidebar {
-    padding: 13px;
+    padding: 18px 12px;
   }
 
   .unified-sidebar-logo img {
-    width: 125px;
+    width: 145px;
+  }
+
+  .unified-shopper-link {
+    gap: 10px;
+    padding: 10px 12px;
   }
 }
+
+/* ==========================================
+   MOBILE
+========================================== */
 
 @media (max-width: 680px) {
   .shopper-shell {
     display: block;
   }
 
+  .shopper-layout-content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .shopper-mobile-toggle {
+    display: flex;
+  }
+
+  .shopper-mobile-backdrop {
+    position: fixed;
+    z-index: 90;
+    inset: 0;
+    display: block;
+    background: rgba(23, 19, 15, 0.48);
+  }
+
   .unified-shopper-sidebar {
-    position: relative;
-    height: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+
+    width: min(280px, 85vw);
+    height: 100vh;
+    height: 100dvh;
     min-height: 0;
-    overflow: visible;
+
+    overflow-y: auto;
+    padding: 65px 16px 20px;
+
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+
+    box-shadow:
+      10px 0 35px rgba(23, 19, 15, 0.15);
+  }
+
+  .unified-shopper-sidebar.mobile-open {
+    transform: translateX(0);
   }
 
   .unified-sidebar-logo {
-    min-height: 70px;
+    min-height: 80px;
+  }
+
+  .unified-sidebar-logo img {
+    width: 150px;
+    height: 75px;
   }
 
   .unified-shopper-navigation {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
 
-  .unified-shopper-logout {
-    margin-top: 14px;
+  .unified-shopper-link {
+    min-height: 46px;
+    gap: 13px;
+    padding: 11px 14px;
+  }
+
+  .unified-shopper-sidebar-bottom {
+    margin-top: auto;
+  }
+
+  .shopper-logout-modal {
+    padding: 28px 23px;
+  }
+}
+
+/* ==========================================
+   SMALL MOBILE
+========================================== */
+
+@media (max-width: 420px) {
+  .shopper-logout-modal h2 {
+    font-size: 22px;
+  }
+
+  .shopper-logout-actions {
+    flex-direction: column;
+  }
+
+  .shopper-logout-actions button {
+    width: 100%;
+  }
+}
+
+/* REDUCED MOTION */
+
+@media (prefers-reduced-motion: reduce) {
+  .unified-shopper-link,
+  .unified-shopper-logout,
+  .unified-shopper-sidebar {
+    transition: none;
   }
 }
