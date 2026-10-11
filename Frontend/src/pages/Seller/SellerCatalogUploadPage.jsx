@@ -145,11 +145,11 @@ function SellerCatalogUploadPage() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       setErrors((current) => ({
         ...current,
         [view]:
-          "The image must not exceed 10 MB.",
+          "The image must not exceed 5 MB.",
       }));
 
       event.target.value = "";
@@ -678,7 +678,7 @@ function ImageUploader({
         >
           <span>+</span>
           <strong>Upload {title}</strong>
-          <small>Maximum size: 10 MB</small>
+          <small>Maximum size: 5 MB</small>
 
           <input
             id={inputId}

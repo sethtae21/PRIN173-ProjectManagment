@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./css/FittingStudioPage.css";
 
@@ -75,19 +75,19 @@ function loadAvatar(isGuest) {
     ? "fitfusion-guest-avatar-gender"
     : "fitfusion-avatar-gender";
 
-  let savedPreset = null;
-
-  if (!isGuest) {
+  const savedPreset = (() => {
     try {
-      savedPreset = JSON.parse(
-        localStorage.getItem(
-          "fitfusion-avatar-preset"
+      return JSON.parse(
+        storage.getItem(
+          isGuest
+            ? "fitfusion-guest-avatar-preset"
+            : "fitfusion-avatar-preset"
         ) || "null"
       );
     } catch {
-      savedPreset = null;
+      return null;
     }
-  }
+  })();
 
   return {
     gender: normalizeGender(
@@ -103,6 +103,7 @@ function loadAvatar(isGuest) {
     cupSize: savedPreset?.cupSize || "B",
     thigh: savedPreset?.thigh || "Average",
     skinTone: savedPreset?.skinTone || "#dca77d",
+    undertone: savedPreset?.undertone || "Neutral",
   };
 }
 
@@ -124,6 +125,7 @@ function ControlGroup({
             className={
               value === option ? "active" : ""
             }
+            aria-pressed={value === option}
             onClick={() => onChange(option)}
           >
             {option}
@@ -140,6 +142,15 @@ function FittingStudioPage({ isGuest = false }) {
   const [avatar, setAvatar] = useState(() =>
     loadAvatar(isGuest)
   );
+
+  useEffect(() => {
+    if (isGuest) {
+      sessionStorage.setItem(
+        "fitfusion-guest-avatar-preset",
+        JSON.stringify(avatar)
+      );
+    }
+  }, [avatar, isGuest]);
 
   const [currentView, setCurrentView] =
     useState("Front");
@@ -281,11 +292,6 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function handleRecommendations() {
-    if (isGuest) {
-      openRegistrationPopup();
-      return;
-    }
-
     setActivePanel("recommendations");
   }
 
@@ -468,42 +474,39 @@ function FittingStudioPage({ isGuest = false }) {
           {/* CUSTOMIZATION PANEL */}
 
           <section className="studio-controls-card">
-            {!isGuest && (
-              <div className="studio-panel-tabs">
-                <button
-                  type="button"
-                  className={
-                    activePanel === "customize"
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setActivePanel("customize")
-                  }
-                >
-                  Customize
-                </button>
+            <div className="studio-panel-tabs">
+              <button
+                type="button"
+                className={
+                  activePanel === "customize"
+                    ? "active"
+                    : ""
+                }
+                aria-pressed={activePanel === "customize"}
+                onClick={() =>
+                  setActivePanel("customize")
+                }
+              >
+                Customize
+              </button>
 
-                <button
-                  type="button"
-                  className={
-                    activePanel === "recommendations"
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setActivePanel(
-                      "recommendations"
-                    )
-                  }
-                >
-                  Recommendations
-                </button>
-              </div>
-            )}
+              <button
+                type="button"
+                className={
+                  activePanel === "recommendations"
+                    ? "active"
+                    : ""
+                }
+                aria-pressed={activePanel === "recommendations"}
+                onClick={() =>
+                  setActivePanel("recommendations")
+                }
+              >
+                Recommendations
+              </button>
+            </div>
 
-            {activePanel === "customize" ||
-            isGuest ? (
+            {activePanel === "customize" ? (
               <div className="studio-customization-panel">
                 <div className="studio-selected-gender">
                   <span>Selected Gender</span>
@@ -651,6 +654,10 @@ function FittingStudioPage({ isGuest = false }) {
                               skinTone.value
                             )
                           }
+                          aria-pressed={
+                            avatar.skinTone ===
+                            skinTone.value
+                          }
                           aria-label={
                             skinTone.name
                           }
@@ -660,6 +667,15 @@ function FittingStudioPage({ isGuest = false }) {
                     )}
                   </div>
                 </div>
+
+                <ControlGroup
+                  label="Undertone"
+                  value={avatar.undertone}
+                  options={["Warm", "Cool", "Neutral"]}
+                  onChange={(value) =>
+                    updateAvatar("undertone", value)
+                  }
+                />
 
                 <button
                   type="button"
@@ -678,8 +694,7 @@ function FittingStudioPage({ isGuest = false }) {
             ) : (
               <div className="studio-recommendations-panel">
                 <p className="studio-recommendation-note">
-                  Select an item to display it
-                  on your avatar.
+                  Sample styling picks for this fitting preview. Select an item to try it on your avatar.
                 </p>
 
                 {RECOMMENDED_ITEMS.map(
@@ -842,7 +857,7 @@ function FittingStudioPage({ isGuest = false }) {
 
                 <p>
                   {isGuest
-                    ? "Create an account or log in to access clothing recommendations."
+                    ? "Open Recommendations to try a sample clothing item on your avatar."
                     : "Open Recommendations and select Try Item."}
                 </p>
               </div>
@@ -890,15 +905,11 @@ function FittingStudioPage({ isGuest = false }) {
 
             <button
               type="button"
-              className={
-                isGuest
-                  ? "studio-restricted-action"
-                  : "studio-open-recommendations"
-              }
+              className="studio-open-recommendations"
               onClick={handleRecommendations}
             >
               {isGuest
-                ? "Registration Required for Recommendations"
+                ? "Browse Sample Picks"
                 : "Open Recommendations"}
             </button>
 

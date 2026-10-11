@@ -20,6 +20,7 @@ const DEFAULT_PRESET = {
   height: 165,
   weight: 58,
   skinTone: "#d9aa82",
+  undertone: "Neutral",
   shoulder: "Balanced",
   waist: "Regular",
   hip: "Balanced",
@@ -110,6 +111,9 @@ function normalizePreset(preset, index = 0) {
       preset.skinTone ||
       preset.skinColor ||
       "#d9aa82",
+
+    undertone:
+      preset.undertone || "Neutral",
 
     shoulder:
       preset.shoulder ||
@@ -291,6 +295,7 @@ function EditAvatarPresetPage() {
       "height",
       "weight",
       "skinTone",
+      "undertone",
       "shoulder",
       "waist",
       "hip",
@@ -1030,6 +1035,17 @@ function EditAvatarPresetPage() {
                       </button>
                     )
                   )}
+                </div>
+
+                <div className="edit-avatar-select-grid">
+                  <SelectField
+                    label="Undertone"
+                    value={formData.undertone}
+                    options={["Warm", "Cool", "Neutral"]}
+                    onChange={(value) =>
+                      updateField("undertone", value)
+                    }
+                  />
                 </div>
               </FormSection>
 

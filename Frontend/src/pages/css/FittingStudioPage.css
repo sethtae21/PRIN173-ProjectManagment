@@ -1213,6 +1213,12 @@
   }
 }
 
+@media (max-width: 680px) {
+  .guest-studio .studio-body {
+    padding-top: 76px;
+  }
+}
+
 @media (max-width: 520px) {
   .studio-introduction h1 {
     font-size: 32px;

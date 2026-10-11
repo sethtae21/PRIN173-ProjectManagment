@@ -15,6 +15,7 @@ const BUILT_IN_PRESET = {
   height: 165,
   weight: 58,
   skinTone: "#d9aa82",
+  undertone: "Neutral",
   shoulder: "Balanced",
   waist: "Regular",
   hip: "Balanced",
@@ -108,6 +109,9 @@ function AvatarPresetPage({
 
         skinTone:
           preset.skinTone || "#d9aa82",
+
+        undertone:
+          preset.undertone || "Neutral",
 
         shoulder:
           preset.shoulder || "Balanced",
@@ -544,6 +548,11 @@ function AvatarPresetPage({
               <Measurement
                 label="Weight"
                 value={`${selectedPreset.weight} kg`}
+              />
+
+              <Measurement
+                label="Undertone"
+                value={selectedPreset.undertone || "Neutral"}
               />
 
               <Measurement
