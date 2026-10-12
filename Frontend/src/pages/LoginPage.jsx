@@ -6,7 +6,7 @@ import "./css/LoginPage.css";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [credentials, setCredentials] = useState({ identifier: "", password: "" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,8 +21,8 @@ function LoginPage() {
     event.preventDefault();
     setErrorMessage("");
 
-    if (!credentials.identifier.trim() || !credentials.password) {
-      setErrorMessage("Please enter your email or username and password.");
+    if (!credentials.email.trim() || !credentials.password) {
+      setErrorMessage("Please enter your email address and password.");
       return;
     }
 
@@ -30,7 +30,7 @@ function LoginPage() {
 
     try {
       // Attempt login via backend API
-      const response = await authAPI.login(credentials.identifier, credentials.password);
+      const response = await authAPI.login(credentials.email, credentials.password);
 
       // Save tokens
       if (response.tokens?.access) {
@@ -46,8 +46,8 @@ function LoginPage() {
       const storeName = userData.store_name || "My Store";
 
       const currentUser = {
-        username: credentials.identifier,
-        email: userData.email || credentials.identifier,
+        username: userData.username || credentials.email,
+        email: userData.email || credentials.email,
         role: role,
         storeName: storeName,
       };
@@ -64,7 +64,7 @@ function LoginPage() {
       }
     } catch (error) {
       console.error("Login failed:", error);
-      setErrorMessage("The email, username, or password is incorrect.");
+      setErrorMessage("The email address or password is incorrect.");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,15 +107,15 @@ function LoginPage() {
 
             <form className="login-form" onSubmit={handleSubmit} noValidate>
               <div className="login-field">
-                <label htmlFor="login-identifier">Email Address or Username</label>
+                <label htmlFor="login-email">Email Address</label>
                 <input 
-                  id="login-identifier" 
-                  name="identifier" 
-                  type="text" 
-                  value={credentials.identifier} 
+                  id="login-email" 
+                  name="email" 
+                  type="email" 
+                  value={credentials.email} 
                   onChange={handleChange} 
                   placeholder="name@example.com" 
-                  autoComplete="username" 
+                  autoComplete="email" 
                 />
               </div>
 

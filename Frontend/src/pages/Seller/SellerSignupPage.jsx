@@ -33,7 +33,6 @@ const provinces = [
 
 const initialForm = {
   fullName: "",
-  username: "",
   storeName: "",
   email: "",
   mobile: "",
@@ -246,13 +245,6 @@ function SellerSignupPage() {
         "Please enter at least your first name and surname.";
     }
 
-    if (!form.username.trim()) {
-      nextErrors.username = "Username is required.";
-    } else if (form.username.trim().length < 3) {
-      nextErrors.username =
-        "Username must contain at least 3 characters.";
-    }
-
     if (!form.storeName.trim()) {
       nextErrors.storeName =
         "Store Name is required for Seller accounts.";
@@ -398,7 +390,6 @@ function SellerSignupPage() {
       id: `seller-${Date.now()}`,
       role: "seller",
       fullName: formatProperCase(form.fullName),
-      username: form.username.trim(),
       storeName: form.storeName.trim(),
       email: form.email.trim().toLowerCase(),
       mobile: form.mobile,
@@ -439,16 +430,12 @@ function SellerSignupPage() {
           String(user.email || "").toLowerCase() ===
           sellerAccount.email;
 
-        const sameUsername =
-          String(user.username || "").toLowerCase() ===
-          sellerAccount.username.toLowerCase();
-
         const sameStore =
           user.role === "seller" &&
           String(user.storeName || "").toLowerCase() ===
           sellerAccount.storeName.toLowerCase();
 
-        return !sameEmail && !sameUsername && !sameStore;
+        return !sameEmail && !sameStore;
       });
 
       const updatedUsers = [
@@ -587,17 +574,6 @@ function SellerSignupPage() {
                   onBlur={formatFullName}
                   placeholder="Juan Santos Dela Cruz"
                   autoComplete="name"
-                  wide
-                />
-
-                <InputField
-                  label="Username"
-                  name="username"
-                  value={form.username}
-                  error={errors.username}
-                  onChange={updateField}
-                  placeholder="Enter username"
-                  autoComplete="username"
                   wide
                 />
 

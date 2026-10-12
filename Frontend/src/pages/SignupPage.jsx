@@ -34,7 +34,6 @@ const provinces = [
 
 const initialForm = {
   fullName: "",
-  username: "",
   storeName: "",
   email: "",
   mobile: "",
@@ -222,13 +221,6 @@ export default function SignupPage({ role = "shopper" }) {
           "Please enter at least your first name and surname.";
       }
 
-      if (!form.username.trim()) {
-        nextErrors.username = "Username is required.";
-      } else if (form.username.trim().length < 3) {
-        nextErrors.username =
-          "Username must contain at least 3 characters.";
-      }
-
       if (isSeller) {
         if (!form.storeName.trim()) {
           nextErrors.storeName = "Store Name is required.";
@@ -346,7 +338,6 @@ export default function SignupPage({ role = "shopper" }) {
       id: `${role}-${Date.now()}`,
       role,
       fullName: properCase(form.fullName),
-      username: form.username.trim(),
       ...(isSeller ? { storeName: form.storeName.trim() } : {}),
       email: form.email.trim().toLowerCase(),
       mobile: form.mobile,
@@ -381,11 +372,7 @@ export default function SignupPage({ role = "shopper" }) {
         const sameEmail =
           String(user.email || "").toLowerCase() === account.email;
 
-        const sameUsername =
-          String(user.username || "").toLowerCase() ===
-          account.username.toLowerCase();
-
-        return !sameEmail && !sameUsername;
+        return !sameEmail;
       });
 
       localStorage.setItem(
@@ -498,17 +485,6 @@ export default function SignupPage({ role = "shopper" }) {
                   onBlur={formatFullName}
                   placeholder="Juan Santos Dela Cruz"
                   autoComplete="name"
-                  wide
-                />
-
-                <FormField
-                  label="Username"
-                  name="username"
-                  value={form.username}
-                  error={errors.username}
-                  onChange={updateField}
-                  placeholder="Enter username"
-                  autoComplete="username"
                   wide
                 />
 
