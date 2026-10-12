@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import "./css/ShopperDashboard.css";
 
@@ -61,7 +60,10 @@ function ShopperDashboard() {
   const navigate = useNavigate();
   const shopper = getCurrentShopper();
 
+  // Greet with the backend full_name first, then legacy fallbacks
   const username =
+    shopper?.full_name ||
+    shopper?.fullName ||
     shopper?.username ||
     shopper?.firstName ||
     "Shopper";

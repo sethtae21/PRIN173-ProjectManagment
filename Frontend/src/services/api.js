@@ -22,6 +22,7 @@ export const apiFetch = async (endpoint, options = {}) => {
         if (response.status === 401) {
             console.warn('Token invalid or expired.');
             localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
         }
 
         const contentType = response.headers.get("content-type");
@@ -31,7 +32,6 @@ export const apiFetch = async (endpoint, options = {}) => {
         }
 
         if (!response.ok) {
-            // Throw the whole data object so the component can parse specific field errors
             throw new Error(JSON.stringify(data)); 
         }
 
@@ -49,7 +49,17 @@ export const authAPI = {
     }),
     login: (identifier, password) => apiFetch('/auth/login/', {
         method: 'POST',
-        body: JSON.stringify({ username: identifier, password: password })
+        body: JSON.stringify({ 
+            email: identifier,  // Send as email field
+            password: password 
+        })
+    }),
+    logout: (refreshToken) => apiFetch('/auth/logout/', {
+        method: 'POST',
+        body: JSON.stringify({ refresh: refreshToken })
+    }),
+    getProfile: () => apiFetch('/profile/', {
+        method: 'GET'
     })
 };
 

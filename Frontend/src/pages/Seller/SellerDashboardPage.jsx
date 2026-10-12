@@ -1,6 +1,6 @@
-
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authAPI } from "../../services/api";
 import "../css/SellerDashboardPage.css";
 
 const fallbackProducts = [
@@ -71,14 +71,24 @@ function getSellerAccount() {
       return fallbackAccount;
     }
 
+    // CHANGED: Sellers are greeted by STORE NAME first (per SRS FR-1.1),
+    // full name only as fallback.
+    const displayName =
+      account.store_name ||
+      account.storeName ||
+      account.full_name ||
+      account.fullName ||
+      account.username ||
+      "Seller";
+
+    const storeName =
+      account.store_name ||
+      account.storeName ||
+      "Maison Aurelia";
+
     return {
-      username:
-        account.username ||
-        account.storeName ||
-        "Seller",
-      storeName:
-        account.storeName ||
-        "Maison Aurelia",
+      username: displayName,
+      storeName: storeName,
     };
   } catch {
     return fallbackAccount;
@@ -122,6 +132,36 @@ function SellerDashboardPage() {
     () => getSellerAccount(),
     []
   );
+
+  // Greeting name — starts from storage, verified against backend if needed
+  const [welcomeName, setWelcomeName] = useState(
+    sellerAccount.username
+  );
+
+  // SAFETY NET: if storage was stale/empty, fetch the real
+  // profile from the backend using the JWT token.
+  useEffect(() => {
+    if (
+      welcomeName === "Seller" &&
+      localStorage.getItem("access_token") &&
+      typeof authAPI.getProfile === "function"
+    ) {
+      authAPI
+        .getProfile()
+        .then((res) => {
+          const user = res?.user || {};
+          // CHANGED: store name first, full name as fallback
+          const name =
+            user.store_name ||
+            user.full_name ||
+            "";
+          if (name) setWelcomeName(name);
+        })
+        .catch(() => {
+          // Keep the storage-based name on failure
+        });
+    }
+  }, []);
 
   const products = useMemo(
     () => getSellerProducts(),
@@ -168,7 +208,7 @@ function SellerDashboardPage() {
           </p>
 
           <h1>
-            Welcome, {sellerAccount.username}
+            Welcome, {welcomeName}
           </h1>
 
           <p>

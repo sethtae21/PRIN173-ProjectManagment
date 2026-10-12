@@ -7,7 +7,6 @@ from .auth_serializers import (
     validate_password_strength,
     validate_email_format,
 )
-from .user_serializer import UserSerializer
 
 __all__ = [
     'RegistrationSerializer',

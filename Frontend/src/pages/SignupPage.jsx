@@ -1,7 +1,7 @@
-
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { authAPI } from "../services/api"; // Added API import
 import "./css/SignupPage.css";
 
 const provinces = [
@@ -327,85 +327,103 @@ export default function SignupPage({ role = "shopper" }) {
     scrollTop();
   }
 
-  function handleSubmit(event) {
+  // ==========================================
+  // UPDATED SUBMIT HANDLER WITH BACKEND INTEGRATION
+  // ==========================================
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (step !== 3 || !validateStep(3)) return;
 
-    // Frontend-only registration.
-    // No API or database duplicate check is performed.
-    const account = {
-      id: `${role}-${Date.now()}`,
-      role,
-      fullName: properCase(form.fullName),
-      ...(isSeller ? { storeName: form.storeName.trim() } : {}),
+    // Frontend-only registration logic removed/replaced with API call
+    const accountPayload = {
       email: form.email.trim().toLowerCase(),
+      full_name: properCase(form.fullName),
+      password: form.password,
+      password_confirm: form.confirmPassword,
+      role: isSeller ? "seller" : "shopper", // CHANGED: "user" -> "shopper" to match backend
+      store_name: isSeller ? form.storeName.trim() : "",
       mobile: form.mobile,
-      address: {
-        street: form.street.trim(),
-        barangay: form.barangay.trim(),
-        city: form.city.trim(),
-        province: form.province,
-        postalCode: form.postalCode.trim()
-      },
-      // Passwords are deliberately not stored in browser storage.
-      // Actual credentials will be handled by the backend later.
-      createdAt: new Date().toISOString()
+      street: form.street.trim(),
+      barangay: form.barangay.trim(),
+      city: form.city.trim(),
+      province: form.province,
+      postal_code: form.postalCode.trim()
     };
 
     try {
-      const storageKey = "fitfusion-users";
-      let savedUsers = [];
+      // Call the backend API
+      const response = await authAPI.register(accountPayload);
 
-      try {
-        const parsed = JSON.parse(
-          localStorage.getItem(storageKey) || "[]"
-        );
-        savedUsers = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        savedUsers = [];
+      if (response && response.success) {
+        // Store tokens
+        if (response.tokens) {
+          localStorage.setItem("access_token", response.tokens.access);
+          localStorage.setItem("refresh_token", response.tokens.refresh);
+        }
+
+        // Store user info
+        const userData = response.user || {};
+        const currentUser = {
+          id: userData.id,
+          full_name: userData.full_name || properCase(form.fullName),
+          email: userData.email || form.email.trim().toLowerCase(),
+          role: userData.role || (isSeller ? "seller" : "shopper"),
+          store_name: userData.store_name || (isSeller ? form.storeName.trim() : ""),
+        };
+
+        localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
+        sessionStorage.setItem("userRole", currentUser.role);
+        sessionStorage.setItem("userEmail", currentUser.email);
+
+        if (isSeller) {
+          localStorage.setItem("sellerAccount", JSON.stringify(currentUser));
+          navigate("/seller/dashboard", { replace: true });
+        } else {
+          localStorage.setItem("registeredAccount", JSON.stringify(currentUser));
+          navigate("/shopper/dashboard", { replace: true });
+        }
+      } else {
+        // Fallback if response structure is weird but no error thrown
+        setSubmitError("Registration successful but response format was unexpected.");
       }
 
-      // Demo behavior: replace matching mock records
-      // instead of blocking signup.
-      const filteredUsers = savedUsers.filter(user => {
-        const sameEmail =
-          String(user.email || "").toLowerCase() === account.email;
-
-        return !sameEmail;
-      });
-
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify([...filteredUsers, account])
-      );
-
-      localStorage.setItem(
-        "fitfusion-current-user",
-        JSON.stringify(account)
-      );
-
-      localStorage.setItem(
-        isSeller ? "sellerAccount" : "registeredAccount",
-        JSON.stringify(account)
-      );
-
-      sessionStorage.setItem(
-        isSeller ? "sellerAccount" : "registeredAccount",
-        JSON.stringify(account)
-      );
-
-      sessionStorage.setItem("userRole", role);
-      sessionStorage.setItem("userEmail", account.email);
-
-      navigate(
-        isSeller ? "/seller/dashboard" : "/shopper/dashboard",
-        { replace: true }
-      );
-    } catch {
-      setSubmitError(
-        "Your demo account could not be saved. Please check browser storage and try again."
-      );
+    } catch (error) {
+      console.error("Registration failed:", error);
+      
+      let errorMessage = "Registration failed. Please try again.";
+      
+      try {
+        // Try to parse the error message from the API
+        const errorData = JSON.parse(error.message);
+        
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.email) {
+          errorMessage = Array.isArray(errorData.email) ? errorData.email[0] : errorData.email;
+        } else if (errorData.full_name) {
+          errorMessage = Array.isArray(errorData.full_name) ? errorData.full_name[0] : errorData.full_name;
+        } else if (errorData.role) {
+          errorMessage = Array.isArray(errorData.role) ? errorData.role[0] : errorData.role;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors[0];
+        } else {
+          // Generic fallback
+          const firstKey = Object.keys(errorData)[0];
+          if (firstKey) {
+             errorMessage = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails (e.g. "null" string), show generic message
+        if (error.message && error.message !== "null") {
+            errorMessage = error.message;
+        } else {
+            errorMessage = "A server error occurred. Please check your backend console.";
+        }
+      }
+      
+      setSubmitError(errorMessage);
     }
   }
 
