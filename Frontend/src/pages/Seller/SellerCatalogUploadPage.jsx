@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../../services/api";
+import { catalogAPI } from "../../services/api";
 import "../css/SellerCatalogUploadPage.css";
 
 const requiredColumns = [
@@ -20,10 +20,14 @@ const requiredColumns = [
 ];
 
 const initialImages = {
-  front: null,
-  side: null,
-  rear: null,
+  front: [],
+  side: [],
+  rear: [],
 };
+
+const MAX_PRODUCTS = 10;
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function getSellerStoreName() {
   const storageKeys = [
@@ -41,7 +45,6 @@ function getSellerStoreName() {
 
     try {
       const account = JSON.parse(savedValue);
-
       const storeName =
         account.storeName ||
         account.store_name ||
@@ -56,6 +59,112 @@ function getSellerStoreName() {
   return "Maison Aurelia";
 }
 
+/* ==========================================
+   QUOTE-AWARE CSV PARSER
+========================================== */
+function parseCsvRows(text) {
+  const rows = [];
+  let current = "";
+  let row = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(current);
+      current = "";
+    } else if (char === "\n") {
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+    } else if (char !== "\r") {
+      current += char;
+    }
+  }
+
+  if (current !== "" || row.length > 0) {
+    row.push(current);
+    rows.push(row);
+  }
+
+  return rows.filter((r) => r.some((cell) => cell.trim() !== ""));
+}
+
+function cleanCell(value) {
+  return String(value || "").replace(/^\uFEFF/, "").trim();
+}
+
+function fileStem(fileName) {
+  return fileName.split(".").slice(0, -1).join(".").toLowerCase();
+}
+
+/* ==========================================
+   CSV ANALYZER (FIXED FOR item_name / name)
+========================================== */
+function analyzeCsvText(text) {
+  const rows = parseCsvRows(text);
+
+  const headerIndex = rows.findIndex((row) => {
+    const first = cleanCell(row[0]).toLowerCase();
+    return first === "name" || first === "item_name";
+  });
+
+  if (headerIndex < 0) {
+    throw new Error(
+      "The CSV file is missing its required header row (expected 'name' or 'item_name' as the first column)."
+    );
+  }
+
+  const header = rows[headerIndex].map((cell) =>
+    cleanCell(cell).toLowerCase()
+  );
+
+  const normalizedHeader = header.map((h) =>
+    h === "item_name" ? "name" : h
+  );
+
+  const missingColumns = requiredColumns.filter(
+    (column) => !normalizedHeader.includes(column)
+  );
+
+  if (missingColumns.length > 0) {
+    throw new Error(
+      `The CSV header is missing required columns: ${missingColumns.join(", ")}.`
+    );
+  }
+
+  const productRows = rows
+    .slice(headerIndex + 1)
+    .map((row) => {
+      const record = {};
+      normalizedHeader.forEach((column, index) => {
+        record[column] = cleanCell(row[index]);
+      });
+      return record;
+    })
+    .filter((record) => record.name !== "");
+
+  return { productRows, missingColumns };
+}
+
+/* ==========================================
+   PAGE COMPONENT
+========================================== */
 function SellerCatalogUploadPage() {
   const navigate = useNavigate();
 
@@ -63,24 +172,41 @@ function SellerCatalogUploadPage() {
   const [csvFile, setCsvFile] = useState(null);
   const [images, setImages] = useState(initialImages);
   const [errors, setErrors] = useState({});
-  const [isProcessing, setIsProcessing] =
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
+
+  const [isDownloadingTemplate, setIsDownloadingTemplate] =
     useState(false);
-  const [validationResult, setValidationResult] =
-    useState(null);
+  const [templateError, setTemplateError] = useState("");
+
+  const pollTimer = useRef(null);
 
   useEffect(() => {
     return () => {
-      Object.values(images).forEach((image) => {
-        if (image?.preview) {
-          URL.revokeObjectURL(image.preview);
-        }
-      });
+      if (pollTimer.current) clearTimeout(pollTimer.current);
     };
-  }, [images]);
+  }, []);
 
+  /* ---------- Template download (FR-4.1) ---------- */
+  async function handleDownloadTemplate() {
+    setIsDownloadingTemplate(true);
+    setTemplateError("");
+
+    try {
+      await catalogAPI.downloadTemplate();
+    } catch (error) {
+      console.error("Template download failed:", error);
+      setTemplateError(
+        "Could not download the template from the server. Make sure the backend is running and try again."
+      );
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  }
+
+  /* ---------- CSV selection ---------- */
   function handleCsvChange(event) {
     const file = event.target.files?.[0];
-
     setValidationResult(null);
 
     if (!file) {
@@ -88,10 +214,7 @@ function SellerCatalogUploadPage() {
       return;
     }
 
-    const extension = file.name
-      .split(".")
-      .pop()
-      ?.toLowerCase();
+    const extension = file.name.split(".").pop()?.toLowerCase();
 
     if (extension !== "csv") {
       setCsvFile(null);
@@ -103,7 +226,7 @@ function SellerCatalogUploadPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_FILE_BYTES) {
       setCsvFile(null);
       setErrors((current) => ({
         ...current,
@@ -114,273 +237,316 @@ function SellerCatalogUploadPage() {
     }
 
     setCsvFile(file);
+    setErrors((current) => ({ ...current, csv: "" }));
+  }
+
+  /* ---------- Multi-file image drop zones (FR-4.2) ---------- */
+  function handleImageAdd(view, event) {
+    const addedFiles = Array.from(event.target.files || []);
+    event.target.value = "";
+    setValidationResult(null);
+
+    if (addedFiles.length === 0) return;
+
+    const allNames = [
+      ...images.front,
+      ...images.side,
+      ...images.rear,
+    ].map((item) => item.file.name.toLowerCase());
+
+    const accepted = [];
+    const problems = [];
+
+    for (const file of addedFiles) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        problems.push(`${file.name}: only JPG, PNG, or WEBP allowed.`);
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        problems.push(`${file.name}: exceeds 5 MB.`);
+        continue;
+      }
+      if (allNames.includes(file.name.toLowerCase())) {
+        problems.push(
+          `${file.name}: duplicate filename. Each view file must have a unique name.`
+        );
+        continue;
+      }
+      allNames.push(file.name.toLowerCase());
+      accepted.push({ file });
+    }
+
+    if (accepted.length > 0) {
+      setImages((current) => ({
+        ...current,
+        [view]: [...current[view], ...accepted],
+      }));
+    }
 
     setErrors((current) => ({
       ...current,
-      csv: "",
+      [view]: problems.length > 0 ? problems.join(" ") : "",
     }));
   }
 
-  function handleImageChange(view, event) {
-    const file = event.target.files?.[0];
-
-    setValidationResult(null);
-
-    if (!file) return;
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      setErrors((current) => ({
-        ...current,
-        [view]:
-          "Please upload a JPG, PNG, or WEBP image.",
-      }));
-
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setErrors((current) => ({
-        ...current,
-        [view]:
-          "The image must not exceed 5 MB.",
-      }));
-
-      event.target.value = "";
-      return;
-    }
-
-    setImages((current) => {
-      if (current[view]?.preview) {
-        URL.revokeObjectURL(
-          current[view].preview
-        );
-      }
-
-      return {
-        ...current,
-        [view]: {
-          file,
-          preview: URL.createObjectURL(file),
-        },
-      };
-    });
-
-    setErrors((current) => ({
+  function handleImageRemove(view, index) {
+    setImages((current) => ({
       ...current,
-      [view]: "",
+      [view]: current[view].filter((_, i) => i !== index),
     }));
-  }
-
-  function removeImage(view) {
-    setImages((current) => {
-      if (current[view]?.preview) {
-        URL.revokeObjectURL(
-          current[view].preview
-        );
-      }
-
-      return {
-        ...current,
-        [view]: null,
-      };
-    });
-
     setValidationResult(null);
   }
 
-  function countCsvProducts(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const text = String(reader.result || "");
-
-        const rows = text
-          .split(/\r?\n/)
-          .filter((row) => row.trim() !== "");
-
-        const headerIndex = rows.findIndex((row) => {
-          const columns = row
-            .replace(/^\uFEFF/, "")
-            .split(",")
-            .map((column) =>
-              column.trim().replace(/^"|"$/g, "").toLowerCase()
-            );
-
-          return columns[0] === "name";
-        });
-
-        if (headerIndex < 0) {
-          reject(
-            new Error("The CSV file is missing its required header row.")
-          );
-          return;
-        }
-
-        const headerColumns = rows[headerIndex]
-          .replace(/^\uFEFF/, "")
-          .split(",")
-          .map((column) =>
-            column.trim().replace(/^"|"$/g, "").toLowerCase()
-          );
-        const missingColumns = requiredColumns.filter(
-          (column) => !headerColumns.includes(column)
-        );
-
-        if (missingColumns.length > 0) {
-          reject(
-            new Error(
-              `The CSV header is missing required columns: ${missingColumns.join(", ")}.`
-            )
-          );
-          return;
-        }
-
-        const productRows = rows
-          .slice(headerIndex + 1)
-          .filter((row) => row.trim() !== "");
-
-        resolve(productRows.length);
-      };
-
-      reader.onerror = () => {
-        reject(
-          new Error("The CSV file could not be read.")
-        );
-      };
-
-      reader.readAsText(file);
-    });
-  }
-
+  /* ---------- Submit → backend /catalog/upload/ ---------- */
   async function handleSubmit(event) {
     event.preventDefault();
 
     const nextErrors = {};
 
-    if (!csvFile) {
-      nextErrors.csv =
-        "Please upload your catalog CSV file.";
-    }
-
-    if (!images.front) {
-      nextErrors.front =
-        "A front-view image is required.";
-    }
-
-    if (!images.side) {
-      nextErrors.side =
-        "A side-view image is required.";
-    }
-
-    if (!images.rear) {
-      nextErrors.rear =
-        "A rear-view image is required.";
-    }
+    if (!csvFile) nextErrors.csv = "Please upload your catalog CSV file.";
+    if (images.front.length === 0) nextErrors.front = "At least one Front View image is required.";
+    if (images.side.length === 0) nextErrors.side = "At least one Side View image is required.";
+    if (images.rear.length === 0) nextErrors.rear = "At least one Rear View image is required.";
 
     setErrors(nextErrors);
     setValidationResult(null);
 
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
+    if (Object.keys(nextErrors).length > 0) return;
 
     setIsProcessing(true);
 
     try {
-      const productCount =
-        await countCsvProducts(csvFile);
+      const csvText = await csvFile.text();
+      const { productRows } = analyzeCsvText(csvText);
 
-      if (productCount === 0) {
-        setErrors({
-          csv: "The CSV file does not contain any product records.",
-        });
-
+      if (productRows.length === 0) {
+        setErrors({ csv: "The CSV file does not contain any product records." });
         setIsProcessing(false);
         return;
       }
 
-      if (productCount > 10) {
+      if (productRows.length > MAX_PRODUCTS) {
         setErrors({
-          csv: `The CSV contains ${productCount} products. Only 10 products can be uploaded at one time.`,
+          csv: `The CSV contains ${productRows.length} products. Only ${MAX_PRODUCTS} products can be uploaded at one time.`,
         });
-
         setIsProcessing(false);
         return;
       }
 
-      const uploadRecord = {
-        id: `UPLOAD-${Date.now()}`,
-        storeName,
-        csvName: csvFile.name,
-        productCount,
-        imageNames: {
-          front: images.front.file.name,
-          side: images.side.file.name,
-          rear: images.rear.file.name,
-        },
-        status: "Validated",
-        uploadedAt: new Date().toISOString(),
-      };
+      const uploaded = [
+        ...images.front.map((i) => i.file.name),
+        ...images.side.map((i) => i.file.name),
+        ...images.rear.map((i) => i.file.name),
+      ];
+      const uploadedExact = new Set(uploaded.map((n) => n.toLowerCase()));
+      const uploadedStems = new Set(uploaded.map((n) => fileStem(n)));
 
-      const previousUploads = JSON.parse(
-        localStorage.getItem(
-          "fitfusion-seller-uploads"
-        ) || "[]"
-      );
+      const missingFiles = [];
+      productRows.forEach((row, index) => {
+        const rowLabel = `Row ${index + 2} (${row.name || "unnamed"})`;
+        [
+          ["front_image_filename", "Front"],
+          ["side_image_filename", "Side"],
+          ["rear_image_filename", "Rear"],
+        ].forEach(([column, label]) => {
+          const csvName = (row[column] || "").trim();
+          if (!csvName) {
+            missingFiles.push(`${rowLabel}: ${label} filename column is empty.`);
+            return;
+          }
+          const ok =
+            uploadedExact.has(csvName.toLowerCase()) ||
+            uploadedStems.has(fileStem(csvName));
+          if (!ok) {
+            missingFiles.push(
+              `${rowLabel}: ${label} file "${csvName}" was not uploaded.`
+            );
+          }
+        });
+      });
 
-      localStorage.setItem(
-        "fitfusion-seller-uploads",
-        JSON.stringify([
-          uploadRecord,
-          ...previousUploads,
-        ])
-      );
+      if (missingFiles.length > 0) {
+        setValidationResult({
+          type: "error",
+          title: "Filename mapping failed",
+          message: missingFiles.slice(0, 6).join(" "),
+          details: missingFiles.slice(0, 6),
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("csv_file", csvFile);
+      [...images.front, ...images.side, ...images.rear].forEach((item) => {
+        formData.append("images", item.file);
+      });
 
       setValidationResult({
-        type: "success",
-        title: "Catalog validated successfully",
-        message: `${productCount} product${
-          productCount === 1 ? "" : "s"
-        } assigned to ${storeName}.`,
+        type: "processing",
+        title: "Upload accepted — validating…",
+        message:
+          "The backend is removing backgrounds (rembg) and validating your items. This can take up to 60 seconds.",
       });
+
+      const response = await catalogAPI.upload(formData);
+
+      if (!response || !response.batch_id) {
+        setValidationResult({
+          type: "error",
+          title: "Upload failed",
+          message: response?.error || "The backend did not return a batch ID.",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      pollBatchReport(response.batch_id, 0);
     } catch (error) {
+      console.error("Upload failed:", error);
+
+      let message =
+        "The catalog could not be uploaded. Please check your files and try again.";
+      try {
+        const errorData = JSON.parse(error.message);
+        message = errorData.error || errorData.detail || message;
+      } catch {
+        if (error.message && error.message !== "null") message = error.message;
+      }
+
       setValidationResult({
         type: "error",
-        title: "Validation failed",
-        message: error.message ||
-          "The CSV file could not be processed. Please check the file and try again.",
+        title: "Upload rejected",
+        message,
       });
-    } finally {
       setIsProcessing(false);
     }
   }
 
-  function handleReset() {
-    Object.values(images).forEach((image) => {
-      if (image?.preview) {
-        URL.revokeObjectURL(image.preview);
+  /* ---------- Batch report polling ---------- */
+  function pollBatchReport(batchId, attempts) {
+    pollTimer.current = setTimeout(async () => {
+      try {
+        const report = await catalogAPI.batchReport(batchId);
+
+        if (report.status === "completed" || report.status === "failed") {
+          await finishWithReport(batchId, report);
+          return;
+        }
+
+        if (attempts >= 30) {
+          setValidationResult({
+            type: "processing",
+            title: "Still processing",
+            message:
+              "Validation is taking longer than expected. Check the Product Validation page in a moment.",
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        pollBatchReport(batchId, attempts + 1);
+      } catch (error) {
+        if (attempts >= 5) {
+          setValidationResult({
+            type: "error",
+            title: "Could not fetch validation report",
+            message: "The upload was accepted, but the report could not be loaded.",
+          });
+          setIsProcessing(false);
+          return;
+        }
+        pollBatchReport(batchId, attempts + 1);
       }
-    });
+    }, 2500);
+  }
+
+  async function finishWithReport(batchId, report) {
+    let details = [];
+    const reportEntries = Object.entries(report.rejection_report || {});
+
+    if (reportEntries.length > 0) {
+      try {
+        const listings = await catalogAPI.myListings();
+        const nameById = {};
+        (Array.isArray(listings) ? listings : []).forEach((item) => {
+          nameById[String(item.id)] = item.name;
+        });
+
+        details = reportEntries.map(([itemId, reasons]) => ({
+          name: nameById[itemId] || `Item ${itemId.slice(0, 8)}`,
+          reasons: Array.isArray(reasons) ? reasons : [reasons],
+        }));
+      } catch {
+        details = reportEntries.map(([itemId, reasons]) => ({
+          name: `Item ${itemId.slice(0, 8)}`,
+          reasons: Array.isArray(reasons) ? reasons : [reasons],
+        }));
+      }
+    }
+
+    try {
+      const record = {
+        id: batchId,
+        batchId,
+        storeName,
+        csvName: csvFile?.name || "",
+        productCount: report.total_items,
+        accepted: report.accepted_count,
+        rejected: report.rejected_count,
+        status: report.status,
+        uploadedAt: new Date().toISOString(),
+      };
+      const previous = JSON.parse(
+        localStorage.getItem("fitfusion-seller-uploads") || "[]"
+      );
+      localStorage.setItem(
+        "fitfusion-seller-uploads",
+        JSON.stringify([record, ...previous])
+      );
+    } catch {
+      // Non-critical
+    }
+
+    if (report.status === "failed") {
+      setValidationResult({
+        type: "error",
+        title: "Batch processing failed",
+        message:
+          report.rejection_report?.error ||
+          "The backend could not process this batch.",
+      });
+    } else if (report.rejected_count > 0) {
+      setValidationResult({
+        type: "success",
+        title: `Processing complete — ${report.accepted_count} accepted, ${report.rejected_count} rejected`,
+        message: `${report.total_items} item(s) processed for ${storeName}. Rejected items are listed below and on the Product Validation page.`,
+        details,
+      });
+    } else {
+      setValidationResult({
+        type: "success",
+        title: "Catalog validated successfully",
+        message: `${report.accepted_count} product(s) published to ${storeName}.`,
+      });
+    }
+
+    setIsProcessing(false);
+  }
+
+  /* ---------- Reset ---------- */
+  function handleReset() {
+    if (pollTimer.current) clearTimeout(pollTimer.current);
 
     setCsvFile(null);
     setImages(initialImages);
     setErrors({});
     setValidationResult(null);
+    setTemplateError("");
+    setIsProcessing(false);
 
-    const csvInput =
-      document.getElementById("catalog-csv");
-
-    if (csvInput) {
-      csvInput.value = "";
-    }
+    const csvInput = document.getElementById("catalog-csv");
+    if (csvInput) csvInput.value = "";
   }
 
   return (
@@ -398,9 +564,9 @@ function SellerCatalogUploadPage() {
           <h1>Add products to your store</h1>
 
           <p>
-            Upload your CSV product list and provide
-            the required Front, Side, and Rear product
-            images.
+            Upload your CSV product list and provide the
+            Front, Side, and Rear images for every product
+            row. Filenames must match the CSV columns.
           </p>
         </section>
 
@@ -411,9 +577,8 @@ function SellerCatalogUploadPage() {
           </div>
 
           <p>
-            Products from this upload will
-            automatically be assigned to your
-            authenticated seller store.
+            Products from this upload will automatically be
+            assigned to your authenticated seller store.
           </p>
         </section>
 
@@ -432,8 +597,8 @@ function SellerCatalogUploadPage() {
 
             <div className="seller-upload-guidelines">
               <p>
-                Use the required CSV template and
-                upload up to 10 products.
+                Use the required CSV template and upload up
+                to 10 products.
               </p>
 
               <ul>
@@ -446,12 +611,19 @@ function SellerCatalogUploadPage() {
             <button
               type="button"
               className="seller-template-button"
-              onClick={() => {
-                window.location.href = `${API_URL}/catalog/download-template/`;
-              }}
+              onClick={handleDownloadTemplate}
+              disabled={isDownloadingTemplate}
             >
-              Download Required Template
+              {isDownloadingTemplate
+                ? "Downloading…"
+                : "Download Required Template"}
             </button>
+
+            {templateError && (
+              <p className="seller-upload-error">
+                {templateError}
+              </p>
+            )}
 
             <label
               className={
@@ -461,19 +633,13 @@ function SellerCatalogUploadPage() {
               }
               htmlFor="catalog-csv"
             >
-              <span className="seller-upload-icon">
-                ↑
-              </span>
+              <span className="seller-upload-icon">↑</span>
 
               <strong>
-                {csvFile
-                  ? csvFile.name
-                  : "Select your CSV file"}
+                {csvFile ? csvFile.name : "Select your CSV file"}
               </strong>
 
-              <small>
-                Click here to browse your files
-              </small>
+              <small>Click here to browse your files</small>
 
               <input
                 id="catalog-csv"
@@ -484,20 +650,14 @@ function SellerCatalogUploadPage() {
             </label>
 
             {errors.csv && (
-              <p className="seller-upload-error">
-                {errors.csv}
-              </p>
+              <p className="seller-upload-error">{errors.csv}</p>
             )}
 
             {csvFile && (
               <div className="seller-selected-file">
                 <div>
                   <strong>{csvFile.name}</strong>
-
-                  <span>
-                    {(csvFile.size / 1024).toFixed(1)}
-                    {" KB"}
-                  </span>
+                  <span>{(csvFile.size / 1024).toFixed(1)}{" KB"}</span>
                 </div>
 
                 <button
@@ -505,12 +665,8 @@ function SellerCatalogUploadPage() {
                   onClick={() => {
                     setCsvFile(null);
                     setValidationResult(null);
-
                     const input =
-                      document.getElementById(
-                        "catalog-csv"
-                      );
-
+                      document.getElementById("catalog-csv");
                     if (input) input.value = "";
                   }}
                 >
@@ -533,37 +689,37 @@ function SellerCatalogUploadPage() {
             </div>
 
             <p className="seller-upload-image-note">
-              Upload a clear Front, Side, and Rear
-              image. Each image must show the same
-              product.
+              Each drop zone accepts multiple files — one per
+              CSV row. Filenames must match the CSV
+              front/side/rear filename columns.
             </p>
 
             <div className="seller-image-grid">
               <ImageUploader
                 view="front"
                 title="Front View"
-                image={images.front}
+                files={images.front}
                 error={errors.front}
-                onChange={handleImageChange}
-                onRemove={removeImage}
+                onAdd={handleImageAdd}
+                onRemove={handleImageRemove}
               />
 
               <ImageUploader
                 view="side"
                 title="Side View"
-                image={images.side}
+                files={images.side}
                 error={errors.side}
-                onChange={handleImageChange}
-                onRemove={removeImage}
+                onAdd={handleImageAdd}
+                onRemove={handleImageRemove}
               />
 
               <ImageUploader
                 view="rear"
                 title="Rear View"
-                image={images.rear}
+                files={images.rear}
                 error={errors.rear}
-                onChange={handleImageChange}
-                onRemove={removeImage}
+                onAdd={handleImageAdd}
+                onRemove={handleImageRemove}
               />
             </div>
           </section>
@@ -575,20 +731,38 @@ function SellerCatalogUploadPage() {
             role="status"
           >
             <div>
-              <strong>
-                {validationResult.title}
-              </strong>
-
+              <strong>{validationResult.title}</strong>
               <p>{validationResult.message}</p>
+
+              {validationResult.details &&
+                validationResult.details.length > 0 && (
+                  <ul>
+                    {validationResult.details.map((entry, index) => (
+                      <li key={index}>
+                        {typeof entry === "string" ? (
+                          entry
+                        ) : (
+                          <>
+                            <strong>{entry.name}:</strong>{" "}
+                            {entry.reasons.join(" • ")}
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
             </div>
 
-            {validationResult.type ===
-              "success" && (
+            {validationResult.type === "success" && (
               <button
                 type="button"
-                onClick={() =>
-                  navigate("/seller/validation")
-                }
+                onClick={() => {
+                  // Navigate with batch_id so validation page can fetch real data
+                  const batchId = validationResult.batchId || "";
+                  navigate(
+                    `/seller/validation${batchId ? `?batch=${batchId}` : ""}`
+                  );
+                }}
               >
                 View Validation
               </button>
@@ -611,9 +785,7 @@ function SellerCatalogUploadPage() {
             className="seller-upload-submit"
             disabled={isProcessing}
           >
-            {isProcessing
-              ? "Processing…"
-              : "Process and Validate"}
+            {isProcessing ? "Processing…" : "Process and Validate"}
           </button>
         </div>
       </form>
@@ -621,81 +793,62 @@ function SellerCatalogUploadPage() {
   );
 }
 
-function ImageUploader({
-  view,
-  title,
-  image,
-  error,
-  onChange,
-  onRemove,
-}) {
+/* ==========================================
+   MULTI-FILE IMAGE DROP ZONE
+========================================== */
+function ImageUploader({ view, title, files, error, onAdd, onRemove }) {
   const inputId = `${view}-product-image`;
 
   return (
     <article className="seller-image-uploader">
       <div className="seller-image-title">
         <strong>{title}</strong>
-        <span>JPG, PNG or WEBP</span>
+        <span>JPG, PNG or WEBP • {files.length} file(s)</span>
       </div>
 
-      {image ? (
-        <div className="seller-image-preview">
-          <img
-            src={image.preview}
-            alt={`${title} product preview`}
-          />
+      <label
+        className={
+          error ? "seller-image-dropzone error" : "seller-image-dropzone"
+        }
+        htmlFor={inputId}
+      >
+        <span>+</span>
+        <strong>Upload {title}</strong>
+        <small>Max 5 MB each • multiple files allowed</small>
 
-          <div className="seller-image-overlay">
-            <label htmlFor={inputId}>
-              Replace
-            </label>
+        <input
+          id={inputId}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => onAdd(view, event)}
+        />
+      </label>
 
-            <button
-              type="button"
-              onClick={() => onRemove(view)}
+      {files.length > 0 && (
+        <div className="seller-image-file-list">
+          {files.map((item, index) => (
+            <div
+              className="seller-selected-file"
+              key={`${item.file.name}-${index}`}
             >
-              Remove
-            </button>
-          </div>
+              <div>
+                <strong>{item.file.name}</strong>
+                <span>{(item.file.size / 1024).toFixed(1)}{" KB"}</span>
+              </div>
 
-          <input
-            id={inputId}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) =>
-              onChange(view, event)
-            }
-          />
+              <button
+                type="button"
+                onClick={() => onRemove(view, index)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
-      ) : (
-        <label
-          className={
-            error
-              ? "seller-image-dropzone error"
-              : "seller-image-dropzone"
-          }
-          htmlFor={inputId}
-        >
-          <span>+</span>
-          <strong>Upload {title}</strong>
-          <small>Maximum size: 5 MB</small>
-
-          <input
-            id={inputId}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) =>
-              onChange(view, event)
-            }
-          />
-        </label>
       )}
 
-      {error && (
-        <p className="seller-upload-error">
-          {error}
-        </p>
-      )}
+      {error && <p className="seller-upload-error">{error}</p>}
     </article>
   );
 }
