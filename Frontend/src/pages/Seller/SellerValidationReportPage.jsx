@@ -14,6 +14,7 @@ function SellerValidationReportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  /* ---------- Fetch batch report + live listings ---------- */
   useEffect(() => {
     let cancelled = false;
 
@@ -22,29 +23,32 @@ function SellerValidationReportPage() {
       setError("");
 
       try {
-        // Fetch all listings first (to map item IDs to names)
         const listingsData = await catalogAPI.myListings();
         if (cancelled) return;
         setListings(Array.isArray(listingsData) ? listingsData : []);
 
-        // If batch_id is in URL, fetch that specific batch
-        if (batchIdFromUrl) {
-          const report = await catalogAPI.batchReport(batchIdFromUrl);
-          if (cancelled) return;
-          setBatchReport(report);
-        } else {
-          // No batch_id: show latest batch from localStorage or all listings
-          const uploads = JSON.parse(
-            localStorage.getItem("fitfusion-seller-uploads") || "[]"
-          );
-          if (uploads.length > 0) {
-            const latestBatch = uploads[0];
-            if (latestBatch.batchId) {
-              const report = await catalogAPI.batchReport(latestBatch.batchId);
-              if (cancelled) return;
-              setBatchReport(report);
+        let targetBatchId = batchIdFromUrl;
+
+        if (!targetBatchId) {
+          try {
+            const uploads = JSON.parse(
+              localStorage.getItem("fitfusion-seller-uploads") || "[]"
+            );
+            if (
+              Array.isArray(uploads) &&
+              uploads.length > 0 &&
+              uploads[0].batchId
+            ) {
+              targetBatchId = uploads[0].batchId;
             }
+          } catch {
+            // ignore storage errors
           }
+        }
+
+        if (targetBatchId) {
+          const report = await catalogAPI.batchReport(targetBatchId);
+          if (!cancelled) setBatchReport(report);
         }
       } catch (err) {
         console.error("Failed to load validation report:", err);
@@ -65,68 +69,79 @@ function SellerValidationReportPage() {
     };
   }, [batchIdFromUrl]);
 
-  // Build validation items from real data
-  const validationItems = useMemo(() => {
+  /* ---------- FIXED: only items that belong to THIS batch ---------- */
+  const batchItems = useMemo(() => {
     if (!batchReport) return [];
-
-    const nameById = {};
-    listings.forEach((item) => {
-      nameById[String(item.id)] = item.name;
-    });
-
-    const accepted = [];
-    const rejected = [];
-
-    listings.forEach((item) => {
-      // Only show items from this batch if batchReport has items
-      const itemId = String(item.id);
-      const rejectionReasons = batchReport.rejection_report?.[itemId];
-
-      if (item.status === "active" || (!rejectionReasons && item.status !== "rejected")) {
-        accepted.push({
-          id: itemId,
-          name: item.name,
-          status: "Accepted",
-          reason: "All required fields, filenames, and images passed validation.",
-        });
-      } else if (item.status === "rejected" || rejectionReasons) {
-        rejected.push({
-          id: itemId,
-          name: item.name,
-          status: "Rejected",
-          reason: Array.isArray(rejectionReasons)
-            ? rejectionReasons.join("; ")
-            : rejectionReasons || "Validation failed.",
-        });
-      }
-    });
-
-    return [...accepted, ...rejected];
-  }, [batchReport, listings]);
+    return listings.filter(
+      (item) => String(item.batch || "") === String(batchReport.id)
+    );
+  }, [listings, batchReport]);
 
   const acceptedItems = useMemo(
-    () => validationItems.filter((item) => item.status === "Accepted"),
-    [validationItems]
+    () =>
+      batchItems
+        .filter((item) => String(item.status).toLowerCase() === "active")
+        .map((item) => ({
+          id: String(item.id),
+          name: item.name,
+          status: "Accepted",
+          reason:
+            "All required fields, filenames, and images passed validation.",
+        })),
+    [batchItems]
   );
 
   const rejectedItems = useMemo(
-    () => validationItems.filter((item) => item.status === "Rejected"),
-    [validationItems]
+    () =>
+      batchItems
+        .filter((item) => {
+          const status = String(item.status).toLowerCase();
+          const hasReasons =
+            Array.isArray(item.rejection_reasons) &&
+            item.rejection_reasons.length > 0;
+          const inReport = Boolean(
+            batchReport?.rejection_report?.[String(item.id)]
+          );
+          return status === "rejected" || hasReasons || inReport;
+        })
+        .map((item) => {
+          const reasons =
+            (Array.isArray(item.rejection_reasons) &&
+              item.rejection_reasons.length > 0 &&
+              item.rejection_reasons) ||
+            batchReport?.rejection_report?.[String(item.id)] ||
+            ["Validation failed."];
+          return {
+            id: String(item.id),
+            name: item.name,
+            status: "Rejected",
+            reason: Array.isArray(reasons) ? reasons.join("; ") : reasons,
+          };
+        }),
+    [batchItems, batchReport]
   );
 
-  const totalItems = batchReport?.total_items || validationItems.length;
-  const acceptedCount = batchReport?.accepted_count ?? acceptedItems.length;
-  const rejectedCount = batchReport?.rejected_count ?? rejectedItems.length;
+  const pendingItems = useMemo(
+    () =>
+      batchItems.filter((item) => {
+        const status = String(item.status).toLowerCase();
+        return status !== "active" && status !== "rejected";
+      }),
+    [batchItems]
+  );
 
-  const acceptanceRate = totalItems > 0
-    ? Math.round((acceptedCount / totalItems) * 100)
-    : 0;
+  /* ---------- FIXED: counts derived from LIVE items, not stored counters ---------- */
+  const totalItems = batchItems.length;
+  const acceptedCount = acceptedItems.length;
+  const rejectedCount = rejectedItems.length;
+  const acceptanceRate =
+    totalItems > 0 ? Math.round((acceptedCount / totalItems) * 100) : 0;
 
-  // Format batch ID for display (e.g., "Batch FF-014")
   const batchDisplayId = batchReport
     ? `Batch ${String(batchReport.id).slice(-6).toUpperCase()}`
     : "Validation Report";
 
+  /* ---------- States ---------- */
   if (isLoading) {
     return (
       <section className="seller-validation-page">
@@ -162,7 +177,7 @@ function SellerValidationReportPage() {
     );
   }
 
-  if (!batchReport && validationItems.length === 0) {
+  if (!batchReport) {
     return (
       <section className="seller-validation-page">
         <div className="seller-validation-body">
@@ -170,9 +185,7 @@ function SellerValidationReportPage() {
             <div>
               <p className="seller-validation-label">VALIDATION REPORT</p>
               <h1>No Batches Yet</h1>
-              <p>
-                Upload a catalog to see validation results here.
-              </p>
+              <p>Upload a catalog to see validation results here.</p>
             </div>
             <button
               type="button"
@@ -192,24 +205,17 @@ function SellerValidationReportPage() {
       <div className="seller-validation-body">
         <section className="seller-validation-introduction">
           <div>
-            <p className="seller-validation-label">
-              VALIDATION REPORT
-            </p>
+            <p className="seller-validation-label">VALIDATION REPORT</p>
 
             <h1>{batchDisplayId}</h1>
 
-            <p>
-              Accepted and rejected products with
-              their validation results.
-            </p>
+            <p>Accepted and rejected products with their validation results.</p>
           </div>
 
           <button
             type="button"
             className="seller-validation-upload-button"
-            onClick={() =>
-              navigate("/seller/upload-catalog")
-            }
+            onClick={() => navigate("/seller/upload-catalog")}
           >
             Upload Another File
           </button>
@@ -237,18 +243,19 @@ function SellerValidationReportPage() {
           </article>
         </section>
 
+        {pendingItems.length > 0 && (
+          <p className="seller-validation-pending-note" role="status">
+            {pendingItems.length} item(s) still processing — results will
+            appear here once validation completes.
+          </p>
+        )}
+
         <section className="seller-validation-results">
           <article className="seller-validation-panel">
             <div className="seller-validation-panel-heading">
               <div>
-                <h2>
-                  Accepted — {acceptedCount} items
-                </h2>
-
-                <p>
-                  These products passed every
-                  validation rule.
-                </p>
+                <h2>Accepted — {acceptedCount} items</h2>
+                <p>These products passed every validation rule.</p>
               </div>
 
               <span className="seller-validation-count accepted">
@@ -259,14 +266,13 @@ function SellerValidationReportPage() {
             <div className="seller-validation-list">
               {acceptedItems.length === 0 ? (
                 <p style={{ padding: "1rem", color: "#666" }}>
-                  No accepted items in this batch.
+                  {totalItems === 0
+                    ? "No items remaining in this batch (items may have been deleted)."
+                    : "No accepted items in this batch."}
                 </p>
               ) : (
                 acceptedItems.map((item) => (
-                  <div
-                    className="seller-validation-item"
-                    key={item.id}
-                  >
+                  <div className="seller-validation-item" key={item.id}>
                     <span
                       className="seller-validation-icon accepted"
                       aria-hidden="true"
@@ -291,14 +297,8 @@ function SellerValidationReportPage() {
           <article className="seller-validation-panel">
             <div className="seller-validation-panel-heading">
               <div>
-                <h2>
-                  Rejected — {rejectedCount} items
-                </h2>
-
-                <p>
-                  Correct these products before
-                  publishing.
-                </p>
+                <h2>Rejected — {rejectedCount} items</h2>
+                <p>Correct these products before publishing.</p>
               </div>
 
               <span className="seller-validation-count rejected">
@@ -309,7 +309,9 @@ function SellerValidationReportPage() {
             <div className="seller-validation-list">
               {rejectedItems.length === 0 ? (
                 <p style={{ padding: "1rem", color: "#666" }}>
-                  No rejected items in this batch.
+                  {totalItems === 0
+                    ? "No items remaining in this batch (items may have been deleted)."
+                    : "No rejected items in this batch."}
                 </p>
               ) : (
                 rejectedItems.map((item) => (
@@ -333,9 +335,7 @@ function SellerValidationReportPage() {
                       type="button"
                       className="seller-validation-fix-button"
                       onClick={() =>
-                        navigate(
-                          `/seller/listings/${item.id}/edit`
-                        )
+                        navigate(`/seller/listings/${item.id}/edit`)
                       }
                     >
                       Fix
@@ -351,9 +351,7 @@ function SellerValidationReportPage() {
           <button
             type="button"
             className="seller-validation-secondary-button"
-            onClick={() =>
-              navigate("/seller/listings")
-            }
+            onClick={() => navigate("/seller/listings")}
           >
             View All Listings
           </button>
@@ -361,9 +359,7 @@ function SellerValidationReportPage() {
           <button
             type="button"
             className="seller-validation-primary-button"
-            onClick={() =>
-              navigate("/seller/upload-catalog")
-            }
+            onClick={() => navigate("/seller/upload-catalog")}
           >
             Upload or Re-upload
           </button>
