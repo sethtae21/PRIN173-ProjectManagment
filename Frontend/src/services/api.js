@@ -35,7 +35,7 @@ function forceLogout(message) {
 }
 
 /* ==========================================
-   TOKEN REFRESH — recovers expired sessions
+   TOKEN REFRESH
 ========================================== */
 async function refreshAccessToken() {
     const refreshToken = getRefreshToken();
@@ -56,7 +56,6 @@ async function refreshAccessToken() {
 
     const data = await response.json();
     localStorage.setItem('access_token', data.access);
-    // CRITICAL: Your backend rotates refresh tokens, so save the new one
     if (data.refresh) {
         localStorage.setItem('refresh_token', data.refresh);
     }
@@ -131,7 +130,25 @@ export const authAPI = {
         method: 'POST',
         body: JSON.stringify({ refresh: refreshToken })
     }),
-    getProfile: () => apiFetch('/profile/', { method: 'GET' })
+    getProfile: () => apiFetch('/profile/', { method: 'GET' }),
+
+    // FR-1.3: update profile fields (writes to accounts_user)
+    updateProfile: (payload) => apiFetch('/profile/', {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+    }),
+
+    // FR-1.3: change password (verifies old password + FR-1.5 policy)
+    changePassword: (payload) => apiFetch('/auth/change-password/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    }),
+
+    // FR-1.4: soft deactivation — is_active=false, records retained
+    deactivateAccount: (payload) => apiFetch('/auth/deactivate/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    }),
 };
 
 /* ==========================================
