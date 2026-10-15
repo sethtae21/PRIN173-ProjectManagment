@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import { authAPI } from "../services/api"; // Correct path for pages/LoginPage.jsx
+import { authAPI } from "../services/api";
 import "./css/LoginPage.css";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [credentials, setCredentials] = useState({ identifier: "", password: "" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,8 +21,8 @@ function LoginPage() {
     event.preventDefault();
     setErrorMessage("");
 
-    if (!credentials.identifier.trim() || !credentials.password) {
-      setErrorMessage("Please enter your email or username and password.");
+    if (!credentials.email.trim() || !credentials.password) {
+      setErrorMessage("Please enter your email address and password.");
       return;
     }
 
@@ -30,7 +30,7 @@ function LoginPage() {
 
     try {
       // Attempt login via backend API
-      const response = await authAPI.login(credentials.identifier, credentials.password);
+      const response = await authAPI.login(credentials.email.trim().toLowerCase(), credentials.password);
 
       // Save tokens
       if (response.tokens?.access) {
@@ -40,16 +40,16 @@ function LoginPage() {
         localStorage.setItem("refresh_token", response.tokens.refresh);
       }
 
-      // Determine role (backend might return it, or we default)
+      // Determine role and extract user data
       const userData = response.user || {};
       const role = userData.role === "seller" ? "seller" : "shopper";
-      const storeName = userData.store_name || "My Store";
-
+      
       const currentUser = {
-        username: credentials.identifier,
-        email: userData.email || credentials.identifier,
+        id: userData.id,
+        full_name: userData.full_name || credentials.email,
+        email: userData.email || credentials.email,
         role: role,
-        storeName: storeName,
+        store_name: userData.store_name || "",
       };
 
       localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
@@ -60,11 +60,24 @@ function LoginPage() {
         sessionStorage.setItem("registeredAccount", JSON.stringify(currentUser));
         navigate("/shopper/dashboard", { replace: true });
       } else {
+        localStorage.setItem("sellerAccount", JSON.stringify(currentUser));
         navigate("/seller/dashboard", { replace: true });
       }
     } catch (error) {
       console.error("Login failed:", error);
-      setErrorMessage("The email, username, or password is incorrect.");
+      let errorMsg = "The email address or password is incorrect.";
+      try {
+        const errorData = JSON.parse(error.message);
+        if (errorData.detail) {
+          errorMsg = errorData.detail;
+        } else {
+          const firstKey = Object.keys(errorData)[0];
+          if (firstKey) {
+            errorMsg = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
+          }
+        }
+      } catch {}
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,15 +120,15 @@ function LoginPage() {
 
             <form className="login-form" onSubmit={handleSubmit} noValidate>
               <div className="login-field">
-                <label htmlFor="login-identifier">Email Address or Username</label>
+                <label htmlFor="login-email">Email Address</label>
                 <input 
-                  id="login-identifier" 
-                  name="identifier" 
-                  type="text" 
-                  value={credentials.identifier} 
+                  id="login-email" 
+                  name="email" 
+                  type="email" 
+                  value={credentials.email} 
                   onChange={handleChange} 
                   placeholder="name@example.com" 
-                  autoComplete="username" 
+                  autoComplete="email" 
                 />
               </div>
 

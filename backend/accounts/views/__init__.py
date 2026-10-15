@@ -1,6 +1,7 @@
 from .preset_views import AvatarPresetViewSet  # noqa: F401
 from .auth_views import (  # noqa: F401
     CustomTokenRefreshView,
+    DeactivateAccountView,
     LoginView,
     LogoutView,
     ProfileView,
@@ -12,7 +13,9 @@ from .auth_views import (  # noqa: F401
 )
 
 __all__ = [
+    'AvatarPresetViewSet',
     'CustomTokenRefreshView',
+    'DeactivateAccountView',
     'LoginView',
     'LogoutView',
     'ProfileView',

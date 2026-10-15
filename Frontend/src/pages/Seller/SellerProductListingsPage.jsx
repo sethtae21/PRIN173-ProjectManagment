@@ -1,173 +1,100 @@
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { catalogAPI } from "../../services/api";
 import "../css/SellerProductListingsPage.css";
 
-const STORAGE_KEY = "fitfusion-seller-products";
-
-const defaultProducts = [
-  {
-    id: "ivory-coat",
-    name: "Ivory Coat",
-    category: "Outerwear",
-    price: 1850,
-    color: "Ivory",
-    status: "Approved",
-  },
-  {
-    id: "gold-dress",
-    name: "Gold Dress",
-    category: "Dresses",
-    price: 1450,
-    color: "Gold",
-    status: "Rejected",
-  },
-  {
-    id: "black-sneakers",
-    name: "Black Sneakers",
-    category: "Footwear",
-    price: 1100,
-    color: "Black",
-    status: "Approved",
-  },
-];
-
+// Map backend status to UI status
 function normalizeStatus(status) {
-  const value = String(status || "")
-    .trim()
-    .toLowerCase();
+  const value = String(status || "").trim().toLowerCase();
 
-  if (
-    value === "active" ||
-    value === "approved" ||
-    value === "accepted"
-  ) {
+  if (value === "active" || value === "approved" || value === "accepted") {
     return "Approved";
   }
-
   if (value === "rejected") {
     return "Rejected";
   }
-
-  if (
-    value === "pending" ||
-    value === "under review" ||
-    value === "for review"
-  ) {
-    return "Pending";
-  }
-
+  // 'processing' or anything else falls to Pending
   return "Pending";
-}
-
-function normalizeProduct(product, index) {
-  return {
-    ...product,
-
-    id:
-      product.id ||
-      product.productId ||
-      `seller-product-${index + 1}`,
-
-    name:
-      product.name ||
-      product.productName ||
-      "Unnamed Product",
-
-    category:
-      product.category ||
-      "Uncategorized",
-
-    price: Number(product.price) || 0,
-
-    color:
-      product.color ||
-      product.dominantColor ||
-      "Not specified",
-
-    status: normalizeStatus(
-      product.reportStatus ??
-      product.status ??
-      product.validationStatus
-    ),
-  };
-}
-
-function getInitialProducts() {
-  try {
-    const savedProducts =
-      localStorage.getItem(STORAGE_KEY);
-
-    if (savedProducts === null) {
-      return defaultProducts.map(normalizeProduct);
-    }
-
-    const parsedProducts = JSON.parse(savedProducts);
-
-    if (!Array.isArray(parsedProducts)) {
-      return defaultProducts.map(normalizeProduct);
-    }
-
-    return parsedProducts.map(normalizeProduct);
-  } catch {
-    return defaultProducts.map(normalizeProduct);
-  }
 }
 
 function formatPrice(price) {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
-  }).format(price);
+  }).format(Number(price) || 0);
 }
 
 function SellerProductListingsPage() {
   const navigate = useNavigate();
 
-  const [products, setProducts] = useState(
-    getInitialProducts
-  );
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [notice, setNotice] = useState("");
-  const [storageError, setStorageError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  // 1. Fetch real data from backend on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchListings() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await catalogAPI.myListings();
+        if (isMounted) {
+          // Ensure data is an array
+          setProducts(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch listings:", err);
+        if (isMounted) {
+          setError("Failed to load product listings. Please try again.");
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    fetchListings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. Filter logic (Search & Status)
   const filteredProducts = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
     return products.filter((product) => {
+      const normStatus = normalizeStatus(product.status);
+      
       const matchesSearch =
         !search ||
-        String(product.name).toLowerCase().includes(search) ||
-        String(product.category).toLowerCase().includes(search) ||
-        String(product.color).toLowerCase().includes(search);
+        String(product.name || "").toLowerCase().includes(search) ||
+        String(product.category || "").toLowerCase().includes(search) ||
+        String(product.color || "").toLowerCase().includes(search);
 
       const matchesStatus =
-        statusFilter === "All" ||
-        normalizeStatus(product.status) === statusFilter;
+        statusFilter === "All" || normStatus === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [products, searchTerm, statusFilter]);
 
+  // 3. Summary stats
   const summary = useMemo(() => {
     return {
       total: products.length,
-      approved: products.filter(
-        (product) =>
-          normalizeStatus(product.status) === "Approved"
-      ).length,
-      rejected: products.filter(
-        (product) =>
-          normalizeStatus(product.status) === "Rejected"
-      ).length,
-      pending: products.filter(
-        (product) =>
-          normalizeStatus(product.status) === "Pending"
-      ).length,
+      approved: products.filter((p) => normalizeStatus(p.status) === "Approved").length,
+      rejected: products.filter((p) => normalizeStatus(p.status) === "Rejected").length,
+      pending: products.filter((p) => normalizeStatus(p.status) === "Pending").length,
     };
   }, [products]);
 
@@ -179,32 +106,27 @@ function SellerProductListingsPage() {
   function requestDelete(product) {
     setDeleteTarget(product);
     setNotice("");
-    setStorageError("");
+    setError("");
   }
 
-  function handleDelete() {
+  // 4. Handle Delete via Backend API
+  async function handleDelete() {
     if (!deleteTarget) return;
 
-    const updatedProducts = products.filter(
-      (product) => product.id !== deleteTarget.id
-    );
-
+    setIsDeleting(true);
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(updatedProducts)
-      );
-
-      setProducts(updatedProducts);
-      setNotice(
-        `"${deleteTarget.name}" was deleted successfully.`
-      );
-      setStorageError("");
+      // Call backend DELETE endpoint
+      await catalogAPI.deleteListing(deleteTarget.id);
+      
+      // Update local state
+      setProducts((prev) => prev.filter((p) => String(p.id) !== String(deleteTarget.id)));
+      setNotice(`"${deleteTarget.name}" was deleted successfully.`);
       setDeleteTarget(null);
-    } catch {
-      setStorageError(
-        "Unable to delete the product. Please check browser storage and try again."
-      );
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setError(`Failed to delete "${deleteTarget.name}". Please try again.`);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -213,9 +135,7 @@ function SellerProductListingsPage() {
   }
 
   function handleEdit(product) {
-    navigate(
-      `/seller/listings/${encodeURIComponent(product.id)}/edit`
-    );
+    navigate(`/seller/listings/${encodeURIComponent(product.id)}/edit`);
   }
 
   return (
@@ -223,24 +143,17 @@ function SellerProductListingsPage() {
       <div className="spl-container">
         <section className="spl-introduction">
           <div className="spl-introduction-text">
-            <p className="spl-eyebrow">
-              PRODUCT MANAGEMENT
-            </p>
-
+            <p className="spl-eyebrow">PRODUCT MANAGEMENT</p>
             <h1>Your product listings</h1>
-
             <p className="spl-description">
-              Review, edit, and manage the products
-              uploaded to your store.
+              Review, edit, and manage the products uploaded to your store.
             </p>
           </div>
 
           <button
             type="button"
             className="spl-upload-button"
-            onClick={() =>
-              navigate("/seller/upload-catalog")
-            }
+            onClick={() => navigate("/seller/upload-catalog")}
           >
             + Upload Products
           </button>
@@ -252,31 +165,25 @@ function SellerProductListingsPage() {
           </div>
         )}
 
-        {storageError && !deleteTarget && (
+        {error && !deleteTarget && (
           <div className="spl-error" role="alert">
-            {storageError}
+            {error}
           </div>
         )}
 
-        <section
-          className="spl-summary"
-          aria-label="Product listing summary"
-        >
+        <section className="spl-summary" aria-label="Product listing summary">
           <article>
             <span>Total Listings</span>
             <strong>{summary.total}</strong>
           </article>
-
           <article>
             <span>Approved</span>
             <strong>{summary.approved}</strong>
           </article>
-
           <article>
             <span>Rejected</span>
             <strong>{summary.rejected}</strong>
           </article>
-
           <article>
             <span>Pending</span>
             <strong>{summary.pending}</strong>
@@ -286,176 +193,109 @@ function SellerProductListingsPage() {
         <section className="spl-toolbar">
           <label className="spl-field">
             <span>Search listings</span>
-
             <input
               type="search"
               value={searchTerm}
               placeholder="Search product, category, or color"
-              onChange={(event) =>
-                setSearchTerm(event.target.value)
-              }
+              onChange={(event) => setSearchTerm(event.target.value)}
             />
           </label>
 
           <label className="spl-field">
             <span>Report Status</span>
-
             <select
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value)
-              }
+              onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="All">
-                All statuses
-              </option>
-
-              <option value="Approved">
-                Approved
-              </option>
-
-              <option value="Rejected">
-                Rejected
-              </option>
-
-              <option value="Pending">
-                Pending
-              </option>
+              <option value="All">All statuses</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Pending">Pending</option>
             </select>
           </label>
         </section>
 
         <section className="spl-table-card">
-          <div className="spl-table-wrapper">
-            <table className="spl-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                  <th>Report Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+          {isLoading ? (
+            <div className="spl-empty-state">
+              <p>Loading listings...</p>
+            </div>
+          ) : (
+            <div className="spl-table-wrapper">
+              <table className="spl-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Report Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => {
+                    const reportStatus = normalizeStatus(product.status);
+                    // Get first letter for placeholder image
+                    const initial = (product.name || "P").charAt(0).toUpperCase();
 
-              <tbody>
-                {filteredProducts.map((product) => {
-                  const reportStatus =
-                    normalizeStatus(product.status);
-
-                  return (
-                    <tr key={product.id}>
-                      <td>
-                        <div className="spl-product">
-                          <div
-                            className="spl-product-image"
-                            aria-hidden="true"
-                          >
-                            {product.name
-                              .charAt(0)
-                              .toUpperCase()}
+                    return (
+                      <tr key={product.id}>
+                        <td>
+                          <div className="spl-product">
+                            <div className="spl-product-image" aria-hidden="true">
+                              {initial}
+                            </div>
+                            <div className="spl-product-information">
+                              <strong>{product.name || "Unnamed Product"}</strong>
+                              <span>{product.color || "No color"}</span>
+                            </div>
                           </div>
-
-                          <div className="spl-product-information">
-                            <strong>
-                              {product.name}
-                            </strong>
-
-                            <span>
-                              {product.color}
-                            </span>
+                        </td>
+                        <td>{product.category || "Uncategorized"}</td>
+                        <td>{formatPrice(product.price)}</td>
+                        <td>
+                          <span className={`spl-status spl-status-${reportStatus.toLowerCase()}`}>
+                            {reportStatus}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="spl-actions">
+                            <button type="button" className="spl-action-button" onClick={() => handleView(product)}>
+                              View
+                            </button>
+                            <button type="button" className="spl-action-button" onClick={() => handleEdit(product)}>
+                              Edit
+                            </button>
+                            <button type="button" className="spl-delete-button" onClick={() => requestDelete(product)}>
+                              Delete
+                            </button>
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                      <td>{product.category}</td>
-
-                      <td>
-                        {formatPrice(product.price)}
-                      </td>
-
-                      <td>
-                        <span
-                          className={`spl-status spl-status-${reportStatus.toLowerCase()}`}
-                        >
-                          {reportStatus}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div className="spl-actions">
-                          <button
-                            type="button"
-                            className="spl-action-button"
-                            onClick={() =>
-                              handleView(product)
-                            }
-                          >
-                            View
-                          </button>
-
-                          <button
-                            type="button"
-                            className="spl-action-button"
-                            onClick={() =>
-                              handleEdit(product)
-                            }
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            className="spl-delete-button"
-                            onClick={() =>
-                              requestDelete(product)
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredProducts.length === 0 && (
+          {!isLoading && filteredProducts.length === 0 && (
             <div className="spl-empty-state">
               <div className="spl-empty-icon">
                 <span aria-hidden="true">▤</span>
               </div>
-
-              <h2>
-                {products.length === 0
-                  ? "No product listings yet"
-                  : "No products found"}
-              </h2>
-
+              <h2>{products.length === 0 ? "No product listings yet" : "No products found"}</h2>
               <p>
                 {products.length === 0
                   ? "Upload products to start building your store catalog."
                   : "Try a different search term or report status."}
               </p>
-
               {products.length === 0 ? (
-                <button
-                  type="button"
-                  className="spl-clear-button"
-                  onClick={() =>
-                    navigate("/seller/upload-catalog")
-                  }
-                >
+                <button type="button" className="spl-clear-button" onClick={() => navigate("/seller/upload-catalog")}>
                   Upload First Product
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="spl-clear-button"
-                  onClick={clearFilters}
-                >
+                <button type="button" className="spl-clear-button" onClick={clearFilters}>
                   Clear Filters
                 </button>
               )}
@@ -468,56 +308,24 @@ function SellerProductListingsPage() {
         <div
           className="spl-modal-overlay"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (event.target === event.currentTarget && !isDeleting) {
               setDeleteTarget(null);
-              setStorageError("");
             }
           }}
         >
-          <section
-            className="spl-delete-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="spl-delete-title"
-          >
-            <div className="spl-delete-icon">
-              !
-            </div>
-
-            <h2 id="spl-delete-title">
-              Delete Product?
-            </h2>
-
+          <section className="spl-delete-modal" role="dialog" aria-modal="true" aria-labelledby="spl-delete-title">
+            <div className="spl-delete-icon">!</div>
+            <h2 id="spl-delete-title">Delete Product?</h2>
             <p>
-              Are you sure you want to delete{" "}
-              <strong>{deleteTarget.name}</strong>?
-              This action cannot be undone.
+              Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This action cannot be undone.
             </p>
 
-            {storageError && (
-              <p className="spl-modal-error" role="alert">
-                {storageError}
-              </p>
-            )}
-
             <div className="spl-modal-actions">
-              <button
-                type="button"
-                className="spl-cancel-button"
-                onClick={() => {
-                  setDeleteTarget(null);
-                  setStorageError("");
-                }}
-              >
+              <button type="button" className="spl-cancel-button" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
                 Cancel
               </button>
-
-              <button
-                type="button"
-                className="spl-confirm-delete"
-                onClick={handleDelete}
-              >
-                Delete Product
+              <button type="button" className="spl-confirm-delete" onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? "Deleting..." : "Delete Product"}
               </button>
             </div>
           </section>

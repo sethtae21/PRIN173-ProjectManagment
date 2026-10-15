@@ -413,9 +413,16 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
         category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear', 'footwear': 'footwear'}
 
+        # ==========================================
+        # FIX: Normalize 'item_name' to 'name' before validation
+        # ==========================================
         for row_number, row in enumerate(rows, start=2):
             try:
-                item_name = row.get('name', row.get('item_name', '')).strip()
+                # Normalize CSV aliases so the validator sees consistent keys
+                if 'item_name' in row and 'name' not in row:
+                    row['name'] = row.pop('item_name')
+
+                item_name = row.get('name', '').strip()
                 raw_category = str(row.get('category', '')).strip().lower()
                 _, item_errors = CatalogValidator().validate_csv_row(row, row_number)
                 resolved_images = {}

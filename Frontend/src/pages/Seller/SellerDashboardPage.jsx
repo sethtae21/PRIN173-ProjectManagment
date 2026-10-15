@@ -1,94 +1,10 @@
-
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authAPI, catalogAPI } from "../../services/api";
 import "../css/SellerDashboardPage.css";
 
-const fallbackProducts = [
-  {
-    id: "product-001",
-    name: "Classic Beige Blazer",
-    category: "Outerwear",
-    price: 1899,
-    status: "Approved",
-  },
-  {
-    id: "product-002",
-    name: "Black Formal Trousers",
-    category: "Bottoms",
-    price: 1299,
-    status: "Approved",
-  },
-  {
-    id: "product-003",
-    name: "Gold Satin Blouse",
-    category: "Tops",
-    price: 995,
-    status: "Rejected",
-  },
-];
-
-function getSellerProducts() {
-  try {
-    const savedProducts = localStorage.getItem(
-      "fitfusion-seller-products"
-    );
-
-    if (!savedProducts) {
-      return fallbackProducts;
-    }
-
-    const parsedProducts = JSON.parse(savedProducts);
-
-    if (!Array.isArray(parsedProducts)) {
-      return fallbackProducts;
-    }
-
-    return parsedProducts;
-  } catch {
-    return fallbackProducts;
-  }
-}
-
-function getSellerAccount() {
-  const fallbackAccount = {
-    username: "Seller",
-    storeName: "Maison Aurelia",
-  };
-
-  try {
-    const storedAccount =
-      localStorage.getItem("fitfusion-current-user") ||
-      localStorage.getItem("sellerAccount") ||
-      sessionStorage.getItem("sellerAccount");
-
-    if (!storedAccount) {
-      return fallbackAccount;
-    }
-
-    const account = JSON.parse(storedAccount);
-
-    if (!account || typeof account !== "object") {
-      return fallbackAccount;
-    }
-
-    return {
-      username:
-        account.username ||
-        account.storeName ||
-        "Seller",
-      storeName:
-        account.storeName ||
-        "Maison Aurelia",
-    };
-  } catch {
-    return fallbackAccount;
-  }
-}
-
 function normalizeStatus(status) {
-  const normalizedStatus = String(
-    status || ""
-  )
+  const normalizedStatus = String(status || "")
     .trim()
     .toLowerCase();
 
@@ -107,7 +23,8 @@ function normalizeStatus(status) {
   if (
     normalizedStatus === "pending" ||
     normalizedStatus === "for review" ||
-    normalizedStatus === "under review"
+    normalizedStatus === "under review" ||
+    normalizedStatus === "processing"
   ) {
     return "Pending";
   }
@@ -115,49 +32,146 @@ function normalizeStatus(status) {
   return "Pending";
 }
 
+function formatPrice(price) {
+  const value = Number(price) || 0;
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function readWelcomeNameFromStorage() {
+  try {
+    const stored =
+      localStorage.getItem("fitfusion-current-user") ||
+      localStorage.getItem("sellerAccount") ||
+      sessionStorage.getItem("sellerAccount");
+
+    if (!stored) return "";
+
+    const account = JSON.parse(stored);
+    if (!account || typeof account !== "object") return "";
+
+    return (
+      account.store_name ||
+      account.storeName ||
+      account.full_name ||
+      account.fullName ||
+      account.username ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 function SellerDashboardPage() {
   const navigate = useNavigate();
 
-  const sellerAccount = useMemo(
-    () => getSellerAccount(),
-    []
+  const [welcomeName, setWelcomeName] = useState(
+    () => readWelcomeNameFromStorage() || "Seller"
   );
 
-  const products = useMemo(
-    () => getSellerProducts(),
-    []
+  const [listings, setListings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  // ---------- Fetch profile + listings on mount ----------
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      setLoadError("");
+
+      // 1. Real profile (store_name for greeting)
+      try {
+        const res = await authAPI.getProfile();
+        const user = res?.user || {};
+        if (!cancelled) {
+          const name =
+            user.store_name ||
+            user.storeName ||
+            user.full_name ||
+            user.fullName ||
+            "";
+          if (name) setWelcomeName(name);
+        }
+      } catch (err) {
+        console.error("Profile load failed:", err);
+        // Fall back to whatever's in storage; do not block page render.
+      }
+
+      // 2. Real listings from MongoDB
+      try {
+        const data = await catalogAPI.myListings();
+        if (!cancelled) {
+          setListings(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Listings load failed:", err);
+        if (!cancelled) {
+          setLoadError(
+            "Could not load your listings. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---------- Derived values from real listings ----------
+  const normalizedProducts = useMemo(
+    () =>
+      listings.map((product, index) => ({
+        ...product,
+        id:
+          product.id ||
+          `seller-product-${index + 1}`,
+        name:
+          product.name ||
+          product.productName ||
+          "Unnamed Product",
+        category:
+          product.category ||
+          "Uncategorized",
+        price: Number(product.price) || 0,
+        status: normalizeStatus(
+          product.reportStatus ?? product.status
+        ),
+      })),
+    [listings]
   );
 
-  const normalizedProducts = products.map(
-    (product, index) => ({
-      ...product,
-      id:
-        product.id ||
-        `seller-product-${index + 1}`,
-      name:
-        product.name ||
-        product.productName ||
-        "Unnamed Product",
-      category:
-        product.category ||
-        "Uncategorized",
-      price: Number(product.price || 0),
-      status: normalizeStatus(
-        product.reportStatus ??
-        product.status
-      ),
-    })
+  const recentProducts = useMemo(
+    () => normalizedProducts.slice(0, 5),
+    [normalizedProducts]
   );
 
-  const recentProducts = normalizedProducts.slice(0, 5);
+  const approvedListings = useMemo(
+    () =>
+      normalizedProducts.filter(
+        (product) => product.status === "Approved"
+      ).length,
+    [normalizedProducts]
+  );
 
-  const approvedListings = normalizedProducts.filter(
-    (product) => product.status === "Approved"
-  ).length;
-
-  const rejectedListings = normalizedProducts.filter(
-    (product) => product.status === "Rejected"
-  ).length;
+  const rejectedListings = useMemo(
+    () =>
+      normalizedProducts.filter(
+        (product) => product.status === "Rejected"
+      ).length,
+    [normalizedProducts]
+  );
 
   return (
     <main className="seller-dashboard-page">
@@ -167,9 +181,7 @@ function SellerDashboardPage() {
             SELLER DASHBOARD
           </p>
 
-          <h1>
-            Welcome, {sellerAccount.username}
-          </h1>
+          <h1>Welcome, {welcomeName}</h1>
 
           <p>
             Upload product records, manage your
@@ -192,21 +204,21 @@ function SellerDashboardPage() {
         <SummaryCard
           number="01"
           label="Total Listings"
-          value={normalizedProducts.length}
+          value={isLoading ? "…" : normalizedProducts.length}
           description="Products uploaded by your store"
         />
 
         <SummaryCard
           number="02"
           label="Approved Listings"
-          value={approvedListings}
+          value={isLoading ? "…" : approvedListings}
           description="Products approved for listing"
         />
 
         <SummaryCard
           number="03"
           label="Rejected Listings"
-          value={rejectedListings}
+          value={isLoading ? "…" : rejectedListings}
           description="Products that require correction"
         />
       </section>
@@ -275,7 +287,23 @@ function SellerDashboardPage() {
           </button>
         </div>
 
-        {recentProducts.length === 0 ? (
+        {loadError && (
+          <div className="seller-listings-error" role="alert">
+            <p>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {isLoading && !loadError ? (
+          <div className="seller-listings-loading">
+            <p>Loading your product listings…</p>
+          </div>
+        ) : recentProducts.length === 0 ? (
           <div className="seller-listings-empty">
             <h3>No product listings yet</h3>
 
@@ -315,16 +343,7 @@ function SellerDashboardPage() {
 
                     <td>{product.category}</td>
 
-                    <td>
-                      ₱
-                      {product.price.toLocaleString(
-                        "en-PH",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }
-                      )}
-                    </td>
+                    <td>{formatPrice(product.price)}</td>
 
                     <td>
                       <span

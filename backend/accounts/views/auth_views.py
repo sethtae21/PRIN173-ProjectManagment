@@ -135,7 +135,6 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         """Delete account + cascade all owned data + invalidate tokens (RA 10173)."""
         user = self.get_object()
 
-        # Blacklist the refresh token if provided (server-side logout)
         refresh_raw = request.data.get('refresh')
         if refresh_raw:
             try:
@@ -163,7 +162,6 @@ class CustomTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         refresh_raw = request.data.get('refresh')
 
-        # 1. Reject tokens that were logged out / already rotated
         if refresh_raw:
             try:
                 old_token = RefreshToken(refresh_raw)
@@ -173,19 +171,16 @@ class CustomTokenRefreshView(TokenRefreshView):
                         'detail': 'Token is blacklisted or already rotated.'
                     }, status=status.HTTP_401_UNAUTHORIZED)
             except TokenError:
-                pass  # let super() return the standard 401 for invalid tokens
+                pass
 
-        # 2. Issue new tokens
         response = super().post(request, *args, **kwargs)
 
-        # 3. Blacklist the consumed refresh token (manual rotation enforcement)
         if refresh_raw and response.status_code == 200:
             try:
                 blacklist_refresh_token(RefreshToken(refresh_raw))
             except TokenError:
                 pass
 
-        # 4. Return access AND the rotated refresh (never drop it)
         data = {'success': True, 'access': response.data.get('access')}
         if 'refresh' in response.data:
             data['refresh'] = response.data['refresh']
@@ -204,7 +199,7 @@ class LogoutView(APIView):
             try:
                 blacklist_refresh_token(RefreshToken(refresh_raw))
             except TokenError:
-                pass  # ignore malformed/expired tokens during logout
+                pass
 
         return Response({
             'success': True,
@@ -227,4 +222,39 @@ class PasswordChangeView(APIView):
         return Response({
             'success': True,
             'message': 'Password updated. Please login again with the new password.'
+        }, status=status.HTTP_200_OK)
+
+
+# ==========================================
+# NEW: Account Deactivation (FR-1.4 soft-delete)
+# Sets is_active=False; all listings/orders/reports are RETAINED
+# (matches the Store Profile privacy notice). JWT auth and login
+# both reject inactive users server-side.
+# ==========================================
+class DeactivateAccountView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        user = request.user
+        reason = str(request.data.get('reason', '')).strip()
+
+        logger.info(
+            f"Account deactivation requested by user {user.id} "
+            f"({user.email}): reason='{reason or 'not provided'}'"
+        )
+
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+
+        # Invalidate the session server-side
+        refresh_raw = request.data.get('refresh')
+        if refresh_raw:
+            try:
+                blacklist_refresh_token(RefreshToken(refresh_raw))
+            except TokenError:
+                pass
+
+        return Response({
+            'success': True,
+            'message': 'Your seller account has been deactivated. Your store records and products are retained.'
         }, status=status.HTTP_200_OK)

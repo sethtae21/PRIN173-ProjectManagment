@@ -1,7 +1,7 @@
-
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
+import { authAPI } from "../../services/api";
 import "../css/SellerSignupPage.css";
 
 const provinces = [
@@ -33,7 +33,6 @@ const provinces = [
 
 const initialForm = {
   fullName: "",
-  username: "",
   storeName: "",
   email: "",
   mobile: "",
@@ -246,13 +245,6 @@ function SellerSignupPage() {
         "Please enter at least your first name and surname.";
     }
 
-    if (!form.username.trim()) {
-      nextErrors.username = "Username is required.";
-    } else if (form.username.trim().length < 3) {
-      nextErrors.username =
-        "Username must contain at least 3 characters.";
-    }
-
     if (!form.storeName.trim()) {
       nextErrors.storeName =
         "Store Name is required for Seller accounts.";
@@ -385,7 +377,10 @@ function SellerSignupPage() {
     scrollToTop();
   }
 
-  function handleSubmit(event) {
+  // ==========================================
+  // SUBMIT HANDLER — BACKEND INTEGRATED
+  // ==========================================
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (step !== 3 || isSubmitting) return;
@@ -394,107 +389,119 @@ function SellerSignupPage() {
     setIsSubmitting(true);
     setSubmitError("");
 
-    const sellerAccount = {
-      id: `seller-${Date.now()}`,
-      role: "seller",
-      fullName: formatProperCase(form.fullName),
-      username: form.username.trim(),
-      storeName: form.storeName.trim(),
+    // 1. Build backend payload (matches RegistrationSerializer fields)
+    const sellerPayload = {
       email: form.email.trim().toLowerCase(),
+      full_name: formatProperCase(form.fullName),
+      password: form.password,
+      password_confirm: form.confirmPassword,
+      role: "seller",
+      store_name: form.storeName.trim(),
       mobile: form.mobile,
-
-      address: {
-        street: form.street.trim(),
-        barangay: form.barangay.trim(),
-        city: form.city.trim(),
-        province: form.province,
-        postalCode: form.postalCode.trim()
-      },
-
-      createdAt: new Date().toISOString()
+      street: form.street.trim(),
+      barangay: form.barangay.trim(),
+      city: form.city.trim(),
+      province: form.province,
+      postal_code: form.postalCode.trim()
     };
 
     try {
-      // Frontend-only registration:
-      // Registration does not require an API or database.
+      // 2. Call backend API
+      const response = await authAPI.register(sellerPayload);
 
-      let users = [];
+      if (response && response.success && response.tokens) {
+        // 3. Persist JWT tokens
+        localStorage.setItem("access_token", response.tokens.access);
+        localStorage.setItem("refresh_token", response.tokens.refresh);
 
-      try {
-        const storedUsers = JSON.parse(
-          localStorage.getItem("fitfusion-users") || "[]"
+        // 4. Build the current-user object for the seller dashboard
+        const userData = response.user || {};
+        const sellerAccount = {
+          id: userData.id,
+          full_name: userData.full_name || formatProperCase(form.fullName),
+          store_name: userData.store_name || form.storeName.trim(),
+          email: userData.email || form.email.trim().toLowerCase(),
+          role: userData.role || "seller",
+          mobile: form.mobile,
+          address: {
+            street: form.street.trim(),
+            barangay: form.barangay.trim(),
+            city: form.city.trim(),
+            province: form.province,
+            postalCode: form.postalCode.trim()
+          }
+        };
+
+        // 5. Save to the storage keys the dashboard reads
+        localStorage.setItem(
+          "fitfusion-current-user",
+          JSON.stringify(sellerAccount)
         );
+        localStorage.setItem(
+          "sellerAccount",
+          JSON.stringify(sellerAccount)
+        );
+        sessionStorage.setItem(
+          "sellerAccount",
+          JSON.stringify(sellerAccount)
+        );
+        sessionStorage.setItem("userRole", "seller");
+        sessionStorage.setItem("userEmail", sellerAccount.email);
 
-        users = Array.isArray(storedUsers)
-          ? storedUsers
-          : [];
-      } catch {
-        users = [];
+        // 6. Redirect to seller dashboard
+        navigate("/seller/dashboard", { replace: true });
+      } else {
+        setSubmitError(
+          "Registration completed but the response format was unexpected. Please try logging in."
+        );
       }
-
-      // Replace matching mock account records.
-      // This avoids blocking registration during frontend testing.
-      const remainingUsers = users.filter((user) => {
-        const sameEmail =
-          String(user.email || "").toLowerCase() ===
-          sellerAccount.email;
-
-        const sameUsername =
-          String(user.username || "").toLowerCase() ===
-          sellerAccount.username.toLowerCase();
-
-        const sameStore =
-          user.role === "seller" &&
-          String(user.storeName || "").toLowerCase() ===
-          sellerAccount.storeName.toLowerCase();
-
-        return !sameEmail && !sameUsername && !sameStore;
-      });
-
-      const updatedUsers = [
-        ...remainingUsers,
-        sellerAccount
-      ];
-
-      // Keep the same mock storage keys used by the project.
-      // Never save actual passwords in localStorage.
-      localStorage.setItem(
-        "fitfusion-users",
-        JSON.stringify(updatedUsers)
-      );
-
-      localStorage.setItem(
-        "fitfusion-current-user",
-        JSON.stringify(sellerAccount)
-      );
-
-      localStorage.setItem(
-        "sellerAccount",
-        JSON.stringify(sellerAccount)
-      );
-
-      sessionStorage.setItem(
-        "sellerAccount",
-        JSON.stringify(sellerAccount)
-      );
-
-      sessionStorage.setItem("userRole", "seller");
-
-      sessionStorage.setItem(
-        "userEmail",
-        sellerAccount.email
-      );
-
-      // Successful frontend registration.
-      navigate("/seller/dashboard", {
-        replace: true
-      });
     } catch (error) {
       console.error("Seller registration failed:", error);
 
-      setSubmitError(
-        "The Seller account could not be created. Please try again."
-      );
+      let errorMessage = "Seller account could not be created. Please try again.";
+
+      try {
+        const errorData = JSON.parse(error.message);
+
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.email) {
+          errorMessage = Array.isArray(errorData.email)
+            ? errorData.email[0]
+            : errorData.email;
+        } else if (errorData.full_name) {
+          errorMessage = Array.isArray(errorData.full_name)
+            ? errorData.full_name[0]
+            : errorData.full_name;
+        } else if (errorData.store_name) {
+          errorMessage = Array.isArray(errorData.store_name)
+            ? errorData.store_name[0]
+            : errorData.store_name;
+        } else if (errorData.password) {
+          errorMessage = Array.isArray(errorData.password)
+            ? errorData.password[0]
+            : errorData.password;
+        } else if (errorData.password_confirm) {
+          errorMessage = Array.isArray(errorData.password_confirm)
+            ? errorData.password_confirm[0]
+            : errorData.password_confirm;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors[0];
+        } else {
+          const firstKey = Object.keys(errorData)[0];
+          if (firstKey) {
+            errorMessage = Array.isArray(errorData[firstKey])
+              ? errorData[firstKey][0]
+              : errorData[firstKey];
+          }
+        }
+      } catch {
+        if (error.message && error.message !== "null") {
+          errorMessage = error.message;
+        }
+      }
+
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -587,17 +594,6 @@ function SellerSignupPage() {
                   onBlur={formatFullName}
                   placeholder="Juan Santos Dela Cruz"
                   autoComplete="name"
-                  wide
-                />
-
-                <InputField
-                  label="Username"
-                  name="username"
-                  value={form.username}
-                  error={errors.username}
-                  onChange={updateField}
-                  placeholder="Enter username"
-                  autoComplete="username"
                   wide
                 />
 
@@ -949,6 +945,7 @@ function SellerSignupPage() {
                   type="button"
                   className="seller-register-next"
                   onClick={handleNext}
+                  disabled={isSubmitting}
                 >
                   {step === 1
                     ? "Next: Address"
