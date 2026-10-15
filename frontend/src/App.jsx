@@ -19,6 +19,7 @@ import ChooseRegistrationRolePage from "./pages/Shared Pages/ChooseRegistrationR
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import SellerSignupPage from "./pages/Seller/SellerSignupPage";
+import FemaleAvatarCanvasTest from "./pages/Shopper/FemaleAvatarCanvasTest";
 
 /* GUEST PAGES */
 import GuestPage from "./pages/GuestPage";
@@ -44,6 +45,7 @@ import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderDetailsPage from "./pages/OrderDetailsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
 import EditAccountPage from "./pages/EditAccountPage";
+
 
 /* SELLER PAGES */
 import SellerDashboardPage from "./pages/Seller/SellerDashboardPage";
@@ -101,6 +103,11 @@ function App() {
         ===================================== */}
 
         <Route path="/" element={<LandingPage />} />
+
+        <Route
+  path="/avatar-c-test"
+  element={<FemaleAvatarCanvasTest />}
+/>
 
         <Route path="/login" element={<LoginPage />} />
 
