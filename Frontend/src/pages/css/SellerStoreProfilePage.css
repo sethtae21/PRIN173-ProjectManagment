@@ -9,6 +9,7 @@
 }
 
 .seller-store-profile-page {
+  position: relative;
   width: 100%;
   min-height: 100vh;
   padding: 46px 40px 70px;
@@ -347,7 +348,55 @@
 }
 
 .seller-profile-edit-modal {
-  width: min(720px, 100%);
+  width: min(850px, 100%);
+  max-height: none;
+  margin: 0 auto;
+  overflow: visible;
+  box-shadow: 0 16px 38px rgba(74, 48, 12, 0.08);
+}
+
+.seller-profile-edit-page-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 46px 40px 70px;
+  background:
+    radial-gradient(
+      circle at right center,
+      rgba(181, 126, 32, 0.18),
+      transparent 43%
+    ),
+    linear-gradient(
+      135deg,
+      #f2efe8,
+      #fffdf9 52%,
+      #eee8de
+    );
+}
+
+.seller-profile-edit-back {
+  margin: 0 0 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #8e641f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.seller-profile-edit-back:hover {
+  text-decoration: underline;
+}
+
+.seller-profile-edit-modal .seller-profile-field {
+  gap: 5px;
+}
+
+.seller-profile-edit-modal .seller-profile-field > span {
+  margin-bottom: 0;
 }
 
 .seller-profile-modal h2 {
@@ -475,6 +524,7 @@
 
 .seller-profile-password-input:focus-within {
   border-color: #8e641f;
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.13);
 }
 
 .seller-profile-password-input input {
@@ -499,6 +549,16 @@
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.seller-profile-password-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 19px;
+}
+
+.seller-profile-password-page .seller-profile-modal-actions {
+  margin-top: 10px;
 }
 
 /* PASSWORD REQUIREMENTS */
@@ -735,11 +795,15 @@
 }
 
 .seller-profile-modal button:focus-visible,
-.seller-profile-modal input:focus-visible,
 .seller-profile-modal select:focus-visible,
 .seller-profile-modal textarea:focus-visible {
   outline: 3px solid #b57e20;
   outline-offset: 2px;
+}
+
+.seller-profile-password-input button:focus-visible {
+  outline: 2px solid #b57e20;
+  outline-offset: -3px;
 }
 
 .seller-profile-modal button:disabled {
@@ -797,6 +861,15 @@
 
   .seller-profile-modal {
     max-height: calc(100dvh - 28px);
+    padding: 27px 20px;
+  }
+
+  .seller-profile-edit-page-overlay {
+    padding: 80px 20px 55px;
+  }
+
+  .seller-profile-edit-modal {
+    max-height: none;
     padding: 27px 20px;
   }
 

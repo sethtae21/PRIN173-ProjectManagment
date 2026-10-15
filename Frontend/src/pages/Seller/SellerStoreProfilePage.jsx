@@ -133,6 +133,11 @@ function SellerStoreProfilePage() {
     new_password: "",
     new_password_confirm: "",
   });
+  const [visiblePasswords, setVisiblePasswords] = useState({
+    old_password: false,
+    new_password: false,
+    new_password_confirm: false,
+  });
   const [pwError, setPwError] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
 
@@ -252,7 +257,7 @@ function SellerStoreProfilePage() {
       nextErrors.mobile = "Philippine mobile number must start with 09.";
     }
     if (!editForm.street.trim()) {
-      nextErrors.street = "House number and street are required.";
+      nextErrors.street = "Store address is required.";
     }
     if (!editForm.barangay.trim()) {
       nextErrors.barangay = "Barangay is required.";
@@ -331,6 +336,13 @@ function SellerStoreProfilePage() {
   function closePassword() {
     setShowPassword(false);
     setShowEdit(true);
+  }
+
+  function togglePasswordVisibility(name) {
+    setVisiblePasswords((current) => ({
+      ...current,
+      [name]: !current[name],
+    }));
   }
 
   function handlePwChange(event) {
@@ -485,7 +497,10 @@ function SellerStoreProfilePage() {
 
   return (
     <main className="seller-store-profile-page">
-      <div className="seller-store-profile-body">
+      <div
+        className="seller-store-profile-body"
+        hidden={showEdit || showPassword}
+      >
         {/* PAGE INTRODUCTION */}
         <section className="seller-store-profile-introduction">
           <p className="seller-store-profile-label">
@@ -562,7 +577,7 @@ function SellerStoreProfilePage() {
 
             <dl className="seller-profile-details">
               <InformationRow
-                label="House Number and Street"
+                label="Store Address"
                 value={profile.street}
               />
 
@@ -637,16 +652,9 @@ function SellerStoreProfilePage() {
         </section>
       </div>
 
-      {/* EDIT PROFILE MODAL */}
+      {/* EDIT STORE PROFILE */}
       {showEdit && (
-        <div
-          className="seller-profile-modal-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowEdit(false);
-            }
-          }}
-        >
+        <div className="seller-profile-edit-page-overlay">
           <form
             className="seller-profile-modal seller-profile-edit-modal"
             onSubmit={submitEdit}
@@ -654,18 +662,17 @@ function SellerStoreProfilePage() {
           >
             <button
               type="button"
-              className="seller-profile-modal-close"
+              className="seller-profile-edit-back"
               onClick={() => setShowEdit(false)}
-              aria-label="Close dialog"
             >
-              ×
+              ← Back to Store Profile
             </button>
 
             <p className="seller-store-profile-label">
-              EDIT STORE PROFILE
+              PROFILE DETAILS
             </p>
 
-            <h2>Update your account information</h2>
+            <h2>Edit Store Profile</h2>
 
             <p className="seller-profile-modal-description">
               Changes are saved directly to your seller
@@ -738,7 +745,7 @@ function SellerStoreProfilePage() {
 
             <label className="seller-profile-field full">
               <span className="seller-store-profile-label">
-                House Number and Street
+                Store Address
               </span>
               <input
                 className="seller-profile-deactivate-other"
@@ -871,28 +878,20 @@ function SellerStoreProfilePage() {
         </div>
       )}
 
-      {/* CHANGE PASSWORD MODAL */}
+      {/* CHANGE PASSWORD PAGE */}
       {showPassword && (
-        <div
-          className="seller-profile-modal-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closePassword();
-            }
-          }}
-        >
+        <div className="seller-profile-edit-page-overlay">
           <form
-            className="seller-profile-modal"
+            className="seller-profile-modal seller-profile-edit-modal seller-profile-password-page"
             onSubmit={submitPassword}
             noValidate
           >
             <button
               type="button"
-              className="seller-profile-modal-close"
+              className="seller-profile-edit-back"
               onClick={closePassword}
-              aria-label="Close dialog"
             >
-              ×
+              ← Back to Edit Store Profile
             </button>
 
             <p className="seller-store-profile-label">
@@ -902,49 +901,52 @@ function SellerStoreProfilePage() {
             <h2>Change Password</h2>
 
             <p className="seller-profile-modal-description">
-              Your current password is required. After a
-              successful change you will be signed out and
-              must log in with the new password.
+              Enter your current password and create a secure new password.
             </p>
 
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Current Password
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="password"
-                name="old_password"
-                value={pwForm.old_password}
-                onChange={handlePwChange}
-              />
-            </label>
+            <div className="seller-profile-password-fields">
+              {[
+                ["old_password", "Current Password", "current-password"],
+                ["new_password", "New Password", "new-password"],
+                ["new_password_confirm", "Confirm New Password", "new-password"],
+              ].map(([name, label, autoComplete]) => (
+                <label className="seller-profile-field" key={name}>
+                  <span className="seller-store-profile-label">
+                    {label}
+                  </span>
+                  <div className="seller-profile-password-input">
+                    <input
+                      type={visiblePasswords[name] ? "text" : "password"}
+                      name={name}
+                      value={pwForm[name]}
+                      onChange={handlePwChange}
+                      autoComplete={autoComplete}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility(name)}
+                      aria-label={`${visiblePasswords[name] ? "Hide" : "Show"} ${label}`}
+                    >
+                      {visiblePasswords[name] ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+              ))}
+            </div>
 
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                New Password
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="password"
-                name="new_password"
-                value={pwForm.new_password}
-                onChange={handlePwChange}
-              />
-            </label>
+            <section className="seller-profile-password-rules">
+              <strong>Password requirements</strong>
+              {PASSWORD_RULES.map((rule) => {
+                const passed = rule.test(pwForm.new_password);
 
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Confirm New Password
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="password"
-                name="new_password_confirm"
-                value={pwForm.new_password_confirm}
-                onChange={handlePwChange}
-              />
-            </label>
+                return (
+                  <p className={passed ? "passed" : ""} key={rule.label}>
+                    <span aria-hidden="true">{passed ? "✓" : "○"}</span>
+                    Include {rule.label}.
+                  </p>
+                );
+              })}
+            </section>
 
             {pwError && (
               <p className="seller-profile-form-error" role="alert">
