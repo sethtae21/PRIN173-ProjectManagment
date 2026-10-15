@@ -1,6 +1,7 @@
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { authAPI } from "../services/api";
 import "./css/EditAccountPage.css";
 
 const PROVINCES = [
@@ -511,6 +512,9 @@ function EditAccountPage() {
   const [passwordErrors, setPasswordErrors] =
     useState({});
 
+  const [passwordSaving, setPasswordSaving] =
+    useState(false);
+
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] =
     useState("info");
@@ -796,7 +800,7 @@ function EditAccountPage() {
     return Object.keys(errors).length === 0;
   }
 
-  function handlePasswordSubmit(event) {
+  async function handlePasswordSubmit(event) {
     event.preventDefault();
 
     if (!validatePassword()) {
@@ -807,28 +811,43 @@ function EditAccountPage() {
       return;
     }
 
-    // Frontend-only validation.
-    // Actual credential verification and password
-    // changes must be performed by the backend.
-    setNoticeType("info");
-    setNotice(
-      "Password validation passed. Actual password changes will become available after backend authentication is integrated."
-    );
+    setPasswordSaving(true);
 
-    setPasswordData({
-      ...emptyPassword,
-    });
+    try {
+      await authAPI.changePassword({
+        old_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+        new_password_confirm: passwordData.confirmPassword,
+      });
 
-    setPasswordErrors({});
-  }
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("fitfusion-current-user");
+      sessionStorage.removeItem("userRole");
+      sessionStorage.removeItem("userEmail");
+      sessionStorage.removeItem("registeredAccount");
 
-  function clearPasswordForm() {
-    setPasswordData({
-      ...emptyPassword,
-    });
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Password update failed:", error);
 
-    setPasswordErrors({});
-    setNotice("");
+      let message = "Password update failed. Please try again.";
+
+      try {
+        const response = JSON.parse(error.message);
+        const firstError = Object.values(response).flat()[0];
+        if (typeof firstError === "string") {
+          message = firstError;
+        }
+      } catch {
+        // Keep the default message when the response is not field-formatted JSON.
+      }
+
+      setNoticeType("error");
+      setNotice(message);
+    } finally {
+      setPasswordSaving(false);
+    }
   }
 
   return (
@@ -1029,7 +1048,7 @@ function EditAccountPage() {
 
           {isPasswordView && (
             <form
-              className="edit-account-card"
+              className="edit-account-card edit-account-password-card"
               onSubmit={handlePasswordSubmit}
               noValidate
             >
@@ -1143,40 +1162,22 @@ function EditAccountPage() {
                 </div>
               </section>
 
-              <div className="edit-account-info">
-                <span>i</span>
-
-                <p>
-                  Password changes require backend
-                  authentication. During frontend
-                  development, this form validates
-                  password requirements without
-                  storing credentials.
-                </p>
-              </div>
-
               <div className="edit-account-form-actions">
                 <button
                   type="button"
                   className="edit-account-secondary-button"
                   onClick={() => navigate("/shopper/account")}
+                  disabled={passwordSaving}
                 >
                   Cancel
                 </button>
 
                 <button
-                  type="button"
-                  className="edit-account-clear-button"
-                  onClick={clearPasswordForm}
-                >
-                  Clear
-                </button>
-
-                <button
                   type="submit"
                   className="edit-account-primary-button"
+                  disabled={passwordSaving}
                 >
-                  Validate Password
+                  {passwordSaving ? "Updating…" : "Update Password"}
                 </button>
               </div>
             </form>

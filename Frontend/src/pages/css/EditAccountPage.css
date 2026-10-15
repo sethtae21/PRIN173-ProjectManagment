@@ -443,24 +443,24 @@
 ========================================= */
 
 .edit-account-requirements {
-  margin-top: 23px;
-  padding: 20px;
+  margin-top: 0;
+  padding: 18px;
 
   background: #f8f5ef;
   border: 1px solid #e2d8c7;
-  border-radius: 11px;
+  border-radius: 10px;
 }
 
 .edit-account-requirements h3 {
-  margin: 0 0 17px;
-  color: #29251f;
-  font-size: 12px;
+  margin: 0 0 14px;
+  color: #8e641f;
+  font-size: 11px;
 }
 
 .edit-account-rules {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 13px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
 }
 
 .edit-account-rule {
@@ -484,7 +484,7 @@
 
 .edit-account-rule p {
   margin: 0;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .edit-account-rule.passed {
@@ -495,44 +495,6 @@
   background: #4b8448;
   border-color: #4b8448;
   color: #fffdf9;
-}
-
-/* =========================================
-   INFORMATION BOX
-========================================= */
-
-.edit-account-info {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-
-  margin-top: 21px;
-  padding: 15px 17px;
-
-  background: #fff5d7;
-  border: 1px solid #d7af4b;
-  border-radius: 10px;
-}
-
-.edit-account-info > span {
-  display: grid;
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-
-  background: #a97219;
-  border-radius: 50%;
-  color: #fffdf9;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.edit-account-info p {
-  margin: 0;
-  color: #684714;
-  font-size: 10px;
-  line-height: 1.6;
 }
 
 /* =========================================
@@ -605,6 +567,21 @@
 .edit-account-secondary-button:hover,
 .edit-account-clear-button:hover {
   background: #fff7df;
+}
+
+.edit-account-password-card .edit-account-form-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.edit-account-password-card .edit-account-form-actions button {
+  width: 100%;
+}
+
+.edit-account-form-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ACCESSIBILITY */
@@ -689,12 +666,12 @@
     grid-column: auto;
   }
 
-  .edit-account-rules {
-    grid-template-columns: 1fr;
-  }
-
   .edit-account-form-actions {
     flex-direction: column-reverse;
+  }
+
+  .edit-account-password-card .edit-account-form-actions {
+    grid-template-columns: 1fr;
   }
 
   .edit-account-primary-button,
