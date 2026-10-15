@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./css/CatalogPage.css";
 
-const products = [
+export const products = [
   {
     id: "product-001",
     name: "Classic Linen Blouse",
