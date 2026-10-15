@@ -318,6 +318,7 @@ function SellerStoreProfilePage() {
 
   /* ---------- Change password ---------- */
   function openPassword() {
+    setShowEdit(false);
     setPwForm({
       old_password: "",
       new_password: "",
@@ -325,6 +326,11 @@ function SellerStoreProfilePage() {
     });
     setPwError("");
     setShowPassword(true);
+  }
+
+  function closePassword() {
+    setShowPassword(false);
+    setShowEdit(true);
   }
 
   function handlePwChange(event) {
@@ -503,7 +509,7 @@ function SellerStoreProfilePage() {
         {/* PROFILE GRID */}
         <section className="seller-store-profile-grid">
           {/* SELLER ACCOUNT INFORMATION */}
-          <article className="seller-profile-card">
+          <article className="seller-profile-card seller-profile-account-card">
             <h2>Seller Account Information</h2>
 
             <dl className="seller-profile-details">
@@ -528,6 +534,34 @@ function SellerStoreProfilePage() {
               />
 
               <InformationRow
+                label="Assigned Role"
+                value={capitalizeRole(profile.role)}
+              />
+
+              <InformationRow
+                label="Store Name"
+                value={profile.store_name}
+              />
+            </dl>
+
+            <div className="seller-profile-actions">
+              <button
+                type="button"
+                className="seller-profile-primary-button"
+                onClick={openEdit}
+              >
+                Edit Store Profile
+              </button>
+
+            </div>
+          </article>
+
+          {/* STORE ADDRESS */}
+          <article className="seller-profile-card seller-profile-address-card">
+            <h2>Store Address</h2>
+
+            <dl className="seller-profile-details">
+              <InformationRow
                 label="House Number and Street"
                 value={profile.street}
               />
@@ -551,35 +585,7 @@ function SellerStoreProfilePage() {
                 label="Postal Code"
                 value={profile.postal_code}
               />
-
-              <InformationRow
-                label="Assigned Role"
-                value={capitalizeRole(profile.role)}
-              />
-
-              <InformationRow
-                label="Store Name"
-                value={profile.store_name}
-              />
             </dl>
-
-            <div className="seller-profile-actions">
-              <button
-                type="button"
-                className="seller-profile-primary-button"
-                onClick={openEdit}
-              >
-                Edit Store Profile
-              </button>
-
-              <button
-                type="button"
-                className="seller-profile-secondary-button"
-                onClick={openPassword}
-              >
-                Change Password
-              </button>
-            </div>
           </article>
 
           {/* PRIVACY AND ACCOUNT ACTIONS */}
@@ -642,7 +648,7 @@ function SellerStoreProfilePage() {
           }}
         >
           <form
-            className="seller-profile-modal"
+            className="seller-profile-modal seller-profile-edit-modal"
             onSubmit={submitEdit}
             noValidate
           >
@@ -665,6 +671,11 @@ function SellerStoreProfilePage() {
               Changes are saved directly to your seller
               account in the database.
             </p>
+
+            <div className="seller-profile-form-grid">
+              <p className="seller-profile-form-section">
+                PERSONAL INFORMATION
+              </p>
 
             <label className="seller-profile-field">
               <span className="seller-store-profile-label">
@@ -721,7 +732,11 @@ function SellerStoreProfilePage() {
               )}
             </label>
 
-            <label className="seller-profile-field">
+              <p className="seller-profile-form-section">
+                STORE ADDRESS
+              </p>
+
+            <label className="seller-profile-field full">
               <span className="seller-store-profile-label">
                 House Number and Street
               </span>
@@ -817,6 +832,7 @@ function SellerStoreProfilePage() {
                 </small>
               )}
             </label>
+            </div>
 
             {editErrors.form && (
               <p className="seller-profile-form-error" role="alert">
@@ -824,7 +840,7 @@ function SellerStoreProfilePage() {
               </p>
             )}
 
-            <div className="seller-profile-modal-actions">
+            <div className="seller-profile-modal-actions seller-profile-edit-actions">
               <button
                 type="button"
                 className="seller-profile-secondary-button"
@@ -832,6 +848,15 @@ function SellerStoreProfilePage() {
                 disabled={editSaving}
               >
                 Cancel
+              </button>
+
+              <button
+                type="button"
+                className="seller-profile-secondary-button"
+                onClick={openPassword}
+                disabled={editSaving}
+              >
+                Change Password
               </button>
 
               <button
@@ -852,7 +877,7 @@ function SellerStoreProfilePage() {
           className="seller-profile-modal-overlay"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
-              setShowPassword(false);
+              closePassword();
             }
           }}
         >
@@ -864,7 +889,7 @@ function SellerStoreProfilePage() {
             <button
               type="button"
               className="seller-profile-modal-close"
-              onClick={() => setShowPassword(false)}
+              onClick={closePassword}
               aria-label="Close dialog"
             >
               ×
@@ -931,7 +956,7 @@ function SellerStoreProfilePage() {
               <button
                 type="button"
                 className="seller-profile-secondary-button"
-                onClick={() => setShowPassword(false)}
+                onClick={closePassword}
                 disabled={pwSaving}
               >
                 Cancel

@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./css/EditAccountPage.css";
 
@@ -495,9 +495,7 @@ function EditAccountPage() {
     readStoredAccount
   );
 
-  const [step, setStep] = useState(
-    location.hash === "#password" ? 2 : 1
-  );
+  const isPasswordView = location.hash === "#password";
 
   const [profileData, setProfileData] = useState(
     () => createProfileData(readStoredAccount())
@@ -523,12 +521,6 @@ function EditAccountPage() {
       newPassword: false,
       confirmPassword: false,
     });
-
-  useEffect(() => {
-    setStep(
-      location.hash === "#password" ? 2 : 1
-    );
-  }, [location.hash]);
 
   const passwordRules = useMemo(
     () => ({
@@ -556,7 +548,6 @@ function EditAccountPage() {
     Object.values(passwordRules).every(Boolean);
 
   function changeStep(nextStep) {
-    setStep(nextStep);
     setNotice("");
     setProfileErrors({});
     setPasswordErrors({});
@@ -610,13 +601,6 @@ function EditAccountPage() {
       profileData.fullName
     );
 
-    if (
-      profileData.username.trim().length < 3
-    ) {
-      errors.username =
-        "Username must contain at least 3 characters.";
-    }
-
     if (!fullName) {
       errors.fullName =
         "Full name is required.";
@@ -630,15 +614,6 @@ function EditAccountPage() {
     ) {
       errors.fullName =
         "Please enter at least your first name and surname.";
-    }
-
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        profileData.email.trim()
-      )
-    ) {
-      errors.email =
-        "Please enter a valid email address.";
     }
 
     if (
@@ -712,12 +687,8 @@ function EditAccountPage() {
 
     const updatedAccount = {
       ...account,
-      username: profileData.username.trim(),
       fullName,
       firstName: nameParts[0] || "",
-      email: profileData.email
-        .trim()
-        .toLowerCase(),
       mobile: profileData.mobile,
       mobileNumber: profileData.mobile,
       phone: profileData.mobile,
@@ -747,11 +718,9 @@ function EditAccountPage() {
         createProfileData(updatedAccount)
       );
 
-      changeStep(2);
-
       setNoticeType("success");
       setNotice(
-        "Profile saved successfully. You may now proceed to account security."
+        "Your account information was saved successfully."
       );
     } catch (error) {
       console.error(
@@ -764,20 +733,6 @@ function EditAccountPage() {
         "Unable to save your profile. Please try again."
       );
     }
-  }
-
-  function resetProfile() {
-    const savedAccount =
-      readStoredAccount();
-
-    setAccount(savedAccount);
-    setProfileData(
-      createProfileData(savedAccount)
-    );
-
-    setProfileErrors({});
-    setNoticeType("info");
-    setNotice("Profile fields were reset.");
   }
 
   function handlePasswordChange(event) {
@@ -894,59 +849,12 @@ function EditAccountPage() {
             <h1>Edit Account</h1>
 
             <p>
-              Update your personal information
-              and account security one step
-              at a time.
+              Update your personal information or change your password.
             </p>
           </div>
         </header>
 
         <div className="edit-account-body">
-          {/* STEP PROGRESS */}
-          <section className="edit-account-progress">
-            <button
-              type="button"
-              className={`edit-account-step ${
-                step === 1
-                  ? "active"
-                  : "completed"
-              }`}
-              onClick={() => changeStep(1)}
-            >
-              <span>1</span>
-
-              <div>
-                <strong>Profile Details</strong>
-                <small>
-                  Personal and delivery information
-                </small>
-              </div>
-            </button>
-
-            <div
-              className={`edit-account-progress-line ${
-                step === 2 ? "active" : ""
-              }`}
-            />
-
-            <button
-              type="button"
-              className={`edit-account-step ${
-                step === 2 ? "active" : ""
-              }`}
-              onClick={() => changeStep(2)}
-            >
-              <span>2</span>
-
-              <div>
-                <strong>Account Security</strong>
-                <small>
-                  Change your account password
-                </small>
-              </div>
-            </button>
-          </section>
-
           {notice && (
             <div
               className={`edit-account-notice ${noticeType}`}
@@ -960,8 +868,7 @@ function EditAccountPage() {
             </div>
           )}
 
-          {/* STEP 1: PROFILE AND ADDRESS */}
-          {step === 1 && (
+          {!isPasswordView && (
             <form
               className="edit-account-card"
               onSubmit={handleProfileSubmit}
@@ -969,21 +876,15 @@ function EditAccountPage() {
             >
               <div className="edit-account-card-heading">
                 <div>
-                  <p>STEP 1 OF 2</p>
+                  <p>ACCOUNT INFORMATION</p>
 
                   <h2>
-                    Profile and Delivery Information
+                    Edit Account Information
                   </h2>
 
                   <span>
-                    Update your personal and delivery
-                    information before continuing to
-                    account security.
+                    Update your personal and delivery information.
                   </span>
-                </div>
-
-                <div className="edit-account-number">
-                  1
                 </div>
               </div>
 
@@ -995,16 +896,6 @@ function EditAccountPage() {
                 </p>
 
                 <div className="edit-account-form-grid">
-                  <FormField
-                    label="Username"
-                    name="username"
-                    value={profileData.username}
-                    error={profileErrors.username}
-                    onChange={handleProfileChange}
-                    placeholder="Enter username"
-                    autoComplete="username"
-                  />
-
                   <FormField
                     label="Full Name"
                     name="fullName"
@@ -1032,6 +923,7 @@ function EditAccountPage() {
                     onChange={handleProfileChange}
                     placeholder="name@example.com"
                     autoComplete="email"
+                    readOnly
                   />
 
                   <FormField
@@ -1112,26 +1004,30 @@ function EditAccountPage() {
                 <button
                   type="button"
                   className="edit-account-secondary-button"
-                  onClick={resetProfile}
+                  onClick={() => navigate("/shopper/account")}
                 >
-                  Reset
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="edit-account-clear-button"
+                  onClick={() => changeStep(2)}
+                >
+                  Change Password
                 </button>
 
                 <button
                   type="submit"
                   className="edit-account-primary-button"
                 >
-                  Save and Continue
-                  <span aria-hidden="true">
-                    →
-                  </span>
+                  Save Changes
                 </button>
               </div>
             </form>
           )}
 
-          {/* STEP 2: ACCOUNT SECURITY */}
-          {step === 2 && (
+          {isPasswordView && (
             <form
               className="edit-account-card"
               onSubmit={handlePasswordSubmit}
@@ -1139,9 +1035,9 @@ function EditAccountPage() {
             >
               <div className="edit-account-card-heading">
                 <div>
-                  <p>STEP 2 OF 2</p>
+                  <p>ACCOUNT SECURITY</p>
 
-                  <h2>Account Security</h2>
+                  <h2>Change Password</h2>
 
                   <span>
                     Enter your current password
@@ -1149,9 +1045,6 @@ function EditAccountPage() {
                   </span>
                 </div>
 
-                <div className="edit-account-number">
-                  2
-                </div>
               </div>
 
               <div className="edit-account-divider" />
@@ -1266,9 +1159,9 @@ function EditAccountPage() {
                 <button
                   type="button"
                   className="edit-account-secondary-button"
-                  onClick={() => changeStep(1)}
+                  onClick={() => navigate("/shopper/account")}
                 >
-                  ← Back
+                  Cancel
                 </button>
 
                 <button

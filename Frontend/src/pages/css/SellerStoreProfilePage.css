@@ -100,6 +100,16 @@
   text-transform: uppercase;
 }
 
+.seller-profile-account-card {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.seller-profile-address-card {
+  grid-column: 1;
+  grid-row: 2;
+}
+
 /* PROFILE INFORMATION */
 
 .seller-profile-details {
@@ -208,6 +218,8 @@
 /* PRIVACY AND ACCOUNT ACTIONS */
 
 .seller-profile-privacy-card {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   min-height: 100%;
@@ -718,6 +730,10 @@
   width: 100%;
 }
 
+.seller-profile-edit-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .seller-profile-modal button:focus-visible,
 .seller-profile-modal input:focus-visible,
 .seller-profile-modal select:focus-visible,
@@ -737,6 +753,13 @@
 @media (max-width: 1050px) {
   .seller-store-profile-grid {
     grid-template-columns: 1fr;
+  }
+
+  .seller-profile-account-card,
+  .seller-profile-address-card,
+  .seller-profile-privacy-card {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .seller-profile-privacy-card {
