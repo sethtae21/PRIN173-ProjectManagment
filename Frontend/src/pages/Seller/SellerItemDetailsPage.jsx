@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { catalogAPI } from "../../services/api";
+import { API_URL, catalogAPI } from "../../services/api";
 import "../css/SellerItemDetailsPage.css";
 
 function normalizeStatus(status) {
@@ -8,6 +8,55 @@ function normalizeStatus(status) {
   if (value === "active" || value === "approved" || value === "accepted") return "Active";
   if (value === "rejected") return "Rejected";
   return "Pending";
+}
+
+/* Build an absolute backend URL from the serialized image path (/media/…) */
+function mediaUrl(path) {
+  if (!path) return "";
+  if (String(path).startsWith("http")) return path;
+  return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
+}
+
+/* Checkerboard backdrop so the rembg alpha channel is visible */
+const CHECKER = {
+  backgroundImage: "repeating-conic-gradient(#efe8d8 0% 25%, #fbf7ec 0% 50%)",
+  backgroundSize: "16px 16px",
+};
+
+/* Renders the real transparent PNG; falls back to the silhouette only on load failure */
+function AssetImage({
+  src,
+  alt,
+  style,
+  fallbackClass = "seller-item-garment",
+  neckClass = "seller-item-garment-neck",
+  bodyClass = "seller-item-garment-body",
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className={fallbackClass}>
+        <div className={neckClass} />
+        <div className={bodyClass} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        padding: "8px",
+        ...style,
+      }}
+    />
+  );
 }
 
 function SellerItemDetailsPage() {
@@ -388,11 +437,14 @@ function SellerItemDetailsPage() {
   );
 }
 
+/* ==========================================
+   SELLER MODE — real rembg transparent PNGs
+========================================== */
 function SellerMode({ product, formatPrice, onEdit, onDelete }) {
   const imageViews = [
-    { label: "FRONT PNG", fileName: product.front_image || "front_image.png" },
-    { label: "SIDE PNG", fileName: product.side_image || "side_image.png" },
-    { label: "REAR PNG", fileName: product.rear_image || "rear_image.png" },
+    { label: "FRONT PNG", path: product.front_image },
+    { label: "SIDE PNG", path: product.side_image },
+    { label: "REAR PNG", path: product.rear_image },
   ];
 
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
@@ -428,15 +480,33 @@ function SellerMode({ product, formatPrice, onEdit, onDelete }) {
             <p>PROCESSED PRODUCT ASSETS</p>
             <h3>Three-view images</h3>
           </div>
+
           <div className="seller-item-assets">
             {imageViews.map((imageView) => (
               <div className="seller-item-asset" key={imageView.label}>
                 <span>{imageView.label}</span>
-                <div className="seller-item-garment">
-                  <div className="seller-item-garment-neck" />
-                  <div className="seller-item-garment-body" />
+
+                {/* REAL IMAGE: rembg-processed transparent PNG streamed from GridFS,
+                    shown on a checkerboard so the alpha channel is visible */}
+                <div
+                  style={{
+                    ...CHECKER,
+                    width: "100%",
+                    height: "220px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <AssetImage
+                    src={mediaUrl(imageView.path)}
+                    alt={`${product.name} ${imageView.label.toLowerCase()} transparent view`}
+                  />
                 </div>
-                <small>{imageView.fileName}</small>
+
+                <small>{imageView.path || "No image stored"}</small>
               </div>
             ))}
           </div>
@@ -474,9 +544,19 @@ function SellerMode({ product, formatPrice, onEdit, onDelete }) {
   );
 }
 
+/* ==========================================
+   SHOPPER PREVIEW — same real image, shopper framing
+========================================== */
 function ShopperPreview({ product, selectedView, setSelectedView, viewInformation, formatPrice }) {
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
   const occasionTags = Array.isArray(product.occasion_tags) ? product.occasion_tags : [];
+
+  const viewPaths = {
+    front: product.front_image,
+    side: product.side_image,
+    rear: product.rear_image,
+  };
+  const currentPath = viewPaths[selectedView] || "";
 
   return (
     <section className="shopper-product-preview">
@@ -492,17 +572,40 @@ function ShopperPreview({ product, selectedView, setSelectedView, viewInformatio
 
       <div className="shopper-preview-product">
         <div className="shopper-preview-gallery">
-          <div className="shopper-preview-main-image">
+          <div
+            className="shopper-preview-main-image"
+            style={{
+              ...CHECKER,
+              minHeight: "320px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
             <span>{viewInformation.label}</span>
-            <div className="shopper-preview-garment">
-              <div className="shopper-preview-neck" />
-              <div className="shopper-preview-body" />
-            </div>
+
+            <AssetImage
+              src={mediaUrl(currentPath)}
+              alt={`${product.name} ${selectedView} view on preview canvas`}
+              style={{ maxHeight: "300px", flex: "1 1 auto" }}
+              fallbackClass="shopper-preview-garment"
+              neckClass="shopper-preview-neck"
+              bodyClass="shopper-preview-body"
+            />
+
             <small>{viewInformation.fileName}</small>
           </div>
+
           <div className="shopper-preview-thumbnails">
             {["front", "side", "rear"].map((view) => (
-              <button type="button" key={view} className={selectedView === view ? "active" : ""} onClick={() => setSelectedView(view)}>
+              <button
+                type="button"
+                key={view}
+                className={selectedView === view ? "active" : ""}
+                onClick={() => setSelectedView(view)}
+              >
                 {view}
               </button>
             ))}

@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 from django.conf import settings
 from django.http import HttpResponse
@@ -38,6 +39,7 @@ CATALOG_TEMPLATE_CSV = (
     'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
     'Classic White Shirt,"A comfortable shirt.",tops,M,White,Pure White,Neutral,15.99,"casual, minimalist","everyday, summer",front.jpeg,side.jpeg,rear.jpeg\n'
 )
+CATALOG_SAMPLE_CSV_PATH = Path(__file__).resolve().parents[1] / 'sample_data' / 'catalog_products.csv'
 SELLER_IMAGE_GUIDELINES = (
     'FitFusion AI Seller Catalog Upload Guidelines\n\n'
     'Upload exactly three clear garment photographs per item: Front, Side, and Rear. '
@@ -48,8 +50,30 @@ SELLER_IMAGE_GUIDELINES = (
     'the file extension may differ when the base filename is the same.\n'
     'Declare the garment color accurately. The backend removes the background and checks '
     'the front image color automatically; you do not need to remove the background yourself.\n'
+    'Side and Rear views must show the garment worn on a mannequin or hanging, photographed '
+    'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
     'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
 )
+
+
+def build_catalog_template_csv():
+    try:
+        sample_csv = CATALOG_SAMPLE_CSV_PATH.read_text(encoding='utf-8-sig')
+    except FileNotFoundError:
+        logger.warning(
+            "Sample catalog CSV not found at %s; using the legacy catalog template.",
+            CATALOG_SAMPLE_CSV_PATH,
+        )
+        return CATALOG_TEMPLATE_CSV
+
+    sample_csv = sample_csv.rstrip('\r\n')
+    instruction_row = io.StringIO(newline='')
+    csv.writer(instruction_row, lineterminator='\n').writerow([
+        '📝 HOW TO UPLOAD: Fill out the product details and upload matching Front, Side, and Rear images using the filenames in the final three columns.',
+        *([''] * 12),
+    ])
+    return f'{instruction_row.getvalue()}\n{sample_csv}\n'
+
 
 # ==========================================
 # Catalog Validator Logic
@@ -64,6 +88,12 @@ class CatalogValidator:
         'color_description', 'color_family', 'price',
         'front_image_filename', 'side_image_filename', 'rear_image_filename'
     ]
+
+    # NEW: Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
+    # A true Side/Rear view shows the garment worn/hanging → portrait alpha-bbox.
+    # A flat-lay rotated sideways → landscape alpha-bbox → reject.
+    ORIENTATION_MAX_W_H = 1.0
+    ORIENTATION_CHECKED_VIEWS = ('Side', 'Rear')
     
     def validate_csv_row(self, row, row_number):
         errors = []
@@ -117,6 +147,54 @@ class CatalogValidator:
                 return True, None
         except Exception as e:
             return False, f"Invalid or corrupted image: {str(e)}"
+
+    # ==========================================
+    # NEW: Side/Rear orientation validation
+    # ==========================================
+    def check_garment_orientation(self, image_bytes, view_label, category=''):
+        """
+        Deterministic orientation check on the rembg-processed transparent PNG.
+
+        Rule: Side and Rear views must show the garment worn on a mannequin or
+        hanging, i.e. the alpha-channel bounding box must be portrait
+        (width/height <= ORIENTATION_MAX_W_H). A flat-lay photograph rotated
+        sideways produces a landscape bounding box and is rejected with a
+        descriptive reason (FR-4.7-style explainable rejection, FR-4.8 report).
+
+        Footwear is exempt: a correct shoe side view is legitimately landscape.
+        """
+        if view_label not in self.ORIENTATION_CHECKED_VIEWS:
+            return True, None
+        if str(category).strip().lower() == 'footwear':
+            return True, None
+
+        try:
+            image_bytes.seek(0)
+            img = Image.open(image_bytes)
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+
+            alpha = img.split()[3]
+            bbox = alpha.getbbox()
+            if not bbox:
+                return False, f"{view_label}: no garment detected in the transparent PNG."
+
+            width = bbox[2] - bbox[0]
+            height = bbox[3] - bbox[1]
+            if height <= 0:
+                return False, f"{view_label}: invalid garment bounding box."
+
+            ratio = width / height
+            if ratio > self.ORIENTATION_MAX_W_H:
+                return False, (
+                    f"{view_label}: image looks like a flat-lay or rotated photo "
+                    f"(garment wider than tall, w/h={ratio:.2f}). Upload a true "
+                    f"{view_label.lower()} view: garment worn on a mannequin or hanging, "
+                    f"photographed vertically (portrait orientation)."
+                )
+            return True, None
+        except Exception as e:
+            return False, f"{view_label}: orientation check failed: {str(e)}"
     
     def process_image_with_rembg(self, image_file, session=None):
         try:
@@ -257,6 +335,15 @@ def process_batch_background(batch_id):
                         )
                         if not color_valid:
                             item_errors.append(color_msg)
+
+                    # NEW: Side/Rear orientation validation (flat-lay rotated sideways → reject)
+                    if field_name in ('side_image', 'rear_image'):
+                        processed_bytes.seek(0)
+                        orient_valid, orient_msg = validator.check_garment_orientation(
+                            processed_bytes, view_label, category=item.category
+                        )
+                        if not orient_valid:
+                            item_errors.append(orient_msg)
                 except Exception as e:
                     item_errors.append(f"{view_label} processing failed: {str(e)}")
             
@@ -330,7 +417,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-template')
     def download_template(self, request):
-        csv_content = CATALOG_TEMPLATE_CSV
+        csv_content = build_catalog_template_csv()
         response = HttpResponse(csv_content, content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="fitfusion_catalog_template.csv"'
         return response
@@ -339,7 +426,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     def download_package(self, request):
         archive = io.BytesIO()
         with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as package:
-            package.writestr('fitfusion_catalog_template.csv', CATALOG_TEMPLATE_CSV)
+            package.writestr('fitfusion_catalog_template.csv', build_catalog_template_csv())
             package.writestr('seller_image_guidelines.txt', SELLER_IMAGE_GUIDELINES)
         response = HttpResponse(archive.getvalue(), content_type='application/zip')
         response['Content-Disposition'] = 'attachment; filename="fitfusion_seller_upload_package.zip"'
@@ -413,9 +500,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
         category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear', 'footwear': 'footwear'}
 
-        # ==========================================
-        # FIX: Normalize 'item_name' to 'name' before validation
-        # ==========================================
         for row_number, row in enumerate(rows, start=2):
             try:
                 # Normalize CSV aliases so the validator sees consistent keys
@@ -578,6 +662,18 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     updated.rejection_reasons = [str(error)]
                     updated.save()
                     return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+                # NEW: Side/Rear orientation validation on re-upload
+                if field in ('side_image', 'rear_image'):
+                    view_label = 'Side' if field == 'side_image' else 'Rear'
+                    orient_valid, orient_msg = validator.check_garment_orientation(
+                        processed_images[field], view_label, category=item.category
+                    )
+                    if not orient_valid:
+                        updated.status = 'rejected'
+                        updated.rejection_reasons = [orient_msg]
+                        updated.save()
+                        return Response({field: orient_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             # FR-4.5: Delete old GridFS objects before saving new file references
             old_image_names = {

@@ -95,9 +95,26 @@ class CatalogValidationAndCRUDTests(TestCase):
             )
             template = package.read('fitfusion_catalog_template.csv').decode()
             guidelines = package.read('seller_image_guidelines.txt').decode()
+        template_response = self.client.get('/catalog/download-template/')
+        self.assertEqual(template, template_response.content.decode('utf-8'))
         self.assertIn('front_image_filename,side_image_filename,rear_image_filename', template)
         self.assertIn('Front, Side, and Rear', guidelines)
         self.assertIn('800 x 800 pixels', guidelines)
+
+    def test_download_template_includes_sample_catalog_rows(self):
+        response = self.client.get('/catalog/download-template/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        lines = response.content.decode('utf-8').splitlines()
+        self.assertEqual(len(lines), 13)
+        self.assertTrue(lines[0].startswith('"📝 HOW TO UPLOAD:'))
+        self.assertEqual(lines[1], '')
+        self.assertEqual(
+            lines[2],
+            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename',
+        )
+        self.assertTrue(lines[3].startswith('Classic White Tee,'))
+        self.assertTrue(lines[-1].startswith('Suede Loafer Shoes,'))
 
     def test_upload_recognizes_header_after_template_instruction_rows(self):
         self.client.force_authenticate(user=self.seller)
