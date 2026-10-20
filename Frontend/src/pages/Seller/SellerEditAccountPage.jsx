@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../css/SellerEditAccountPage.css";
 
@@ -281,9 +281,7 @@ function SellerEditAccountPage() {
     getFormValues(readProfile())
   );
 
-  const [step, setStep] = useState(
-    location.hash === "#password" ? 2 : 1
-  );
+  const isPasswordView = location.hash === "#password";
 
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState("");
@@ -298,10 +296,6 @@ function SellerEditAccountPage() {
     confirmPassword: false,
   });
 
-  useEffect(() => {
-    setStep(location.hash === "#password" ? 2 : 1);
-  }, [location.hash]);
-
   const passwordRules = useMemo(() => ({
     length: passwordForm.newPassword.length >= 8,
     uppercase: /[A-Z]/.test(passwordForm.newPassword),
@@ -311,7 +305,6 @@ function SellerEditAccountPage() {
   }), [passwordForm.newPassword]);
 
   function changeStep(nextStep) {
-    setStep(nextStep);
     setErrors({});
     setNotice("");
 
@@ -375,22 +368,9 @@ function SellerEditAccountPage() {
         "Enter at least your first name and surname.";
     }
 
-    if (form.username.trim().length < 3) {
-      next.username =
-        "Username must contain at least 3 characters.";
-    }
-
     if (form.storeName.trim().length < 2) {
       next.storeName =
         "Store Name must contain at least 2 characters.";
-    }
-
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        form.email.trim()
-      )
-    ) {
-      next.email = "Enter a valid email address.";
     }
 
     if (!/^09\d{9}$/.test(form.mobile)) {
@@ -444,9 +424,7 @@ function SellerEditAccountPage() {
       ...profile,
       role: "seller",
       fullName: properCase(form.fullName),
-      username: form.username.trim(),
       storeName: form.storeName.trim(),
-      email: form.email.trim().toLowerCase(),
       mobile: form.mobile,
       ...address,
       address,
@@ -512,10 +490,9 @@ function SellerEditAccountPage() {
       setProfile(updated);
       setForm(getFormValues(updated));
 
-      changeStep(2);
       setNoticeType("success");
       setNotice(
-        "Store profile saved successfully. You may now update your account security."
+        "Your seller account information was saved successfully."
       );
     } catch {
       setNoticeType("error");
@@ -523,14 +500,6 @@ function SellerEditAccountPage() {
         "Unable to save your changes. Please try again."
       );
     }
-  }
-
-  function resetProfile() {
-    const saved = readProfile();
-    setProfile(saved);
-    setForm(getFormValues(saved));
-    setErrors({});
-    setNotice("");
   }
 
   function handlePasswordChange(event) {
@@ -614,48 +583,12 @@ function SellerEditAccountPage() {
             <h1>Edit Seller Account</h1>
             <p>
               Update your personal details, store information,
-              business address, and account security.
+              and business address, or change your password.
             </p>
           </div>
         </header>
 
         <div className="edit-account-body">
-          <section className="edit-account-progress">
-            <button
-              type="button"
-              className={`edit-account-step ${
-                step === 1 ? "active" : "completed"
-              }`}
-              onClick={() => changeStep(1)}
-            >
-              <span>1</span>
-              <div>
-                <strong>Profile Details</strong>
-                <small>Personal and business information</small>
-              </div>
-            </button>
-
-            <div
-              className={`edit-account-progress-line ${
-                step === 2 ? "active" : ""
-              }`}
-            />
-
-            <button
-              type="button"
-              className={`edit-account-step ${
-                step === 2 ? "active" : ""
-              }`}
-              onClick={() => changeStep(2)}
-            >
-              <span>2</span>
-              <div>
-                <strong>Account Security</strong>
-                <small>Change your account password</small>
-              </div>
-            </button>
-          </section>
-
           {notice && (
             <div
               className={`edit-account-notice ${noticeType}`}
@@ -665,7 +598,7 @@ function SellerEditAccountPage() {
             </div>
           )}
 
-          {step === 1 && (
+          {!isPasswordView && (
             <form
               className="edit-account-card"
               onSubmit={saveProfile}
@@ -673,13 +606,12 @@ function SellerEditAccountPage() {
             >
               <div className="edit-account-card-heading">
                 <div>
-                  <p>STEP 1 OF 2</p>
-                  <h2>Profile and Business Information</h2>
+                  <p>ACCOUNT INFORMATION</p>
+                  <h2>Edit Account Information</h2>
                   <span>
-                    Update your registered seller and store details.
+                    Update your personal, store, and business address details.
                   </span>
                 </div>
-                <div className="edit-account-number">1</div>
               </div>
 
               <div className="edit-account-divider" />
@@ -706,14 +638,6 @@ function SellerEditAccountPage() {
                   />
 
                   <Field
-                    label="Username"
-                    name="username"
-                    value={form.username}
-                    error={errors.username}
-                    onChange={handleChange}
-                  />
-
-                  <Field
                     label="Store Name"
                     name="storeName"
                     value={form.storeName}
@@ -726,8 +650,7 @@ function SellerEditAccountPage() {
                     name="email"
                     type="email"
                     value={form.email}
-                    error={errors.email}
-                    onChange={handleChange}
+                    readOnly
                   />
 
                   <Field
@@ -822,22 +745,30 @@ function SellerEditAccountPage() {
                 <button
                   type="button"
                   className="edit-account-secondary-button"
-                  onClick={resetProfile}
+                  onClick={() => navigate(returnTo)}
                 >
-                  Reset
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="edit-account-clear-button"
+                  onClick={() => changeStep(2)}
+                >
+                  Change Password
                 </button>
 
                 <button
                   type="submit"
                   className="edit-account-primary-button"
                 >
-                  Save and Continue →
+                  Save Changes
                 </button>
               </div>
             </form>
           )}
 
-          {step === 2 && (
+          {isPasswordView && (
             <form
               className="edit-account-card"
               onSubmit={validatePassword}
@@ -845,14 +776,13 @@ function SellerEditAccountPage() {
             >
               <div className="edit-account-card-heading">
                 <div>
-                  <p>STEP 2 OF 2</p>
-                  <h2>Account Security</h2>
+                  <p>ACCOUNT SECURITY</p>
+                  <h2>Change Password</h2>
                   <span>
                     Enter your current password and create
                     a stronger new password.
                   </span>
                 </div>
-                <div className="edit-account-number">2</div>
               </div>
 
               <div className="edit-account-divider" />
@@ -926,9 +856,9 @@ function SellerEditAccountPage() {
                 <button
                   type="button"
                   className="edit-account-secondary-button"
-                  onClick={() => changeStep(1)}
+                  onClick={() => navigate(returnTo)}
                 >
-                  ← Back
+                  Cancel
                 </button>
 
                 <button

@@ -427,44 +427,28 @@ function AccountManagementPage() {
           </div>
         </article>
 
-        {/* ACCOUNT SECURITY */}
-        <article className="account-card account-security-card">
+        {/* ACCOUNT ACTIONS */}
+        <article className="account-card account-actions-card">
           <div className="account-card-heading">
             <div>
               <p className="account-card-label">
-                ACCOUNT SECURITY
+                ACCOUNT DEACTIVATION
               </p>
 
-              <h2>Password and privacy</h2>
+              <h2>Deactivate your account</h2>
             </div>
           </div>
 
-          <div className="account-security-information">
-            <div className="account-security-icon">
-              <LockIcon />
-            </div>
-
-            <div>
-              <strong>Password</strong>
-
-              <p>
-                Use a strong password that you do not
-                use for another account.
-              </p>
-            </div>
+          <div className="account-action-list">
+            <AccountAction
+              icon={<DeactivateIcon />}
+              title="Deactivate Account"
+              description="Temporarily disable your shopper account while retaining your profile, saved outfits, and order information."
+              buttonLabel="Deactivate Account"
+              danger
+              onClick={openDeactivateModal}
+            />
           </div>
-
-          <button
-            type="button"
-            className="account-secondary-button account-full-button"
-            onClick={() =>
-              navigate(
-                "/shopper/account/edit#password"
-              )
-            }
-          >
-            Change Password
-          </button>
         </article>
 
         {/* DELIVERY ADDRESS */}
@@ -477,18 +461,6 @@ function AccountManagementPage() {
 
               <h2>Delivery address</h2>
             </div>
-
-            <button
-              type="button"
-              className="account-secondary-button"
-              onClick={() =>
-                navigate(
-                  "/shopper/account/edit#address"
-                )
-              }
-            >
-              Edit Address
-            </button>
           </div>
 
           <div className="account-address-content">
@@ -524,54 +496,6 @@ function AccountManagementPage() {
             <InformationRow
               label="Postal Code"
               value={details.postalCode}
-            />
-          </div>
-        </article>
-
-        {/* ACCOUNT ACTIONS */}
-        <article className="account-card account-actions-card">
-          <div className="account-card-heading">
-            <div>
-              <p className="account-card-label">
-                ACCOUNT ACTIONS
-              </p>
-
-              <h2>Privacy and account control</h2>
-            </div>
-          </div>
-
-          <div className="account-action-list">
-            <AccountAction
-              icon={<UserIcon />}
-              title="Update account details"
-              description="Edit your name, username, email address, and mobile number."
-              buttonLabel="Manage Profile"
-              onClick={() =>
-                navigate(
-                  "/shopper/account/edit#profile"
-                )
-              }
-            />
-
-            <AccountAction
-              icon={<ShieldIcon />}
-              title="Manage account security"
-              description="Change your password and review the security of your account."
-              buttonLabel="Security Settings"
-              onClick={() =>
-                navigate(
-                  "/shopper/account/edit#password"
-                )
-              }
-            />
-
-            <AccountAction
-              icon={<DeactivateIcon />}
-              title="Deactivate Account"
-              description="Temporarily disable your shopper account while retaining your profile, saved outfits, and order information."
-              buttonLabel="Deactivate Account"
-              danger
-              onClick={openDeactivateModal}
             />
           </div>
         </article>
@@ -791,44 +715,11 @@ function AccountAction({
   );
 }
 
-function LockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect
-        x="5"
-        y="10"
-        width="14"
-        height="11"
-        rx="2"
-      />
-      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-    </svg>
-  );
-}
-
 function LocationIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
       <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c.8-5 3.5-7 8-7s7.2 2 8 7" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3 20 6v5c0 5.2-3.1 8.5-8 10-4.9-1.5-8-4.8-8-10V6l8-3Z" />
-      <path d="m9 12 2 2 4-5" />
     </svg>
   );
 }

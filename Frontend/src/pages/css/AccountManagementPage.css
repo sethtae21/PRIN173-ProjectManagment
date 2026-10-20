@@ -122,11 +122,6 @@
   transform: translateY(-1px);
 }
 
-.account-full-button {
-  width: 100%;
-  margin-top: 31px;
-}
-
 /* INFORMATION ROWS */
 
 .account-information-list,
@@ -157,24 +152,6 @@
   font-size: 13px;
 }
 
-/* SECURITY CARD */
-
-.account-security-card {
-  min-height: 100%;
-}
-
-.account-security-information {
-  display: flex;
-  align-items: center;
-  gap: 21px;
-  min-height: 135px;
-  padding: 25px;
-  background: #f8f5ef;
-  border: 1px solid #e2d8c7;
-  border-radius: 15px;
-}
-
-.account-security-icon,
 .account-address-icon {
   display: grid;
   flex: 0 0 62px;
@@ -190,7 +167,6 @@
   color: #fffdf9;
 }
 
-.account-security-icon svg,
 .account-address-icon svg {
   width: 27px;
   height: 27px;
@@ -201,12 +177,10 @@
   stroke-linejoin: round;
 }
 
-.account-security-information strong,
 .account-address-content strong {
   font-size: 13px;
 }
 
-.account-security-information p,
 .account-address-content p {
   margin: 9px 0 0;
   color: #5c554c;
@@ -235,7 +209,7 @@
 
 .account-actions-card {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .account-action-list {
@@ -677,7 +651,6 @@
     padding: 18px 0;
   }
 
-  .account-security-information,
   .account-address-content {
     align-items: flex-start;
     flex-direction: column;
