@@ -161,7 +161,7 @@ export const catalogAPI = {
         const response = await fetch(`${API_URL}/catalog/download-template/`);
         if (!response.ok) throw new Error(`Template download failed (${response.status})`);
         const blob = await response.blob();
-        saveBlob(blob, 'fitfusion_catalog_template.csv');
+        saveBlob(blob, 'catalog_products.csv');
         return blob;
     },
 

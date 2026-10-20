@@ -91,9 +91,9 @@ class CatalogValidationAndCRUDTests(TestCase):
         with zipfile.ZipFile(io.BytesIO(response.content)) as package:
             self.assertEqual(
                 set(package.namelist()),
-                {'fitfusion_catalog_template.csv', 'seller_image_guidelines.txt'},
+                {'catalog_products.csv', 'seller_image_guidelines.txt'},
             )
-            template = package.read('fitfusion_catalog_template.csv').decode()
+            template = package.read('catalog_products.csv').decode()
             guidelines = package.read('seller_image_guidelines.txt').decode()
         template_response = self.client.get('/catalog/download-template/')
         self.assertEqual(template, template_response.content.decode('utf-8'))

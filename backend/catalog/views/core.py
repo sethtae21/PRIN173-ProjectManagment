@@ -419,7 +419,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     def download_template(self, request):
         csv_content = build_catalog_template_csv()
         response = HttpResponse(csv_content, content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="fitfusion_catalog_template.csv"'
+        response['Content-Disposition'] = 'attachment; filename="catalog_products.csv"'
         return response
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-package')
