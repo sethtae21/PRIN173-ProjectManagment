@@ -1,6 +1,7 @@
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { authAPI } from "../../services/api";
 import "../css/SellerEditAccountPage.css";
 
 const PROVINCES = [
@@ -286,6 +287,7 @@ function SellerEditAccountPage() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("info");
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   const [passwordForm, setPasswordForm] =
     useState(EMPTY_PASSWORD);
@@ -518,7 +520,7 @@ function SellerEditAccountPage() {
     setNotice("");
   }
 
-  function validatePassword(event) {
+  async function handlePasswordSubmit(event) {
     event.preventDefault();
 
     const next = {};
@@ -558,13 +560,44 @@ function SellerEditAccountPage() {
       return;
     }
 
-    // Do not store passwords in browser storage.
-    // Actual password changes require a backend.
-    setPasswordForm({ ...EMPTY_PASSWORD });
-    setNoticeType("info");
-    setNotice(
-      "Password validation passed. Actual password changes will be available after backend integration."
-    );
+    if (passwordSaving) return;
+
+    setPasswordSaving(true);
+
+    try {
+      await authAPI.changePassword({
+        old_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+        new_password_confirm: passwordForm.confirmPassword,
+      });
+
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("fitfusion-current-user");
+      sessionStorage.removeItem("userRole");
+      sessionStorage.removeItem("userEmail");
+      sessionStorage.removeItem("sellerAccount");
+
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Seller password update failed:", error);
+
+      let message = "Password update failed. Please try again.";
+      try {
+        const response = JSON.parse(error.message);
+        const firstError = Object.values(response).flat()[0];
+        if (typeof firstError === "string") {
+          message = firstError;
+        }
+      } catch {
+        // Keep the default message when the response is not field-formatted JSON.
+      }
+
+      setNoticeType("error");
+      setNotice(message);
+    } finally {
+      setPasswordSaving(false);
+    }
   }
 
   return (
@@ -771,7 +804,7 @@ function SellerEditAccountPage() {
           {isPasswordView && (
             <form
               className="edit-account-card"
-              onSubmit={validatePassword}
+              onSubmit={handlePasswordSubmit}
               noValidate
             >
               <div className="edit-account-card-heading">
@@ -846,9 +879,9 @@ function SellerEditAccountPage() {
               <div className="edit-account-info">
                 <span>i</span>
                 <p>
-                  During frontend development, password
-                  requirements are validated without changing
-                  actual account credentials.
+                  Your current password is verified before the new
+                  password is saved. You will need to log in again
+                  after the change.
                 </p>
               </div>
 
@@ -857,6 +890,7 @@ function SellerEditAccountPage() {
                   type="button"
                   className="edit-account-secondary-button"
                   onClick={() => navigate(returnTo)}
+                  disabled={passwordSaving}
                 >
                   Cancel
                 </button>
@@ -869,6 +903,7 @@ function SellerEditAccountPage() {
                     setErrors({});
                     setNotice("");
                   }}
+                  disabled={passwordSaving}
                 >
                   Clear
                 </button>
@@ -876,8 +911,9 @@ function SellerEditAccountPage() {
                 <button
                   type="submit"
                   className="edit-account-primary-button"
+                  disabled={passwordSaving}
                 >
-                  Validate Password
+                  {passwordSaving ? "Updating…" : "Update Password"}
                 </button>
               </div>
             </form>

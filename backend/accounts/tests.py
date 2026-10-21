@@ -133,6 +133,51 @@ class AccountManagementTests(TestCase):
         self.assertEqual(login.status_code, 400)
 
 
+class PasswordChangePersistenceTests(TestCase):
+    """Password changes are stored for both registered account roles."""
+
+    def change_password(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client.post(
+            '/auth/change-password/',
+            {
+                'old_password': 'OldPass123!@#',
+                'new_password': 'NewPass123!@#',
+                'new_password_confirm': 'NewPass123!@#',
+            },
+            format='json',
+        )
+
+    def test_shopper_password_change_is_persisted(self):
+        user = User.objects.create_user(
+            email='password-shopper@test.com',
+            full_name='Password Shopper',
+            password='OldPass123!@#',
+            role='shopper',
+        )
+
+        response = self.change_password(user)
+
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password('NewPass123!@#'))
+
+    def test_seller_password_change_is_persisted(self):
+        user = User.objects.create_seller(
+            email='password-seller@test.com',
+            full_name='Password Seller',
+            store_name='Password Store',
+            password='OldPass123!@#',
+        )
+
+        response = self.change_password(user)
+
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password('NewPass123!@#'))
+
+
 class GridFSStorageDeletionTests(SimpleTestCase):
     def test_delete_finds_object_id_backed_image_fields(self):
         from bson import ObjectId
