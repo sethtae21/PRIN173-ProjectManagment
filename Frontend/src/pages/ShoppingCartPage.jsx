@@ -12,46 +12,10 @@ import {
 import "./css/ShoppingCartPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
-const CHECKOUT_STORAGE_KEY =
-  "fitfusion-checkout-items";
+const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
 const MAX_QUANTITY = 10;
 
-const defaultCartItems = [
-  {
-    id: "001-S-Beige",
-    productId: "001",
-    name: "Classic Beige Top",
-    category: "Tops",
-    sellerId: "luna-clothing",
-    sellerName: "Luna Clothing",
-    price: 699,
-    originalPrice: 799,
-    quantity: 2,
-    size: "S",
-    color: "Beige",
-    sizes: ["XS", "S", "M", "L"],
-    colors: ["Beige", "White", "Black"],
-    selected: true,
-    image: "",
-  },
-  {
-    id: "002-M-Black",
-    productId: "002",
-    name: "Elegant Black Trousers",
-    category: "Bottoms",
-    sellerId: "maison-moderne",
-    sellerName: "Maison Moderne",
-    price: 1099,
-    originalPrice: 1299,
-    quantity: 1,
-    size: "M",
-    color: "Black",
-    sizes: ["S", "M", "L", "XL"],
-    colors: ["Black", "Brown"],
-    selected: false,
-    image: "",
-  },
-];
+// REMOVED defaultCartItems to prevent fake data from appearing
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
@@ -66,8 +30,8 @@ function normalizeCartItem(item, index) {
     item.productId ?? item.id ?? index + 1
   );
 
-  const size = item.size || "M";
-  const color = item.color || "Default";
+  const size = item.size || item.selectedSize || "M";
+  const color = item.color || item.selectedColor || "Default";
 
   return {
     id:
@@ -75,11 +39,11 @@ function normalizeCartItem(item, index) {
       `${productId}-${size}-${color}`,
     productId,
     name: item.name || "Fashion Item",
-    category: item.category || "Clothing",
+    category: item.category || item.displayCategory || "Clothing",
     sellerId:
-      item.sellerId || "fitfusion-seller",
+      item.sellerId || item.seller_id || "fitfusion-seller",
     sellerName:
-      item.sellerName || "FitFusion Seller",
+      item.sellerName || item.store_name || "FitFusion Seller",
     price: Number(item.price || 0),
     originalPrice: Number(
       item.originalPrice || item.price || 0
@@ -97,14 +61,15 @@ function normalizeCartItem(item, index) {
       Array.isArray(item.sizes) &&
       item.sizes.length > 0
         ? item.sizes
-        : ["S", "M", "L", "XL"],
+        : [size], // Fallback to current size if no array
     colors:
       Array.isArray(item.colors) &&
       item.colors.length > 0
         ? item.colors
-        : ["Beige", "Black", "White"],
+        : [color],
     selected: item.selected !== false,
-    image: item.image || "",
+    // FIX: Map imageUrl (from CatalogPage) to image (for Cart display)
+    image: item.imageUrl || item.image || item.frontImageUrl || "",
   };
 }
 
@@ -156,18 +121,18 @@ function loadCartItems() {
     );
 
     if (!storedCart) {
-      return defaultCartItems;
+      return []; // Return empty array instead of mock data
     }
 
     const parsedCart = JSON.parse(storedCart);
 
     if (!Array.isArray(parsedCart)) {
-      return defaultCartItems;
+      return [];
     }
 
     return mergeDuplicateItems(parsedCart);
   } catch {
-    return defaultCartItems;
+    return [];
   }
 }
 
@@ -179,19 +144,21 @@ function ShoppingCartPage() {
 
   const [notice, setNotice] = useState("");
 
+  // Sync cart to localStorage and dispatch event for header update
   useEffect(() => {
     localStorage.setItem(
       CART_STORAGE_KEY,
       JSON.stringify(cartItems)
     );
 
+    // Dispatch event so the header cart icon updates immediately
     window.dispatchEvent(
       new CustomEvent(
         "fitfusion-cart-updated",
         {
           detail: {
             cart: cartItems,
-            quantity: cartItems.length,
+            quantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
           },
         }
       )
@@ -211,8 +178,8 @@ function ShoppingCartPage() {
       window.clearTimeout(timeout);
   }, [notice]);
 
-  const cartProductCount =
-    cartItems.length;
+  // Calculate total unique items
+  const cartProductCount = cartItems.length;
 
   const selectedItems = useMemo(
     () =>
@@ -539,16 +506,17 @@ function ShoppingCartPage() {
                         <img
                           src={item.image}
                           alt={item.name}
+                          className="cart-item-img"
                         />
                       ) : (
-                        <span aria-hidden="true">
+                        <span aria-hidden="true" className="cart-item-placeholder">
                           {item.name.charAt(0)}
                         </span>
                       )}
 
                       {item.originalPrice >
                         item.price && (
-                        <small>
+                        <small className="cart-discount-badge">
                           -
                           {Math.round(
                             (1 -
@@ -612,6 +580,7 @@ function ShoppingCartPage() {
 
                         <button
                           type="button"
+                          className="shopping-cart-remove-btn"
                           onClick={() =>
                             handleRemoveItem(
                               item.id

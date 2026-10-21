@@ -14,6 +14,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSerializer, PasswordChangeSerializer
+# ✅ FIXED: Import from auth_serializers instead of validators
+from accounts.serializers.auth_serializers import validate_password_strength 
 from accounts.utils import generate_jwt_tokens, blacklist_refresh_token, is_token_blacklisted
 from accounts.models import User
 
@@ -128,9 +130,6 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
             'user': serializer.data
         })
 
-    # ==========================================
-    # KAN-56 ADDED: Account deletion with RA 10173 erasure
-    # ==========================================
     def destroy(self, request, *args, **kwargs):
         """Delete account + cascade all owned data + invalidate tokens (RA 10173)."""
         user = self.get_object()
@@ -207,9 +206,6 @@ class LogoutView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ==========================================
-# KAN-56 ADDED: Password Change Endpoint (FR-1.3)
-# ==========================================
 class PasswordChangeView(APIView):
     """FR-1.3: change password with current-password verification."""
     permission_classes = (IsAuthenticated,)
@@ -225,13 +221,8 @@ class PasswordChangeView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ==========================================
-# NEW: Account Deactivation (FR-1.4 soft-delete)
-# Sets is_active=False; all listings/orders/reports are RETAINED
-# (matches the Store Profile privacy notice). JWT auth and login
-# both reject inactive users server-side.
-# ==========================================
 class DeactivateAccountView(APIView):
+    """FR-1.4 soft-delete: Sets is_active=False; retains records."""
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
