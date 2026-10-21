@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import RatingControl from "../components/RatingControl";
 import "./css/FittingStudioPage.css";
 
 const SKIN_TONES = [
@@ -57,6 +58,21 @@ function readStoredArray(key) {
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
+  }
+}
+
+function readAuthState() {
+  if (!localStorage.getItem("access_token")) {
+    return null;
+  }
+
+  try {
+    const user = JSON.parse(
+      localStorage.getItem("fitfusion-current-user") || "null"
+    );
+    return user || {};
+  } catch {
+    return {};
   }
 }
 
@@ -885,6 +901,13 @@ function FittingStudioPage({ isGuest = false }) {
                             Size {item.size} •{" "}
                             {item.color}
                           </small>
+                          <RatingControl
+                            key={`${category}-${item.id}`}
+                            itemId={item.id}
+                            isEquipped={Boolean(item)}
+                            authState={isGuest ? null : readAuthState()}
+                            onGuestRate={openRegistrationPopup}
+                          />
                         </div>
 
                         <button

@@ -286,6 +286,68 @@
   margin-top: 10px;
 }
 
+.product-review-locked .product-review-star-input {
+  justify-content: center;
+  margin: 14px 0;
+}
+
+.product-review-locked .product-review-star-input button {
+  width: auto;
+  margin: 0;
+  color: #d7af4b;
+}
+
+.product-review-auth-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(23, 19, 15, 0.65);
+}
+
+.product-review-auth-prompt {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 28px;
+  background: #fffdf9;
+  border: 1px solid #e2d8c7;
+  border-radius: 14px;
+  color: #17130f;
+  text-align: center;
+}
+
+.product-review-auth-prompt h3 {
+  margin: 12px 0 8px;
+}
+
+.product-review-auth-prompt p {
+  color: #746b60;
+  font-size: 13px;
+}
+
+.product-review-auth-prompt button {
+  min-height: 40px;
+  margin: 6px;
+  padding: 8px 14px;
+  border: 1px solid #8e641f;
+  border-radius: 7px;
+  background: #fffdf9;
+  color: #5d4218;
+  cursor: pointer;
+}
+
+.product-review-auth-prompt button:first-child {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 32px;
+  padding: 3px 10px;
+  border: 0;
+  font-size: 20px;
+}
+
 .product-review-empty {
   padding: 35px;
   background: #f8f5ef;

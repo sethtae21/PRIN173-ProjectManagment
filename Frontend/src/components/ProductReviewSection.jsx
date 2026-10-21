@@ -2,6 +2,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 
 import "./ProductReviewSection.css";
 
@@ -36,15 +37,6 @@ function getCurrentUser() {
     ...registeredAccount,
     ...currentUser,
   };
-}
-
-function getProductId(item) {
-  return String(
-    item.productId ||
-      item.id ||
-      item.product?.id ||
-      ""
-  );
 }
 
 function formatReviewDate(value) {
@@ -107,7 +99,11 @@ function ProductReviewSection({
   onReviewsChange,
   ratingSummary,
 }) {
+  const navigate = useNavigate();
   const currentUser = getCurrentUser();
+  const isRegisteredUser = Boolean(
+    localStorage.getItem("access_token")
+  );
 
   const userKey =
     currentUser.email ||
@@ -139,34 +135,6 @@ function ProductReviewSection({
         String(userKey)
     );
 
-  const orders = readStoredObject(
-    "fitfusion-orders",
-    []
-  );
-
-  let purchasedItem = null;
-
-  if (Array.isArray(orders)) {
-    for (const order of orders) {
-      const foundItem = (
-        Array.isArray(order.items)
-          ? order.items
-          : []
-      ).find(
-        (item) =>
-          getProductId(item) ===
-          String(product.id)
-      );
-
-      if (foundItem) {
-        purchasedItem = foundItem;
-        break;
-      }
-    }
-  }
-
-  const canReview = Boolean(purchasedItem);
-
   const [selectedRating, setSelectedRating] =
     useState(existingReview?.rating || 0);
 
@@ -179,6 +147,8 @@ function ProductReviewSection({
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showRegistrationPrompt, setShowRegistrationPrompt] =
+    useState(false);
 
   useEffect(() => {
     setSelectedRating(
@@ -195,10 +165,8 @@ function ProductReviewSection({
     setMessage("");
     setError("");
 
-    if (!canReview) {
-      setError(
-        "You can only rate this product after purchasing it."
-      );
+    if (!isRegisteredUser) {
+      setShowRegistrationPrompt(true);
       return;
     }
 
@@ -227,12 +195,9 @@ function ProductReviewSection({
       rating: selectedRating,
       comment: comment.trim(),
 
-      size:
-        purchasedItem.selectedSize ||
-        purchasedItem.size ||
-        "Default",
+      size: product.size || "Default",
 
-      verifiedPurchase: true,
+      verifiedPurchase: false,
 
       createdAt:
         existingReview?.createdAt ||
@@ -387,7 +352,7 @@ function ProductReviewSection({
               : "Share your experience"}
           </h3>
 
-          {canReview || existingReview ? (
+          {isRegisteredUser ? (
             <form onSubmit={submitReview}>
               <label>Your rating</label>
 
@@ -411,6 +376,10 @@ function ProductReviewSection({
                         setHoveredRating(0)
                       }
                       onClick={() => {
+                        if (!isRegisteredUser) {
+                          setShowRegistrationPrompt(true);
+                          return;
+                        }
                         setSelectedRating(star);
                         setError("");
                       }}
@@ -469,25 +438,69 @@ function ProductReviewSection({
               <span>★</span>
 
               <p>
-                Only shoppers who purchased this
-                product can submit a rating and
-                review.
+                Sign in or create an account to submit a rating and review.
               </p>
+
+              <div className="product-review-star-input">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`${star} star rating`}
+                    onClick={() => setShowRegistrationPrompt(true)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  window.location.assign(
-                    "/shopper/orders"
-                  )
-                }
+                onClick={() => setShowRegistrationPrompt(true)}
               >
-                View Order History
+                Rate this product
               </button>
             </div>
           )}
         </aside>
       </div>
+      {showRegistrationPrompt && (
+        <div
+          className="product-review-auth-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowRegistrationPrompt(false);
+            }
+          }}
+        >
+          <section
+            className="product-review-auth-prompt"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-review-auth-title"
+          >
+            <button
+              type="button"
+              aria-label="Close registration prompt"
+              onClick={() => setShowRegistrationPrompt(false)}
+            >
+              ×
+            </button>
+            <h3 id="product-review-auth-title">Sign in to rate this product</h3>
+            <p>Create an account or log in to submit your rating.</p>
+            <button type="button" onClick={() => navigate("/signup")}>
+              Create Account
+            </button>
+            <button type="button" onClick={() => navigate("/login")}>
+              Log In
+            </button>
+            <button type="button" onClick={() => setShowRegistrationPrompt(false)}>
+              Continue as Guest
+            </button>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

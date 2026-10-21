@@ -1,0 +1,47 @@
+.studio-rating-control {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.studio-rating-label {
+  color: #5d625d;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.studio-rating-stars {
+  display: flex;
+  gap: 3px;
+}
+
+.studio-rating-stars button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a9ada8;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.studio-rating-stars button.active {
+  color: #d59a24;
+}
+
+.studio-rating-stars button:disabled {
+  cursor: default;
+}
+
+.studio-rating-control small {
+  color: #5d625d;
+  font-size: 0.7rem;
+}
+
+.studio-rating-control .studio-rating-success {
+  color: #237447;
+}
+
+.studio-rating-control .studio-rating-error {
+  color: #b42318;
+}

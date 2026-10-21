@@ -787,8 +787,7 @@ function ProductDetailsPage({
           </div>
 
           <p className="product-rating-notice">
-            Only shoppers with delivered orders
-            can submit a star rating.
+            Try this item in the Fitting Studio to rate how it looks on your avatar.
           </p>
         </section>
       </div>
