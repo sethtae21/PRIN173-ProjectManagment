@@ -27,6 +27,8 @@ from drf_spectacular.types import OpenApiTypes
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
+# Size-label format rule (sellers input SML only; inch/cm rejected).
+from recommendations.knowledge_table import validate_size_label
 
 logger = logging.getLogger(__name__)
 UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
@@ -66,6 +68,10 @@ SELLER_IMAGE_GUIDELINES = (
     'the front image color automatically; you do not need to remove the background yourself.\n'
     'Side and Rear views must show the garment worn on a mannequin or hanging, photographed '
     'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
+    'SIZE RULE: enter standard size labels ONLY - XS, S, M, L, XL, or XXL. Do NOT type inch or '
+    'cm measurements (e.g., "32 inches", "96 cm"); they are rejected automatically. The product '
+    'page displays the equivalent inch and cm ranges for standard sizes on its own. '
+    'Footwear uses regional shoe sizes (e.g., "US 9", "EU 40", "UK 8").\n'
     'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
 )
 
@@ -78,7 +84,9 @@ def build_catalog_template_csv():
             '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front, Side, and Rear image filenames. '
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
             f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
-            'Separate multiple tags with commas.'
+            'Separate multiple tags with commas. '
+            'SIZE RULE: enter standard size labels ONLY (XS, S, M, L, XL, XXL) - inch or cm measurements are rejected; '
+            'the product page shows the inch and cm ranges automatically. Footwear: regional sizes (e.g., "US 9", "EU 40").'
         ),
         *([''] * (len(CATALOG_CSV_COLUMNS) - 1)),
     ])
@@ -106,9 +114,7 @@ class CatalogValidator:
         'occasion_tags': frozenset(OCCASION_TAG_OPTIONS),
     }
 
-    # NEW: Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
-    # A true Side/Rear view shows the garment worn/hanging → portrait alpha-bbox.
-    # A flat-lay rotated sideways → landscape alpha-bbox → reject.
+    # Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     ORIENTATION_MAX_W_H = 1.0
     ORIENTATION_CHECKED_VIEWS = ('Side', 'Rear')
     
@@ -132,6 +138,13 @@ class CatalogValidator:
             category = 'dresses'
         if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
+
+        # SIZE RULE: sellers input categorical labels only (footwear: regional
+        # codes). Inch/cm measurements are rejected with a descriptive reason
+        # that appears in the validation report (FR-4.7 / FR-4.8).
+        size_valid, size_error = validate_size_label(row.get('size', ''), category)
+        if not size_valid:
+            errors.append(f"Row {row_number}: {size_error}")
 
         for field, allowed_tags in self.TAG_OPTIONS.items():
             submitted_tags = [
@@ -179,20 +192,12 @@ class CatalogValidator:
         except Exception as e:
             return False, f"Invalid or corrupted image: {str(e)}"
 
-    # ==========================================
-    # NEW: Side/Rear orientation validation
-    # ==========================================
     def check_garment_orientation(self, image_bytes, view_label, category=''):
         """
         Deterministic orientation check on the rembg-processed transparent PNG.
-
-        Rule: Side and Rear views must show the garment worn on a mannequin or
-        hanging, i.e. the alpha-channel bounding box must be portrait
-        (width/height <= ORIENTATION_MAX_W_H). A flat-lay photograph rotated
-        sideways produces a landscape bounding box and is rejected with a
-        descriptive reason (FR-4.7-style explainable rejection, FR-4.8 report).
-
-        Footwear is exempt: a correct shoe side view is legitimately landscape.
+        Side/Rear views must be portrait (w/h <= ORIENTATION_MAX_W_H); a flat-lay
+        rotated sideways produces a landscape alpha-bbox and is rejected.
+        Footwear is exempt (correct shoe side views are landscape).
         """
         if view_label not in self.ORIENTATION_CHECKED_VIEWS:
             return True, None
@@ -367,7 +372,7 @@ def process_batch_background(batch_id):
                         if not color_valid:
                             item_errors.append(color_msg)
 
-                    # NEW: Side/Rear orientation validation (flat-lay rotated sideways → reject)
+                    # Side/Rear orientation validation (flat-lay rotated sideways → reject)
                     if field_name in ('side_image', 'rear_image'):
                         processed_bytes.seek(0)
                         orient_valid, orient_msg = validator.check_garment_orientation(
@@ -610,7 +615,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
         return Response(CatalogItemSerializer(items, many=True).data)
     
-    # COMBINED ROUTE FIX: Handles GET/PUT/PATCH/DELETE + File Uploads (FR-4.5 / FR-4.6 / FR-4.7)
+    # COMBINED ROUTE: Handles GET/PUT/PATCH/DELETE + File Uploads (FR-4.5 / FR-4.6 / FR-4.7)
     @extend_schema(
         summary="Manage a specific seller listing",
         description="GET details, PUT/PATCH update (with optional image replacement), or DELETE a specific catalog item.",
@@ -662,6 +667,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
             serializer = CatalogItemSerializer(
                 item, data=payload, partial=request.method == 'PATCH'
             )
+            # validate_size inside the serializer enforces the SML-only rule here.
             serializer.is_valid(raise_exception=True)
             
             # Save text fields first
@@ -694,7 +700,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     updated.save()
                     return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-                # NEW: Side/Rear orientation validation on re-upload
+                # Side/Rear orientation validation on re-upload
                 if field in ('side_image', 'rear_image'):
                     view_label = 'Side' if field == 'side_image' else 'Rear'
                     orient_valid, orient_msg = validator.check_garment_orientation(

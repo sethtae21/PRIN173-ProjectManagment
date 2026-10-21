@@ -164,6 +164,21 @@ function SellerItemDetailsPage() {
     return views[selectedView];
   }, [product, selectedView]);
 
+  /* Derived three-value size display for the UI.
+     size_inches / size_cm come from the backend serializer (computed from
+     SIZE_RANGE_TABLE in knowledge_table.py). Footwear / unknown sizes have
+     both fields null, so we fall back to the raw size label only. */
+  const sizeDisplay = useMemo(() => {
+    if (!product) return null;
+    const label = product.size || "";
+    const inches = product.size_inches;
+    const cm = product.size_cm;
+    if (inches && cm) {
+      return `${label} · ${inches} · ${cm}`;
+    }
+    return label;
+  }, [product]);
+
   function formatPrice(price) {
     return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(price);
   }
@@ -324,6 +339,7 @@ function SellerItemDetailsPage() {
         {viewMode === "seller" ? (
           <SellerMode
             product={displayProduct}
+            sizeDisplay={sizeDisplay}
             formatPrice={formatPrice}
             onEdit={openEditModal}
             onDelete={() => setShowDeleteModal(true)}
@@ -331,6 +347,7 @@ function SellerItemDetailsPage() {
         ) : (
           <ShopperPreview
             product={displayProduct}
+            sizeDisplay={sizeDisplay}
             selectedView={selectedView}
             setSelectedView={setSelectedView}
             viewInformation={viewInformation}
@@ -385,7 +402,20 @@ function SellerItemDetailsPage() {
                   <option value="footwear">Footwear</option>
                 </select>
               </label>
-              <EditField label="Sizes" name="sizes" value={editForm.sizes} onChange={handleEditChange} placeholder="S, M, L, XL" required />
+              <label className="seller-item-edit-field">
+                <span>Size</span>
+                <input
+                  name="sizes"
+                  value={editForm.sizes}
+                  onChange={handleEditChange}
+                  placeholder="XS, S, M, L, XL, XXL (or US 9, EU 40 for footwear)"
+                  required
+                />
+                <small className="seller-item-edit-hint">
+                  Clothing: standard labels only (XS, S, M, L, XL, XXL). Inch/cm measurements are rejected automatically.
+                  Footwear: regional codes (e.g., US 9, EU 40). The product page shows the inch and cm ranges automatically.
+                </small>
+              </label>
               <EditField label="Color" name="color" value={editForm.color} onChange={handleEditChange} required />
               <EditField label="Color Description" name="colorDescription" value={editForm.colorDescription} onChange={handleEditChange} required />
               <EditField label="Color Family" name="colorFamily" value={editForm.colorFamily} onChange={handleEditChange} required />
@@ -440,7 +470,7 @@ function SellerItemDetailsPage() {
 /* ==========================================
    SELLER MODE — real rembg transparent PNGs
 ========================================== */
-function SellerMode({ product, formatPrice, onEdit, onDelete }) {
+function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
   const imageViews = [
     { label: "FRONT PNG", path: product.front_image },
     { label: "SIDE PNG", path: product.side_image },
@@ -521,7 +551,11 @@ function SellerMode({ product, formatPrice, onEdit, onDelete }) {
           <MetadataRow label="Name" value={product.name} />
           <MetadataRow label="Description" value={product.description} />
           <MetadataRow label="Category" value={product.category} />
-          <MetadataRow label="Size" value={product.size} />
+
+          {/* Three-value size display (SML label + inch range + cm range).
+              For footwear / unknown sizes, falls back to the raw size label. */}
+          <MetadataRow label="Size" value={sizeDisplay} />
+
           <MetadataRow label="Color" value={product.color} />
           <MetadataRow label="Color description" value={product.color_description} />
           <MetadataRow label="Color family" value={product.color_family} />
@@ -547,7 +581,7 @@ function SellerMode({ product, formatPrice, onEdit, onDelete }) {
 /* ==========================================
    SHOPPER PREVIEW — same real image, shopper framing
 ========================================== */
-function ShopperPreview({ product, selectedView, setSelectedView, viewInformation, formatPrice }) {
+function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, viewInformation, formatPrice }) {
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
   const occasionTags = Array.isArray(product.occasion_tags) ? product.occasion_tags : [];
 
@@ -629,8 +663,15 @@ function ShopperPreview({ product, selectedView, setSelectedView, viewInformatio
           <div className="shopper-preview-selection">
             <strong>Available Sizes</strong>
             <div>
-              <button type="button" disabled>{product.size || "M"}</button>
+              {/* Three-value size display for shoppers */}
+              <button type="button" disabled className="shopper-preview-size-chip">
+                {sizeDisplay}
+              </button>
             </div>
+            {/* SRS §1.2 compliance disclaimer */}
+            <small className="shopper-preview-size-disclaimer">
+              Standard size chart for reference only. FitFusion AI does not predict your size and does not guarantee physical fit.
+            </small>
           </div>
 
           <div className="shopper-preview-color">

@@ -158,15 +158,15 @@ export const catalogAPI = {
     getAll: () => apiFetch('/catalog/'),
 
     downloadTemplate: async () => {
-        const response = await fetch(`${API_URL}/catalog/download-template/`);
+        const response = await fetch(`${API_URL}/catalog/download-template/`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Template download failed (${response.status})`);
         const blob = await response.blob();
-        saveBlob(blob, 'catalog_products.csv');
+        saveBlob(blob, 'fitfusion_catalog_template.csv');
         return blob;
     },
 
     downloadPackage: async () => {
-        const response = await fetch(`${API_URL}/catalog/download-package/`);
+        const response = await fetch(`${API_URL}/catalog/download-package/`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Package download failed (${response.status})`);
         const blob = await response.blob();
         saveBlob(blob, 'fitfusion_seller_upload_package.zip');
@@ -208,4 +208,38 @@ export const catalogAPI = {
 
     deleteListing: (itemId) =>
         apiFetch(`/catalog/my-listings/${itemId}/`, { method: 'DELETE' }),
+};
+
+/* ==========================================
+   RECOMMENDATIONS API (FR-7.3 / FR-7.4)
+   Guest-accessible (AllowAny per SRS §4.2)
+========================================== */
+export const recommendationsAPI = {
+    /**
+     * Fetches ranked, explainable recommendations for an avatar profile.
+     * @param {Object} params - Avatar parameters (undertone, height_cm, body_shape, styles, occasions, limit)
+     * @returns {Promise<Object>} - Response containing weights, avatar profile, and ranked recommendations.
+     */
+    getRecommendations: (params = {}) => {
+        const query = new URLSearchParams({
+            undertone: params.undertone || 'neutral',
+            height_cm: params.height_cm || 170,
+            body_shape: params.body_shape || 'balanced',
+            styles: Array.isArray(params.styles) ? params.styles.join(',') : (params.styles || ''),
+            occasions: Array.isArray(params.occasions) ? params.occasions.join(',') : (params.occasions || ''),
+            limit: params.limit || 10,
+        }).toString();
+
+        // Guest accessible, no auth token needed.
+        return fetch(`${API_URL}/api/recommendations/?${query}`)
+            .then(async (res) => {
+                const data = await res.json().catch(() => null);
+                if (!res.ok) throw new Error(JSON.stringify(data));
+                return data;
+            })
+            .catch(err => {
+                console.error("Recommendations API error:", err);
+                throw err;
+            });
+    },
 };

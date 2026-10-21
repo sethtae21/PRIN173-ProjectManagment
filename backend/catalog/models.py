@@ -47,6 +47,9 @@ class CatalogItem(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    # Categorical size only (XS-XXL for clothing; regional codes for footwear).
+    # Inch/cm display ranges are derived at serialization time from
+    # recommendations.knowledge_table.SIZE_RANGE_TABLE - nothing extra stored.
     size = models.CharField(max_length=50)
     color = models.CharField(max_length=100)
     color_description = models.TextField()

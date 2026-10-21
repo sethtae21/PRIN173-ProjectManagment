@@ -587,6 +587,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
+  align-items: center;
 }
 
 .shopper-preview-selection button {
@@ -598,6 +599,34 @@
   color: #29251f;
   font: inherit;
   font-size: 10px;
+}
+
+/* NEW: Three-value size chip in Shopper Preview */
+.shopper-preview-size-chip {
+  display: inline-block;
+  padding: 8px 14px;
+  background: #f8f5ef;
+  border: 1px solid #d2be91;
+  border-radius: 7px;
+  color: #29251f;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: not-allowed;
+  opacity: 0.85;
+  min-width: auto;
+  min-height: auto;
+}
+
+/* NEW: SRS §1.2 compliance disclaimer */
+.shopper-preview-size-disclaimer {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  color: #5c554c;
+  font-size: 9px;
+  font-style: italic;
+  line-height: 1.5;
 }
 
 .shopper-preview-color > div {
@@ -852,6 +881,16 @@
 .seller-item-edit-field textarea:focus {
   border-color: #8e641f;
   box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
+}
+
+/* NEW: Edit modal size hint text */
+.seller-item-edit-hint {
+  display: block;
+  font-size: 9px;
+  color: #5c554c;
+  margin-top: 4px;
+  line-height: 1.4;
+  font-weight: 400;
 }
 
 .seller-item-modal-actions {

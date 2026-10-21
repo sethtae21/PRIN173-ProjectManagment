@@ -1,5 +1,5 @@
 """
-FitFusion AI - color-theory knowledge table (rule-based recommendation engine).
+FitFusion AI - color-theory & size-range knowledge table (rule-based engine).
 
 Traceability: SRS FR-7.1, FR-7.2 | Scope Baseline WBS 1.3.5 | Charter OBJ-05.
 Nature: deterministic, code-encoded knowledge (symbolic/heuristic AI).
@@ -9,8 +9,9 @@ Weight tuning: before the baseline freeze, bump WEIGHTS_VERSION and record the
 change + rationale in the tuning log (KAN-107). AFTER the freeze, weight changes
 are baselined changes and must go through the CCB (Charter Sec. 8).
 """
+import re
 
-WEIGHTS_VERSION = "1.0.0"
+WEIGHTS_VERSION = "1.1.0"
 
 # SRS FR-7.2 weighted tag scoring. Keys are the rule ids used in scoring.py.
 WEIGHTS = {
@@ -32,9 +33,6 @@ COLOR_COMPATIBILITY = {
 }
 
 # --- FR-7.2 rule 2: height-appropriate contrast ------------------------------
-# Style theory: low contrast (tonal/monochrome) keeps the eye-line unbroken and
-# elongates shorter frames; high contrast breaks the line and flatters taller
-# frames; average height carries any contrast level.
 HEIGHT_BANDS = (  # (band, min_cm inclusive, max_cm exclusive)
     ("petite", 0.0, 160.0),
     ("average", 160.0, 175.0),
@@ -47,7 +45,6 @@ CONTRAST_BY_HEIGHT = {
 }
 
 # --- FR-7.2 rule 3: proportion-appropriate shading ---------------------------
-# Dark shades visually minimize, light shades visually emphasize.
 CATEGORY_GROUPS = {
     "top": {"tops", "outerwear"},
     "bottom": {"bottoms"},
@@ -64,6 +61,98 @@ PROPORTION_SHADING = {
                  "onepiece": {"light", "medium", "dark"},
                  "footwear": {"light", "medium", "dark"}},
 }
+
+# --- Size range table (display-only, expert-encoded) -------------------------
+# Maps categorical sizes to standard unisex adult chest/body girth ranges in
+# BOTH units so the UI can show "M - 38-40 in - 96-102 cm". Display-only:
+# never stored, never scored. Sellers input SML labels ONLY (see
+# validate_size_label); inch/cm entries are rejected at upload/edit time.
+SIZE_RANGE_TABLE = {
+    'XS': {'inches': (30, 32), 'cm': (76, 81)},
+    'S':  {'inches': (34, 36), 'cm': (86, 91)},
+    'M':  {'inches': (38, 40), 'cm': (96, 102)},
+    'L':  {'inches': (42, 44), 'cm': (107, 112)},
+    'XL': {'inches': (46, 48), 'cm': (117, 122)},
+    'XXL': {'inches': (50, 52), 'cm': (127, 132)},
+}
+
+# --- Size label validation (CSV upload + listing edits) ----------------------
+# Sellers must enter categorical labels only; measured sizes ("32 inches",
+# "96 cm") are rejected with a descriptive reason (FR-4.7-style report,
+# FR-4.8 display; supports OBJ-09 data quality). Footwear additionally accepts
+# regional shoe codes (US 9, EU 40, UK 8).
+CLOTHING_SIZE_OPTIONS = ('XS', 'S', 'M', 'L', 'XL', 'XXL')
+_FOOTWEAR_REGIONAL_RE = re.compile(r'^(?:US|EU|UK)?\s?\d{1,3}(?:\.\d+)?$', re.IGNORECASE)
+_MEASURED_RE = re.compile(
+    r'\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)',
+    re.IGNORECASE,
+)
+
+
+def validate_size_label(size_text, category=''):
+    """
+    Deterministic size-format rule. Returns (is_valid, error_message_or_None).
+
+    Clothing (tops/bottoms/dresses/outerwear): label must be XS-XXL.
+    Footwear: XS-XXL or a regional code (US 9, EU 40, UK 8).
+    Any inch/cm/measured entry is rejected for every category.
+    Empty values pass here - presence is enforced by the required-field rule.
+    """
+    raw = str(size_text or '').strip()
+    if not raw:
+        return True, None
+
+    key = raw.upper()
+    cat = str(category or '').strip().lower()
+
+    if _MEASURED_RE.search(raw):
+        suffix = (
+            " or a regional shoe size (e.g., US 9, EU 40)."
+            if cat == 'footwear' else "."
+        )
+        return False, (
+            f"Invalid size '{raw}': measurements in inches or cm are not accepted. "
+            f"Enter a standard size label ({', '.join(CLOTHING_SIZE_OPTIONS)}){suffix}"
+        )
+
+    if cat == 'footwear':
+        if key in CLOTHING_SIZE_OPTIONS or _FOOTWEAR_REGIONAL_RE.match(key):
+            return True, None
+        return False, (
+            f"Invalid size '{raw}'. Footwear sizes must be regional codes "
+            f"(e.g., US 9, EU 40, UK 8) or standard labels "
+            f"({', '.join(CLOTHING_SIZE_OPTIONS)}); inch/cm measurements are not accepted."
+        )
+
+    if key in CLOTHING_SIZE_OPTIONS:
+        return True, None
+    return False, (
+        f"Invalid size '{raw}'. Use standard clothing sizes only: "
+        f"{', '.join(CLOTHING_SIZE_OPTIONS)}. Do not enter inch or cm measurements; "
+        f"the product page shows both units automatically."
+    )
+
+
+def get_size_ranges(size_text):
+    """
+    Convert a categorical size label (XS-XXL) to its display ranges.
+
+    Returns {'label', 'inches', 'cm'} or None for footwear / regional /
+    unknown sizes. Case- and whitespace-insensitive (" m " -> "M").
+    Display-only: never used for scoring or validation.
+    """
+    if not size_text:
+        return None
+    key = str(size_text).strip().upper()
+    entry = SIZE_RANGE_TABLE.get(key)
+    if not entry:
+        return None
+    return {
+        'label': key,
+        'inches': f"{entry['inches'][0]}-{entry['inches'][1]} in",
+        'cm': f"{entry['cm'][0]}-{entry['cm'][1]} cm",
+    }
+
 
 # --- deterministic keyword inference (fallback when catalog lacks the tag) ---
 CONTRAST_KEYWORDS = {
@@ -101,4 +190,4 @@ def infer_shade(color_description: str) -> str:
     for level, keywords in SHADE_KEYWORDS.items():
         if any(k in text for k in keywords):
             return level
-    return DEFAULT_SHADE
+    return DEFAULT_SHADE    

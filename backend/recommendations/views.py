@@ -63,7 +63,12 @@ class RecommendationQuerySerializer(serializers.Serializer):
 
 def _item_profile(item) -> ItemProfile:
     """Single adapter between catalog models and the pure scoring core.
-    If catalog/models.py uses different field names, fix them HERE only."""
+    If catalog/models.py uses different field names, fix them HERE only.
+
+    size_min_cm / size_max_cm are the system-derived wearer-height range
+    stored at upload/edit time (None for footwear / measured sizes); they
+    feed the informational size_height_match note in the FR-7.4 payload.
+    """
     return ItemProfile(
         name=item.name,
         category=(getattr(item, "category", "") or "").lower(),
@@ -71,14 +76,22 @@ def _item_profile(item) -> ItemProfile:
         color_description=getattr(item, "color_description", "") or "",
         style_tags=_as_tuple(getattr(item, "style_tags", ())),
         occasion_tags=_as_tuple(getattr(item, "occasion_tags", ())),
+        size=getattr(item, "size", "") or "",
+        size_min_cm=getattr(item, "size_min_cm", None),
+        size_max_cm=getattr(item, "size_max_cm", None),
     )
 
 
 class RecommendationListView(APIView):
-    """GET /api/recommendations/ - ranked, explainable recommendations.
+    """GET /recommendations/ - ranked, explainable recommendations.
 
     Query params: undertone (warm|cool|neutral), height_cm, body_shape
     (top-heavy|bottom-heavy|balanced), styles (csv), occasions (csv), limit.
+
+    Response includes, per item: total_score, max_score, the four baselined
+    FR-7.2 rules (fired or not, with reasons), and the score-neutral
+    size_height_match note (FR-7.4 explainability; supports OBJ-06 by
+    surfacing size-appropriateness before purchase).
     """
     permission_classes = [AllowAny]
 
