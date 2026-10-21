@@ -90,6 +90,14 @@ class UpdateCartItemSerializer(AddToCartSerializer):
     """Validate the item and replacement quantity for a cart entry."""
 
 
+class RemoveSelectedCartItemsSerializer(serializers.Serializer):
+    """Validate catalog item identifiers selected for removal."""
+
+    catalog_items = serializers.ListField(
+        child=serializers.CharField(), allow_empty=False
+    )
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     """Immutable item details captured when an order was placed."""
 
@@ -98,8 +106,19 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ('id', 'catalog_item', 'item_name', 'store_name', 'unit_price', 'quantity')
+        fields = (
+            'id', 'catalog_item', 'item_name', 'store_name', 'unit_price',
+            'quantity', 'size', 'color',
+        )
         read_only_fields = fields
+
+
+class CheckoutItemSerializer(serializers.Serializer):
+    """Validate selected cart product options to snapshot on the order."""
+
+    catalog_item = serializers.CharField()
+    size = serializers.CharField(max_length=32, allow_blank=True, required=False)
+    color = serializers.CharField(max_length=64, allow_blank=True, required=False)
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -111,8 +130,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'status', 'shipping_address', 'payment_method', 'transaction_ref',
-            'total_amount', 'created_at', 'items',
+            'id', 'status', 'recipient_name', 'recipient_email', 'contact_number',
+            'shipping_address', 'payment_method', 'transaction_ref',
+            'shipping_fee', 'total_amount', 'created_at', 'items',
         )
         read_only_fields = fields
 
@@ -120,8 +140,12 @@ class OrderSerializer(serializers.ModelSerializer):
 class CheckoutSerializer(serializers.Serializer):
     """Validate the customer-provided shipping and payment details."""
 
+    recipient_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    recipient_email = serializers.EmailField(required=False, allow_blank=True)
+    contact_number = serializers.CharField(max_length=32, required=False, allow_blank=True)
     shipping_address = serializers.CharField(trim_whitespace=True)
     payment_method = serializers.CharField(max_length=32, trim_whitespace=True)
+    items = CheckoutItemSerializer(many=True, required=False)
 
     def validate_shipping_address(self, value):
         if not value:

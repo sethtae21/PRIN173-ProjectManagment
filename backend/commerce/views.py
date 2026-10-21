@@ -17,6 +17,7 @@ from commerce.serializers import (
     CartSerializer,
     CheckoutSerializer,
     OrderSerializer,
+    RemoveSelectedCartItemsSerializer,
     UpdateCartItemSerializer,
 )
 from commerce.services import MockPaymentGateway
@@ -81,6 +82,19 @@ class CartViewSet(viewsets.GenericViewSet):
         ).delete()
         return Response(self.get_serializer(self.get_cart()).data)
 
+    @extend_schema(request=RemoveSelectedCartItemsSerializer, responses=CartSerializer)
+    @action(detail=False, methods=('post',), url_path='remove_selected')
+    def remove_selected(self, request):
+        """Remove selected catalog items from the current user's cart."""
+        input_serializer = RemoveSelectedCartItemsSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        cart = self.get_cart()
+        CartItem.objects.filter(
+            cart=cart,
+            item_id__in=input_serializer.validated_data['catalog_items'],
+        ).delete()
+        return Response(self.get_serializer(self.get_cart()).data)
+
     @extend_schema(request=None, responses=CartSerializer)
     @action(detail=False, methods=('delete', 'post'), url_path='clear')
     def clear(self, request):
@@ -110,6 +124,28 @@ class CheckoutView(APIView):
 
         cart, _ = Cart.objects.get_or_create(user=request.user)
         cart_items = list(cart.items.select_related('item').all())
+        submitted_items = input_serializer.validated_data.get('items')
+        item_options = {}
+        if submitted_items is not None:
+            requested_ids = [entry['catalog_item'] for entry in submitted_items]
+            if len(requested_ids) != len(set(requested_ids)):
+                return Response(
+                    {'detail': 'A product may only be selected once per checkout.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            item_options = {
+                entry['catalog_item']: entry for entry in submitted_items
+            }
+            cart_items = [
+                entry for entry in cart_items
+                if str(entry.item_id) in item_options
+            ]
+            if len(cart_items) != len(requested_ids):
+                return Response(
+                    {'detail': 'One or more selected products are not in your cart.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         if not cart_items:
             return Response(
                 {'detail': 'Cannot checkout with an empty cart.'},
@@ -120,9 +156,15 @@ class CheckoutView(APIView):
             (entry.item.price * entry.quantity for entry in cart_items),
             Decimal('0.00'),
         )
+        shipping_fee = Decimal('0.00') if total_amount >= Decimal('1500.00') else Decimal('80.00')
+        order_total = total_amount + shipping_fee
         checkout_data = input_serializer.validated_data
-        payment = MockPaymentGateway.process_payment(
-            checkout_data['payment_method'], total_amount
+        payment_method = checkout_data['payment_method']
+        is_cash_on_delivery = payment_method.casefold() == 'cash on delivery'
+        payment = (
+            {'success': True, 'transaction_ref': None}
+            if is_cash_on_delivery
+            else MockPaymentGateway.process_payment(payment_method, order_total)
         )
         if not payment['success']:
             return Response(
@@ -132,11 +174,15 @@ class CheckoutView(APIView):
 
         order = Order.objects.create(
             user=request.user,
-            status='paid',
+            status='pending' if is_cash_on_delivery else 'paid',
+            recipient_name=checkout_data.get('recipient_name', ''),
+            recipient_email=checkout_data.get('recipient_email', ''),
+            contact_number=checkout_data.get('contact_number', ''),
             shipping_address=checkout_data['shipping_address'],
-            payment_method=checkout_data['payment_method'],
-            transaction_ref=payment['transaction_ref'],
-            total_amount=total_amount,
+            payment_method=payment_method,
+            transaction_ref=payment['transaction_ref'] or '',
+            shipping_fee=shipping_fee,
+            total_amount=order_total,
         )
         try:
             for entry in cart_items:
@@ -148,12 +194,14 @@ class CheckoutView(APIView):
                     store_name=item.store_name,
                     unit_price=item.price,
                     quantity=entry.quantity,
+                    size=item_options.get(str(item.pk), {}).get('size', ''),
+                    color=item_options.get(str(item.pk), {}).get('color', ''),
                 )
         except Exception:
             order.delete()
             raise
 
-        cart.items.all().delete()
+        cart.items.filter(pk__in=[entry.pk for entry in cart_items]).delete()
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 

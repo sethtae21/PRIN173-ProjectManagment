@@ -9,12 +9,11 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import { API_URL } from "../services/api";
+import { API_URL, authAPI, checkoutAPI } from "../services/api";
 import "./css/CheckoutPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
 const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
-const ORDERS_STORAGE_KEY = "fitfusion-orders";
 
 const provinces = [
   "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
@@ -44,23 +43,6 @@ const provinces = [
   "Zamboanga del Sur", "Zamboanga Sibugay"
 ];
 
-const fallbackItems = [
-  {
-    id: "001-M-Beige",
-    productId: "001",
-    name: "Classic Beige Blazer",
-    category: "Clothing",
-    sellerId: "fitfusion-seller",
-    sellerName: "FitFusion Seller",
-    price: 1499,
-    originalPrice: 1699,
-    quantity: 1,
-    size: "M",
-    color: "Beige",
-    image: "",
-  },
-];
-
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
@@ -87,14 +69,7 @@ function loadCheckoutItems() {
   const selectedCartItems = readStoredArray(CART_STORAGE_KEY).filter(
     (item) => item.selected !== false
   );
-  if (selectedCartItems.length > 0) return selectedCartItems;
-
-  return fallbackItems;
-}
-
-function createOrderNumber() {
-  const randomPart = Math.floor(10000000 + Math.random() * 90000000);
-  return `FF-${randomPart}`;
+  return selectedCartItems;
 }
 
 function CheckoutPage() {
@@ -104,6 +79,8 @@ function CheckoutPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState("");
 
   const [form, setForm] = useState({
     fullName: "",
@@ -120,7 +97,7 @@ function CheckoutPage() {
   useEffect(() => {
     async function fetchUserProfile() {
       try {
-        const token = localStorage.getItem("fitfusion-token");
+        const token = localStorage.getItem("access_token");
         
         if (!token) {
           // Fallback to localStorage if no token
@@ -150,7 +127,8 @@ function CheckoutPage() {
         });
 
         if (response.ok) {
-          const userData = await response.json();
+          const profileResponse = await response.json();
+          const userData = profileResponse.user || profileResponse;
           
           setForm((prevForm) => ({
             ...prevForm,
@@ -329,54 +307,111 @@ function CheckoutPage() {
     );
   }
 
-  function handleConfirmOrder() {
-    const orderNumber = createOrderNumber();
+  async function handleConfirmOrder() {
+    if (isSubmitting || checkoutItems.length === 0) return;
+    setIsSubmitting(true);
+    setOrderError("");
 
-    const newOrder = {
-      id: orderNumber,
-      placedAt: new Date().toLocaleDateString("en-PH", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-      status: "Processing",
-      customer: {
-        fullName: form.fullName,
-        email: form.email,
-        contactNumber: form.contactNumber,
-        address: {
-          street: form.street,
-          city: form.city,
-          province: form.province,
-          postalCode: form.postalCode,
+    try {
+      await authAPI.updateProfile({
+        full_name: form.fullName.trim(),
+        mobile: form.contactNumber.trim(),
+        street: form.street.trim(),
+        city: form.city.trim(),
+        province: form.province,
+        postal_code: form.postalCode.trim(),
+      });
+
+      const address = [
+        form.street.trim(),
+        form.city.trim(),
+        form.province,
+        form.postalCode.trim(),
+      ].filter(Boolean).join(", ");
+      const order = await checkoutAPI.placeOrder({
+        recipient_name: form.fullName.trim(),
+        recipient_email: form.email.trim(),
+        contact_number: form.contactNumber.trim(),
+        shipping_address: address,
+        payment_method: form.paymentMethod,
+        items: checkoutItems.map((item) => ({
+          catalog_item: String(item.productId ?? item.id),
+          size: item.size || item.selectedSize || "",
+          color: item.color || item.selectedColor || "",
+        })),
+      });
+
+      const orderItems = order.items.map((item) => {
+        const checkoutItem = checkoutItems.find(
+          (candidate) =>
+            String(candidate.productId ?? candidate.id) ===
+            String(item.catalog_item)
+        );
+        return {
+          ...checkoutItem,
+          id: item.catalog_item || item.id,
+          productId: item.catalog_item || item.id,
+          name: item.item_name,
+          sellerName: item.store_name,
+          price: Number(item.unit_price),
+          quantity: item.quantity,
+          size: item.size || checkoutItem?.size || "M",
+          color: item.color || checkoutItem?.color || "Default",
+        };
+      });
+      const newOrder = {
+        id: order.id,
+        placedAt: new Date(order.created_at).toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        status: order.status === "pending" ? "Processing" : order.status,
+        customer: {
+          fullName: order.recipient_name || form.fullName,
+          email: order.recipient_email || form.email,
+          contactNumber: order.contact_number || form.contactNumber,
+          address: {
+            street: form.street,
+            city: form.city,
+            province: form.province,
+            postalCode: form.postalCode,
+          },
         },
-      },
-      paymentMethod: form.paymentMethod,
-      items: checkoutItems,
-      originalSubtotal,
-      productDiscount,
-      shippingFee,
-      total,
-    };
+        paymentMethod: order.payment_method,
+        items: orderItems,
+        originalSubtotal,
+        productDiscount,
+        shippingFee: Number(order.shipping_fee),
+        total: Number(order.total_amount),
+      };
 
-    const existingOrders = readStoredArray(ORDERS_STORAGE_KEY);
-
-    localStorage.setItem(
-      ORDERS_STORAGE_KEY,
-      JSON.stringify([newOrder, ...existingOrders])
-    );
-
-    localStorage.setItem("fitfusion-last-order", JSON.stringify(newOrder));
-
-    removePurchasedItemsFromCart();
-    localStorage.removeItem(CHECKOUT_STORAGE_KEY);
-
-    setShowConfirmation(false);
-
-    navigate("/shopper/order-confirmation", {
-      replace: true,
-      state: { orderId: orderNumber, total },
-    });
+      localStorage.setItem("fitfusion-last-order", JSON.stringify(newOrder));
+      const storedOrders = readStoredArray("fitfusion-orders");
+      localStorage.setItem(
+        "fitfusion-orders",
+        JSON.stringify([newOrder, ...storedOrders])
+      );
+      removePurchasedItemsFromCart();
+      localStorage.removeItem(CHECKOUT_STORAGE_KEY);
+      setShowConfirmation(false);
+      navigate("/shopper/order-confirmation", {
+        replace: true,
+        state: { orderId: order.id, total: Number(order.total_amount) },
+      });
+    } catch (error) {
+      console.error("Failed to place order:", error);
+      let message = "We couldn't place your order. Please try again.";
+      try {
+        const details = JSON.parse(error.message);
+        message = details.detail || message;
+      } catch {
+        // Keep the clear checkout error when the API returned a non-JSON failure.
+      }
+      setOrderError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (isLoadingUserData) {
@@ -384,6 +419,19 @@ function CheckoutPage() {
       <main className="checkout-page">
         <div className="checkout-content" style={{ padding: "4rem", textAlign: "center" }}>
           <p>Loading your information...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (checkoutItems.length === 0) {
+    return (
+      <main className="checkout-page">
+        <div className="checkout-content" style={{ padding: "4rem", textAlign: "center" }}>
+          <h1>Your checkout has no selected products</h1>
+          <Link to="/shopper/cart" className="checkout-return-link">
+            Return to Shopping Cart
+          </Link>
         </div>
       </main>
     );
@@ -704,7 +752,11 @@ function CheckoutPage() {
               <strong>{formatCurrency(total)}</strong>
             </div>
 
-            <button type="submit" className="checkout-place-order-button">
+            <button
+              type="submit"
+              className="checkout-place-order-button"
+              disabled={isSubmitting}
+            >
               Review and Place Order
             </button>
 
@@ -763,10 +815,16 @@ function CheckoutPage() {
                 type="button"
                 className="checkout-confirm-button"
                 onClick={handleConfirmOrder}
+                disabled={isSubmitting}
               >
-                Confirm Order
+                {isSubmitting ? "Placing Order..." : "Confirm Order"}
               </button>
             </div>
+            {orderError && (
+              <p className="checkout-field-error" role="alert">
+                {orderError}
+              </p>
+            )}
           </section>
         </div>
       )}

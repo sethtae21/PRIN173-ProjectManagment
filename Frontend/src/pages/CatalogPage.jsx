@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { API_URL, catalogAPI } from "../services/api";
+import { API_URL, cartAPI, catalogAPI } from "../services/api";
 import "./css/CatalogPage.css";
 
 const categories = [
@@ -56,6 +56,8 @@ function CatalogPage({ isGuest = false }) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortOption, setSortOption] = useState("featured");
   const [cartCount, setCartCount] = useState(getCartCount());
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartError, setCartError] = useState("");
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
@@ -152,38 +154,50 @@ function CatalogPage({ isGuest = false }) {
     console.log("Viewing store for:", product.store_name);
   }
 
-  function addToCart(product) {
+  async function addToCart(product) {
     if (guestMode) {
       showGuestRestriction("add products to your cart");
       return;
     }
 
-    const cart = readCart();
-    const existingIndex = cart.findIndex((item) => item.id === product.id);
-    const nextCart = [...cart];
+    setAddingToCart(true);
+    setCartError("");
 
-    if (existingIndex >= 0) {
-      nextCart[existingIndex] = {
-        ...nextCart[existingIndex],
-        quantity: Number(nextCart[existingIndex].quantity || 1) + 1,
-      };
-    } else {
-      nextCart.push({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        storeName: product.store_name,
-        imageUrl: product.imageUrl,
-        quantity: 1,
-        selectedSize: "M",
-        selectedColor: product.color || "Default",
-        selected: true,
-      });
+    try {
+      await cartAPI.addItem(product.id);
+
+      const cart = readCart();
+      const existingIndex = cart.findIndex((item) => item.id === product.id);
+      const nextCart = [...cart];
+
+      if (existingIndex >= 0) {
+        nextCart[existingIndex] = {
+          ...nextCart[existingIndex],
+          quantity: Number(nextCart[existingIndex].quantity || 1) + 1,
+        };
+      } else {
+        nextCart.push({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          storeName: product.store_name,
+          imageUrl: product.imageUrl,
+          quantity: 1,
+          selectedSize: "M",
+          selectedColor: product.color || "Default",
+          selected: true,
+        });
+      }
+
+      localStorage.setItem("fitfusion-cart", JSON.stringify(nextCart));
+      setCartCount(getCartCount());
+      window.dispatchEvent(new Event("fitfusion-cart-updated"));
+    } catch (error) {
+      console.error("Failed to save cart item:", error);
+      setCartError("We couldn't add this item to your cart. Please try again.");
+    } finally {
+      setAddingToCart(false);
     }
-
-    localStorage.setItem("fitfusion-cart", JSON.stringify(nextCart));
-    setCartCount(getCartCount());
-    window.dispatchEvent(new Event("fitfusion-cart-updated"));
   }
 
   function clearFilters() {
@@ -262,6 +276,12 @@ function CatalogPage({ isGuest = false }) {
           )}
         </div>
 
+        {cartError && (
+          <p className="catalog-cart-error" role="alert">
+            {cartError}
+          </p>
+        )}
+
         {isLoading ? (
           <div className="catalog-loading-state">
             <p>Browsing the latest collections...</p>
@@ -335,8 +355,13 @@ function CatalogPage({ isGuest = false }) {
                     type="button"
                     className="catalog-cart-action"
                     onClick={() => addToCart(product)}
+                    disabled={addingToCart}
                   >
-                    {guestMode ? "Register to Add to Cart" : "Add to Cart"}
+                    {guestMode
+                      ? "Register to Add to Cart"
+                      : addingToCart
+                        ? "Adding..."
+                        : "Add to Cart"}
                   </button>
                 </div>
               </article>

@@ -211,6 +211,41 @@ export const catalogAPI = {
 };
 
 /* ==========================================
+   SHOPPING CART API
+========================================== */
+export const cartAPI = {
+    get: () => apiFetch('/cart/'),
+    addItem: (catalogItem, quantity = 1) => apiFetch('/cart/add_item/', {
+        method: 'POST',
+        body: JSON.stringify({ catalog_item: catalogItem, quantity })
+    }),
+    updateQuantity: (catalogItem, quantity) => apiFetch('/cart/update_quantity/', {
+        method: 'PATCH',
+        body: JSON.stringify({ catalog_item: catalogItem, quantity })
+    }),
+    removeItem: (catalogItem) => apiFetch('/cart/remove_item/', {
+        method: 'POST',
+        body: JSON.stringify({ catalog_item: catalogItem })
+    }),
+    removeSelected: (catalogItems) => apiFetch('/cart/remove_selected/', {
+        method: 'POST',
+        body: JSON.stringify({ catalog_items: catalogItems })
+    }),
+};
+
+/* ==========================================
+   CHECKOUT AND ORDER API
+========================================== */
+export const checkoutAPI = {
+    placeOrder: (payload) => apiFetch('/checkout/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    }),
+    getOrders: () => apiFetch('/orders/'),
+    getOrder: (orderId) => apiFetch(`/orders/${encodeURIComponent(orderId)}/`),
+};
+
+/* ==========================================
    RECOMMENDATIONS API (FR-7.3 / FR-7.4)
    Guest-accessible (AllowAny per SRS §4.2)
 ========================================== */

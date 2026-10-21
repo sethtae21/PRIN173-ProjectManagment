@@ -200,6 +200,12 @@
   text-decoration: underline;
 }
 
+.catalog-cart-error {
+  margin: 0 0 16px;
+  color: #a32626;
+  font-size: 14px;
+}
+
 /* PRODUCT GRID */
 
 .catalog-product-grid {
@@ -464,6 +470,11 @@
 .catalog-cart-action:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 17px rgba(142, 100, 31, 0.22);
+}
+
+.catalog-cart-action:disabled {
+  cursor: wait;
+  opacity: 0.75;
 }
 
 /* EMPTY STATE */

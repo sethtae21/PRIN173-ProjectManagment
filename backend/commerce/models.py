@@ -32,9 +32,13 @@ class Order(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    recipient_name = models.CharField(max_length=255, blank=True)
+    recipient_email = models.EmailField(blank=True)
+    contact_number = models.CharField(max_length=32, blank=True)
     shipping_address = models.TextField()
     payment_method = models.CharField(max_length=32)
     transaction_ref = models.CharField(max_length=64, blank=True, help_text='Mock gateway reference')
+    shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -54,6 +58,8 @@ class OrderItem(models.Model):
     store_name = models.CharField(max_length=255)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
+    size = models.CharField(max_length=32, blank=True)
+    color = models.CharField(max_length=64, blank=True)
 
     class Meta:
         db_table = 'accounts_orderitem'

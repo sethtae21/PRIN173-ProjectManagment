@@ -9,6 +9,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import { API_URL, cartAPI } from "../services/api";
 import "./css/ShoppingCartPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
@@ -142,7 +143,67 @@ function ShoppingCartPage() {
   const [cartItems, setCartItems] =
     useState(loadCartItems);
 
+  const [isCartLoading, setIsCartLoading] = useState(true);
+  const [isCartBusy, setIsCartBusy] = useState(false);
+  const [cartLoadError, setCartLoadError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDatabaseCart() {
+      try {
+        const cart = await cartAPI.get();
+        if (!isMounted) return;
+
+        const savedItems = loadCartItems();
+        const items = cart.items.map((item, index) => {
+          const previousItem = savedItems.find(
+            (saved) =>
+              String(saved.productId ?? saved.id) ===
+              String(item.catalog_item)
+          );
+          const imageUrl = item.front_image_url
+            ? item.front_image_url.startsWith("http")
+              ? item.front_image_url
+              : `${API_URL}${item.front_image_url.startsWith("/") ? "" : "/"}${item.front_image_url}`
+            : "";
+
+          return normalizeCartItem(
+            {
+              ...previousItem,
+              id: previousItem?.id || item.catalog_item,
+              productId: item.catalog_item,
+              name: item.name,
+              sellerName: item.store_name,
+              price: item.price,
+              quantity: item.quantity,
+              imageUrl,
+            },
+            index
+          );
+        });
+
+        setCartItems(items);
+        setCartLoadError("");
+      } catch (error) {
+        console.error("Failed to load database cart:", error);
+        if (isMounted) {
+          setCartItems([]);
+          setCartLoadError(
+            "We couldn't load your saved cart. Please refresh the page to try again."
+          );
+        }
+      } finally {
+        if (isMounted) setIsCartLoading(false);
+      }
+    }
+
+    loadDatabaseCart();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Sync cart to localStorage and dispatch event for header update
   useEffect(() => {
@@ -281,43 +342,58 @@ function ShoppingCartPage() {
     );
   }
 
-  function handleQuantityChange(
+  async function handleQuantityChange(
     itemId,
     change
   ) {
-    setCartItems((currentItems) =>
-      currentItems.map((item) => {
-        if (item.id !== itemId) {
-          return item;
-        }
+    const item = cartItems.find((cartItem) => cartItem.id === itemId);
+    if (!item || isCartBusy) return;
 
-        const nextQuantity =
-          Number(item.quantity) + change;
-
-        return {
-          ...item,
-          quantity: Math.min(
-            MAX_QUANTITY,
-            Math.max(1, nextQuantity)
-          ),
-        };
-      })
+    const nextQuantity = Math.min(
+      MAX_QUANTITY,
+      Math.max(1, Number(item.quantity) + change)
     );
+    if (nextQuantity === item.quantity) return;
+
+    setIsCartBusy(true);
+    try {
+      await cartAPI.updateQuantity(item.productId, nextQuantity);
+      setCartItems((currentItems) =>
+        currentItems.map((cartItem) =>
+          cartItem.id === itemId
+            ? { ...cartItem, quantity: nextQuantity }
+            : cartItem
+        )
+      );
+      setNotice("Cart quantity updated.");
+    } catch (error) {
+      console.error("Failed to update cart quantity:", error);
+      setNotice("We couldn't update the quantity. Please try again.");
+    } finally {
+      setIsCartBusy(false);
+    }
   }
 
-  function handleRemoveItem(itemId) {
-    setCartItems((currentItems) =>
-      currentItems.filter(
-        (item) => item.id !== itemId
-      )
-    );
+  async function handleRemoveItem(itemId) {
+    const item = cartItems.find((cartItem) => cartItem.id === itemId);
+    if (!item || isCartBusy) return;
 
-    setNotice(
-      "The product was removed from your cart."
-    );
+    setIsCartBusy(true);
+    try {
+      await cartAPI.removeItem(item.productId);
+      setCartItems((currentItems) =>
+        currentItems.filter((cartItem) => cartItem.id !== itemId)
+      );
+      setNotice("The product was removed from your cart.");
+    } catch (error) {
+      console.error("Failed to remove cart item:", error);
+      setNotice("We couldn't remove the product. Please try again.");
+    } finally {
+      setIsCartBusy(false);
+    }
   }
 
-  function handleRemoveSelected() {
+  async function handleRemoveSelected() {
     if (selectedItems.length === 0) {
       setNotice(
         "Please select a product to remove."
@@ -326,15 +402,26 @@ function ShoppingCartPage() {
       return;
     }
 
-    setCartItems((currentItems) =>
-      currentItems.filter(
-        (item) => !item.selected
-      )
-    );
+    if (isCartBusy) return;
 
-    setNotice(
-      "Selected products were removed."
+    const selectedIds = new Set(
+      selectedItems.map((item) => item.id)
     );
+    setIsCartBusy(true);
+    try {
+      await cartAPI.removeSelected(
+        selectedItems.map((item) => item.productId)
+      );
+      setCartItems((currentItems) =>
+        currentItems.filter((item) => !selectedIds.has(item.id))
+      );
+      setNotice("Selected products were removed.");
+    } catch (error) {
+      console.error("Failed to remove selected cart items:", error);
+      setNotice("We couldn't remove the selected products. Please try again.");
+    } finally {
+      setIsCartBusy(false);
+    }
   }
 
   function handleCheckout() {
@@ -362,6 +449,12 @@ function ShoppingCartPage() {
           role="status"
         >
           {notice}
+        </div>
+      )}
+
+      {cartLoadError && (
+        <div className="shopping-cart-toast" role="alert">
+          {cartLoadError}
         </div>
       )}
 
@@ -416,7 +509,11 @@ function ShoppingCartPage() {
           </div>
         </section>
 
-        {cartItems.length === 0 ? (
+        {isCartLoading ? (
+          <section className="shopping-cart-empty" aria-live="polite">
+            <p>Loading your saved cart...</p>
+          </section>
+        ) : cartItems.length === 0 ? (
           <section className="shopping-cart-empty">
             <div className="shopping-cart-empty-icon">
               <svg
@@ -469,6 +566,7 @@ function ShoppingCartPage() {
                   onClick={
                     handleRemoveSelected
                   }
+                  disabled={isCartBusy}
                 >
                   Remove Selected
                 </button>
@@ -663,9 +761,7 @@ function ShoppingCartPage() {
                                 -1
                               )
                             }
-                            disabled={
-                              item.quantity <= 1
-                            }
+                            disabled={isCartBusy || item.quantity <= 1}
                             aria-label={`Decrease quantity of ${item.name}`}
                           >
                             −
@@ -683,10 +779,7 @@ function ShoppingCartPage() {
                                 1
                               )
                             }
-                            disabled={
-                              item.quantity >=
-                              MAX_QUANTITY
-                            }
+                            disabled={isCartBusy || item.quantity >= MAX_QUANTITY}
                             aria-label={`Increase quantity of ${item.name}`}
                           >
                             +
