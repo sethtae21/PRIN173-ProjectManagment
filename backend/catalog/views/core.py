@@ -7,7 +7,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 from django.conf import settings
 from django.http import HttpResponse
@@ -33,15 +32,30 @@ logger = logging.getLogger(__name__)
 UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
 IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS * 3)
 
-CATALOG_TEMPLATE_CSV = (
-    '"INSTRUCTIONS: Fill out the columns below. Type your photo filenames in the last 3 columns.",,,,,,,,,,,,\n'
-    ',,,,,,,,,,,,\n'
-    'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
-    'Classic White Shirt,"A comfortable shirt.",tops,M,White,Pure White,Neutral,15.99,"casual, minimalist","everyday, summer",front.jpeg,side.jpeg,rear.jpeg\n'
+STYLE_TAG_OPTIONS = (
+    'casual', 'minimalist', 'resort', 'classic', 'work',
+    'streetwear', 'elegant', 'romantic', 'formal', 'sporty',
 )
-CATALOG_SAMPLE_CSV_PATH = Path(__file__).resolve().parents[1] / 'sample_data' / 'catalog_products.csv'
+OCCASION_TAG_OPTIONS = (
+    'everyday', 'summer', 'office', 'weekend', 'evening',
+    'formal', 'winter', 'vacation', 'outdoor',
+)
+
+CATALOG_CSV_COLUMNS = [
+    'name', 'description', 'category', 'size', 'color', 'color_description',
+    'color_family', 'price', 'style_tags', 'occasion_tags',
+    'front_image_filename', 'side_image_filename', 'rear_image_filename',
+]
+CATALOG_EXAMPLE_ROW = [
+    'Example Product', 'Replace with a product description.', 'tops', 'M',
+    'White', 'Pure White', 'neutral', '599.00', 'casual, minimalist',
+    'everyday, summer', 'front.jpg', 'side.jpg', 'rear.jpg',
+]
 SELLER_IMAGE_GUIDELINES = (
     'FitFusion AI Seller Catalog Upload Guidelines\n\n'
+    f'Use only these style_tags: {", ".join(STYLE_TAG_OPTIONS)}. '
+    f'Use only these occasion_tags: {", ".join(OCCASION_TAG_OPTIONS)}. '
+    'Separate multiple tags with commas; tags are validated without regard to capitalization.\n\n'
     'Upload exactly three clear garment photographs per item: Front, Side, and Rear. '
     'Photograph the garment laid flat or on a mannequin against a plain, contrasting background.\n'
     'Each image must be at least 800 x 800 pixels and no larger than 5 MB. '
@@ -57,22 +71,21 @@ SELLER_IMAGE_GUIDELINES = (
 
 
 def build_catalog_template_csv():
-    try:
-        sample_csv = CATALOG_SAMPLE_CSV_PATH.read_text(encoding='utf-8-sig')
-    except FileNotFoundError:
-        logger.warning(
-            "Sample catalog CSV not found at %s; using the legacy catalog template.",
-            CATALOG_SAMPLE_CSV_PATH,
-        )
-        return CATALOG_TEMPLATE_CSV
-
-    sample_csv = sample_csv.rstrip('\r\n')
-    instruction_row = io.StringIO(newline='')
-    csv.writer(instruction_row, lineterminator='\n').writerow([
-        '📝 HOW TO UPLOAD: Fill out the product details and upload matching Front, Side, and Rear images using the filenames in the final three columns.',
-        *([''] * 12),
+    output = io.StringIO(newline='')
+    writer = csv.writer(output, lineterminator='\n')
+    writer.writerow([
+        (
+            '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front, Side, and Rear image filenames. '
+            f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
+            f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
+            'Separate multiple tags with commas.'
+        ),
+        *([''] * (len(CATALOG_CSV_COLUMNS) - 1)),
     ])
-    return f'{instruction_row.getvalue()}\n{sample_csv}\n'
+    writer.writerow([])
+    writer.writerow(CATALOG_CSV_COLUMNS)
+    writer.writerow(CATALOG_EXAMPLE_ROW)
+    return output.getvalue()
 
 
 # ==========================================
@@ -88,6 +101,10 @@ class CatalogValidator:
         'color_description', 'color_family', 'price',
         'front_image_filename', 'side_image_filename', 'rear_image_filename'
     ]
+    TAG_OPTIONS = {
+        'style_tags': frozenset(STYLE_TAG_OPTIONS),
+        'occasion_tags': frozenset(OCCASION_TAG_OPTIONS),
+    }
 
     # NEW: Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     # A true Side/Rear view shows the garment worn/hanging → portrait alpha-bbox.
@@ -115,6 +132,20 @@ class CatalogValidator:
             category = 'dresses'
         if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
+
+        for field, allowed_tags in self.TAG_OPTIONS.items():
+            submitted_tags = [
+                tag.strip() for tag in str(row.get(field, '')).split(',') if tag.strip()
+            ]
+            invalid_tags = [
+                tag for tag in submitted_tags if tag.casefold() not in allowed_tags
+            ]
+            if invalid_tags:
+                choices = ', '.join(sorted(allowed_tags))
+                errors.append(
+                    f"Row {row_number}: Invalid {field} value(s): "
+                    f"{', '.join(invalid_tags)}. Choose from: {choices}."
+                )
         
         return len(errors) == 0, errors
     
@@ -426,7 +457,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     def download_package(self, request):
         archive = io.BytesIO()
         with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as package:
-            package.writestr('fitfusion_catalog_template.csv', build_catalog_template_csv())
+            package.writestr('catalog_products.csv', build_catalog_template_csv())
             package.writestr('seller_image_guidelines.txt', SELLER_IMAGE_GUIDELINES)
         response = HttpResponse(archive.getvalue(), content_type='application/zip')
         response['Content-Disposition'] = 'attachment; filename="fitfusion_seller_upload_package.zip"'

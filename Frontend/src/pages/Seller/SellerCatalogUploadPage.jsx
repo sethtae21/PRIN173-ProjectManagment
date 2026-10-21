@@ -28,6 +28,31 @@ const initialImages = {
 const MAX_PRODUCTS = 10;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const TAG_OPTIONS = {
+  style_tags: [
+    "casual",
+    "minimalist",
+    "resort",
+    "classic",
+    "work",
+    "streetwear",
+    "elegant",
+    "romantic",
+    "formal",
+    "sporty",
+  ],
+  occasion_tags: [
+    "everyday",
+    "summer",
+    "office",
+    "weekend",
+    "evening",
+    "formal",
+    "winter",
+    "vacation",
+    "outdoor",
+  ],
+};
 
 function getSellerStoreName() {
   const storageKeys = [
@@ -111,6 +136,28 @@ function cleanCell(value) {
 
 function fileStem(fileName) {
   return fileName.split(".").slice(0, -1).join(".").toLowerCase();
+}
+
+function getInvalidCsvTags(productRows) {
+  const errors = [];
+
+  productRows.forEach((row, index) => {
+    Object.entries(TAG_OPTIONS).forEach(([field, options]) => {
+      const allowedTags = new Set(options.map((tag) => tag.toLowerCase()));
+      const invalidTags = String(row[field] || "")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag && !allowedTags.has(tag.toLowerCase()));
+
+      if (invalidTags.length > 0) {
+        errors.push(
+          `Product ${index + 1} (${row.name}): invalid ${field} value(s) "${invalidTags.join(", ")}". Choose from: ${options.join(", ")}.`
+        );
+      }
+    });
+  });
+
+  return errors;
 }
 
 /* ==========================================
@@ -328,6 +375,19 @@ function SellerCatalogUploadPage() {
       if (productRows.length > MAX_PRODUCTS) {
         setErrors({
           csv: `The CSV contains ${productRows.length} products. Only ${MAX_PRODUCTS} products can be uploaded at one time.`,
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      const invalidTags = getInvalidCsvTags(productRows);
+      if (invalidTags.length > 0) {
+        setValidationResult({
+          type: "error",
+          title: "Invalid style or occasion tags",
+          message:
+            "Update the CSV to use only the approved tags below. Separate multiple tags with commas.",
+          details: invalidTags,
         });
         setIsProcessing(false);
         return;
@@ -606,6 +666,21 @@ function SellerCatalogUploadPage() {
                 <li>Maximum file size: 5 MB</li>
                 <li>Maximum records: 10 products</li>
               </ul>
+
+              <div className="seller-tag-options">
+                <div>
+                  <strong>Choose style_tags from:</strong>
+                  <p>{TAG_OPTIONS.style_tags.join(", ")}</p>
+                </div>
+                <div>
+                  <strong>Choose occasion_tags from:</strong>
+                  <p>{TAG_OPTIONS.occasion_tags.join(", ")}</p>
+                </div>
+                <small>
+                  Enter one or more approved values in the matching CSV
+                  column, separated by commas. Values are case-insensitive.
+                </small>
+              </div>
             </div>
 
             <button

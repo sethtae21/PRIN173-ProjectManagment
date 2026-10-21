@@ -151,6 +151,35 @@
   padding-left: 20px;
 }
 
+.seller-tag-options {
+  display: grid;
+  gap: 11px;
+  margin-top: 16px;
+  padding: 13px;
+  background: #fff9e8;
+  border: 1px solid #e2c978;
+  border-radius: 9px;
+}
+
+.seller-tag-options strong {
+  display: block;
+  color: #6c4814;
+  font-size: 10px;
+}
+
+.seller-tag-options p {
+  margin: 4px 0 0;
+  color: #5c554c;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.seller-tag-options small {
+  color: #766e64;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
 .seller-template-button {
   display: flex;
   min-height: 44px;

@@ -24,6 +24,41 @@ class CatalogColorAlignmentTests(SimpleTestCase):
         self.assertIn('Color mismatch', message)
 
 
+class CatalogTagValidationTests(SimpleTestCase):
+    def setUp(self):
+        self.row = {
+            'name': 'Test Shirt',
+            'description': 'A nice shirt',
+            'category': 'tops',
+            'size': 'M',
+            'color': 'White',
+            'color_description': 'Pure white',
+            'color_family': 'neutral',
+            'price': '20.00',
+            'style_tags': 'Casual, minimalist',
+            'occasion_tags': 'Everyday, summer',
+            'front_image_filename': 'front.png',
+            'side_image_filename': 'side.png',
+            'rear_image_filename': 'rear.png',
+        }
+
+    def test_accepts_approved_comma_separated_tags_case_insensitively(self):
+        is_valid, errors = CatalogValidator().validate_csv_row(self.row, 2)
+
+        self.assertTrue(is_valid)
+        self.assertEqual(errors, [])
+
+    def test_rejects_unapproved_style_and_occasion_tags(self):
+        self.row['style_tags'] = 'casual, unrelated'
+        self.row['occasion_tags'] = 'everyday, not-an-occasion'
+
+        is_valid, errors = CatalogValidator().validate_csv_row(self.row, 2)
+
+        self.assertFalse(is_valid)
+        self.assertTrue(any('unrelated' in error and 'style_tags' in error for error in errors))
+        self.assertTrue(any('not-an-occasion' in error and 'occasion_tags' in error for error in errors))
+
+
 class CatalogValidationAndCRUDTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -100,21 +135,24 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.assertIn('front_image_filename,side_image_filename,rear_image_filename', template)
         self.assertIn('Front, Side, and Rear', guidelines)
         self.assertIn('800 x 800 pixels', guidelines)
+        self.assertIn('Use style_tags from: casual, minimalist', template)
+        self.assertIn('Use only these style_tags: casual, minimalist', guidelines)
+        self.assertIn('Use only these occasion_tags: everyday, summer', guidelines)
 
-    def test_download_template_includes_sample_catalog_rows(self):
+    def test_download_template_contains_header_and_single_example_row(self):
         response = self.client.get('/catalog/download-template/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         lines = response.content.decode('utf-8').splitlines()
-        self.assertEqual(len(lines), 13)
+        self.assertEqual(len(lines), 4)
         self.assertTrue(lines[0].startswith('"📝 HOW TO UPLOAD:'))
         self.assertEqual(lines[1], '')
         self.assertEqual(
             lines[2],
             'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename',
         )
-        self.assertTrue(lines[3].startswith('Classic White Tee,'))
-        self.assertTrue(lines[-1].startswith('Suede Loafer Shoes,'))
+        self.assertTrue(lines[3].startswith('Example Product,'))
+        self.assertIn('Replace the example row', lines[0])
 
     def test_upload_recognizes_header_after_template_instruction_rows(self):
         self.client.force_authenticate(user=self.seller)
