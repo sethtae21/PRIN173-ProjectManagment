@@ -1,34 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../services/api";
 import "./css/AccountManagementPage.css";
-
-const PROVINCES = [
-  "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
-  "Albay", "Antique", "Apayao", "Aurora", "Basilan",
-  "Bataan", "Batanes", "Batangas", "Benguet", "Biliran",
-  "Bohol", "Bukidnon", "Bulacan", "Cagayan",
-  "Camarines Norte", "Camarines Sur", "Camiguin",
-  "Capiz", "Catanduanes", "Cavite", "Cebu", "Cotabato",
-  "Davao de Oro", "Davao del Norte", "Davao del Sur",
-  "Davao Occidental", "Davao Oriental", "Dinagat Islands",
-  "Eastern Samar", "Guimaras", "Ifugao", "Ilocos Norte",
-  "Ilocos Sur", "Iloilo", "Isabela", "Kalinga",
-  "La Union", "Laguna", "Lanao del Norte", "Lanao del Sur",
-  "Leyte", "Maguindanao del Norte", "Maguindanao del Sur",
-  "Marinduque", "Masbate", "Metro Manila",
-  "Misamis Occidental", "Misamis Oriental",
-  "Mountain Province", "Negros Occidental",
-  "Negros Oriental", "Northern Samar", "Nueva Ecija",
-  "Nueva Vizcaya", "Occidental Mindoro", "Oriental Mindoro",
-  "Palawan", "Pampanga", "Pangasinan", "Quezon",
-  "Quirino", "Rizal", "Romblon", "Samar", "Sarangani",
-  "Siquijor", "Sorsogon", "South Cotabato",
-  "Southern Leyte", "Sultan Kudarat", "Sulu",
-  "Surigao del Norte", "Surigao del Sur", "Tarlac",
-  "Tawi-Tawi", "Zambales", "Zamboanga del Norte",
-  "Zamboanga del Sur", "Zamboanga Sibugay",
-];
 
 function clearAuthStorage() {
   localStorage.removeItem("access_token");
@@ -59,21 +32,6 @@ function AccountManagementPage() {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [notice, setNotice] = useState("");
-
-  /* ---------- edit profile modal ---------- */
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: "",
-    mobile: "",
-    street: "",
-    barangay: "",
-    city: "",
-    province: "",
-    postal_code: "",
-  });
-  const [editErrors, setEditErrors] = useState({});
-  const [editSaving, setEditSaving] = useState(false);
 
   /* ---------- deactivation modal ---------- */
   const [showDeactivateModal, setShowDeactivateModal] =
@@ -89,6 +47,15 @@ function AccountManagementPage() {
     useState(false);
 
   /* ---------- fetch real account on mount (FR-1.2) ---------- */
+  const closeDeactivateModal = useCallback(() => {
+    if (isDeactivating) return;
+    setShowDeactivateModal(false);
+    setDeactivationReason("");
+    setOtherReason("");
+    setConfirmationChecked(false);
+    setDeactivationError("");
+  }, [isDeactivating]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -176,14 +143,13 @@ function AccountManagementPage() {
   const canDeactivate =
     reasonIsValid && confirmationChecked && !isDeactivating;
 
-  /* ---------- escape-key closing for both modals ---------- */
+  /* ---------- escape-key closing for deactivation modal ---------- */
   useEffect(() => {
-    if (!showDeactivateModal && !showEditModal) return;
+    if (!showDeactivateModal) return;
 
     function handleEscape(event) {
       if (event.key === "Escape") {
-        if (showDeactivateModal) closeDeactivateModal();
-        if (showEditModal) closeEditModal();
+        closeDeactivateModal();
       }
     }
 
@@ -192,118 +158,7 @@ function AccountManagementPage() {
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [showDeactivateModal, showEditModal]);
-
-  function showNotice(message) {
-    setNotice(message);
-    window.setTimeout(() => setNotice(""), 4000);
-  }
-
-  /* ---------- EDIT PROFILE (FR-1.3) ---------- */
-  function openEditModal() {
-    if (!profile) return;
-    setEditForm({
-      full_name: profile.full_name || "",
-      mobile: profile.mobile || "",
-      street: profile.street || "",
-      barangay: profile.barangay || "",
-      city: profile.city || "",
-      province: profile.province || "",
-      postal_code: profile.postal_code || "",
-    });
-    setEditErrors({});
-    setShowEditModal(true);
-  }
-
-  function closeEditModal() {
-    if (editSaving) return;
-    setShowEditModal(false);
-    setEditErrors({});
-  }
-
-  function handleEditChange(event) {
-    const { name, value } = event.target;
-    setEditForm((current) => ({ ...current, [name]: value }));
-    setEditErrors((current) => ({ ...current, [name]: "", form: "" }));
-  }
-
-  function validateEdit() {
-    const nextErrors = {};
-
-    if (!editForm.full_name.trim()) {
-      nextErrors.full_name = "Full name is required.";
-    }
-    if (!/^\d{11}$/.test(editForm.mobile)) {
-      nextErrors.mobile = "Mobile number must contain exactly 11 digits.";
-    } else if (!editForm.mobile.startsWith("09")) {
-      nextErrors.mobile = "Philippine mobile number must start with 09.";
-    }
-    if (!editForm.street.trim()) {
-      nextErrors.street = "Street address is required.";
-    }
-    if (!editForm.barangay.trim()) {
-      nextErrors.barangay = "Barangay is required.";
-    }
-    if (!editForm.city.trim()) {
-      nextErrors.city = "City is required.";
-    }
-    if (!editForm.province) {
-      nextErrors.province = "Please select your province.";
-    }
-    if (!/^\d{4}$/.test(editForm.postal_code)) {
-      nextErrors.postal_code = "Postal code must contain exactly 4 digits.";
-    }
-
-    setEditErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }
-
-  async function handleSaveProfile(event) {
-    event.preventDefault();
-    if (!validateEdit()) return;
-    if (editSaving) return;
-
-    setEditSaving(true);
-    try {
-      const res = await authAPI.updateProfile(editForm);
-      const updated = res?.user || res;
-
-      setProfile(updated);
-
-      try {
-        const prev = JSON.parse(
-          localStorage.getItem("fitfusion-current-user") || "{}"
-        );
-        localStorage.setItem(
-          "fitfusion-current-user",
-          JSON.stringify({ ...prev, ...updated })
-        );
-      } catch {
-        // non-critical cache sync
-      }
-
-      window.dispatchEvent(new Event("fitfusion-account-updated"));
-      setShowEditModal(false);
-      showNotice("Profile and delivery address updated successfully.");
-    } catch (error) {
-      console.error("Profile update failed:", error);
-      let message = "Update failed. Please try again.";
-      try {
-        const data = JSON.parse(error.message);
-        const firstKey = Object.keys(data)[0];
-        if (firstKey) {
-          message = `${firstKey}: ${
-            Array.isArray(data[firstKey]) ? data[firstKey][0] : data[firstKey]
-          }`;
-        }
-      } catch {
-        // keep default message
-      }
-      setEditErrors({ form: message });
-    } finally {
-      setEditSaving(false);
-    }
-  }
+  }, [showDeactivateModal, closeDeactivateModal]);
 
   /* ---------- DEACTIVATE (FR-1.4, real backend call) ---------- */
   function openDeactivateModal() {
@@ -312,15 +167,6 @@ function AccountManagementPage() {
     setConfirmationChecked(false);
     setDeactivationError("");
     setShowDeactivateModal(true);
-  }
-
-  function closeDeactivateModal() {
-    if (isDeactivating) return;
-    setShowDeactivateModal(false);
-    setDeactivationReason("");
-    setOtherReason("");
-    setConfirmationChecked(false);
-    setDeactivationError("");
   }
 
   async function handleDeactivateAccount() {
@@ -416,16 +262,10 @@ function AccountManagementPage() {
         <h1>Account Management</h1>
 
         <p className="account-page-description">
-          Keep your personal details, delivery address,
-          and security information up to date.
+          Keep your personal details, home address, and
+          security information up to date.
         </p>
       </section>
-
-      {notice && (
-        <div className="account-deactivate-error" role="status" style={{ background: "#eef6ee", borderColor: "#2f6b3a", color: "#2f6b3a" }}>
-          {notice}
-        </div>
-      )}
 
       <section className="account-page-grid">
         {/* PROFILE DETAILS */}
@@ -439,7 +279,7 @@ function AccountManagementPage() {
             <button
               type="button"
               className="account-primary-button"
-              onClick={openEditModal}
+              onClick={() => navigate("/shopper/account/edit#profile")}
             >
               Edit Profile
             </button>
@@ -474,12 +314,12 @@ function AccountManagementPage() {
           </div>
         </article>
 
-        {/* DELIVERY ADDRESS */}
+        {/* HOME ADDRESS */}
         <article className="account-card account-address-card">
           <div className="account-card-heading">
             <div>
-              <p className="account-card-label">DELIVERY INFORMATION</p>
-              <h2>Delivery address</h2>
+              <p className="account-card-label">HOME ADDRESS</p>
+              <h2>Home address</h2>
             </div>
           </div>
 
@@ -489,7 +329,7 @@ function AccountManagementPage() {
             </div>
 
             <div>
-              <strong>Default delivery address</strong>
+              <strong>Home address</strong>
               <p>{details.completeAddress || "Not provided"}</p>
             </div>
           </div>
@@ -502,177 +342,6 @@ function AccountManagementPage() {
           </div>
         </article>
       </section>
-
-      {/* EDIT PROFILE MODAL (FR-1.3) */}
-      {showEditModal && (
-        <div
-          className="account-deactivate-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeEditModal();
-            }
-          }}
-        >
-          <form
-            className="account-deactivate-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-modal-title"
-            onSubmit={handleSaveProfile}
-            noValidate
-          >
-            <button
-              type="button"
-              className="account-deactivate-close"
-              onClick={closeEditModal}
-              aria-label="Close edit dialog"
-              disabled={editSaving}
-            >
-              ×
-            </button>
-
-            <p className="account-deactivate-eyebrow">PROFILE SETTINGS</p>
-
-            <h2 id="edit-modal-title">Edit Profile & Delivery Address</h2>
-
-            <p className="account-deactivate-description">
-              Changes are saved directly to your account in the
-              database. Email address and role cannot be changed.
-            </p>
-
-            <label className="account-card-label">Full Name</label>
-            <input
-              className="account-deactivate-other"
-              type="text"
-              name="full_name"
-              value={editForm.full_name}
-              onChange={handleEditChange}
-            />
-            {editErrors.full_name && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.full_name}
-              </div>
-            )}
-
-            <label className="account-card-label">Mobile Number</label>
-            <input
-              className="account-deactivate-other"
-              type="tel"
-              name="mobile"
-              value={editForm.mobile}
-              onChange={handleEditChange}
-              maxLength={11}
-            />
-            {editErrors.mobile && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.mobile}
-              </div>
-            )}
-
-            <label className="account-card-label">Street Address</label>
-            <input
-              className="account-deactivate-other"
-              type="text"
-              name="street"
-              value={editForm.street}
-              onChange={handleEditChange}
-            />
-            {editErrors.street && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.street}
-              </div>
-            )}
-
-            <label className="account-card-label">Barangay</label>
-            <input
-              className="account-deactivate-other"
-              type="text"
-              name="barangay"
-              value={editForm.barangay}
-              onChange={handleEditChange}
-            />
-            {editErrors.barangay && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.barangay}
-              </div>
-            )}
-
-            <label className="account-card-label">City / Municipality</label>
-            <input
-              className="account-deactivate-other"
-              type="text"
-              name="city"
-              value={editForm.city}
-              onChange={handleEditChange}
-            />
-            {editErrors.city && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.city}
-              </div>
-            )}
-
-            <label className="account-card-label">Province</label>
-            <select
-              className="account-deactivate-other"
-              name="province"
-              value={editForm.province}
-              onChange={handleEditChange}
-            >
-              <option value="">Select your province</option>
-              {PROVINCES.map((province) => (
-                <option key={province} value={province}>
-                  {province}
-                </option>
-              ))}
-            </select>
-            {editErrors.province && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.province}
-              </div>
-            )}
-
-            <label className="account-card-label">Postal Code</label>
-            <input
-              className="account-deactivate-other"
-              type="text"
-              name="postal_code"
-              value={editForm.postal_code}
-              onChange={handleEditChange}
-              maxLength={4}
-            />
-            {editErrors.postal_code && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.postal_code}
-              </div>
-            )}
-
-            {editErrors.form && (
-              <div className="account-deactivate-error" role="alert">
-                {editErrors.form}
-              </div>
-            )}
-
-            <div className="account-deactivate-actions">
-              <button
-                type="button"
-                className="account-deactivate-cancel"
-                onClick={closeEditModal}
-                disabled={editSaving}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="account-deactivate-submit"
-                disabled={editSaving}
-              >
-                {editSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* DEACTIVATION CONFIRMATION MODAL (FR-1.4) */}
       {showDeactivateModal && (
