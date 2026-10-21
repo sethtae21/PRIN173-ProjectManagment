@@ -54,7 +54,18 @@ function SellerProductListingsPage() {
       } catch (err) {
         console.error("Failed to fetch listings:", err);
         if (isMounted) {
-          setError("Failed to load product listings. Please try again.");
+          let errorMsg = "Failed to load product listings. Please try again.";
+          try {
+            const errData = JSON.parse(err.message);
+            if (errData.detail?.includes("permission") || errData.detail?.includes("Seller")) {
+              errorMsg = "Access denied. Please log out and log back in with a Seller account.";
+            } else if (errData.detail?.includes("Authentication")) {
+              errorMsg = "Your session expired. Please log in again.";
+            }
+          } catch (e) {
+            // fallback to default message
+          }
+          setError(errorMsg);
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -168,6 +179,19 @@ function SellerProductListingsPage() {
         {error && !deleteTarget && (
           <div className="spl-error" role="alert">
             {error}
+            {error.includes("Access denied") && (
+              <button 
+                type="button" 
+                className="spl-clear-button" 
+                style={{ marginLeft: '12px', marginTop: '0' }}
+                onClick={() => {
+                  localStorage.clear();
+                  navigate("/login");
+                }}
+              >
+                Go to Login
+              </button>
+            )}
           </div>
         )}
 

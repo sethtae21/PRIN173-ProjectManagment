@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import {
   Link,
@@ -19,6 +18,7 @@ import ChooseRegistrationRolePage from "./pages/Shared Pages/ChooseRegistrationR
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import SellerSignupPage from "./pages/Seller/SellerSignupPage";
+// FIX: Updated path to include /Shopper/
 import FemaleAvatarCanvasTest from "./pages/Shopper/FemaleAvatarCanvasTest";
 
 /* GUEST PAGES */
@@ -105,9 +105,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         <Route
-  path="/avatar-c-test"
-  element={<FemaleAvatarCanvasTest />}
-/>
+          path="/avatar-c-test"
+          element={<FemaleAvatarCanvasTest />}
+        />
 
         <Route path="/login" element={<LoginPage />} />
 

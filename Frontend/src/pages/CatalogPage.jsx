@@ -1,158 +1,7 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { API_URL, catalogAPI } from "../services/api";
 import "./css/CatalogPage.css";
-
-export const products = [
-  {
-    id: "product-001",
-    name: "Classic Linen Blouse",
-    category: "Tops",
-    gender: "Women",
-    price: 899,
-    originalPrice: 1099,
-    rating: 4.8,
-    ratingsCount: 128,
-    sellerId: "seller-001",
-    sellerName: "Aurelia Studio",
-    sellerLocation: "Makati City",
-    symbol: "👚",
-    colors: ["Ivory", "Beige", "Black"],
-    sizes: ["S", "M", "L", "XL"],
-    stock: 24,
-    matchScore: "6/7",
-    description:
-      "A lightweight linen blouse designed for everyday comfort. It features breathable fabric, a relaxed silhouette, and a clean classic finish.",
-  },
-  {
-    id: "product-002",
-    name: "Tailored Wide-Leg Trousers",
-    category: "Bottoms",
-    gender: "Women",
-    price: 1299,
-    originalPrice: 1499,
-    rating: 4.7,
-    ratingsCount: 94,
-    sellerId: "seller-001",
-    sellerName: "Aurelia Studio",
-    sellerLocation: "Makati City",
-    symbol: "👖",
-    colors: ["Sand", "Brown", "Black"],
-    sizes: ["S", "M", "L", "XL"],
-    stock: 18,
-    matchScore: "5/7",
-    description:
-      "Elegant wide-leg trousers with a structured waist and comfortable fit for casual or professional styling.",
-  },
-  {
-    id: "product-003",
-    name: "Modern Structured Blazer",
-    category: "Outerwear",
-    gender: "Women",
-    price: 1899,
-    originalPrice: 2299,
-    rating: 4.9,
-    ratingsCount: 76,
-    sellerId: "seller-002",
-    sellerName: "Maison Moderne",
-    sellerLocation: "Makati City",
-    symbol: "🧥",
-    colors: ["Cream", "Brown", "Black"],
-    sizes: ["S", "M", "L", "XL", "2XL"],
-    stock: 12,
-    matchScore: "7/7",
-    description:
-      "A polished structured blazer with a modern silhouette, suitable for smart-casual and formal outfits.",
-  },
-  {
-    id: "product-004",
-    name: "Premium Cotton Polo",
-    category: "Tops",
-    gender: "Men",
-    price: 799,
-    originalPrice: 999,
-    rating: 4.6,
-    ratingsCount: 82,
-    sellerId: "seller-003",
-    sellerName: "North & Thread",
-    sellerLocation: "Quezon City",
-    symbol: "👕",
-    colors: ["White", "Navy", "Olive"],
-    sizes: ["S", "M", "L", "XL"],
-    stock: 30,
-    matchScore: "6/7",
-    description:
-      "A soft premium cotton polo with a clean collar and comfortable everyday fit.",
-  },
-  {
-    id: "golden-midi-dress",
-    name: "Golden Midi Dress",
-    category: "Dresses",
-    gender: "Women",
-    price: 2199,
-    rating: 4.9,
-    sellerId: "luna-fashion",
-    sellerName: "Luna Fashion",
-    sellerLocation: "Makati City",
-    symbol: "👗",
-    colors: ["Gold"],
-    sizes: ["XS", "S", "M", "L"],
-    stock: 15,
-    description:
-      "A graceful midi dress for elegant everyday styling.",
-  },
-  {
-    id: "cream-knit-sweater",
-    name: "Cream Knit Sweater",
-    category: "Tops",
-    gender: "Unisex",
-    price: 1599,
-    rating: 4.5,
-    sellerId: "urban-thread",
-    sellerName: "Urban Thread",
-    sellerLocation: "Makati City",
-    symbol: "🧶",
-    colors: ["Cream"],
-    sizes: ["S", "M", "L", "XL"],
-    stock: 20,
-    description:
-      "A comfortable knit sweater for everyday outfits.",
-  },
-  {
-    id: "pleated-midi-skirt",
-    name: "Pleated Midi Skirt",
-    category: "Bottoms",
-    gender: "Women",
-    price: 1299,
-    rating: 4.6,
-    sellerId: "maison-aurelia",
-    sellerName: "Maison Aurelia",
-    sellerLocation: "Makati City",
-    symbol: "👗",
-    colors: ["Brown"],
-    sizes: ["XS", "S", "M", "L"],
-    stock: 18,
-    description:
-      "A classic pleated skirt for versatile styling.",
-  },
-  {
-    id: "classic-denim-jacket",
-    name: "Classic Denim Jacket",
-    category: "Outerwear",
-    gender: "Unisex",
-    price: 2299,
-    rating: 4.8,
-    sellerId: "urban-thread",
-    sellerName: "Urban Thread",
-    sellerLocation: "Makati City",
-    symbol: "🧥",
-    colors: ["Blue"],
-    sizes: ["S", "M", "L", "XL"],
-    stock: 16,
-    description:
-      "A classic denim jacket for casual layering.",
-  },
-];
 
 const categories = [
   "All",
@@ -160,7 +9,15 @@ const categories = [
   "Bottoms",
   "Dresses",
   "Outerwear",
+  "Footwear",
 ];
+
+// Helper to construct image URLs exactly like the Seller page does
+function mediaUrl(path) {
+  if (!path) return null;
+  if (String(path).startsWith("http")) return path;
+  return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
+}
 
 function readCart() {
   try {
@@ -174,8 +31,7 @@ function readCart() {
 
 function getCartCount() {
   return readCart().reduce(
-    (total, item) =>
-      total + Number(item.quantity || 1),
+    (total, item) => total + Number(item.quantity || 1),
     0
   );
 }
@@ -188,50 +44,64 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function productDetailsData(product) {
-  return {
-    ...product,
-    category: `${product.gender} • ${product.category}`,
-    storeName: product.sellerName,
-    colors: product.colors,
-    sizes: product.sizes,
-  };
-}
-
 function CatalogPage({ isGuest = false }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const guestMode =
-    isGuest || location.pathname.startsWith("/guest");
+  const guestMode = isGuest || location.pathname.startsWith("/guest");
 
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [selectedCategory, setSelectedCategory] =
-    useState("All");
-  const [sortOption, setSortOption] =
-    useState("featured");
-  const [cartCount, setCartCount] =
-    useState(getCartCount);
-  const [
-    showRegistrationModal,
-    setShowRegistrationModal,
-  ] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortOption, setSortOption] = useState("featured");
+  const [cartCount, setCartCount] = useState(getCartCount());
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
   useEffect(() => {
-    const updateCount = () => setCartCount(getCartCount());
+    let isMounted = true;
+    setIsLoading(true);
 
-    window.addEventListener(
-      "fitfusion-cart-updated",
-      updateCount
-    );
-    window.addEventListener("storage", updateCount);
+    async function fetchProducts() {
+      try {
+        const data = await catalogAPI.getAll();
+        if (isMounted) {
+          const normalized = Array.isArray(data)
+            ? data.map((p) => ({
+                ...p,
+                displayCategory: p.category
+                  ? p.category.charAt(0).toUpperCase() + p.category.slice(1)
+                  : "Item",
+                // FIX: Use the mediaUrl helper to ensure correct path
+                imageUrl: mediaUrl(p.front_image),
+                rating: 0,
+                ratingsCount: 0,
+              }))
+            : [];
+          setProducts(normalized);
+        }
+      } catch (err) {
+        console.error("Failed to load catalog:", err);
+        if (isMounted) setProducts([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    fetchProducts();
 
     return () => {
-      window.removeEventListener(
-        "fitfusion-cart-updated",
-        updateCount
-      );
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateCount = () => setCartCount(getCartCount());
+    window.addEventListener("fitfusion-cart-updated", updateCount);
+    window.addEventListener("storage", updateCount);
+    return () => {
+      window.removeEventListener("fitfusion-cart-updated", updateCount);
       window.removeEventListener("storage", updateCount);
     };
   }, []);
@@ -242,33 +112,23 @@ function CatalogPage({ isGuest = false }) {
     const filtered = products.filter((product) => {
       const matchesSearch =
         !query ||
-        product.name.toLowerCase().includes(query) ||
-        product.category.toLowerCase().includes(query) ||
-        product.sellerName.toLowerCase().includes(query);
+        String(product.name || "").toLowerCase().includes(query) ||
+        String(product.displayCategory || "").toLowerCase().includes(query) ||
+        String(product.store_name || "").toLowerCase().includes(query);
 
       const matchesCategory =
         selectedCategory === "All" ||
-        product.category === selectedCategory;
+        product.displayCategory === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
 
     return [...filtered].sort((a, b) => {
-      if (sortOption === "price-low") {
-        return a.price - b.price;
-      }
-
-      if (sortOption === "price-high") {
-        return b.price - a.price;
-      }
-
-      if (sortOption === "rating") {
-        return b.rating - a.rating;
-      }
-
+      if (sortOption === "price-low") return a.price - b.price;
+      if (sortOption === "price-high") return b.price - a.price;
       return 0;
     });
-  }, [searchText, selectedCategory, sortOption]);
+  }, [products, searchText, selectedCategory, sortOption]);
 
   function showGuestRestriction(action) {
     setModalAction(action);
@@ -276,11 +136,7 @@ function CatalogPage({ isGuest = false }) {
   }
 
   function openProductDetails(product) {
-    localStorage.setItem(
-      "fitfusion-selected-product",
-      JSON.stringify(productDetailsData(product))
-    );
-
+    localStorage.setItem("fitfusion-selected-product-id", product.id);
     navigate(
       guestMode
         ? `/guest/products/${product.id}`
@@ -290,71 +146,44 @@ function CatalogPage({ isGuest = false }) {
 
   function openSellerStore(product) {
     if (guestMode) {
-      showGuestRestriction(
-        "view the seller's complete store"
-      );
+      showGuestRestriction("view the seller's complete store");
       return;
     }
-
-    localStorage.setItem(
-      "fitfusion-selected-seller",
-      JSON.stringify({
-        id: product.sellerId,
-        name: product.sellerName,
-        location: product.sellerLocation,
-      })
-    );
-
-    navigate(
-      `/shopper/sellers/${product.sellerId}`
-    );
+    console.log("Viewing store for:", product.store_name);
   }
 
   function addToCart(product) {
     if (guestMode) {
-      showGuestRestriction(
-        "add products to your cart"
-      );
+      showGuestRestriction("add products to your cart");
       return;
     }
 
     const cart = readCart();
-    const existingIndex = cart.findIndex(
-      (item) => item.id === product.id
-    );
-
+    const existingIndex = cart.findIndex((item) => item.id === product.id);
     const nextCart = [...cart];
 
     if (existingIndex >= 0) {
       nextCart[existingIndex] = {
         ...nextCart[existingIndex],
-        quantity:
-          Number(
-            nextCart[existingIndex].quantity || 1
-          ) + 1,
+        quantity: Number(nextCart[existingIndex].quantity || 1) + 1,
       };
     } else {
       nextCart.push({
-        ...product,
-        productId: product.id,
-        storeName: product.sellerName,
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        storeName: product.store_name,
+        imageUrl: product.imageUrl,
         quantity: 1,
-        selectedSize: product.sizes[0],
-        selectedColor: product.colors[0],
+        selectedSize: "M",
+        selectedColor: product.color || "Default",
         selected: true,
       });
     }
 
-    localStorage.setItem(
-      "fitfusion-cart",
-      JSON.stringify(nextCart)
-    );
-
+    localStorage.setItem("fitfusion-cart", JSON.stringify(nextCart));
     setCartCount(getCartCount());
-
-    window.dispatchEvent(
-      new Event("fitfusion-cart-updated")
-    );
+    window.dispatchEvent(new Event("fitfusion-cart-updated"));
   }
 
   function clearFilters() {
@@ -370,9 +199,7 @@ function CatalogPage({ isGuest = false }) {
           <button
             type="button"
             className="catalog-header-cart"
-            onClick={() =>
-              navigate("/shopper/cart")
-            }
+            onClick={() => navigate("/shopper/cart")}
             aria-label={`Open shopping cart with ${cartCount} items`}
           >
             <CartIcon />
@@ -389,9 +216,7 @@ function CatalogPage({ isGuest = false }) {
               type="search"
               value={searchText}
               placeholder="Search product, category, or store"
-              onChange={(event) =>
-                setSearchText(event.target.value)
-              }
+              onChange={(event) => setSearchText(event.target.value)}
             />
           </label>
 
@@ -399,20 +224,11 @@ function CatalogPage({ isGuest = false }) {
             <span>Category</span>
             <select
               value={selectedCategory}
-              onChange={(event) =>
-                setSelectedCategory(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setSelectedCategory(event.target.value)}
             >
               {categories.map((category) => (
-                <option
-                  key={category}
-                  value={category}
-                >
-                  {category === "All"
-                    ? "All Categories"
-                    : category}
+                <option key={category} value={category}>
+                  {category === "All" ? "All Categories" : category}
                 </option>
               ))}
             </select>
@@ -422,77 +238,71 @@ function CatalogPage({ isGuest = false }) {
             <span>Sort By</span>
             <select
               value={sortOption}
-              onChange={(event) =>
-                setSortOption(event.target.value)
-              }
+              onChange={(event) => setSortOption(event.target.value)}
             >
-              <option value="featured">
-                Featured
-              </option>
-              <option value="rating">
-                Highest Rating
-              </option>
-              <option value="price-low">
-                Price: Low to High
-              </option>
-              <option value="price-high">
-                Price: High to Low
-              </option>
+              <option value="featured">Featured</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
             </select>
           </label>
         </section>
 
         <div className="catalog-result-row">
           <p>
-            Showing{" "}
-            <strong>
-              {filteredProducts.length}
-            </strong>{" "}
-            {filteredProducts.length === 1
-              ? "product"
-              : "products"}
+            {isLoading
+              ? "Loading catalog..."
+              : `Showing ${filteredProducts.length} products`}
           </p>
-
           {(searchText ||
             selectedCategory !== "All" ||
             sortOption !== "featured") && (
-            <button
-              type="button"
-              onClick={clearFilters}
-            >
+            <button type="button" onClick={clearFilters}>
               Clear filters
             </button>
           )}
         </div>
 
-        {filteredProducts.length > 0 ? (
+        {isLoading ? (
+          <div className="catalog-loading-state">
+            <p>Browsing the latest collections...</p>
+          </div>
+        ) : filteredProducts.length > 0 ? (
           <section className="catalog-product-grid">
             {filteredProducts.map((product) => (
-              <article
-                key={product.id}
-                className="catalog-product-card"
-              >
+              <article key={product.id} className="catalog-product-card">
                 <button
                   type="button"
                   className="catalog-product-preview"
-                  onClick={() =>
-                    openProductDetails(product)
-                  }
+                  onClick={() => openProductDetails(product)}
                   aria-label={`View ${product.name}`}
                 >
-                  <span
-                    className="catalog-product-emoji"
-                    role="img"
-                    aria-label={product.name}
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="catalog-product-image"
+                      onError={(e) => {
+                        // If image fails, hide it and show placeholder
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  {/* Fallback placeholder */}
+                  <div
+                    className="catalog-product-placeholder"
+                    style={{ display: product.imageUrl ? "none" : "flex" }}
                   >
-                    {product.symbol}
-                  </span>
+                    <span className="catalog-placeholder-category">
+                      {product.displayCategory}
+                    </span>
+                  </div>
                 </button>
 
                 <div className="catalog-product-content">
                   <div className="catalog-product-tags">
-                    <span>{product.category}</span>
-                    <span>{product.gender}</span>
+                    <span>{product.displayCategory}</span>
+                    {product.color_family && <span>{product.color_family}</span>}
                   </div>
 
                   <h2>{product.name}</h2>
@@ -500,49 +310,22 @@ function CatalogPage({ isGuest = false }) {
                   <button
                     type="button"
                     className="catalog-store-link"
-                    onClick={() =>
-                      openSellerStore(product)
-                    }
+                    onClick={() => openSellerStore(product)}
                   >
-                    {product.sellerName}
+                    {product.store_name || "FitFusion Store"}
                   </button>
-
-                  <div className="catalog-rating">
-                    <StarIcon />
-                    <strong>
-                      {product.rating.toFixed(1)}
-                    </strong>
-
-                    {product.ratingsCount && (
-                      <small>
-                        ({product.ratingsCount})
-                      </small>
-                    )}
-                  </div>
 
                   <div className="catalog-product-footer">
                     <div className="catalog-price-group">
                       <strong className="catalog-price">
-                        {formatCurrency(
-                          product.price
-                        )}
+                        {formatCurrency(product.price)}
                       </strong>
-
-                      {product.originalPrice && (
-                        <del>
-                          {formatCurrency(
-                            product.originalPrice
-                          )}
-                        </del>
-                      )}
                     </div>
 
                     <button
                       type="button"
                       className="catalog-details-button"
-                      onClick={() =>
-                        openProductDetails(product)
-                      }
+                      onClick={() => openProductDetails(product)}
                     >
                       View Details
                     </button>
@@ -551,13 +334,9 @@ function CatalogPage({ isGuest = false }) {
                   <button
                     type="button"
                     className="catalog-cart-action"
-                    onClick={() =>
-                      addToCart(product)
-                    }
+                    onClick={() => addToCart(product)}
                   >
-                    {guestMode
-                      ? "Register to Add to Cart"
-                      : "Add to Cart"}
+                    {guestMode ? "Register to Add to Cart" : "Add to Cart"}
                   </button>
                 </div>
               </article>
@@ -568,18 +347,9 @@ function CatalogPage({ isGuest = false }) {
             <div className="catalog-empty-icon">
               <SearchIcon />
             </div>
-
             <h2>No products found</h2>
-
-            <p>
-              Try another search term or clear
-              your filters.
-            </p>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-            >
+            <p>Try another search term or clear your filters.</p>
+            <button type="button" onClick={clearFilters}>
               Clear All Filters
             </button>
           </section>
@@ -591,11 +361,8 @@ function CatalogPage({ isGuest = false }) {
           className="catalog-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget
-            ) {
+            if (event.target === event.currentTarget)
               setShowRegistrationModal(false);
-            }
           }}
         >
           <section
@@ -607,56 +374,37 @@ function CatalogPage({ isGuest = false }) {
             <button
               type="button"
               className="catalog-modal-close"
-              onClick={() =>
-                setShowRegistrationModal(false)
-              }
+              onClick={() => setShowRegistrationModal(false)}
               aria-label="Close"
             >
               ×
             </button>
-
-            <p className="catalog-modal-label">
-              REGISTRATION REQUIRED
-            </p>
-
-            <h2 id="catalog-modal-title">
-              Create an account to continue
-            </h2>
-
+            <p className="catalog-modal-label">REGISTRATION REQUIRED</p>
+            <h2 id="catalog-modal-title">Create an account to continue</h2>
             <p>
-              Guest users may browse the catalog.
-              Please create an account or log in to{" "}
-              {modalAction}.
+              Guest users may browse the catalog. Please create an account or
+              log in to {modalAction}.
             </p>
-
             <div className="catalog-modal-actions">
               <button
                 type="button"
                 className="catalog-modal-primary"
-                onClick={() =>
-                  navigate("/signup")
-                }
+                onClick={() => navigate("/signup")}
               >
                 Create Account
               </button>
-
               <button
                 type="button"
                 className="catalog-modal-secondary"
-                onClick={() =>
-                  navigate("/login")
-                }
+                onClick={() => navigate("/login")}
               >
                 Log In
               </button>
             </div>
-
             <button
               type="button"
               className="catalog-modal-cancel"
-              onClick={() =>
-                setShowRegistrationModal(false)
-              }
+              onClick={() => setShowRegistrationModal(false)}
             >
               Continue Browsing
             </button>
@@ -682,14 +430,6 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="11" cy="11" r="7" />
       <path d="m16 16 5 5" />
-    </svg>
-  );
-}
-
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m12 2.8 2.8 5.7 6.3.9-4.5 4.4 1 6.2-5.6-3-5.6 3 1-6.2-4.5-4.4 6.3-.9L12 2.8Z" />
     </svg>
   );
 }

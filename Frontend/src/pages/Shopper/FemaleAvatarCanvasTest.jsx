@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { products as catalogProducts } from "../CatalogPage";
+
+// FIX: Removed broken import. Replaced with local mock data below.
+// import { products as catalogProducts } from "../CatalogPage";
+
 import {
   BODY_OPTIONS,
   SKIN_TONES,
@@ -16,6 +19,99 @@ import {
   catalogIllustration,
 } from "./canvasWarp2D";
 import "../css/FemaleAvatarCanvasTest.css";
+
+// Local mock catalog for canvas test.
+// CatalogPage no longer exports 'products' because it now fetches from the backend API.
+const catalogProducts = [
+  {
+    id: "test-top-001",
+    name: "Classic Linen Blouse",
+    category: "Tops",
+    gender: "Women",
+    price: 899,
+    sellerName: "Aurelia Studio",
+    symbol: "👚",
+    colors: ["Ivory", "Beige", "Black"],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "test-bottom-001",
+    name: "Tailored Wide-Leg Trousers",
+    category: "Bottoms",
+    gender: "Women",
+    price: 1299,
+    sellerName: "Aurelia Studio",
+    symbol: "👖",
+    colors: ["Sand", "Brown", "Black"],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "test-dress-001",
+    name: "Golden Midi Dress",
+    category: "Dresses",
+    gender: "Women",
+    price: 2199,
+    sellerName: "Luna Fashion",
+    symbol: "👗",
+    colors: ["Gold"],
+    sizes: ["XS", "S", "M", "L"],
+  },
+  {
+    id: "test-outer-001",
+    name: "Modern Structured Blazer",
+    category: "Outerwear",
+    gender: "Women",
+    price: 1899,
+    sellerName: "Maison Moderne",
+    symbol: "🧥",
+    colors: ["Cream", "Brown", "Black"],
+    sizes: ["S", "M", "L", "XL", "2XL"],
+  },
+  {
+    id: "test-top-002",
+    name: "Premium Cotton Polo",
+    category: "Tops",
+    gender: "Unisex",
+    price: 799,
+    sellerName: "North & Thread",
+    symbol: "",
+    colors: ["White", "Navy", "Olive"],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "test-bottom-002",
+    name: "Pleated Midi Skirt",
+    category: "Bottoms",
+    gender: "Women",
+    price: 1299,
+    sellerName: "Maison Aurelia",
+    symbol: "👗",
+    colors: ["Brown"],
+    sizes: ["XS", "S", "M", "L"],
+  },
+  {
+    id: "test-outer-002",
+    name: "Classic Denim Jacket",
+    category: "Outerwear",
+    gender: "Unisex",
+    price: 2299,
+    sellerName: "Urban Thread",
+    symbol: "🧥",
+    colors: ["Blue"],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "test-top-003",
+    name: "Cream Knit Sweater",
+    category: "Tops",
+    gender: "Unisex",
+    price: 1599,
+    sellerName: "Urban Thread",
+    symbol: "🧶",
+    colors: ["Cream"],
+    sizes: ["S", "M", "L", "XL"],
+  },
+];
 
 const ROOT = "/Avatars/Female_avatar";
 const avatarPath = (letter, view) => `${ROOT}/Female_${letter}/female_${letter}_${view}.png`;
@@ -177,8 +273,8 @@ export default function FemaleAvatarCanvasTest() {
     <main className="fc-test">
       <header className="fc-header">
         <div>
-          <p className="fc-eyebrow">FITFUSION AI Â· KAN-116 Â· CANVAS 2D ONLY</p>
-          <h1>Avatar C â€” Deformation & Catalog Try-On</h1>
+          <p className="fc-eyebrow">FITFUSION AI · KAN-116 · CANVAS 2D ONLY</p>
+          <h1>Avatar C — Deformation & Catalog Try-On</h1>
           <p>Calibrated body regions, fixed head width, height/weight selection, and catalog garment preview.</p>
         </div>
         <button type="button" className="fc-outline" onClick={resetAvatar}>Reset avatar</button>
@@ -197,24 +293,24 @@ export default function FemaleAvatarCanvasTest() {
             <canvas ref={canvasRef} width={W} height={H} role="img"
               aria-label={`Female avatar ${loaded?.letter || 'C'} ${view} view`} />
             {(loading || error || !bounds) && (
-              <div className="fc-overlay-message">{error || (loading ? "Loading avatarâ€¦" : "Avatar PNG is empty or has no transparency.")}</div>
+              <div className="fc-overlay-message">{error || (loading ? "Loading avatar…" : "Avatar PNG is empty or has no transparency.")}</div>
             )}
           </div>
           <div className="fc-readings">
             <span>Requested silhouette: <b>{requested.letter}</b></span>
-            <span>Loaded PNG: <b>{loaded?.letter || "â€”"}</b></span>
+            <span>Loaded PNG: <b>{loaded?.letter || "—"}</b></span>
             <span>Reference weight: <b>{requested.referenceWeight.toFixed(1)} kg</b></span>
-            <span>Canvas draw: <b>{drawMs === null ? "â€”" : `${drawMs.toFixed(1)} ms`}</b></span>
+            <span>Canvas draw: <b>{drawMs === null ? "—" : `${drawMs.toFixed(1)} ms`}</b></span>
           </div>
-          {loaded?.isFallback && <p className="fc-warning">Requested silhouette {requested.letter} is not rendered yet. Showing Female C unchanged â€” no fake whole-body stretching.</p>}
-          {bounds && <p className="fc-tiny">Auto-calibrated body: {Math.round(bounds.width)} Ã— {Math.round(bounds.height)} preview pixels. Shoulder/waist/hip zones follow this detected body, not blank PNG margins.</p>}
+          {loaded?.isFallback && <p className="fc-warning">Requested silhouette {requested.letter} is not rendered yet. Showing Female C unchanged — no fake whole-body stretching.</p>}
+          {bounds && <p className="fc-tiny">Auto-calibrated body: {Math.round(bounds.width)} × {Math.round(bounds.height)} preview pixels. Shoulder/waist/hip zones follow this detected body, not blank PNG margins.</p>}
         </section>
 
         <section className="fc-card fc-settings">
           <h2>Measurements</h2>
           <RangeControl label="Height" min={140} max={218.44} step={0.01} value={heightCm} onChange={setHeightCm} unit=" cm" />
           <RangeControl label="Weight" min={40} max={200} value={weightKg} onChange={setWeightKg} unit=" kg" />
-          <p className="fc-tiny">Weight selects Aâ€“E base art with a reference-weight heuristic. Minimum input limits are test placeholders. Missing A/B/D/E PNGs use C unchanged.</p>
+          <p className="fc-tiny">Weight selects A–E base art with a reference-weight heuristic. Minimum input limits are test placeholders. Missing A/B/D/E PNGs use C unchanged.</p>
 
           <h2>Independent body adjustments</h2>
           <SegmentControl label="Shoulder width" options={BODY_OPTIONS.shoulders} value={shape.shoulders} onChange={(v) => changeShape("shoulders", v)} />
@@ -238,7 +334,7 @@ export default function FemaleAvatarCanvasTest() {
           <h2>Choose clothing from Catalog</h2>
           <div className="fc-catalog-choice">
             <div className="fc-current-product">
-              {product ? <><span className="fc-emoji">{product.symbol || "ðŸ‘š"}</span><div><b>{product.name}</b><small>{product.sellerName} Â· {peso(product.price)}</small></div></> : <p>No clothing selected yet</p>}
+              {product ? <><span className="fc-emoji">{product.symbol || "👚"}</span><div><b>{product.name}</b><small>{product.sellerName} · {peso(product.price)}</small></div></> : <p>No clothing selected yet</p>}
             </div>
             <button type="button" className="fc-gold-button" onClick={() => setCatalogOpen(true)}>Browse Catalog</button>
             {product && <button type="button" className="fc-outline" onClick={() => selectProduct(null)}>Remove outfit item</button>}
@@ -246,18 +342,18 @@ export default function FemaleAvatarCanvasTest() {
           {product && <p className="fc-warning">Catalog item selected: the test currently draws an illustrative {product.category.toLowerCase()} shape, because this catalog record has no registered Front/Side/Rear transparent garment PNGs. The shared lattice warps this placeholder with the avatar; real seller-photo alignment is still unverified.</p>}
 
           <h2>Warp inspector</h2>
-          <RangeControl label="Strength" min={0} max={1.5} step={0.05} value={strength} onChange={setStrength} unit="Ã—" />
-          <label className="fc-check"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Show {GRID_COLS}Ã—{GRID_ROWS} deformation grid and labels</label>
+          <RangeControl label="Strength" min={0} max={1.5} step={0.05} value={strength} onChange={setStrength} unit="×" />
+          <label className="fc-check"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Show {GRID_COLS}×{GRID_ROWS} deformation grid and labels</label>
           <label className="fc-check"><input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Pause body-part warp for comparison (height unchanged)</label>
           {view === "side" && <label className="fc-select-block">Side camera orientation<select value={sideFacing} onChange={(e) => setSideFacing(e.target.value)}><option value="left">Facing left</option><option value="right">Facing right</option></select></label>}
-          <label className="fc-select-block">Preview resolution<select value={quality} onChange={(e) => setQuality(Number(e.target.value))}><option value={512}>512 Ã— 1024 (fast)</option><option value={1024}>1024 Ã— 2048 (full)</option></select></label>
+          <label className="fc-select-block">Preview resolution<select value={quality} onChange={(e) => setQuality(Number(e.target.value))}><option value={512}>512 × 1024 (fast)</option><option value={1024}>1024 × 2048 (full)</option></select></label>
           <p className="fc-tiny">Draw time excludes image downloads and interaction latency; target complete updates under one second on a mid-range laptop.</p>
         </section>
       </div>
 
       {catalogOpen && <div className="fc-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setCatalogOpen(false); }}>
         <section className="fc-modal" role="dialog" aria-modal="true" aria-labelledby="fc-catalog-title">
-          <div className="fc-modal-header"><div><p className="fc-eyebrow">FITFUSION CATALOG</p><h2 id="fc-catalog-title">Select an item to try on</h2></div><button type="button" className="fc-close" aria-label="Close catalog" onClick={() => setCatalogOpen(false)}>Ã—</button></div>
+          <div className="fc-modal-header"><div><p className="fc-eyebrow">FITFUSION CATALOG</p><h2 id="fc-catalog-title">Select an item to try on</h2></div><button type="button" className="fc-close" aria-label="Close catalog" onClick={() => setCatalogOpen(false)}>×</button></div>
           <div className="fc-catalog-filters">
             <input type="search" placeholder="Search clothing or store" value={catalogQuery} onChange={(e) => setCatalogQuery(e.target.value)} />
             <select value={catalogCategory} onChange={(e) => setCatalogCategory(e.target.value)}>
@@ -266,8 +362,8 @@ export default function FemaleAvatarCanvasTest() {
           </div>
           <div className="fc-product-grid">
             {filteredCatalog.map((item) => <article className="fc-product" key={item.id}>
-              <div className="fc-product-icon">{item.symbol || "ðŸ‘•"}</div>
-              <p className="fc-product-meta">{item.category} Â· {item.gender}</p>
+              <div className="fc-product-icon">{item.symbol || "👕"}</div>
+              <p className="fc-product-meta">{item.category} · {item.gender}</p>
               <h3>{item.name}</h3>
               <p className="fc-product-meta">{item.sellerName}</p>
               <p className="fc-price">{peso(item.price)}</p>

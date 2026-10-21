@@ -53,9 +53,20 @@ function SellerValidationReportPage() {
       } catch (err) {
         console.error("Failed to load validation report:", err);
         if (!cancelled) {
-          setError(
-            "Could not load the validation report. Please try again or upload a new catalog."
-          );
+          let isAuthError = false;
+          try {
+            const errData = JSON.parse(err.message);
+            if (errData.detail && (errData.detail.includes("permission") || errData.detail.includes("Authentication"))) {
+              isAuthError = true;
+            }
+          } catch (e) {}
+
+          if (isAuthError) {
+            setError("Access denied. Please log out and log back in with a Seller account.");
+          } else {
+            // If it's just a missing batch or generic error, treat it as "No batches yet"
+            setError("No batches uploaded yet. Upload a catalog to see validation results here.");
+          }
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -161,38 +172,15 @@ function SellerValidationReportPage() {
           <div className="seller-validation-introduction">
             <div>
               <p className="seller-validation-label">VALIDATION REPORT</p>
-              <h1>Error</h1>
+              <h1>{error.includes("Access denied") ? "Access Denied" : "No Batches Yet"}</h1>
               <p>{error}</p>
             </div>
             <button
               type="button"
               className="seller-validation-upload-button"
-              onClick={() => navigate("/seller/upload-catalog")}
+              onClick={() => navigate(error.includes("Access denied") ? "/login" : "/seller/upload-catalog")}
             >
-              Upload Catalog
-            </button>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (!batchReport) {
-    return (
-      <section className="seller-validation-page">
-        <div className="seller-validation-body">
-          <div className="seller-validation-introduction">
-            <div>
-              <p className="seller-validation-label">VALIDATION REPORT</p>
-              <h1>No Batches Yet</h1>
-              <p>Upload a catalog to see validation results here.</p>
-            </div>
-            <button
-              type="button"
-              className="seller-validation-upload-button"
-              onClick={() => navigate("/seller/upload-catalog")}
-            >
-              Upload Catalog
+              {error.includes("Access denied") ? "Go to Login" : "Upload Catalog"}
             </button>
           </div>
         </div>

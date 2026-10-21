@@ -1,4 +1,3 @@
-
 /* ==========================================
    FITFUSION AI - PRODUCT DETAILS PAGE
 ========================================== */
@@ -136,16 +135,17 @@
 }
 
 /* ==========================================
-   GARMENT PREVIEW
+   GARMENT PREVIEW - REAL IMAGES
 ========================================== */
 
 .product-details-gallery {
   min-width: 0;
 }
 
-.product-details-image {
-  display: grid;
+.product-details-image-container {
+  width: 100%;
   min-height: 530px;
+  display: grid;
   place-items: center;
   overflow: hidden;
   background:
@@ -161,29 +161,41 @@
     );
   border: 1px solid #dfcfad;
   border-radius: 16px;
+  position: relative;
 }
 
-.product-details-image span {
-  display: block;
-  font-family:
-    "Segoe UI Emoji",
-    "Apple Color Emoji",
-    "Noto Color Emoji",
-    sans-serif;
-  font-size: clamp(150px, 20vw, 245px);
-  line-height: 1.3;
-  filter: drop-shadow(
-    0 24px 18px rgba(40, 28, 14, 0.16)
-  );
-  transition: transform 0.25s ease;
+.product-details-main-image {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
 }
 
-.product-details-image.side span {
-  transform: rotateY(38deg) scaleX(0.88);
+.product-details-image-container:hover .product-details-main-image {
+  transform: scale(1.02);
 }
 
-.product-details-image.rear span {
-  transform: rotateY(180deg);
+/* Placeholder when image fails to load */
+.product-details-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 530px;
+}
+
+.product-details-placeholder span {
+  padding: 16px 32px;
+  background: rgba(142, 100, 31, 0.15);
+  border: 2px solid #b57e20;
+  border-radius: 999px;
+  color: #8e641f;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* ==========================================
@@ -209,12 +221,19 @@
   font-weight: 700;
   text-transform: capitalize;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .product-view-buttons button.active,
-.product-view-buttons button:hover {
+.product-view-buttons button:hover:not(:disabled) {
   background: #17130f;
   color: #fffdf9;
+  border-color: #17130f;
+}
+
+.product-view-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .product-image-note {
@@ -239,6 +258,7 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .product-information h1 {
@@ -249,34 +269,14 @@
 }
 
 /* ==========================================
-   RATINGS AND PRICE
+   PRICE (Ratings removed - not in backend yet)
 ========================================== */
 
-.product-rating-row,
 .product-price-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.product-rating-row {
-  margin-bottom: 20px;
-}
-
-.product-stars,
-.product-rating-stars,
-.product-rating-large-stars {
-  color: #d09a24;
-  letter-spacing: 2px;
-}
-
-.product-rating-row span,
-.product-rating-row strong {
-  font-size: 12px;
-}
-
-.product-price-row {
   margin-bottom: 22px;
 }
 
@@ -298,33 +298,36 @@
 }
 
 /* ==========================================
-   FIT MATCH SCORE
+   SIZE INFO CARD (Replaces fake Fit Match Score)
 ========================================== */
 
 .product-match-card {
   margin: 24px 0;
   padding: 18px 20px;
-  background: #17130f;
-  border: 1px solid #8e641f;
+  background: #f8f5ef;
+  border: 1px solid #e2d8c7;
   border-radius: 12px;
-  color: #fffdf9;
 }
 
 .product-match-card span {
-  color: #d7af4b;
+  color: #8e641f;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .product-match-card strong {
   display: block;
   margin: 7px 0;
-  font-size: 25px;
+  font-size: 20px;
+  color: #17130f;
 }
 
 .product-match-card p {
   margin: 0;
   font-size: 11px;
+  color: #5c554c;
 }
 
 /* ==========================================
@@ -388,14 +391,22 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .product-color-options button.active,
 .product-size-options button.active,
-.product-color-options button:hover,
-.product-size-options button:hover {
+.product-color-options button:hover:not(:disabled),
+.product-size-options button:hover:not(:disabled) {
   background: #17130f;
   color: #fffdf9;
+  border-color: #17130f;
+}
+
+.product-color-options button:disabled,
+.product-size-options button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* ==========================================
@@ -424,6 +435,7 @@
   border: 0;
   font-size: 18px;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .product-quantity-control button:hover {
@@ -447,6 +459,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  margin-top: 24px;
 }
 
 .product-try-button,
@@ -459,6 +472,7 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .product-try-button {
@@ -545,11 +559,13 @@
   color: #b57e20;
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.1em;
 }
 
 .product-seller-card h2 {
   margin: 0 0 7px;
   color: #17130f;
+  font-size: 18px;
 }
 
 .product-seller-card span {
@@ -568,10 +584,18 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.product-seller-card button:hover {
+  background: #fbf7ed;
 }
 
 .product-information-card h2 {
   margin-top: 0;
+  margin-bottom: 20px;
+  color: #17130f;
+  font-size: 20px;
 }
 
 .product-information-list {
@@ -603,10 +627,12 @@
 .product-information-list strong {
   font-size: 12px;
   text-align: right;
+  color: #17130f;
 }
 
 /* ==========================================
-   PRODUCT RATINGS
+   PRODUCT RATINGS (Hidden - not in backend yet)
+   Keeping styles in case ratings are added later
 ========================================== */
 
 .product-ratings-header {
@@ -678,6 +704,8 @@
 
 .product-rating-large-stars {
   margin-top: 12px;
+  color: #d09a24;
+  letter-spacing: 2px;
 }
 
 .product-rating-breakdown {
@@ -751,17 +779,21 @@
   border: 0;
   font-size: 25px;
   cursor: pointer;
+  color: #5c554c;
 }
 
 .guest-product-modal > p {
   color: #b57e20;
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.1em;
 }
 
 .guest-product-modal > span {
   color: #5c554c;
   font-size: 13px;
+  display: block;
+  margin-top: 12px;
 }
 
 .guest-product-modal-actions {
@@ -778,6 +810,7 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .guest-product-modal-actions button:first-child {
@@ -793,6 +826,11 @@
 .guest-product-modal-actions button:last-child {
   background: #fffdf9;
   color: #8e641f;
+}
+
+.guest-product-modal-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(142, 100, 31, 0.15);
 }
 
 .guest-product-cancel {
@@ -839,12 +877,12 @@
     padding: 18px;
   }
 
-  .product-details-image {
+  .product-details-image-container {
     min-height: 350px;
   }
 
-  .product-details-image span {
-    font-size: 155px;
+  .product-details-placeholder {
+    min-height: 350px;
   }
 
   .product-main-actions,

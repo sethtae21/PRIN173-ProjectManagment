@@ -1,4 +1,3 @@
-
 .catalog-page {
   min-height: 100vh;
   min-width: 0;
@@ -77,7 +76,7 @@
   padding: 42px 0 72px;
 }
 
-/* FILTER TOOLBAR - THREE CONTROLS */
+/* FILTER TOOLBAR */
 
 .catalog-toolbar {
   display: grid;
@@ -166,7 +165,7 @@
   box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
-/* RESULTS */
+/* RESULTS ROW */
 
 .catalog-result-row {
   display: flex;
@@ -254,25 +253,46 @@
   cursor: pointer;
 }
 
-.catalog-product-emoji {
-  display: block;
+/* Real Product Image Styles */
+.catalog-product-image {
   position: relative;
   z-index: 1;
-  font-family:
-    "Segoe UI Emoji",
-    "Apple Color Emoji",
-    "Noto Color Emoji",
-    sans-serif;
-  font-size: clamp(110px, 12vw, 165px);
-  line-height: 1.2;
-  filter: drop-shadow(
-    0 24px 18px rgba(40, 28, 14, 0.16)
-  );
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
+}
+
+.catalog-product-card:hover .catalog-product-image {
+  transform: scale(1.05) translateY(-5px);
+}
+
+/* NEW: Clean Placeholder Styles (Replaces Emojis) */
+.catalog-product-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.catalog-placeholder-category {
+  padding: 12px 24px;
+  background: rgba(142, 100, 31, 0.12);
+  border: 2px solid #b57e20;
+  border-radius: 999px;
+  color: #8e641f;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   transition: transform 0.25s ease;
 }
 
-.catalog-product-card:hover .catalog-product-emoji {
-  transform: translateY(-5px) scale(1.04);
+.catalog-product-card:hover .catalog-placeholder-category {
+  transform: scale(1.05);
 }
 
 .catalog-product-preview::after {
@@ -289,6 +309,7 @@
   letter-spacing: 0.08em;
   opacity: 0;
   transition: opacity 0.2s ease;
+  z-index: 2;
 }
 
 .catalog-product-preview:hover::after {
@@ -372,7 +393,7 @@
   font-size: 10px;
 }
 
-/* PRODUCT PRICE */
+/* PRODUCT PRICE & FOOTER */
 
 .catalog-product-footer {
   display: flex;
@@ -501,6 +522,20 @@
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
+}
+
+/* Loading State */
+.catalog-loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  color: #5c554c;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fffdf9;
+  border: 1px solid #e2d8c7;
+  border-radius: 20px;
 }
 
 /* GUEST REGISTRATION MODAL */
@@ -668,10 +703,6 @@
 
   .catalog-product-preview {
     height: 310px;
-  }
-
-  .catalog-product-emoji {
-    font-size: 170px;
   }
 
   .catalog-modal {
