@@ -621,7 +621,7 @@ function EditAccountPage() {
               >
                 ← Back to Account
               </button>
-              <h1>Edit Account</h1>
+              <h1>Edit Shopper Profile</h1>
               <p>Loading your account information…</p>
             </div>
           </header>
@@ -643,7 +643,7 @@ function EditAccountPage() {
               >
                 ← Back to Account
               </button>
-              <h1>Edit Account</h1>
+              <h1>Edit Shopper Profile</h1>
               <p>{loadError || "Account information is unavailable."}</p>
               <button
                 type="button"
@@ -672,10 +672,11 @@ function EditAccountPage() {
               ← Back to Account
             </button>
 
-            <h1>Edit Account</h1>
+            <h1>Edit Shopper Profile</h1>
 
             <p>
-              Update your personal information or change your password.
+              Update your personal details and home address, or change
+              your password.
             </p>
           </div>
         </header>
@@ -701,7 +702,7 @@ function EditAccountPage() {
                   <p>ACCOUNT INFORMATION</p>
                   <h2>Edit Account Information</h2>
                   <span>
-                    Update your personal and delivery information.
+                    Update your personal information and home address.
                   </span>
                 </div>
               </div>
@@ -761,7 +762,7 @@ function EditAccountPage() {
 
               <section className="edit-account-section">
                 <p className="edit-account-section-label">
-                  DELIVERY ADDRESS
+                  HOME ADDRESS
                 </p>
 
                 <div className="edit-account-form-grid">
