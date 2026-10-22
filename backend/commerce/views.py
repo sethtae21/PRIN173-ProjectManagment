@@ -1,10 +1,11 @@
 """Authenticated cart, checkout, and order-history API views."""
-
+import logging
 from decimal import Decimal
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -22,8 +23,31 @@ from commerce.serializers import (
 )
 from commerce.services import MockPaymentGateway
 
+logger = logging.getLogger(__name__)
 
-class CartViewSet(viewsets.GenericViewSet):
+
+class MongoRetryMixin:
+    """Retry the whole dispatch once on transient MongoDB connection errors.
+
+    Atlas free-tier sockets can be reset after idle periods (WinError 10054 /
+    ServerSelectionTimeoutError), which otherwise surfaces as a 500 on the
+    FIRST request after idle. One immediate retry lets the driver reconnect
+    and serve the request normally.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except (ConnectionFailure, ServerSelectionTimeoutError) as exc:
+            logger.warning(
+                "Transient MongoDB error (%s) on %s; retrying once",
+                type(exc).__name__,
+                request.path,
+            )
+            return super().dispatch(request, *args, **kwargs)
+
+
+class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
     """Manage the authenticated user's one shopping cart."""
 
     permission_classes = (IsAuthenticated,)
@@ -104,7 +128,7 @@ class CartViewSet(viewsets.GenericViewSet):
         return Response(self.get_serializer(self.get_cart()).data)
 
 
-class CheckoutView(APIView):
+class CheckoutView(MongoRetryMixin, APIView):
     """Approve a mock payment and create an order from the current cart."""
 
     permission_classes = (IsAuthenticated,)
@@ -121,7 +145,6 @@ class CheckoutView(APIView):
         """Create an order only after the mock gateway approves payment."""
         input_serializer = CheckoutSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
-
         cart, _ = Cart.objects.get_or_create(user=request.user)
         cart_items = list(cart.items.select_related('item').all())
         submitted_items = input_serializer.validated_data.get('items')
@@ -145,13 +168,11 @@ class CheckoutView(APIView):
                     {'detail': 'One or more selected products are not in your cart.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
         if not cart_items:
             return Response(
                 {'detail': 'Cannot checkout with an empty cart.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         total_amount = sum(
             (entry.item.price * entry.quantity for entry in cart_items),
             Decimal('0.00'),
@@ -171,7 +192,6 @@ class CheckoutView(APIView):
                 {'detail': payment['message'], 'transaction_ref': payment['transaction_ref']},
                 status=status.HTTP_402_PAYMENT_REQUIRED,
             )
-
         order = Order.objects.create(
             user=request.user,
             status='pending' if is_cash_on_delivery else 'paid',
@@ -200,12 +220,11 @@ class CheckoutView(APIView):
         except Exception:
             order.delete()
             raise
-
         cart.items.filter(pk__in=[entry.pk for entry in cart_items]).delete()
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
-class OrderViewSet(viewsets.ReadOnlyModelViewSet):
+class OrderViewSet(MongoRetryMixin, viewsets.ReadOnlyModelViewSet):
     """Read-only order history scoped to the authenticated owner."""
 
     serializer_class = OrderSerializer

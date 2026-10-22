@@ -20,10 +20,8 @@ from accounts.permissions import IsSeller
 from PIL import Image
 from rembg import new_session, remove
 from bson.objectid import ObjectId
-
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
@@ -31,6 +29,7 @@ from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CS
 from recommendations.knowledge_table import validate_size_label
 
 logger = logging.getLogger(__name__)
+
 UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
 IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS * 3)
 
@@ -42,7 +41,6 @@ OCCASION_TAG_OPTIONS = (
     'everyday', 'summer', 'office', 'weekend', 'evening',
     'formal', 'winter', 'vacation', 'outdoor',
 )
-
 CATALOG_CSV_COLUMNS = [
     'name', 'description', 'category', 'size', 'color', 'color_description',
     'color_family', 'price', 'style_tags', 'occasion_tags',
@@ -54,10 +52,10 @@ CATALOG_EXAMPLE_ROW = [
     'everyday, summer', 'front.jpg', 'side.jpg', 'rear.jpg',
 ]
 SELLER_IMAGE_GUIDELINES = (
-    'FitFusion AI Seller Catalog Upload Guidelines\n\n'
+    'FitFusion AI Seller Catalog Upload Guidelines\n'
     f'Use only these style_tags: {", ".join(STYLE_TAG_OPTIONS)}. '
     f'Use only these occasion_tags: {", ".join(OCCASION_TAG_OPTIONS)}. '
-    'Separate multiple tags with commas; tags are validated without regard to capitalization.\n\n'
+    'Separate multiple tags with commas; tags are validated without regard to capitalization.\n'
     'Upload exactly three clear garment photographs per item: Front, Side, and Rear. '
     'Photograph the garment laid flat or on a mannequin against a plain, contrasting background.\n'
     'Each image must be at least 800 x 800 pixels and no larger than 5 MB. '
@@ -113,17 +111,15 @@ class CatalogValidator:
         'style_tags': frozenset(STYLE_TAG_OPTIONS),
         'occasion_tags': frozenset(OCCASION_TAG_OPTIONS),
     }
-
     # Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     ORIENTATION_MAX_W_H = 1.0
     ORIENTATION_CHECKED_VIEWS = ('Side', 'Rear')
-    
+
     def validate_csv_row(self, row, row_number):
         errors = []
         for field in self.REQUIRED_FIELDS:
             if field not in row or not str(row[field]).strip():
                 errors.append(f"Row {row_number}: Missing required field '{field}'")
-        
         if row.get('price'):
             try:
                 price = Decimal(str(row['price']))
@@ -131,21 +127,18 @@ class CatalogValidator:
                     errors.append(f"Row {row_number}: Price must be positive")
             except (InvalidOperation, ValueError):
                 errors.append(f"Row {row_number}: Invalid price format")
-        
         valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear', 'footwear']
         category = str(row.get('category', '')).strip().lower()
         if category == 'dresses/one-piece':
             category = 'dresses'
         if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
-
         # SIZE RULE: sellers input categorical labels only (footwear: regional
         # codes). Inch/cm measurements are rejected with a descriptive reason
         # that appears in the validation report (FR-4.7 / FR-4.8).
         size_valid, size_error = validate_size_label(row.get('size', ''), category)
         if not size_valid:
             errors.append(f"Row {row_number}: {size_error}")
-
         for field, allowed_tags in self.TAG_OPTIONS.items():
             submitted_tags = [
                 tag.strip() for tag in str(row.get(field, '')).split(',') if tag.strip()
@@ -159,9 +152,8 @@ class CatalogValidator:
                     f"Row {row_number}: Invalid {field} value(s): "
                     f"{', '.join(invalid_tags)}. Choose from: {choices}."
                 )
-        
         return len(errors) == 0, errors
-    
+
     def validate_image_format(self, image_file):
         try:
             image_file.seek(0)
@@ -188,7 +180,7 @@ class CatalogValidator:
                 width, height = img.size
                 if width < self.MIN_IMAGE_DIMENSION or height < self.MIN_IMAGE_DIMENSION:
                     return False, f"Image too small ({width}x{height}). Minimum is {self.MIN_IMAGE_DIMENSION}x{self.MIN_IMAGE_DIMENSION}."
-                return True, None
+            return True, None
         except Exception as e:
             return False, f"Invalid or corrupted image: {str(e)}"
 
@@ -203,23 +195,19 @@ class CatalogValidator:
             return True, None
         if str(category).strip().lower() == 'footwear':
             return True, None
-
         try:
             image_bytes.seek(0)
             img = Image.open(image_bytes)
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
-
             alpha = img.split()[3]
             bbox = alpha.getbbox()
             if not bbox:
                 return False, f"{view_label}: no garment detected in the transparent PNG."
-
             width = bbox[2] - bbox[0]
             height = bbox[3] - bbox[1]
             if height <= 0:
                 return False, f"{view_label}: invalid garment bounding box."
-
             ratio = width / height
             if ratio > self.ORIENTATION_MAX_W_H:
                 return False, (
@@ -231,7 +219,7 @@ class CatalogValidator:
             return True, None
         except Exception as e:
             return False, f"{view_label}: orientation check failed: {str(e)}"
-    
+
     def process_image_with_rembg(self, image_file, session=None):
         try:
             img_data = image_file.read()
@@ -249,7 +237,7 @@ class CatalogValidator:
             return img_byte_arr
         except Exception as e:
             raise Exception(f"Background removal failed: {str(e)}")
-    
+
     def extract_dominant_color(self, image_bytes):
         try:
             img = Image.open(image_bytes)
@@ -269,7 +257,7 @@ class CatalogValidator:
             return "#000000"
         except Exception:
             return "#000000"
-    
+
     def validate_color_alignment(self, declared_color, dominant_hex):
         color_map = {
             'red': lambda h, s, v: (h <= 0.06 or h >= 0.94) and s >= 0.35,
@@ -295,9 +283,10 @@ class CatalogValidator:
         if not any(color_map[name](*hsv) for name in declared_colors):
             return False, f"Color mismatch: declared '{declared_color}' but image appears to be different color ({dominant_hex})"
         return True, "Color alignment OK"
-    
+
     def generate_color_palette_tags(self, dominant_hex, color_family):
         return get_palette_tags(color_family)
+
 
 # ==========================================
 # Background Processing Function
@@ -306,30 +295,26 @@ def process_batch_background(batch_id):
     start_time = time.time()
     print(f"\n{'='*60}")
     print(f"🚀 Starting batch {batch_id} processing...")
-    
     try:
         time.sleep(0.5)
         try:
             batch = UploadBatch.objects.get(id=batch_id)
         except (UploadBatch.DoesNotExist, ValueError, TypeError):
             batch = UploadBatch.objects.get(id=ObjectId(batch_id))
-        
         batch.status = 'processing'
         batch.save()
-        
+
         validator = CatalogValidator()
         rembg_session = None
         accepted_count = 0
         rejected_count = 0
         rejection_report = {}
-        
         items = CatalogItem.objects.filter(batch=batch)
         total_items = items.count()
         print(f"📦 Processing {total_items} items in batch {batch_id}...")
-        
+
         for i, item in enumerate(items, 1):
             item_start = time.time()
-            
             if item.status == 'rejected':
                 rejected_count += 1
                 rejection_report[str(item.id)] = item.rejection_reasons or ['Rejected at upload']
@@ -352,6 +337,22 @@ def process_batch_background(batch_id):
                         ),
                     )
 
+            # FR-4.7(b) guard: an item whose image assets never reached GridFS
+            # (e.g. the upload happened during a storage outage and the row-level
+            # exception was only logged) must be REJECTED, not published image-less.
+            missing_assets = [
+                view_label
+                for field_name, view_label in (
+                    ('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear'),
+                )
+                if not getattr(getattr(item, field_name, None), 'name', None)
+            ]
+            if missing_assets:
+                item_errors.append(
+                    f"Missing stored image assets: {', '.join(missing_assets)}. "
+                    "The original upload did not persist the images; re-upload this listing."
+                )
+
             for field_name, (view_label, original_name, future) in image_jobs.items():
                 try:
                     processed_bytes = future.result()
@@ -362,7 +363,6 @@ def process_batch_background(batch_id):
                     image_field.save(processed_file.name, processed_file, save=False)
                     if original_name:
                         image_field.storage.delete(original_name)
-
                     if field_name == 'front_image':
                         processed_bytes.seek(0)
                         front_color = validator.extract_dominant_color(processed_bytes)
@@ -371,7 +371,6 @@ def process_batch_background(batch_id):
                         )
                         if not color_valid:
                             item_errors.append(color_msg)
-
                     # Side/Rear orientation validation (flat-lay rotated sideways → reject)
                     if field_name in ('side_image', 'rear_image'):
                         processed_bytes.seek(0)
@@ -382,7 +381,7 @@ def process_batch_background(batch_id):
                             item_errors.append(orient_msg)
                 except Exception as e:
                     item_errors.append(f"{view_label} processing failed: {str(e)}")
-            
+
             if item_errors:
                 rejection_report[str(item.id)] = item_errors
                 item.status = 'rejected'
@@ -398,7 +397,7 @@ def process_batch_background(batch_id):
                 accepted_count += 1
                 item_time = time.time() - item_start
                 print(f"✅ Item {i}/{total_items} ({item.name}) processed in {item_time:.2f}s")
-        
+
         total_time = time.time() - start_time
         batch.accepted_count = accepted_count
         batch.rejected_count = rejected_count
@@ -406,13 +405,11 @@ def process_batch_background(batch_id):
         batch.status = 'completed'
         batch.completed_at = timezone.now()
         batch.save()
-        
         print(f"🏁 BATCH {batch_id} PROCESSING COMPLETE")
         print(f"⏱️  Total Time: {total_time:.2f} seconds")
         print(f"📊 Accepted: {accepted_count} | Rejected: {rejected_count}")
         print(f"⚡ Average per item: {total_time/max(total_items,1):.2f} seconds")
         print(f"{'='*60}\n")
-        
     except Exception as e:
         total_time = time.time() - start_time
         print(f"❌ Batch {batch_id} failed after {total_time:.2f}s: {e}")
@@ -424,6 +421,7 @@ def process_batch_background(batch_id):
         except UploadBatch.DoesNotExist:
             pass
 
+
 # ==========================================
 # Catalog ViewSet
 # ==========================================
@@ -431,7 +429,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     queryset = CatalogItem.objects.filter(status='active')
     serializer_class = CatalogItemSerializer
     permission_classes = [IsSeller]
-    
+
     def get_queryset(self):
         queryset = CatalogItem.objects.filter(status='active')
         if category := self.request.query_params.get('category'):
@@ -450,7 +448,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 and any(style_query in str(tag).casefold() for tag in item.style_tags)
             ]
         return queryset
-    
+
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-template')
     def download_template(self, request):
         csv_content = build_catalog_template_csv()
@@ -478,17 +476,13 @@ class CatalogViewSet(viewsets.ModelViewSet):
     def upload(self, request):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can upload catalog items'}, status=status.HTTP_403_FORBIDDEN)
-
         csv_file = request.FILES.get('csv_file')
         if not csv_file:
             return Response({'error': 'CSV file is required'}, status=status.HTTP_400_BAD_REQUEST)
-
         image_files = request.FILES.getlist('images')
-        
         for img in image_files:
             if img.size > 5 * 1024 * 1024:
                 return Response({'error': f'Image "{img.name}" exceeds the 5 MB maximum file size limit.'}, status=status.HTTP_400_BAD_REQUEST)
-
         csv_content = csv_file.read().decode('utf-8')
         lines = csv_content.splitlines()
         header_index = None
@@ -497,29 +491,23 @@ class CatalogViewSet(viewsets.ModelViewSet):
             if {'category', 'front_image_filename', 'side_image_filename', 'rear_image_filename'} <= columns:
                 header_index = i
                 break
-
         if header_index is None:
             return Response({'error': 'CSV header row is missing required columns.'}, status=status.HTTP_400_BAD_REQUEST)
-
         data_lines = lines[header_index:]
         reader = csv.DictReader(data_lines)
         rows = [row for row in reader if any(row.values())]
-
         if len(rows) > settings.MAX_BATCH_ITEMS:
             return Response({'error': f'Upload exceeds maximum of {settings.MAX_BATCH_ITEMS} items.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(rows) == 0:
             return Response({'error': 'CSV file is empty'}, status=status.HTTP_400_BAD_REQUEST)
-            
         if len(image_files) < len(rows) * 3:
             return Response({
                 'error': 'Missing view images. Each item requires 3 images (Front, Side, Rear). Please upload all required views.'
             }, status=status.HTTP_400_BAD_REQUEST)
-
         batch = UploadBatch.objects.create(
             seller=request.user, store_name=request.user.store_name or "Unknown Store",
             status='processing', total_items=len(rows))
         batch_id = str(batch.id)
-        
         image_map = {img.name: img for img in image_files}
         stem_map = {os.path.splitext(img.name)[0].lower(): img for img in image_files}
 
@@ -535,13 +523,11 @@ class CatalogViewSet(viewsets.ModelViewSet):
             return None, f"{view_label}: '{csv_name}' not found among uploaded images"
 
         category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear', 'footwear': 'footwear'}
-
         for row_number, row in enumerate(rows, start=2):
             try:
                 # Normalize CSV aliases so the validator sees consistent keys
                 if 'item_name' in row and 'name' not in row:
                     row['name'] = row.pop('item_name')
-
                 item_name = row.get('name', '').strip()
                 raw_category = str(row.get('category', '')).strip().lower()
                 _, item_errors = CatalogValidator().validate_csv_row(row, row_number)
@@ -558,14 +544,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     if not dimensions_valid:
                         item_errors.append(f"{label}: {dimensions_error}")
                     resolved_images[field_name] = image_file
-
                 try:
                     price = Decimal(str(row.get('price', '0')))
                     if not price.is_finite():
                         price = Decimal('0.00')
                 except (InvalidOperation, ValueError):
                     price = Decimal('0.00')
-                
                 item = CatalogItem.objects.create(
                     name=item_name, description=row.get('description', ''),
                     category=category_map.get(raw_category, raw_category),
@@ -579,23 +563,20 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     batch=batch, status='rejected' if item_errors else 'processing',
                     rejection_reasons=item_errors
                 )
-
                 if not item_errors:
                     for field_name, image_file in resolved_images.items():
                         image_file.seek(0)
                         getattr(item, field_name).save(f"{batch_id}_{row_number}_{field_name}.jpg", image_file, save=False)
-                item.save()
+                    item.save()
             except Exception as e:
                 logger.error(f"Error processing row {row_number}: {e}", exc_info=True)
-
         UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
-
         return Response({
             'batch_id': batch_id, 'status': 'processing',
             'message': f'Batch {batch_id} accepted for processing.',
             'total_items': len(rows)
         }, status=status.HTTP_202_ACCEPTED)
-    
+
     @action(detail=False, methods=['get'], permission_classes=[IsSeller], url_path='batch-report')
     def batch_report(self, request):
         batch_id = request.query_params.get('batch_id')
@@ -609,12 +590,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
             except Exception:
                 return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(UploadBatchSerializer(batch).data)
-    
+
     @action(detail=False, methods=['get'], permission_classes=[IsSeller])
     def my_listings(self, request):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
         return Response(CatalogItemSerializer(items, many=True).data)
-    
+
     # COMBINED ROUTE: Handles GET/PUT/PATCH/DELETE + File Uploads (FR-4.5 / FR-4.6 / FR-4.7)
     @extend_schema(
         summary="Manage a specific seller listing",
@@ -624,24 +605,21 @@ class CatalogViewSet(viewsets.ModelViewSet):
         tags=['Seller Listings']
     )
     @action(
-        detail=False, 
-        methods=['get', 'put', 'patch', 'delete'], 
-        permission_classes=[IsSeller], 
+        detail=False,
+        methods=['get', 'put', 'patch', 'delete'],
+        permission_classes=[IsSeller],
         url_path='my-listings/(?P<item_id>[^/.]+)',
         parser_classes=[parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
     )
     def my_listing_manage(self, request, item_id=None):
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
-        
         try:
             item = CatalogItem.objects.get(id=item_id, seller=request.user)
         except CatalogItem.DoesNotExist:
             return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
-        
         if request.method == 'GET':
             return Response(CatalogItemSerializer(item).data)
-        
         elif request.method == 'DELETE':
             # FR-4.6: Explicit storage.delete calls (post_delete signal also handles this as a safety net)
             for field in ('front_image', 'side_image', 'rear_image'):
@@ -650,30 +628,25 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     image.delete(save=False)
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        
         elif request.method in ['PUT', 'PATCH']:
-            # FR-4.7: Any edited/re-uploaded item must return to status "processing" 
+            # FR-4.7: Any edited/re-uploaded item must return to status "processing"
             # and re-enter the validation pipeline.
             item.status = 'processing'
             item.rejection_reasons = []
             item.save()
-
             image_fields = ('front_image', 'side_image', 'rear_image')
             payload = request.data.copy()
             replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
             for field in image_fields:
                 payload.pop(field, None)
-
             serializer = CatalogItemSerializer(
                 item, data=payload, partial=request.method == 'PATCH'
             )
             # validate_size inside the serializer enforces the SML-only rule here.
             serializer.is_valid(raise_exception=True)
-            
             # Save text fields first
             updated = serializer.save()
             validator = CatalogValidator()
-            
             # Process any new images
             processed_images = {}
             for field, image_file in replacement_images.items():
@@ -682,7 +655,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     updated.rejection_reasons = ['Image must not exceed 5 MB.']
                     updated.save()
                     return Response({field: 'Image must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
-                
                 format_valid, format_error = validator.validate_image_format(image_file)
                 dimensions_valid, dimensions_error = validator.check_image_dimensions(image_file)
                 if not format_valid or not dimensions_valid:
@@ -690,7 +662,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     updated.rejection_reasons = [format_error or dimensions_error]
                     updated.save()
                     return Response({field: format_error or dimensions_error}, status=status.HTTP_400_BAD_REQUEST)
-                
                 image_file.seek(0)
                 try:
                     processed_images[field] = validator.process_image_with_rembg(image_file)
@@ -699,7 +670,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     updated.rejection_reasons = [str(error)]
                     updated.save()
                     return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
                 # Side/Rear orientation validation on re-upload
                 if field in ('side_image', 'rear_image'):
                     view_label = 'Side' if field == 'side_image' else 'Rear'
@@ -711,7 +681,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         updated.rejection_reasons = [orient_msg]
                         updated.save()
                         return Response({field: orient_msg}, status=status.HTTP_400_BAD_REQUEST)
-
             # FR-4.5: Delete old GridFS objects before saving new file references
             old_image_names = {
                 field: getattr(updated, field).name for field in processed_images
@@ -726,7 +695,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 old_name = old_image_names.get(field)
                 if old_name:
                     getattr(updated, field).storage.delete(old_name)
-
             # Re-validate color if front image or color changed, OR if the item was previously rejected
             needs_color_check = (
                 'color_family' in serializer.validated_data
@@ -734,14 +702,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 or 'front_image' in processed_images
                 or item.status == 'rejected'
             )
-            
             if needs_color_check:
                 front_image = processed_images.get('front_image') or updated.front_image
                 if front_image:
                     front_image.seek(0)
                     front_color = validator.extract_dominant_color(front_image)
                     declared_color = serializer.validated_data.get('color', updated.color)
-                    
                     color_valid, color_message = validator.validate_color_alignment(
                         declared_color, front_color
                     )
@@ -750,22 +716,20 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         updated.rejection_reasons = [color_message]
                         updated.save()
                         return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
-                    
                     updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
                         front_color, updated.color_family
                     )
-
             # If we reach here, validation passed
             updated.status = 'active'
             updated.rejection_reasons = []
             updated.save()
-            
             return Response(CatalogItemSerializer(updated).data)
-    
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'download_template', 'download_package']:
             return [AllowAny()]
         return [IsSeller()]
+
 
 # ==========================================
 # Startup Sweep (run on app boot)

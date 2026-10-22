@@ -1,5 +1,4 @@
 """Serializers for shopping carts, checkout, and order history."""
-
 from decimal import Decimal
 
 from rest_framework import serializers
@@ -19,7 +18,6 @@ def _image_url(image_field):
 
 class CartItemSerializer(serializers.ModelSerializer):
     """Current catalog details for a cart entry."""
-
     id = serializers.CharField(read_only=True)
     catalog_item = serializers.CharField(source='item_id', read_only=True)
     name = serializers.CharField(source='item.name', read_only=True)
@@ -51,7 +49,6 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 class CartSerializer(serializers.ModelSerializer):
     """Cart contents with a total based on current catalog prices."""
-
     id = serializers.CharField(read_only=True)
     items = CartItemSerializer(many=True, read_only=True)
     total_amount = serializers.SerializerMethodField()
@@ -75,7 +72,6 @@ class CartSerializer(serializers.ModelSerializer):
 
 class AddToCartSerializer(serializers.Serializer):
     """Validate a catalog item and quantity for adding to a cart."""
-
     catalog_item = serializers.CharField()
     quantity = serializers.IntegerField(min_value=1, default=1)
 
@@ -92,7 +88,6 @@ class UpdateCartItemSerializer(AddToCartSerializer):
 
 class RemoveSelectedCartItemsSerializer(serializers.Serializer):
     """Validate catalog item identifiers selected for removal."""
-
     catalog_items = serializers.ListField(
         child=serializers.CharField(), allow_empty=False
     )
@@ -100,7 +95,6 @@ class RemoveSelectedCartItemsSerializer(serializers.Serializer):
 
 class OrderItemSerializer(serializers.ModelSerializer):
     """Immutable item details captured when an order was placed."""
-
     id = serializers.CharField(read_only=True)
     catalog_item = serializers.CharField(source='catalog_item_id', read_only=True, allow_null=True)
 
@@ -115,7 +109,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class CheckoutItemSerializer(serializers.Serializer):
     """Validate selected cart product options to snapshot on the order."""
-
     catalog_item = serializers.CharField()
     size = serializers.CharField(max_length=32, allow_blank=True, required=False)
     color = serializers.CharField(max_length=64, allow_blank=True, required=False)
@@ -123,23 +116,23 @@ class CheckoutItemSerializer(serializers.Serializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     """Read-only order representation, including purchase-time item snapshots."""
-
     id = serializers.CharField(read_only=True)
+    # NEW: expose the stored order number to the frontend
+    order_number = serializers.CharField(read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
         fields = (
-            'id', 'status', 'recipient_name', 'recipient_email', 'contact_number',
-            'shipping_address', 'payment_method', 'transaction_ref',
-            'shipping_fee', 'total_amount', 'created_at', 'items',
+            'id', 'order_number', 'status', 'recipient_name', 'recipient_email',
+            'contact_number', 'shipping_address', 'payment_method',
+            'transaction_ref', 'shipping_fee', 'total_amount', 'created_at', 'items',
         )
         read_only_fields = fields
 
 
 class CheckoutSerializer(serializers.Serializer):
     """Validate the customer-provided shipping and payment details."""
-
     recipient_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     recipient_email = serializers.EmailField(required=False, allow_blank=True)
     contact_number = serializers.CharField(max_length=32, required=False, allow_blank=True)

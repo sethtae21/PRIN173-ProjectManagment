@@ -1,80 +1,104 @@
+import logging
 import os
+import time
+
+from bson.objectid import ObjectId
+from django.core.files.base import ContentFile
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
+from gridfs import GridFS
+from pymongo import MongoClient
+from pymongo.uri_parser import parse_uri
+
+logger = logging.getLogger(__name__)
+
+FALLBACK_DB_NAME = "fitfusion"
+SETUP_RETRY_SECONDS = 30
 
 
 @deconstructible
 class GridFSStorage(Storage):
+    """GridFS storage with retryable setup.
+
+    The old version cached a failed connection attempt forever
+    (_use_gridfs = False), so one transient Atlas hiccup on the first
+    /media/ request made every product image 404 until the server was
+    restarted. This version retries at most once per SETUP_RETRY_SECONDS
+    and always resolves an explicit database name (URI path, else
+    FALLBACK_DB_NAME) so get_database() can never raise ConfigurationError
+    on a path-less URI.
     """
-    Custom storage class to store files in MongoDB GridFS.
-    """
+
     def __init__(self):
-        # Lazy initialization: Do not connect yet to avoid migration serialization errors
         self._client = None
         self._db = None
         self._fs = None
-        self._use_gridfs = None
+        self._last_setup_attempt = 0.0
 
     def _setup(self):
-        """Connect to MongoDB only when needed"""
-        if self._fs is None and self._use_gridfs is None:
-            try:
-                from pymongo import MongoClient
-                from gridfs import GridFS
-                mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
-                # Short timeout to fail fast if MongoDB is unreachable
-                self._client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
-                self._client.admin.command('ping')
-                self._db = self._client.get_database()
-                self._fs = GridFS(self._db)
-                self._use_gridfs = True
-            except Exception:
-                self._use_gridfs = False
+        if self._fs is not None:
+            return True
+        now = time.monotonic()
+        if now - self._last_setup_attempt < SETUP_RETRY_SECONDS:
+            return False
+        self._last_setup_attempt = now
+        try:
+            mongo_uri = os.getenv("MONGODB_URI") or f"mongodb://localhost:27017/{FALLBACK_DB_NAME}"
+            db_name = parse_uri(mongo_uri).get("database") or FALLBACK_DB_NAME
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+            client.admin.command("ping")
+            self._client = client
+            self._db = client.get_database(db_name)
+            self._fs = GridFS(self._db)
+            logger.info("GridFS storage connected (db=%s).", db_name)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "GridFS setup failed (retry in %ss): %s", SETUP_RETRY_SECONDS, exc
+            )
+            self._client = None
+            self._db = None
+            self._fs = None
+            return False
 
-    def _open(self, name, mode='rb'):
-        """Open a file from GridFS for reading"""
-        self._setup()
-        if self._use_gridfs:
-            from django.core.files.base import ContentFile
-            try:
-                from bson.objectid import ObjectId
-                file = self._fs.find_one({'_id': ObjectId(name)})
-            except Exception:
-                file = self._fs.find_one({'filename': name})
-            if file:
-                return ContentFile(file.read())
-            raise FileNotFoundError(f"File {name} not found in GridFS")
-        raise FileNotFoundError(f"GridFS not available and file {name} not found")
+    def _require_fs(self):
+        if self._fs is None and not self._setup():
+            raise FileNotFoundError("GridFS is not reachable right now")
+        return self._fs
+
+    def _open(self, name, mode="rb"):
+        fs = self._require_fs()
+        file = fs.find_one({"_id": ObjectId(name)}) if ObjectId.is_valid(name) else None
+        if file is None:
+            file = fs.find_one({"filename": name})
+        if file:
+            return ContentFile(file.read())
+        raise FileNotFoundError(f"File {name} not found in GridFS")
 
     def _save(self, name, content):
-        self._setup()
-        if self._use_gridfs:
-            file_id = self._fs.put(content, filename=name)
-            return str(file_id)
-        raise Exception("GridFS not available - cannot save file")
+        fs = self._require_fs()
+        return str(fs.put(content, filename=name))
 
     def exists(self, name):
-        self._setup()
-        if self._use_gridfs:
-            return self._fs.exists({'filename': name})
-        return False
+        try:
+            fs = self._require_fs()
+        except FileNotFoundError:
+            return False
+        return bool(fs.exists({"filename": name}))
 
     def url(self, name):
-        return f'/media/{name}'
+        return f"/media/{name}"
 
     def delete(self, name):
-        self._setup()
-        if self._use_gridfs:
-            try:
-                from bson.objectid import ObjectId
-                file = self._fs.find_one({'_id': ObjectId(name)}) if ObjectId.is_valid(name) else None
-                if file is None:
-                    file = self._fs.find_one({'filename': name})
-                if file:
-                    self._fs.delete(file._id)
-            except Exception:
-                pass
+        try:
+            fs = self._require_fs()
+        except FileNotFoundError:
+            return
+        file = fs.find_one({"_id": ObjectId(name)}) if ObjectId.is_valid(name) else None
+        if file is None:
+            file = fs.find_one({"filename": name})
+        if file:
+            fs.delete(file._id)
 
 
-# Create the singleton instance
 gridfs_storage = GridFSStorage()

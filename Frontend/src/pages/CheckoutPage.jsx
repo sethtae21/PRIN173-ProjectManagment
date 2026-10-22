@@ -3,18 +3,15 @@ import {
   useMemo,
   useState,
 } from "react";
-
 import {
   Link,
   useNavigate,
 } from "react-router-dom";
-
 import { API_URL, authAPI, checkoutAPI } from "../services/api";
 import "./css/CheckoutPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
 const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
-
 const provinces = [
   "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
   "Albay", "Antique", "Apayao", "Aurora", "Basilan",
@@ -65,7 +62,6 @@ function readStoredArray(key) {
 function loadCheckoutItems() {
   const checkoutItems = readStoredArray(CHECKOUT_STORAGE_KEY);
   if (checkoutItems.length > 0) return checkoutItems;
-
   const selectedCartItems = readStoredArray(CART_STORAGE_KEY).filter(
     (item) => item.selected !== false
   );
@@ -74,14 +70,12 @@ function loadCheckoutItems() {
 
 function CheckoutPage() {
   const navigate = useNavigate();
-
   const [checkoutItems] = useState(loadCheckoutItems);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
-
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -93,14 +87,11 @@ function CheckoutPage() {
     paymentMethod: "Cash on Delivery",
   });
 
-  // Fetch user profile data from backend on component mount
   useEffect(() => {
     async function fetchUserProfile() {
       try {
         const token = localStorage.getItem("access_token");
-        
         if (!token) {
-          // Fallback to localStorage if no token
           const storedUser = localStorage.getItem("fitfusion-user");
           if (storedUser) {
             const userData = JSON.parse(storedUser);
@@ -118,18 +109,15 @@ function CheckoutPage() {
           setIsLoadingUserData(false);
           return;
         }
-
         const response = await fetch(`${API_URL}/auth/user/profile/`, {
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });
-
         if (response.ok) {
           const profileResponse = await response.json();
           const userData = profileResponse.user || profileResponse;
-          
           setForm((prevForm) => ({
             ...prevForm,
             fullName: userData.full_name || userData.name || "",
@@ -141,7 +129,6 @@ function CheckoutPage() {
             postalCode: userData.postal_code || userData.postalCode || userData.address?.postal_code || "",
           }));
         } else {
-          // Fallback to localStorage
           const storedUser = localStorage.getItem("fitfusion-user");
           if (storedUser) {
             const userData = JSON.parse(storedUser);
@@ -159,7 +146,6 @@ function CheckoutPage() {
         }
       } catch (error) {
         console.error("Failed to fetch user profile:", error);
-        // Fallback to localStorage
         const storedUser = localStorage.getItem("fitfusion-user");
         if (storedUser) {
           const userData = JSON.parse(storedUser);
@@ -178,7 +164,6 @@ function CheckoutPage() {
         setIsLoadingUserData(false);
       }
     }
-
     fetchUserProfile();
   }, []);
 
@@ -190,19 +175,17 @@ function CheckoutPage() {
   }, [checkoutItems]);
 
   const productCount = checkoutItems.length;
-
   const originalSubtotal = useMemo(
     () =>
       checkoutItems.reduce(
         (total, item) =>
           total +
           Number(item.originalPrice || item.price || 0) *
-            Number(item.quantity || 1),
+          Number(item.quantity || 1),
         0
       ),
     [checkoutItems]
   );
-
   const discountedSubtotal = useMemo(
     () =>
       checkoutItems.reduce(
@@ -212,7 +195,6 @@ function CheckoutPage() {
       ),
     [checkoutItems]
   );
-
   const productDiscount = Math.max(0, originalSubtotal - discountedSubtotal);
   const shippingFee = discountedSubtotal >= 1500 ? 0 : 80;
   const total = discountedSubtotal + shippingFee;
@@ -223,7 +205,6 @@ function CheckoutPage() {
       ...currentForm,
       [name]: value,
     }));
-
     if (errors[name]) {
       setErrors((currentErrors) => ({
         ...currentErrors,
@@ -234,72 +215,59 @@ function CheckoutPage() {
 
   function validateForm() {
     const nextErrors = {};
-
     if (!form.fullName.trim()) {
       nextErrors.fullName = "Please enter the recipient's full name.";
     }
-
     if (!form.email.trim()) {
       nextErrors.email = "Please enter your email address.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       nextErrors.email = "Please enter a valid email address.";
     }
-
     if (!form.contactNumber.trim()) {
       nextErrors.contactNumber = "Please enter your contact number.";
     } else if (!/^(09|\+639)\d{9}$/.test(form.contactNumber.replace(/\s/g, ""))) {
       nextErrors.contactNumber = "Use a valid Philippine mobile number.";
     }
-
     if (!form.street.trim()) {
       nextErrors.street = "Please enter your street or building address.";
     }
-
     if (!form.city.trim()) {
       nextErrors.city = "Please enter your barangay or city.";
     }
-
     if (!form.province) {
       nextErrors.province = "Please select your province.";
     }
-
     if (!form.postalCode.trim()) {
       nextErrors.postalCode = "Please enter your postal code.";
     } else if (!/^\d{4}$/.test(form.postalCode)) {
       nextErrors.postalCode = "Postal code must contain 4 digits.";
     }
-
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
   function handleReviewOrder(event) {
     event.preventDefault();
-
     if (!validateForm()) {
       const firstError = document.querySelector(".checkout-field-error");
       firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-
     setShowConfirmation(true);
   }
 
   function removePurchasedItemsFromCart() {
     const currentCart = readStoredArray(CART_STORAGE_KEY);
-
     const remainingCart = currentCart.filter((cartItem) => {
       return !checkoutItems.some(
         (checkoutItem) =>
           String(checkoutItem.productId ?? checkoutItem.id) ===
-            String(cartItem.productId ?? cartItem.id) &&
+          String(cartItem.productId ?? cartItem.id) &&
           checkoutItem.size === cartItem.size &&
           checkoutItem.color === cartItem.color
       );
     });
-
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(remainingCart));
-
     window.dispatchEvent(
       new CustomEvent("fitfusion-cart-updated", {
         detail: { cart: remainingCart, quantity: remainingCart.length },
@@ -311,7 +279,6 @@ function CheckoutPage() {
     if (isSubmitting || checkoutItems.length === 0) return;
     setIsSubmitting(true);
     setOrderError("");
-
     try {
       await authAPI.updateProfile({
         full_name: form.fullName.trim(),
@@ -321,7 +288,6 @@ function CheckoutPage() {
         province: form.province,
         postal_code: form.postalCode.trim(),
       });
-
       const address = [
         form.street.trim(),
         form.city.trim(),
@@ -340,7 +306,6 @@ function CheckoutPage() {
           color: item.color || item.selectedColor || "",
         })),
       });
-
       const orderItems = order.items.map((item) => {
         const checkoutItem = checkoutItems.find(
           (candidate) =>
@@ -357,10 +322,16 @@ function CheckoutPage() {
           quantity: item.quantity,
           size: item.size || checkoutItem?.size || "M",
           color: item.color || checkoutItem?.color || "Default",
+          image:
+            checkoutItem?.image ||
+            checkoutItem?.imageUrl ||
+            checkoutItem?.frontImageUrl ||
+            "",
         };
       });
       const newOrder = {
         id: order.id,
+        orderNumber: order.order_number || order.id,
         placedAt: new Date(order.created_at).toLocaleDateString("en-PH", {
           year: "numeric",
           month: "long",
@@ -385,7 +356,6 @@ function CheckoutPage() {
         shippingFee: Number(order.shipping_fee),
         total: Number(order.total_amount),
       };
-
       localStorage.setItem("fitfusion-last-order", JSON.stringify(newOrder));
       const storedOrders = readStoredArray("fitfusion-orders");
       localStorage.setItem(
@@ -397,7 +367,11 @@ function CheckoutPage() {
       setShowConfirmation(false);
       navigate("/shopper/order-confirmation", {
         replace: true,
-        state: { orderId: order.id, total: Number(order.total_amount) },
+        state: {
+          orderId: order.id,
+          orderNumber: order.order_number || order.id,
+          total: Number(order.total_amount),
+        },
       });
     } catch (error) {
       console.error("Failed to place order:", error);
@@ -443,7 +417,6 @@ function CheckoutPage() {
         <Link to="/shopper/cart" className="checkout-return-link">
           ← Return to Shopping Cart
         </Link>
-
         <button
           type="button"
           className="checkout-cart-count"
@@ -458,7 +431,6 @@ function CheckoutPage() {
           <strong>{productCount}</strong>
         </button>
       </div>
-
       <div className="checkout-content">
         <section className="checkout-introduction">
           <div>
@@ -468,7 +440,6 @@ function CheckoutPage() {
               Review your information before submitting the simulated order.
             </span>
           </div>
-
           <div className="checkout-progress">
             <div className="complete">
               <strong>1</strong>
@@ -484,7 +455,6 @@ function CheckoutPage() {
             </div>
           </div>
         </section>
-
         <form className="checkout-grid" onSubmit={handleReviewOrder} noValidate>
           <div className="checkout-form-column">
             <section className="checkout-form-card">
@@ -495,7 +465,6 @@ function CheckoutPage() {
                   <h2>Recipient and contact</h2>
                 </div>
               </div>
-
               <div className="checkout-fields-grid">
                 <label className="checkout-full-field">
                   <span>Full Name *</span>
@@ -513,7 +482,6 @@ function CheckoutPage() {
                     </small>
                   )}
                 </label>
-
                 <label>
                   <span>Email Address *</span>
                   <input
@@ -530,7 +498,6 @@ function CheckoutPage() {
                     </small>
                   )}
                 </label>
-
                 <label>
                   <span>Contact Number *</span>
                   <input
@@ -549,7 +516,6 @@ function CheckoutPage() {
                 </label>
               </div>
             </section>
-
             <section className="checkout-form-card">
               <div className="checkout-card-heading">
                 <strong>2</strong>
@@ -558,7 +524,6 @@ function CheckoutPage() {
                   <h2>Where should we deliver?</h2>
                 </div>
               </div>
-
               <div className="checkout-fields-grid">
                 <label className="checkout-full-field">
                   <span>Street, Building, or Unit *</span>
@@ -576,7 +541,6 @@ function CheckoutPage() {
                     </small>
                   )}
                 </label>
-
                 <label>
                   <span>Barangay / City *</span>
                   <input
@@ -593,7 +557,6 @@ function CheckoutPage() {
                     </small>
                   )}
                 </label>
-
                 <label>
                   <span>Province *</span>
                   <select
@@ -615,7 +578,6 @@ function CheckoutPage() {
                     </small>
                   )}
                 </label>
-
                 <label>
                   <span>Postal Code *</span>
                   <input
@@ -636,7 +598,6 @@ function CheckoutPage() {
                 </label>
               </div>
             </section>
-
             <section className="checkout-form-card">
               <div className="checkout-card-heading">
                 <strong>3</strong>
@@ -645,7 +606,6 @@ function CheckoutPage() {
                   <h2>Select your payment</h2>
                 </div>
               </div>
-
               <div className="checkout-payment-options">
                 <label
                   className={
@@ -664,7 +624,6 @@ function CheckoutPage() {
                     <span>Pay when your products arrive.</span>
                   </div>
                 </label>
-
                 <label
                   className={
                     form.paymentMethod === "Mock E-Wallet" ? "selected" : ""
@@ -685,16 +644,13 @@ function CheckoutPage() {
               </div>
             </section>
           </div>
-
           <aside className="checkout-order-review">
             <p className="checkout-review-label">ORDER REVIEW</p>
             <h2>Your products</h2>
             <span>
               {productCount} {productCount === 1 ? "product" : "products"}
             </span>
-
             <div className="checkout-divider" />
-
             <div className="checkout-products">
               {checkoutItems.map((item, index) => (
                 <article
@@ -702,21 +658,22 @@ function CheckoutPage() {
                   key={item.id || `${item.productId}-${index}`}
                 >
                   <div className="checkout-product-image">
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} />
+                    {item.image || item.imageUrl ? (
+                      <img
+                        src={item.image || item.imageUrl}
+                        alt={item.name}
+                      />
                     ) : (
                       <strong>{(item.name || "Product").charAt(0)}</strong>
                     )}
                     <small>×{Number(item.quantity || 1)}</small>
                   </div>
-
                   <div className="checkout-product-copy">
                     <span>{item.sellerName || "FitFusion Seller"}</span>
                     <strong>{item.name}</strong>
                     <small>Size: {item.size || "M"}</small>
                     <small>Color: {item.color || "Default"}</small>
                   </div>
-
                   <strong className="checkout-product-price">
                     {formatCurrency(
                       Number(item.price || 0) * Number(item.quantity || 1)
@@ -725,33 +682,26 @@ function CheckoutPage() {
                 </article>
               ))}
             </div>
-
             <div className="checkout-divider" />
-
             <div className="checkout-summary-row">
               <span>Subtotal</span>
               <strong>{formatCurrency(originalSubtotal)}</strong>
             </div>
-
             <div className="checkout-summary-row discount">
               <span>Product discount</span>
               <strong>−{formatCurrency(productDiscount)}</strong>
             </div>
-
             <div className="checkout-summary-row">
               <span>Shipping fee</span>
               <strong>
                 {shippingFee === 0 ? "FREE" : formatCurrency(shippingFee)}
               </strong>
             </div>
-
             <div className="checkout-divider" />
-
             <div className="checkout-total">
               <span>Total</span>
               <strong>{formatCurrency(total)}</strong>
             </div>
-
             <button
               type="submit"
               className="checkout-place-order-button"
@@ -759,14 +709,12 @@ function CheckoutPage() {
             >
               Review and Place Order
             </button>
-
             <p className="checkout-prototype-note">
               This is a simulated checkout. No real payment will be charged.
             </p>
           </aside>
         </form>
       </div>
-
       {showConfirmation && (
         <div
           className="checkout-modal-backdrop"
@@ -786,7 +734,6 @@ function CheckoutPage() {
               Please confirm that the delivery information and selected products
               are correct.
             </span>
-
             <div className="checkout-modal-summary">
               <div>
                 <span>Products</span>
@@ -801,7 +748,6 @@ function CheckoutPage() {
                 <strong>{formatCurrency(total)}</strong>
               </div>
             </div>
-
             <div className="checkout-modal-actions">
               <button
                 type="button"
@@ -810,7 +756,6 @@ function CheckoutPage() {
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 className="checkout-confirm-button"
