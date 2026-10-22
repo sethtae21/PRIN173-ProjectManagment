@@ -3,20 +3,16 @@ import {
   useMemo,
   useState,
 } from "react";
-
 import {
   Link,
   useNavigate,
 } from "react-router-dom";
-
 import { API_URL, cartAPI } from "../services/api";
 import "./css/ShoppingCartPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
 const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
 const MAX_QUANTITY = 10;
-
-// REMOVED defaultCartItems to prevent fake data from appearing
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
@@ -30,10 +26,8 @@ function normalizeCartItem(item, index) {
   const productId = String(
     item.productId ?? item.id ?? index + 1
   );
-
   const size = item.size || item.selectedSize || "M";
   const color = item.color || item.selectedColor || "Default";
-
   return {
     id:
       item.id ||
@@ -62,43 +56,36 @@ function normalizeCartItem(item, index) {
       Array.isArray(item.sizes) &&
       item.sizes.length > 0
         ? item.sizes
-        : [size], // Fallback to current size if no array
+        : [size],
     colors:
       Array.isArray(item.colors) &&
       item.colors.length > 0
         ? item.colors
         : [color],
     selected: item.selected !== false,
-    // FIX: Map imageUrl (from CatalogPage) to image (for Cart display)
     image: item.imageUrl || item.image || item.frontImageUrl || "",
   };
 }
 
 function mergeDuplicateItems(items) {
   const mergedItems = new Map();
-
   items.forEach((item, index) => {
     const normalizedItem =
       normalizeCartItem(item, index);
-
     const key = [
       normalizedItem.productId,
       normalizedItem.size,
       normalizedItem.color,
     ].join("-");
-
     if (!mergedItems.has(key)) {
       mergedItems.set(key, {
         ...normalizedItem,
         id: key,
       });
-
       return;
     }
-
     const existingItem =
       mergedItems.get(key);
-
     mergedItems.set(key, {
       ...existingItem,
       quantity: Math.min(
@@ -111,7 +98,6 @@ function mergeDuplicateItems(items) {
         normalizedItem.selected,
     });
   });
-
   return Array.from(mergedItems.values());
 }
 
@@ -120,17 +106,13 @@ function loadCartItems() {
     const storedCart = localStorage.getItem(
       CART_STORAGE_KEY
     );
-
     if (!storedCart) {
-      return []; // Return empty array instead of mock data
+      return [];
     }
-
     const parsedCart = JSON.parse(storedCart);
-
     if (!Array.isArray(parsedCart)) {
       return [];
     }
-
     return mergeDuplicateItems(parsedCart);
   } catch {
     return [];
@@ -139,23 +121,20 @@ function loadCartItems() {
 
 function ShoppingCartPage() {
   const navigate = useNavigate();
-
   const [cartItems, setCartItems] =
     useState(loadCartItems);
-
   const [isCartLoading, setIsCartLoading] = useState(true);
   const [isCartBusy, setIsCartBusy] = useState(false);
   const [cartLoadError, setCartLoadError] = useState("");
   const [notice, setNotice] = useState("");
+  const [pendingRemoveId, setPendingRemoveId] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
-
     async function loadDatabaseCart() {
       try {
         const cart = await cartAPI.get();
         if (!isMounted) return;
-
         const savedItems = loadCartItems();
         const items = cart.items.map((item, index) => {
           const previousItem = savedItems.find(
@@ -168,7 +147,6 @@ function ShoppingCartPage() {
               ? item.front_image_url
               : `${API_URL}${item.front_image_url.startsWith("/") ? "" : "/"}${item.front_image_url}`
             : "";
-
           return normalizeCartItem(
             {
               ...previousItem,
@@ -183,7 +161,6 @@ function ShoppingCartPage() {
             index
           );
         });
-
         setCartItems(items);
         setCartLoadError("");
       } catch (error) {
@@ -198,21 +175,17 @@ function ShoppingCartPage() {
         if (isMounted) setIsCartLoading(false);
       }
     }
-
     loadDatabaseCart();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Sync cart to localStorage and dispatch event for header update
   useEffect(() => {
     localStorage.setItem(
       CART_STORAGE_KEY,
       JSON.stringify(cartItems)
     );
-
-    // Dispatch event so the header cart icon updates immediately
     window.dispatchEvent(
       new CustomEvent(
         "fitfusion-cart-updated",
@@ -230,18 +203,14 @@ function ShoppingCartPage() {
     if (!notice) {
       return undefined;
     }
-
     const timeout = window.setTimeout(() => {
       setNotice("");
     }, 2500);
-
     return () =>
       window.clearTimeout(timeout);
   }, [notice]);
 
-  // Calculate total unique items
   const cartProductCount = cartItems.length;
-
   const selectedItems = useMemo(
     () =>
       cartItems.filter(
@@ -249,56 +218,47 @@ function ShoppingCartPage() {
       ),
     [cartItems]
   );
-
   const selectedProductCount =
     selectedItems.length;
-
   const subtotal = useMemo(
     () =>
       selectedItems.reduce(
         (total, item) =>
           total +
           Number(item.price) *
-            Number(item.quantity),
+          Number(item.quantity),
         0
       ),
     [selectedItems]
   );
-
   const originalSubtotal = useMemo(
     () =>
       selectedItems.reduce(
         (total, item) =>
           total +
           Number(item.originalPrice) *
-            Number(item.quantity),
+          Number(item.quantity),
         0
       ),
     [selectedItems]
   );
-
   const productDiscount = Math.max(
     0,
     originalSubtotal - subtotal
   );
-
   const freeShippingThreshold = 1500;
-
   const shippingFee =
     selectedItems.length === 0
       ? 0
       : subtotal >= freeShippingThreshold
-        ? 0
-        : 80;
-
+      ? 0
+      : 80;
   const amountUntilFreeShipping =
     Math.max(
       0,
       freeShippingThreshold - subtotal
     );
-
   const total = subtotal + shippingFee;
-
   const allSelected =
     cartItems.length > 0 &&
     cartItems.every(
@@ -333,7 +293,6 @@ function ShoppingCartPage() {
 
   function handleSelectAll() {
     const shouldSelect = !allSelected;
-
     setCartItems((currentItems) =>
       currentItems.map((item) => ({
         ...item,
@@ -348,6 +307,12 @@ function ShoppingCartPage() {
   ) {
     const item = cartItems.find((cartItem) => cartItem.id === itemId);
     if (!item || isCartBusy) return;
+
+    // When decreasing from quantity 1, ask for confirmation to remove
+    if (change < 0 && item.quantity <= 1) {
+      setPendingRemoveId(itemId);
+      return;
+    }
 
     const nextQuantity = Math.min(
       MAX_QUANTITY,
@@ -374,10 +339,36 @@ function ShoppingCartPage() {
     }
   }
 
+  async function confirmRemoveItem() {
+    if (!pendingRemoveId || isCartBusy) return;
+    const item = cartItems.find((cartItem) => cartItem.id === pendingRemoveId);
+    if (!item) {
+      setPendingRemoveId(null);
+      return;
+    }
+    setIsCartBusy(true);
+    try {
+      await cartAPI.removeItem(item.productId);
+      setCartItems((currentItems) =>
+        currentItems.filter((cartItem) => cartItem.id !== pendingRemoveId)
+      );
+      setNotice(`${item.name} was removed from your cart.`);
+    } catch (error) {
+      console.error("Failed to remove cart item:", error);
+      setNotice("We couldn't remove the product. Please try again.");
+    } finally {
+      setIsCartBusy(false);
+      setPendingRemoveId(null);
+    }
+  }
+
+  function cancelRemoveItem() {
+    setPendingRemoveId(null);
+  }
+
   async function handleRemoveItem(itemId) {
     const item = cartItems.find((cartItem) => cartItem.id === itemId);
     if (!item || isCartBusy) return;
-
     setIsCartBusy(true);
     try {
       await cartAPI.removeItem(item.productId);
@@ -398,12 +389,9 @@ function ShoppingCartPage() {
       setNotice(
         "Please select a product to remove."
       );
-
       return;
     }
-
     if (isCartBusy) return;
-
     const selectedIds = new Set(
       selectedItems.map((item) => item.id)
     );
@@ -429,17 +417,18 @@ function ShoppingCartPage() {
       setNotice(
         "Please select at least one product before checkout."
       );
-
       return;
     }
-
     localStorage.setItem(
       CHECKOUT_STORAGE_KEY,
       JSON.stringify(selectedItems)
     );
-
     navigate("/shopper/checkout");
   }
+
+  const pendingItem = pendingRemoveId
+    ? cartItems.find((item) => item.id === pendingRemoveId)
+    : null;
 
   return (
     <main className="shopping-cart-page">
@@ -451,13 +440,11 @@ function ShoppingCartPage() {
           {notice}
         </div>
       )}
-
       {cartLoadError && (
         <div className="shopping-cart-toast" role="alert">
           {cartLoadError}
         </div>
       )}
-
       <div className="shopping-cart-toolbar">
         <Link
           to="/shopper/catalog"
@@ -465,7 +452,6 @@ function ShoppingCartPage() {
         >
           ← Continue Shopping
         </Link>
-
         <div
           className="shopping-cart-count"
           aria-label={`${cartProductCount} products in cart`}
@@ -478,29 +464,23 @@ function ShoppingCartPage() {
             <circle cx="10" cy="20" r="1" />
             <circle cx="18" cy="20" r="1" />
           </svg>
-
           <strong>{cartProductCount}</strong>
         </div>
       </div>
-
       <div className="shopping-cart-content">
         <section className="shopping-cart-intro">
           <div>
             <p>YOUR SELECTED PRODUCTS</p>
-
             <h1>
               Review your shopping bag
             </h1>
-
             <span>
               Select the products you want
               included in your checkout.
             </span>
           </div>
-
           <div className="shopping-cart-item-badge">
             <strong>{cartProductCount}</strong>
-
             <span>
               {cartProductCount === 1
                 ? "item in cart"
@@ -508,7 +488,6 @@ function ShoppingCartPage() {
             </span>
           </div>
         </section>
-
         {isCartLoading ? (
           <section className="shopping-cart-empty" aria-live="polite">
             <p>Loading your saved cart...</p>
@@ -525,14 +504,11 @@ function ShoppingCartPage() {
                 <circle cx="18" cy="20" r="1" />
               </svg>
             </div>
-
             <h2>Your shopping cart is empty</h2>
-
             <p>
               Browse the catalog and add products
               you would like to purchase.
             </p>
-
             <button
               type="button"
               className="shopping-cart-primary-button"
@@ -553,13 +529,10 @@ function ShoppingCartPage() {
                     checked={allSelected}
                     onChange={handleSelectAll}
                   />
-
                   <span>
-                    Select all (
-                    {cartItems.length})
+                    Select all ({cartItems.length})
                   </span>
                 </label>
-
                 <button
                   type="button"
                   className="shopping-cart-remove-selected"
@@ -571,7 +544,6 @@ function ShoppingCartPage() {
                   Remove Selected
                 </button>
               </div>
-
               <div className="shopping-cart-product-list">
                 {cartItems.map((item) => (
                   <article
@@ -589,7 +561,6 @@ function ShoppingCartPage() {
                       }
                       aria-label={`Select ${item.name}`}
                     />
-
                     <button
                       type="button"
                       className="shopping-cart-product-image"
@@ -611,7 +582,6 @@ function ShoppingCartPage() {
                           {item.name.charAt(0)}
                         </span>
                       )}
-
                       {item.originalPrice >
                         item.price && (
                         <small className="cart-discount-badge">
@@ -619,14 +589,13 @@ function ShoppingCartPage() {
                           {Math.round(
                             (1 -
                               item.price /
-                                item.originalPrice) *
+                              item.originalPrice) *
                               100
                           )}
                           %
                         </small>
                       )}
                     </button>
-
                     <div className="shopping-cart-product-info">
                       <Link
                         to={`/shopper/sellers/${item.sellerId}`}
@@ -634,7 +603,6 @@ function ShoppingCartPage() {
                       >
                         {item.sellerName} →
                       </Link>
-
                       <button
                         type="button"
                         className="shopping-cart-product-name"
@@ -646,16 +614,13 @@ function ShoppingCartPage() {
                       >
                         {item.name}
                       </button>
-
                       <p>{item.category}</p>
-
                       <div className="shopping-cart-price">
                         <strong>
                           {formatCurrency(
                             item.price
                           )}
                         </strong>
-
                         {item.originalPrice >
                           item.price && (
                           <del>
@@ -665,35 +630,19 @@ function ShoppingCartPage() {
                           </del>
                         )}
                       </div>
-
                       <div className="shopping-cart-product-total">
                         <span>Item total</span>
-
                         <strong>
                           {formatCurrency(
                             item.price *
                               item.quantity
                           )}
                         </strong>
-
-                        <button
-                          type="button"
-                          className="shopping-cart-remove-btn"
-                          onClick={() =>
-                            handleRemoveItem(
-                              item.id
-                            )
-                          }
-                        >
-                          Remove
-                        </button>
                       </div>
                     </div>
-
                     <div className="shopping-cart-options">
                       <label>
                         <span>Size</span>
-
                         <select
                           value={item.size}
                           onChange={(event) =>
@@ -719,10 +668,8 @@ function ShoppingCartPage() {
                           )}
                         </select>
                       </label>
-
                       <label>
                         <span>Color</span>
-
                         <select
                           value={item.color}
                           onChange={(event) =>
@@ -748,10 +695,8 @@ function ShoppingCartPage() {
                           )}
                         </select>
                       </label>
-
                       <div className="shopping-cart-quantity-section">
                         <span>Quantity</span>
-
                         <div className="shopping-cart-quantity">
                           <button
                             type="button"
@@ -761,16 +706,14 @@ function ShoppingCartPage() {
                                 -1
                               )
                             }
-                            disabled={isCartBusy || item.quantity <= 1}
+                            disabled={isCartBusy}
                             aria-label={`Decrease quantity of ${item.name}`}
                           >
                             −
                           </button>
-
                           <strong>
                             {item.quantity}
                           </strong>
-
                           <button
                             type="button"
                             onClick={() =>
@@ -791,36 +734,28 @@ function ShoppingCartPage() {
                 ))}
               </div>
             </section>
-
             <aside className="shopping-cart-summary-card">
               <p className="shopping-cart-summary-label">
                 ORDER SUMMARY
               </p>
-
               <h2>Selected Products</h2>
-
               <p className="shopping-cart-selected-count">
                 {selectedProductCount}{" "}
                 {selectedProductCount === 1
                   ? "product"
                   : "products"}
               </p>
-
               <div className="shopping-cart-summary-divider" />
-
               <div className="shopping-cart-summary-row">
                 <span>Subtotal</span>
-
                 <strong>
                   {formatCurrency(
                     originalSubtotal
                   )}
                 </strong>
               </div>
-
               <div className="shopping-cart-summary-row discount">
                 <span>Product discount</span>
-
                 <strong>
                   −
                   {formatCurrency(
@@ -828,10 +763,8 @@ function ShoppingCartPage() {
                   )}
                 </strong>
               </div>
-
               <div className="shopping-cart-summary-row">
                 <span>Shipping fee</span>
-
                 <strong>
                   {shippingFee === 0 &&
                   selectedItems.length > 0
@@ -841,40 +774,31 @@ function ShoppingCartPage() {
                       )}
                 </strong>
               </div>
-
               <div className="shopping-cart-summary-divider" />
-
               {selectedItems.length > 0 &&
-                amountUntilFreeShipping > 0 && (
-                  <div className="shopping-cart-shipping-notice">
-                    Add{" "}
-                    <strong>
-                      {formatCurrency(
-                        amountUntilFreeShipping
-                      )}
-                    </strong>{" "}
-                    more to receive free
-                    shipping.
-                  </div>
-                )}
-
-              {selectedItems.length > 0 &&
-                amountUntilFreeShipping ===
-                  0 && (
-                  <div className="shopping-cart-shipping-notice qualified">
-                    Your order qualifies for free
-                    shipping.
-                  </div>
-                )}
-
+              amountUntilFreeShipping > 0 ? (
+                <div className="shopping-cart-shipping-notice">
+                  Add{" "}
+                  <strong>
+                    {formatCurrency(
+                      amountUntilFreeShipping
+                    )}
+                  </strong>{" "}
+                  more to receive free
+                  shipping.
+                </div>
+              ) : selectedItems.length > 0 ? (
+                <div className="shopping-cart-shipping-notice qualified">
+                  Your order qualifies for free
+                  shipping.
+                </div>
+              ) : null}
               <div className="shopping-cart-summary-total">
                 <span>Total</span>
-
                 <strong>
                   {formatCurrency(total)}
                 </strong>
               </div>
-
               <button
                 type="button"
                 className="shopping-cart-checkout-button"
@@ -885,7 +809,6 @@ function ShoppingCartPage() {
               >
                 Proceed to Checkout
               </button>
-
               <Link
                 to="/shopper/catalog"
                 className="shopping-cart-continue-link"
@@ -896,6 +819,48 @@ function ShoppingCartPage() {
           </div>
         )}
       </div>
+
+      {/* Remove Confirmation Modal */}
+      {pendingItem && (
+        <div
+          className="shopping-cart-modal-backdrop"
+          role="presentation"
+          onMouseDown={cancelRemoveItem}
+        >
+          <section
+            className="shopping-cart-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-confirm-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p>CONFIRM REMOVAL</p>
+            <h2 id="remove-confirm-title">Remove this item?</h2>
+            <span>
+              <strong>{pendingItem.name}</strong> will be removed from your cart.
+              You can add it again later from the catalog.
+            </span>
+            <div className="shopping-cart-modal-actions">
+              <button
+                type="button"
+                className="shopping-cart-modal-secondary"
+                onClick={cancelRemoveItem}
+                disabled={isCartBusy}
+              >
+                Keep Item
+              </button>
+              <button
+                type="button"
+                className="shopping-cart-modal-primary"
+                onClick={confirmRemoveItem}
+                disabled={isCartBusy}
+              >
+                {isCartBusy ? "Removing..." : "Yes, Remove"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
