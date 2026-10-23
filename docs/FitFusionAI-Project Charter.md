@@ -23,7 +23,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 | Version | Date | Author(s) | Description of Changes |
 | :---- | :---- | :---- | :---- |
 | 1.0 | 2026-08-29 | Project Group 1 |  |
-| 1.1 | 2026-09-21 | Project Group 1 | Revisions per Panel of Evaluators feedback |
+| 1.1 | 2026-09-21 | Project Group 1 | Revisions per Panel of Evaluators feedback; Clarified validated avatar height/weight input ranges and target age. |
 
 ### **2.2 Referenced Documents**
 
@@ -88,7 +88,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 ### **4.1 In-Scope Features**
 
 1. System Authentication & Role-Based Access Control (JWT; Registered User / Guest / Seller; server-side RBAC; ephemeral guest sessions)  
-2. Multi-Angle Avatar System (male/female; height/weight mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions; Front/Side/Rear views)  
+2. Multi-Angle Avatar System (male/female; height/weight mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions; Front/Side/Rear views) Avatar customization accepts only validated inputs: height 120–220 cm and weight 30–200 kg; the system targets users aged 12 years and older.
 3. Seller-Managed Catalog via CSV upload with automated rembg background removal and Pillow-based validation with rejection reports  
 4. Virtual Try-On 2D Overlay Canvas (per-category item switching, instant view toggling, saved outfit CRUD)  
 5. Explainable Rule-Based Styling Engine (Deterministic Expert System) using weighted tag scoring (color \+3, height contrast \+2, proportion shading \+1, style/occasion \+1) with visible match reasons.  
@@ -107,6 +107,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 6. Multi-seller marketplace discovery; external third-party API integrations  
 7. Body tracking, pose detection, fabric simulation  
 8. Cloud-hosted application hosting (application runs on local staging host; only MongoDB Atlas remains cloud-hosted)
+9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and weight 30–200 kg); inputs outside these ranges are rejected with descriptive validation errors.
 
 ### 
 
@@ -327,4 +328,3 @@ Signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\
 Name: **MR. JOHN ERICK D. BAUTISTA** 
 
 Signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_     Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_
-
