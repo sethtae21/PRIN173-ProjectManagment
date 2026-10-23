@@ -1,12 +1,23 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
 
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/AvatarPresetPage.css";
+
+// ======================================================
+// FITFUSION AI — AVATAR PRESETS
+// One built-in preset + saved custom presets
+// Canvas 2D avatar preview: Front, Side, Rear
+// Uses existing shared ShopperLayout / GuestLayout
+// ======================================================
+
+const PRESETS_KEY = "fitfusion-avatar-presets";
+const ACTIVE_KEY = "fitfusion-avatar-preset";
+const GENDER_KEY = "fitfusion-avatar-gender";
+const EDITING_KEY = "fitfusion-editing-avatar-preset";
+
+const GUEST_ACTIVE_KEY = "fitfusion-guest-avatar-preset";
+const GUEST_GENDER_KEY = "fitfusion-guest-avatar-gender";
 
 const BUILT_IN_PRESET = {
   id: "premade-default",
@@ -16,40 +27,184 @@ const BUILT_IN_PRESET = {
   weight: 58,
   skinTone: "#d9aa82",
   undertone: "Neutral",
-  shoulder: "Balanced",
-  waist: "Regular",
-  hip: "Balanced",
-  thigh: "Regular",
+  shoulder: "Average",
+  waist: "Average",
+  hip: "Average",
+  thigh: "Average",
   cupSize: "B",
   builtIn: true,
 };
 
-function readStorageArray(key) {
-  try {
-    const storedValue = JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
+const VIEWS = ["front", "side", "rear"];
 
-    return Array.isArray(storedValue)
-      ? storedValue
-      : [];
+// ======================================================
+// STORAGE HELPERS
+// ======================================================
+
+function readJSON(storage, key, fallback = null) {
+  try {
+    const raw = storage.getItem(key);
+
+    if (!raw) {
+      return fallback;
+    }
+
+    const value = JSON.parse(raw);
+
+    return value ?? fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
 function normalizeGender(value) {
-  if (
-    typeof value === "string" &&
-    value.toLowerCase() === "male"
-  ) {
-    return "Male";
-  }
-
-  return "Female";
+  return String(value || "").toLowerCase() === "male"
+    ? "Male"
+    : "Female";
 }
 
-function AvatarPresetPage({
+function normalizePreset(preset, index = 0) {
+  const gender = normalizeGender(preset?.gender);
+
+  return {
+    ...preset,
+
+    id: String(
+      preset?.id ||
+      preset?.presetId ||
+      `custom-${index}`
+    ),
+
+    name: String(
+      preset?.name ||
+      preset?.presetName ||
+      `Custom Avatar ${index + 1}`
+    ).trim(),
+
+    gender,
+
+    height: Number(preset?.height) || 165,
+
+    weight:
+      Number(preset?.weight) ||
+      (gender === "Male" ? 70 : 58),
+
+    skinTone:
+      preset?.skinTone ||
+      preset?.skinColor ||
+      "#d9aa82",
+
+    undertone: preset?.undertone || "Neutral",
+
+    shoulder:
+      preset?.shoulder ||
+      preset?.shoulderWidth ||
+      "Average",
+
+    waist:
+      preset?.waist ||
+      preset?.waistSize ||
+      "Average",
+
+    hip:
+      preset?.hip ||
+      preset?.hipSize ||
+      "Average",
+
+    thigh:
+      preset?.thigh ||
+      preset?.thighSize ||
+      "Average",
+
+    cupSize:
+      gender === "Female"
+        ? preset?.cupSize || "B"
+        : null,
+
+    builtIn: false,
+  };
+}
+
+function getCustomPresets() {
+  const saved = readJSON(
+    localStorage,
+    PRESETS_KEY,
+    []
+  );
+
+  if (!Array.isArray(saved)) {
+    return [];
+  }
+
+  return saved
+    .filter(
+      (preset) =>
+        preset &&
+        String(preset.id) !== BUILT_IN_PRESET.id &&
+        !preset.builtIn
+    )
+    .map(normalizePreset);
+}
+
+function getActivePresetId(isGuest) {
+  const storage = isGuest
+    ? sessionStorage
+    : localStorage;
+
+  const key = isGuest
+    ? GUEST_ACTIVE_KEY
+    : ACTIVE_KEY;
+
+  const active = readJSON(storage, key);
+
+  return active?.id
+    ? String(active.id)
+    : BUILT_IN_PRESET.id;
+}
+
+// ======================================================
+// AVATAR FIGURE
+// ======================================================
+
+function AvatarFigure({
+  preset,
+  view = "front",
+  small = false,
+}) {
+  return (
+    <div
+      className={`avatar-preset-figure ${
+        small ? "avatar-preset-figure--small" : ""
+      }`}
+      aria-label={`${preset.name}, ${view} view`}
+    >
+      <AvatarCanvas
+        avatar={preset}
+        view={view}
+        equippedItems={{}}
+      />
+    </div>
+  );
+}
+
+// ======================================================
+// MEASUREMENT ITEM
+// ======================================================
+
+function Measurement({ label, value }) {
+  return (
+    <div className="avatar-preset-measurement">
+      <span>{label}</span>
+      <strong>{value ?? "Average"}</strong>
+    </div>
+  );
+}
+
+// ======================================================
+// MAIN COMPONENT
+// ======================================================
+
+export default function AvatarPresetPage({
   isGuest = false,
 }) {
   const navigate = useNavigate();
@@ -58,13 +213,12 @@ function AvatarPresetPage({
     ? "/guest"
     : "/shopper";
 
-  const [customPresets, setCustomPresets] =
-    useState([]);
+  const [customPresets, setCustomPresets] = useState(
+    () => (isGuest ? [] : getCustomPresets())
+  );
 
-  const [
-    selectedPresetId,
-    setSelectedPresetId,
-  ] = useState(BUILT_IN_PRESET.id);
+  const [selectedPresetId, setSelectedPresetId] =
+    useState(() => getActivePresetId(isGuest));
 
   const [previewView, setPreviewView] =
     useState("front");
@@ -75,86 +229,56 @@ function AvatarPresetPage({
   const [toastMessage, setToastMessage] =
     useState("");
 
+  // ====================================================
+  // REFRESH SAVED PRESETS
+  // ====================================================
+
   useEffect(() => {
-    if (isGuest) {
-      /*
-       * Guests cannot have permanently
-       * saved custom presets.
-       */
-      setCustomPresets([]);
-      return;
+    function refreshPresets() {
+      if (isGuest) {
+        setCustomPresets([]);
+      } else {
+        setCustomPresets(getCustomPresets());
+      }
     }
 
-    const savedPresets = readStorageArray(
-      "fitfusion-avatar-presets"
-    ).map((preset, index) => {
-      const gender = normalizeGender(
-        preset.gender
+    refreshPresets();
+
+    window.addEventListener("focus", refreshPresets);
+    window.addEventListener("storage", refreshPresets);
+
+    return () => {
+      window.removeEventListener(
+        "focus",
+        refreshPresets
       );
 
-      return {
-        id:
-          preset.id ||
-          `saved-preset-${index}`,
-
-        name:
-          preset.name ||
-          `Custom Avatar ${index + 1}`,
-
-        gender,
-        height:
-          Number(preset.height) || 165,
-        weight:
-          Number(preset.weight) || 58,
-
-        skinTone:
-          preset.skinTone || "#d9aa82",
-
-        undertone:
-          preset.undertone || "Neutral",
-
-        shoulder:
-          preset.shoulder || "Balanced",
-
-        waist:
-          preset.waist || "Regular",
-
-        hip:
-          preset.hip || "Balanced",
-
-        thigh:
-          preset.thigh || "Regular",
-
-        /*
-         * Cup size only applies to
-         * Female avatars.
-         */
-        cupSize:
-          gender === "Female"
-            ? preset.cupSize || "B"
-            : null,
-
-        builtIn:
-          Boolean(preset.builtIn),
-      };
-    });
-
-    setCustomPresets(savedPresets);
+      window.removeEventListener(
+        "storage",
+        refreshPresets
+      );
+    };
   }, [isGuest]);
+
+  // ====================================================
+  // NOTIFICATION TIMER
+  // ====================================================
 
   useEffect(() => {
     if (!toastMessage) {
-      return undefined;
+      return;
     }
 
     const timer = window.setTimeout(() => {
       setToastMessage("");
-    }, 2600);
+    }, 3000);
 
-    return () => {
-      window.clearTimeout(timer);
-    };
+    return () => window.clearTimeout(timer);
   }, [toastMessage]);
+
+  // ====================================================
+  // COMBINED PRESETS
+  // ====================================================
 
   const allPresets = useMemo(
     () => [
@@ -164,21 +288,33 @@ function AvatarPresetPage({
     [customPresets]
   );
 
-  const selectedPreset =
-    allPresets.find(
-      (preset) =>
-        preset.id === selectedPresetId
-    ) || BUILT_IN_PRESET;
+  const selectedPreset = useMemo(
+    () =>
+      allPresets.find(
+        (preset) =>
+          String(preset.id) ===
+          String(selectedPresetId)
+      ) || BUILT_IN_PRESET,
+    [allPresets, selectedPresetId]
+  );
+
+  const activePresetId = getActivePresetId(isGuest);
+
+  // ====================================================
+  // SELECT PRESET
+  // ====================================================
 
   function selectPreset(preset) {
-    setSelectedPresetId(preset.id);
+    setSelectedPresetId(String(preset.id));
     setPreviewView("front");
   }
 
-  function usePreset(preset) {
-    const gender = normalizeGender(
-      preset.gender
-    );
+  // ====================================================
+  // SAVE SELECTED ACTIVE AVATAR
+  // ====================================================
+
+  function writeActivePreset(preset) {
+    const gender = normalizeGender(preset.gender);
 
     const activePreset = {
       ...preset,
@@ -192,108 +328,120 @@ function AvatarPresetPage({
 
     if (isGuest) {
       sessionStorage.setItem(
-        "fitfusion-guest-avatar-preset",
+        GUEST_ACTIVE_KEY,
         JSON.stringify(activePreset)
       );
 
       sessionStorage.setItem(
-        "fitfusion-guest-avatar-gender",
+        GUEST_GENDER_KEY,
         gender
-      );
-
-      setToastMessage(
-        `Using ${activePreset.name} for this temporary session.`
       );
     } else {
       localStorage.setItem(
-        "fitfusion-avatar-preset",
+        ACTIVE_KEY,
         JSON.stringify(activePreset)
       );
 
       localStorage.setItem(
-        "fitfusion-avatar-gender",
+        GENDER_KEY,
         gender
       );
-
-      setToastMessage(
-        `${activePreset.name} is now your active avatar.`
-      );
     }
+  }
 
-    window.setTimeout(() => {
+  // ====================================================
+  // USE AVATAR
+  // ====================================================
+
+  function usePreset(preset) {
+    try {
+      writeActivePreset(preset);
+
+      setSelectedPresetId(String(preset.id));
+
       navigate(
         `${basePath}/fitting-studio/customize`
       );
-    }, 700);
+    } catch (error) {
+      console.error(
+        "Unable to use avatar preset:",
+        error
+      );
+
+      setToastMessage(
+        "Unable to load this avatar. Please try again."
+      );
+    }
   }
+
+  // ====================================================
+  // EDIT AVATAR
+  // ====================================================
 
   function editPreset(preset) {
-    const gender = normalizeGender(
-      preset.gender
-    );
+    if (isGuest || preset.builtIn) {
+      try {
+        writeActivePreset(preset);
 
-    const presetToEdit = {
-      ...preset,
-      gender,
+        navigate(
+          `${basePath}/fitting-studio/customize`
+        );
+      } catch (error) {
+        console.error(
+          "Unable to customize avatar:",
+          error
+        );
 
-      cupSize:
-        gender === "Female"
-          ? preset.cupSize || "B"
-          : null,
-    };
-
-    if (isGuest) {
-      sessionStorage.setItem(
-        "fitfusion-guest-avatar-preset",
-        JSON.stringify(presetToEdit)
-      );
-
-      sessionStorage.setItem(
-        "fitfusion-guest-avatar-gender",
-        gender
-      );
-
-      navigate(
-        "/guest/fitting-studio/customize"
-      );
+        setToastMessage(
+          "Unable to open avatar customization."
+        );
+      }
 
       return;
     }
 
-    if (preset.builtIn) {
+    try {
       localStorage.setItem(
-        "fitfusion-avatar-preset",
-        JSON.stringify(presetToEdit)
-      );
-
-      localStorage.setItem(
-        "fitfusion-avatar-gender",
-        gender
+        EDITING_KEY,
+        JSON.stringify(preset)
       );
 
       navigate(
-        "/shopper/fitting-studio/customize"
+        `/shopper/avatar-presets/${encodeURIComponent(
+          preset.id
+        )}/edit`
+      );
+    } catch (error) {
+      console.error(
+        "Unable to edit avatar preset:",
+        error
       );
 
-      return;
+      setToastMessage(
+        "Unable to open this preset for editing."
+      );
     }
+  }
 
-    localStorage.setItem(
-      "fitfusion-editing-avatar-preset",
-      JSON.stringify(presetToEdit)
-    );
+  // ====================================================
+  // CREATE CUSTOM AVATAR
+  // ====================================================
 
+  function createAvatar() {
     navigate(
-      `/shopper/avatar-presets/${preset.id}/edit`
+      `${basePath}/fitting-studio/customize`
     );
   }
 
-  function requestDelete(preset) {
-    if (preset.builtIn) {
-      setToastMessage(
-        "The built-in preset cannot be deleted."
-      );
+  // ====================================================
+  // DELETE PRESET
+  // ====================================================
 
+  function requestDelete(preset) {
+    if (isGuest || preset.builtIn) {
+      setToastMessage(
+        "The built-in avatar cannot be deleted."
+      );
       return;
     }
 
@@ -301,54 +449,104 @@ function AvatarPresetPage({
   }
 
   function confirmDelete() {
-    if (!deleteTarget) {
+    if (
+      !deleteTarget ||
+      isGuest ||
+      deleteTarget.builtIn
+    ) {
       return;
     }
 
-    const nextPresets =
-      customPresets.filter(
+    try {
+      const remaining = customPresets.filter(
         (preset) =>
-          preset.id !== deleteTarget.id
+          String(preset.id) !==
+          String(deleteTarget.id)
       );
 
-    setCustomPresets(nextPresets);
+      localStorage.setItem(
+        PRESETS_KEY,
+        JSON.stringify(remaining)
+      );
 
-    localStorage.setItem(
-      "fitfusion-avatar-presets",
-      JSON.stringify(nextPresets)
-    );
+      const active = readJSON(
+        localStorage,
+        ACTIVE_KEY
+      );
 
-    if (
-      selectedPresetId ===
-      deleteTarget.id
-    ) {
-      setSelectedPresetId(
-        BUILT_IN_PRESET.id
+      if (
+        String(active?.id) ===
+        String(deleteTarget.id)
+      ) {
+        localStorage.removeItem(ACTIVE_KEY);
+      }
+
+      const editing = readJSON(
+        localStorage,
+        EDITING_KEY
+      );
+
+      if (
+        String(editing?.id) ===
+        String(deleteTarget.id)
+      ) {
+        localStorage.removeItem(EDITING_KEY);
+      }
+
+      if (
+        String(selectedPresetId) ===
+        String(deleteTarget.id)
+      ) {
+        setSelectedPresetId(
+          BUILT_IN_PRESET.id
+        );
+
+        setPreviewView("front");
+      }
+
+      setCustomPresets(remaining);
+
+      setToastMessage(
+        `“${deleteTarget.name}” was deleted successfully.`
+      );
+
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error(
+        "Unable to delete avatar preset:",
+        error
+      );
+
+      setToastMessage(
+        "Unable to delete this avatar. Please try again."
       );
     }
-
-    setToastMessage(
-      `${deleteTarget.name} was deleted.`
-    );
-
-    setDeleteTarget(null);
   }
+
+  // ====================================================
+  // RENDER
+  // ====================================================
 
   return (
     <main className="avatar-presets-page-content">
       <div className="avatar-presets-body">
-        <section className="avatar-presets-intro">
-          <div>
-            <p>YOUR FITTING PROFILE</p>
 
-            <h1>
-              Choose an avatar preset
-            </h1>
+        {/* =========================================
+            PAGE INTRODUCTION
+        ========================================= */}
+
+        <section className="avatar-presets-intro">
+          <div className="avatar-presets-intro-copy">
+            <p className="avatar-presets-eyebrow">
+              YOUR FITTING PROFILE
+            </p>
+
+            <h1>Choose an Avatar Preset</h1>
 
             <span>
               {isGuest
-                ? "Use the premade avatar to start your temporary fitting session."
-                : "Use the premade avatar or select one of your saved custom avatars."}
+                ? "Explore our premade 2D avatar. Create an account to save your own customized avatars."
+                : "Choose the premade avatar or select one of your saved custom avatars to continue fitting clothes."}
             </span>
           </div>
 
@@ -356,19 +554,25 @@ function AvatarPresetPage({
             <button
               type="button"
               className="avatar-presets-create"
-              onClick={() =>
-                navigate(
-                  "/shopper/fitting-studio"
-                )
-              }
+              onClick={createAvatar}
             >
-              + Create Custom Avatar
+              <span aria-hidden="true">+</span>
+              Create Custom Avatar
             </button>
           )}
         </section>
 
-        <section className="avatar-presets-workspace">
-          <div className="avatar-presets-list-panel">
+        {/* =========================================
+            WORKSPACE
+        ========================================= */}
+
+        <div className="avatar-presets-workspace">
+
+          {/* =====================================
+              LEFT — AVATAR LIST
+          ===================================== */}
+
+          <section className="avatar-presets-list-panel">
             <div className="avatar-presets-panel-heading">
               <div>
                 <p>AVAILABLE PRESETS</p>
@@ -376,118 +580,126 @@ function AvatarPresetPage({
                 <h2>
                   {allPresets.length}{" "}
                   {allPresets.length === 1
-                    ? "avatar"
-                    : "avatars"}
+                    ? "Avatar"
+                    : "Avatars"}
                 </h2>
               </div>
 
               {!isGuest && (
                 <span>
-                  {customPresets.length} custom
+                  {customPresets.length} Custom
                 </span>
               )}
             </div>
 
             <div className="avatar-presets-grid">
-              {allPresets.map((preset) => (
-                <article
-                  key={preset.id}
-                  className={
-                    selectedPresetId ===
-                    preset.id
-                      ? "avatar-preset-card selected"
-                      : "avatar-preset-card"
-                  }
-                  onClick={() =>
-                    selectPreset(preset)
-                  }
-                >
-                  <button
-                    type="button"
-                    className="avatar-preset-select-area"
-                    onClick={() =>
-                      selectPreset(preset)
-                    }
+              {allPresets.map((preset) => {
+                const isSelected =
+                  String(selectedPreset.id) ===
+                  String(preset.id);
+
+                const isActive =
+                  String(activePresetId) ===
+                  String(preset.id);
+
+                return (
+                  <article
+                    key={preset.id}
+                    className={`avatar-preset-card ${
+                      isSelected ? "selected" : ""
+                    }`}
                   >
-                    <AvatarFigure
-                      preset={preset}
-                      view="front"
-                      small
-                    />
-
-                    <span className="avatar-preset-type">
-                      {preset.builtIn
-                        ? "PREMADE"
-                        : "CUSTOM"}
-                    </span>
-
-                    <strong>
-                      {preset.name}
-                    </strong>
-
-                    <small>
-                      {normalizeGender(
-                        preset.gender
-                      )}{" "}
-                      • {preset.height} cm
-                    </small>
-                  </button>
-
-                  <div className="avatar-preset-card-actions">
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        usePreset(preset);
-                      }}
+                      className="avatar-preset-select-area"
+                      aria-pressed={isSelected}
+                      onClick={() =>
+                        selectPreset(preset)
+                      }
                     >
-                      Use
+                      <div className="avatar-preset-card-image">
+                        <AvatarFigure
+                          preset={preset}
+                          view="front"
+                          small
+                        />
+                      </div>
+
+                      <div className="avatar-preset-card-badges">
+                        <span className="avatar-preset-type">
+                          {preset.builtIn
+                            ? "PREMADE"
+                            : "CUSTOM"}
+                        </span>
+
+                        {isActive && (
+                          <span className="avatar-preset-active-tag">
+                            In Use
+                          </span>
+                        )}
+                      </div>
+
+                      <strong>{preset.name}</strong>
+
+                      <small>
+                        {preset.gender}
+                        {" • "}
+                        {preset.height} cm
+                        {" • "}
+                        {preset.weight} kg
+                      </small>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        editPreset(preset);
-                      }}
-                    >
-                      {preset.builtIn
-                        ? "Customize"
-                        : "Edit"}
-                    </button>
+                    <div className="avatar-preset-card-actions">
+                      <button
+                        type="button"
+                        className="avatar-preset-card-use"
+                        onClick={() =>
+                          usePreset(preset)
+                        }
+                      >
+                        Use
+                      </button>
 
-                    {!preset.builtIn &&
-                      !isGuest && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          editPreset(preset)
+                        }
+                      >
+                        {preset.builtIn
+                          ? "Customize"
+                          : "Edit"}
+                      </button>
+
+                      {!preset.builtIn && !isGuest && (
                         <button
                           type="button"
                           className="avatar-preset-delete"
-                          onClick={(
-                            event
-                          ) => {
-                            event.stopPropagation();
-
-                            requestDelete(
-                              preset
-                            );
-                          }}
+                          onClick={() =>
+                            requestDelete(preset)
+                          }
                         >
                           Delete
                         </button>
                       )}
-                  </div>
-                </article>
-              ))}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </div>
+          </section>
+
+          {/* =====================================
+              RIGHT — SELECTED AVATAR PREVIEW
+          ===================================== */}
 
           <aside className="avatar-preset-preview-panel">
             <div className="avatar-preset-preview-header">
               <div>
-                <p>PREVIEW</p>
+                <p>LIVE 2D PREVIEW</p>
 
-                <h2>
-                  {selectedPreset.name}
-                </h2>
+                <h2>{selectedPreset.name}</h2>
               </div>
 
               <span>
@@ -497,12 +709,14 @@ function AvatarPresetPage({
               </span>
             </div>
 
-            <div className="avatar-preset-view-buttons">
-              {[
-                "front",
-                "side",
-                "rear",
-              ].map((view) => (
+            {/* FRONT / SIDE / REAR */}
+
+            <div
+              className="avatar-preset-view-buttons"
+              role="group"
+              aria-label="Avatar preview angle"
+            >
+              {VIEWS.map((view) => (
                 <button
                   key={view}
                   type="button"
@@ -510,6 +724,9 @@ function AvatarPresetPage({
                     previewView === view
                       ? "active"
                       : ""
+                  }
+                  aria-pressed={
+                    previewView === view
                   }
                   onClick={() =>
                     setPreviewView(view)
@@ -520,24 +737,26 @@ function AvatarPresetPage({
               ))}
             </div>
 
+            {/* BLENDER-RENDERED 2D CANVAS */}
+
             <div className="avatar-preset-preview-stage">
               <AvatarFigure
+                key={`${selectedPreset.id}-${previewView}`}
                 preset={selectedPreset}
                 view={previewView}
               />
 
               <span className="avatar-preset-view-label">
-                {previewView.toUpperCase()}{" "}
-                VIEW
+                {previewView.toUpperCase()} VIEW
               </span>
             </div>
+
+            {/* AVATAR INFORMATION */}
 
             <div className="avatar-preset-measurements">
               <Measurement
                 label="Gender"
-                value={normalizeGender(
-                  selectedPreset.gender
-                )}
+                value={selectedPreset.gender}
               />
 
               <Measurement
@@ -551,15 +770,8 @@ function AvatarPresetPage({
               />
 
               <Measurement
-                label="Undertone"
-                value={selectedPreset.undertone || "Neutral"}
-              />
-
-              <Measurement
-                label="Shoulder"
-                value={
-                  selectedPreset.shoulder
-                }
+                label="Shoulders"
+                value={selectedPreset.shoulder}
               />
 
               <Measurement
@@ -568,27 +780,48 @@ function AvatarPresetPage({
               />
 
               <Measurement
-                label="Hip"
+                label="Hips"
                 value={selectedPreset.hip}
               />
 
               <Measurement
-                label="Thigh"
+                label="Thighs"
                 value={selectedPreset.thigh}
               />
 
-              {normalizeGender(
-                selectedPreset.gender
-              ) === "Female" && (
+              <Measurement
+                label="Undertone"
+                value={selectedPreset.undertone}
+              />
+
+              {selectedPreset.gender === "Female" && (
                 <Measurement
                   label="Cup Size"
-                  value={
-                    selectedPreset.cupSize ||
-                    "B"
-                  }
+                  value={selectedPreset.cupSize || "B"}
                 />
               )}
+
+              <div className="avatar-preset-measurement">
+                <span>Skin Tone</span>
+
+                <div className="avatar-preset-skin-row">
+                  <i
+                    className="avatar-preset-skin-dot"
+                    style={{
+                      backgroundColor:
+                        selectedPreset.skinTone,
+                    }}
+                    aria-hidden="true"
+                  />
+
+                  <strong>
+                    {selectedPreset.skinTone}
+                  </strong>
+                </div>
+              </div>
             </div>
+
+            {/* PREVIEW ACTIONS */}
 
             <div className="avatar-preset-preview-actions">
               <button
@@ -612,27 +845,44 @@ function AvatarPresetPage({
                   ? "Customize Avatar"
                   : "Edit Preset"}
               </button>
+
+              {!selectedPreset.builtIn &&
+                !isGuest && (
+                  <button
+                    type="button"
+                    className="avatar-preset-preview-delete"
+                    onClick={() =>
+                      requestDelete(selectedPreset)
+                    }
+                  >
+                    Delete Preset
+                  </button>
+                )}
             </div>
           </aside>
-        </section>
+        </div>
       </div>
+
+      {/* =========================================
+          DELETE CONFIRMATION
+      ========================================= */}
 
       {deleteTarget && !isGuest && (
         <div
           className="avatar-preset-modal-backdrop"
-          role="presentation"
-          onMouseDown={() =>
-            setDeleteTarget(null)
-          }
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget
+            ) {
+              setDeleteTarget(null);
+            }
+          }}
         >
           <section
             className="avatar-preset-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-preset-title"
-            onMouseDown={(event) =>
-              event.stopPropagation()
-            }
           >
             <div className="avatar-preset-modal-icon">
               !
@@ -645,8 +895,9 @@ function AvatarPresetPage({
             </h2>
 
             <span>
-              This avatar preset will be
-              permanently removed.
+              This avatar preset will be permanently
+              deleted. Your saved outfits and order
+              history will not be deleted.
             </span>
 
             <div className="avatar-preset-modal-actions">
@@ -656,7 +907,7 @@ function AvatarPresetPage({
                   setDeleteTarget(null)
                 }
               >
-                Cancel
+                Keep Preset
               </button>
 
               <button
@@ -671,6 +922,10 @@ function AvatarPresetPage({
         </div>
       )}
 
+      {/* =========================================
+          NOTIFICATION
+      ========================================= */}
+
       {toastMessage && (
         <div
           className="avatar-preset-toast"
@@ -682,69 +937,3 @@ function AvatarPresetPage({
     </main>
   );
 }
-
-function Measurement({
-  label,
-  value,
-}) {
-  return (
-    <div className="avatar-preset-measurement">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function AvatarFigure({
-  preset,
-  view,
-  small = false,
-}) {
-  const gender =
-    normalizeGender(preset.gender);
-
-  const genderClass =
-    gender === "Male"
-      ? "male"
-      : "female";
-
-  const className = [
-    "preset-avatar",
-    `preset-avatar-${genderClass}`,
-    `preset-avatar-${view}`,
-    small
-      ? "preset-avatar-small"
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return (
-    <div
-      className={className}
-      style={{
-        "--avatar-skin":
-          preset.skinTone ||
-          "#d9aa82",
-      }}
-      aria-label={`${preset.name} ${view} view`}
-    >
-      <div className="preset-avatar-head">
-        <span />
-      </div>
-
-      <div className="preset-avatar-neck" />
-
-      <div className="preset-avatar-body">
-        <div className="preset-avatar-shirt" />
-      </div>
-
-      <div className="preset-avatar-arm left" />
-      <div className="preset-avatar-arm right" />
-      <div className="preset-avatar-leg left" />
-      <div className="preset-avatar-leg right" />
-    </div>
-  );
-}
-
-export default AvatarPresetPage;

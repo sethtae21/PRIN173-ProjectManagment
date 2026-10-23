@@ -1,12 +1,23 @@
+
+/* ==========================================
+   FITFUSION AI
+   CHOOSE AVATAR GENDER PAGE
+   Gold, White & Black Theme
+========================================== */
+
 .gender-page {
   min-height: 100vh;
-  padding: 48px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 48px 36px;
+
   color: #17130f;
+
   background:
     radial-gradient(
       circle at right center,
-      rgba(181, 126, 32, 0.2),
-      transparent 44%
+      rgba(181, 126, 32, 0.16),
+      transparent 45%
     ),
     linear-gradient(
       135deg,
@@ -16,12 +27,20 @@
     );
 }
 
+.gender-page *,
+.gender-page *::before,
+.gender-page *::after {
+  box-sizing: border-box;
+}
+
 .gender-page-content {
   width: min(1100px, 100%);
   margin: 0 auto;
 }
 
-/* Introduction */
+/* ==========================================
+   PAGE INTRODUCTION
+========================================== */
 
 .gender-introduction {
   margin-bottom: 34px;
@@ -30,6 +49,7 @@
 
 .gender-introduction > p {
   margin: 0 0 12px;
+
   color: #9a6a1d;
   font-size: 12px;
   font-weight: 700;
@@ -38,260 +58,298 @@
 
 .gender-introduction h1 {
   margin: 0 0 14px;
+
   color: #17130f;
   font-size: clamp(34px, 4vw, 48px);
+  font-weight: 750;
   line-height: 1.15;
 }
 
 .gender-introduction span {
+  display: block;
+
   color: #5c554c;
   font-size: 13px;
   line-height: 1.6;
 }
 
-/* Gender cards */
+/* ==========================================
+   MALE AND FEMALE CARD GRID
+========================================== */
 
 .gender-options {
   display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 28px;
+  width: 100%;
 }
 
+/* ==========================================
+   AVATAR SELECTION CARDS
+========================================== */
+
 .gender-card {
+  appearance: none;
+  -webkit-appearance: none;
+
   position: relative;
   display: flex;
-  min-height: 510px;
-  overflow: hidden;
-  align-items: center;
   flex-direction: column;
-  padding: 32px;
+  align-items: center;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 560px;
+
+  padding: 30px 28px;
+
+  overflow: hidden;
+
   border: 1px solid #d2be91;
   border-radius: 18px;
+
   color: #17130f;
-  background: rgba(255, 253, 249, 0.95);
-  box-shadow: 0 15px 35px
-    rgba(81, 58, 24, 0.08);
-  font: inherit;
+  background: rgba(255, 253, 249, 0.97);
+
+  box-shadow:
+    0 15px 35px rgba(81, 58, 24, 0.08);
+
+  font-family: inherit;
+  font-size: inherit;
   text-align: center;
+
   cursor: pointer;
+
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    background 0.2s ease;
 }
 
 .gender-card:hover {
   border-color: #b57e20;
-  box-shadow: 0 20px 42px
-    rgba(81, 58, 24, 0.14);
+
+  box-shadow:
+    0 20px 42px rgba(81, 58, 24, 0.14);
+
   transform: translateY(-3px);
 }
 
+/* Selected gender */
+
 .gender-card.selected {
   border: 2px solid #b57e20;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 253, 249, 0.98),
-      rgba(246, 231, 183, 0.6)
-    );
+
+  background: linear-gradient(
+    180deg,
+    rgba(255, 253, 249, 0.99),
+    rgba(246, 231, 183, 0.55)
+  );
+
   box-shadow:
-    0 0 0 4px
-      rgba(215, 175, 75, 0.2),
-    0 20px 42px
-      rgba(81, 58, 24, 0.15);
+    0 0 0 4px rgba(215, 175, 75, 0.16),
+    0 20px 42px rgba(81, 58, 24, 0.13);
 }
 
-/* Avatar previews */
+/* ==========================================
+   BLENDER AVATAR PREVIEW CONTAINER
+========================================== */
 
-.gender-avatar-preview {
-  --gender-skin: #dca77d;
-
+.gender-avatar-preview,
+.gender-avatar-preview.rendered {
   position: relative;
-  width: 190px;
-  height: 285px;
-  margin-bottom: 24px;
-  border: 1px solid #e2d8c7;
-  border-radius: 95px 95px 16px 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 auto;
+
+  width: 230px;
+  height: 315px;
+  min-height: 315px;
+
+  margin: 0 auto 22px;
+
+  overflow: hidden;
+
+  border: 1px solid #e4d4b5;
+  border-radius: 115px 115px 18px 18px;
+
   background:
     radial-gradient(
-      circle at center,
-      rgba(215, 175, 75, 0.2),
-      transparent 58%
+      ellipse at center 65%,
+      rgba(226, 195, 126, 0.22),
+      transparent 72%
     ),
-    #f8f5ef;
+    linear-gradient(
+      180deg,
+      #fffcf7,
+      #f5ede0
+    );
+
+  isolation: isolate;
 }
 
-.gender-avatar-head {
+/* Soft golden glow behind the model */
+
+.gender-avatar-preview-glow {
   position: absolute;
-  z-index: 3;
-  top: 37px;
-  left: 69px;
-  width: 52px;
-  height: 63px;
-  border-radius: 45% 45% 48% 48%;
-  background: var(--gender-skin);
-}
+  z-index: 0;
 
-.gender-avatar-hair {
-  position: absolute;
-  z-index: 4;
-  top: 28px;
-  left: 65px;
-  width: 60px;
-  height: 42px;
-  border-radius: 32px 32px 9px 9px;
-  background: #29211b;
-}
+  top: 42px;
+  left: 50%;
 
-.gender-avatar-preview.female
-  .gender-avatar-hair {
-  top: 26px;
-  left: 59px;
-  width: 72px;
-  height: 83px;
-  border-radius: 38px 38px 22px 22px;
-}
+  width: 185px;
+  height: 245px;
 
-.gender-avatar-neck {
-  position: absolute;
-  z-index: 2;
-  top: 94px;
-  left: 81px;
-  width: 28px;
-  height: 30px;
-  background: var(--gender-skin);
-}
+  transform: translateX(-50%);
 
-.gender-avatar-body {
-  position: absolute;
-  z-index: 2;
-  top: 118px;
-  left: 47px;
-  width: 96px;
-  height: 95px;
-  background: var(--gender-skin);
-  clip-path: polygon(
-    17% 0,
-    83% 0,
-    100% 22%,
-    82% 100%,
-    18% 100%,
-    0 22%
+  border-radius: 50%;
+
+  background: radial-gradient(
+    ellipse,
+    rgba(218, 177, 92, 0.18) 0%,
+    rgba(218, 177, 92, 0.06) 60%,
+    transparent 75%
   );
+
+  pointer-events: none;
 }
 
-.gender-avatar-preview.male
-  .gender-avatar-body {
-  left: 39px;
-  width: 112px;
-  clip-path: polygon(
-    10% 0,
-    90% 0,
-    100% 20%,
-    78% 100%,
-    22% 100%,
-    0 20%
-  );
-}
+/* Actual Blender avatar canvas */
 
-.gender-avatar-preview.female
-  .gender-avatar-body {
-  clip-path: polygon(
-    20% 0,
-    80% 0,
-    100% 20%,
-    90% 100%,
-    10% 100%,
-    0 20%
-  );
-}
-
-.gender-avatar-left-arm,
-.gender-avatar-right-arm {
-  position: absolute;
+.gender-avatar-canvas {
+  position: relative;
   z-index: 1;
-  top: 130px;
-  width: 24px;
-  height: 100px;
-  border-radius: 16px;
-  background: var(--gender-skin);
+
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: contain;
+
+  pointer-events: none;
+
+  filter: drop-shadow(
+    0 7px 6px rgba(73, 49, 20, 0.13)
+  );
 }
 
-.gender-avatar-left-arm {
-  left: 35px;
-  transform: rotate(7deg);
+/* Selected avatar preview */
+
+.gender-card.selected .gender-avatar-preview {
+  border-color: #c69840;
+
+  box-shadow:
+    0 0 0 3px rgba(212, 166, 67, 0.13),
+    0 12px 28px rgba(122, 83, 22, 0.09);
 }
 
-.gender-avatar-right-arm {
-  right: 35px;
-  transform: rotate(-7deg);
+.gender-card:hover .gender-avatar-preview {
+  border-color: #c89b4a;
 }
 
-.gender-avatar-left-leg,
-.gender-avatar-right-leg {
+/* Avatar error message */
+
+.gender-avatar-error {
   position: absolute;
-  top: 204px;
-  width: 34px;
-  height: 72px;
-  border-radius: 0 0 14px 14px;
-  background: var(--gender-skin);
+  z-index: 2;
+
+  left: 10px;
+  right: 10px;
+  bottom: 16px;
+
+  color: #9e3029;
+  font-size: 12px;
+  text-align: center;
 }
 
-.gender-avatar-left-leg {
-  left: 58px;
-}
-
-.gender-avatar-right-leg {
-  right: 58px;
-}
-
-/* Card text */
+/* ==========================================
+   AVATAR CARD INFORMATION
+========================================== */
 
 .gender-card-information {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: center;
+
+  width: 100%;
+  min-width: 0;
 }
 
 .gender-card-information p {
   margin: 0 0 8px;
+
   color: #9a6a1d;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.09em;
 }
 
 .gender-card-information h2 {
   margin: 0 0 12px;
+
   color: #17130f;
-  font-size: 25px;
+  font-size: 26px;
+  font-weight: 750;
+  line-height: 1.2;
 }
 
 .gender-card-information span {
   display: block;
+
   max-width: 360px;
+  margin: 0 auto;
+
   color: #5c554c;
   font-size: 12px;
-  line-height: 1.6;
+  font-weight: 400;
+  line-height: 1.7;
 }
+
+/* ==========================================
+   SELECT MALE / FEMALE BUTTON
+========================================== */
 
 .gender-selection-indicator {
-  width: 100%;
-  min-height: 44px;
   display: grid;
   place-items: center;
+
+  flex: 0 0 auto;
+
+  width: 100%;
+  min-height: 46px;
+
   margin-top: 22px;
+  padding: 12px 16px;
+
   border: 1px solid #b57e20;
   border-radius: 8px;
+
   color: #8e641f;
   background: #fffdf9;
-  font-size: 11px;
+
+  font-size: 12px;
   font-weight: 700;
+  text-align: center;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
-.gender-card.selected
-  .gender-selection-indicator {
+.gender-card:hover .gender-selection-indicator {
+  background: #fff7e6;
+}
+
+.gender-card.selected .gender-selection-indicator {
   color: #fffdf9;
+
   background: linear-gradient(
     135deg,
     #17130f,
@@ -300,30 +358,58 @@
   );
 }
 
-/* Bottom buttons */
+/* ==========================================
+   BOTTOM ACTION BUTTONS
+========================================== */
 
 .gender-actions {
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+
   gap: 16px;
   margin-top: 30px;
 }
 
 .gender-primary-button,
 .gender-secondary-button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   min-width: 230px;
   min-height: 50px;
+
   padding: 12px 24px;
+
   border-radius: 9px;
-  font: inherit;
+
+  font-family: inherit;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+
   cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
+
+/* Continue button */
 
 .gender-primary-button {
   border: 1px solid #b57e20;
+
   color: #fffdf9;
+
   background: linear-gradient(
     135deg,
     #17130f,
@@ -332,23 +418,27 @@
   );
 }
 
-.gender-primary-button:hover:not(
-    :disabled
-  ) {
-  box-shadow: 0 9px 22px
-    rgba(142, 100, 31, 0.24);
+.gender-primary-button:hover:not(:disabled) {
+  box-shadow:
+    0 9px 22px rgba(142, 100, 31, 0.24);
+
   transform: translateY(-1px);
 }
 
 .gender-primary-button:disabled {
   border-color: #cfc6b6;
+
   color: #9b9388;
   background: #e9e4dc;
+
   cursor: not-allowed;
 }
 
+/* View premade avatar button */
+
 .gender-secondary-button {
   border: 1px solid #b57e20;
+
   color: #8e641f;
   background: #fffdf9;
 }
@@ -358,15 +448,34 @@
   background: #8e641f;
 }
 
+/* ==========================================
+   ACCESSIBILITY
+========================================== */
+
 .gender-card:focus-visible,
 .gender-primary-button:focus-visible,
 .gender-secondary-button:focus-visible {
-  outline: 3px solid
-    rgba(181, 126, 32, 0.38);
+  outline: 3px solid rgba(181, 126, 32, 0.4);
   outline-offset: 3px;
 }
 
-/* Responsive design */
+/* ==========================================
+   RESPONSIVE DESIGN
+========================================== */
+
+@media (max-width: 1100px) {
+  .gender-page {
+    padding: 38px 26px;
+  }
+
+  .gender-options {
+    gap: 20px;
+  }
+
+  .gender-card {
+    padding: 26px 20px;
+  }
+}
 
 @media (max-width: 900px) {
   .gender-page {
@@ -375,10 +484,19 @@
 
   .gender-options {
     grid-template-columns: 1fr;
+    max-width: 560px;
+    margin: 0 auto;
   }
 
   .gender-card {
-    min-height: 480px;
+    min-height: 540px;
+  }
+
+  .gender-avatar-preview,
+  .gender-avatar-preview.rendered {
+    width: 230px;
+    height: 315px;
+    min-height: 315px;
   }
 }
 
@@ -388,11 +506,23 @@
   }
 
   .gender-introduction {
-    text-align: left;
+    text-align: center;
+  }
+
+  .gender-introduction h1 {
+    font-size: 32px;
   }
 
   .gender-card {
-    padding: 25px 18px;
+    min-height: 0;
+    padding: 24px 18px;
+  }
+
+  .gender-avatar-preview,
+  .gender-avatar-preview.rendered {
+    width: 205px;
+    height: 285px;
+    min-height: 285px;
   }
 
   .gender-actions {
@@ -404,5 +534,18 @@
   .gender-secondary-button {
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .gender-avatar-preview,
+  .gender-avatar-preview.rendered {
+    width: 190px;
+    height: 265px;
+    min-height: 265px;
+  }
+
+  .gender-card-information h2 {
+    font-size: 24px;
   }
 }

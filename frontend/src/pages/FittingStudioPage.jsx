@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import RatingControl from "../components/RatingControl";
+import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/FittingStudioPage.css";
 
 const SKIN_TONES = [
@@ -70,6 +71,7 @@ function readAuthState() {
     const user = JSON.parse(
       localStorage.getItem("fitfusion-current-user") || "null"
     );
+
     return user || {};
   } catch {
     return {};
@@ -83,27 +85,25 @@ function normalizeGender(value) {
 }
 
 function loadAvatar(isGuest) {
-  const storage = isGuest
-    ? sessionStorage
-    : localStorage;
+  const storage = isGuest ? sessionStorage : localStorage;
 
   const genderKey = isGuest
     ? "fitfusion-guest-avatar-gender"
     : "fitfusion-avatar-gender";
 
-  const savedPreset = (() => {
-    try {
-      return JSON.parse(
-        storage.getItem(
-          isGuest
-            ? "fitfusion-guest-avatar-preset"
-            : "fitfusion-avatar-preset"
-        ) || "null"
-      );
-    } catch {
-      return null;
-    }
-  })();
+  const presetKey = isGuest
+    ? "fitfusion-guest-avatar-preset"
+    : "fitfusion-avatar-preset";
+
+  let savedPreset = null;
+
+  try {
+    savedPreset = JSON.parse(
+      storage.getItem(presetKey) || "null"
+    );
+  } catch {
+    savedPreset = null;
+  }
 
   return {
     gender: normalizeGender(
@@ -138,9 +138,7 @@ function ControlGroup({
           <button
             key={option}
             type="button"
-            className={
-              value === option ? "active" : ""
-            }
+            className={value === option ? "active" : ""}
             aria-pressed={value === option}
             onClick={() => onChange(option)}
           >
@@ -159,27 +157,14 @@ function FittingStudioPage({ isGuest = false }) {
     loadAvatar(isGuest)
   );
 
-  useEffect(() => {
-    if (isGuest) {
-      sessionStorage.setItem(
-        "fitfusion-guest-avatar-preset",
-        JSON.stringify(avatar)
-      );
-    }
-  }, [avatar, isGuest]);
+  const [currentView, setCurrentView] = useState("Front");
+  const [activePanel, setActivePanel] = useState("customize");
 
-  const [currentView, setCurrentView] =
-    useState("Front");
-
-  const [activePanel, setActivePanel] =
-    useState("customize");
-
-  const [equippedItems, setEquippedItems] =
-    useState({
-      top: null,
-      bottom: null,
-      shoes: null,
-    });
+  const [equippedItems, setEquippedItems] = useState({
+    top: null,
+    bottom: null,
+    shoes: null,
+  });
 
   const [
     showRegistrationModal,
@@ -191,39 +176,51 @@ function FittingStudioPage({ isGuest = false }) {
     setShowSaveOutfitModal,
   ] = useState(false);
 
-  const [outfitName, setOutfitName] =
-    useState("");
+  // =====================================
+  // AVATAR PRESET POPUP STATES
+  // =====================================
 
-  const [outfitNameError, setOutfitNameError] =
-    useState("");
+  const [
+    showSaveAvatarModal,
+    setShowSaveAvatarModal,
+  ] = useState(false);
 
-  const [notification, setNotification] =
-    useState("");
+  const [
+    avatarPresetName,
+    setAvatarPresetName,
+  ] = useState("");
 
-  const equippedItemsArray = useMemo(
-    () =>
-      Object.values(equippedItems).filter(
-        Boolean
-      ),
-    [equippedItems]
-  );
+  const [
+    avatarPresetNameError,
+    setAvatarPresetNameError,
+  ] = useState("");
 
-  const basePath = isGuest
-    ? "/guest"
-    : "/shopper";
+  const [outfitName, setOutfitName] = useState("");
+  const [outfitNameError, setOutfitNameError] = useState("");
+  const [notification, setNotification] = useState("");
+
+  const basePath = isGuest ? "/guest" : "/shopper";
 
   const isFemale =
     avatar.gender.toLowerCase() === "female";
 
-  const avatarClassName = [
-    "studio-avatar",
-    avatar.gender.toLowerCase(),
-    currentView.toLowerCase(),
-    `shoulder-${avatar.shoulder.toLowerCase()}`,
-    `waist-${avatar.waist.toLowerCase()}`,
-    `hip-${avatar.hip.toLowerCase()}`,
-    `thigh-${avatar.thigh.toLowerCase()}`,
-  ].join(" ");
+  const equippedItemsArray = useMemo(
+    () => Object.values(equippedItems).filter(Boolean),
+    [equippedItems]
+  );
+
+  // =====================================
+  // GUEST AVATAR STORAGE
+  // =====================================
+
+  useEffect(() => {
+    if (isGuest) {
+      sessionStorage.setItem(
+        "fitfusion-guest-avatar-preset",
+        JSON.stringify(avatar)
+      );
+    }
+  }, [avatar, isGuest]);
 
   function updateAvatar(field, value) {
     setAvatar((current) => ({
@@ -244,9 +241,54 @@ function FittingStudioPage({ isGuest = false }) {
     setShowRegistrationModal(true);
   }
 
+  // =====================================
+  // SAVE AVATAR PRESET
+  // =====================================
+
   function handleSavePreset() {
     if (isGuest) {
       openRegistrationPopup();
+      return;
+    }
+
+    // Open popup instead of saving immediately.
+    setAvatarPresetName("");
+    setAvatarPresetNameError("");
+    setShowSaveAvatarModal(true);
+  }
+
+  function closeSaveAvatarModal() {
+    setShowSaveAvatarModal(false);
+    setAvatarPresetName("");
+    setAvatarPresetNameError("");
+  }
+
+  function confirmSaveAvatarPreset(event) {
+    event.preventDefault();
+
+    if (isGuest) {
+      closeSaveAvatarModal();
+      openRegistrationPopup();
+      return;
+    }
+
+    const name = avatarPresetName
+      .trim()
+      .replace(/\s+/g, " ");
+
+    // VALIDATION 1: REQUIRED NAME
+    if (!name) {
+      setAvatarPresetNameError(
+        "Please enter a preset name before saving."
+      );
+      return;
+    }
+
+    // VALIDATION 2: CHARACTER LIMIT
+    if (name.length > 50) {
+      setAvatarPresetNameError(
+        "Preset name must not exceed 50 characters."
+      );
       return;
     }
 
@@ -254,40 +296,85 @@ function FittingStudioPage({ isGuest = false }) {
       "fitfusion-avatar-presets"
     );
 
+    // VALIDATION 3: DUPLICATE NAME
+    const isDuplicate =
+      name.toLowerCase() === "fitfusion standard" ||
+      savedPresets.some(
+        (preset) =>
+          String(preset.name || "")
+            .trim()
+            .toLowerCase() === name.toLowerCase()
+      );
+
+    if (isDuplicate) {
+      setAvatarPresetNameError(
+        "This preset name already exists. Please choose another name."
+      );
+      return;
+    }
+
+    // CREATE CUSTOM AVATAR PRESET
     const newPreset = {
-      id: `avatar-${Date.now()}`,
-      name: `${avatar.gender} Avatar ${
-        savedPresets.length + 1
-      }`,
       ...avatar,
+
+      id: `avatar-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}`,
+
+      name,
+
+      gender: normalizeGender(avatar.gender),
+
       cupSize: isFemale
         ? avatar.cupSize
         : null,
+
+      builtIn: false,
+
       updatedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(
-      "fitfusion-avatar-presets",
-      JSON.stringify([
-        newPreset,
-        ...savedPresets,
-      ])
-    );
+    try {
+      // Save custom avatar presets.
+      localStorage.setItem(
+        "fitfusion-avatar-presets",
+        JSON.stringify([
+          newPreset,
+          ...savedPresets,
+        ])
+      );
 
-    localStorage.setItem(
-      "fitfusion-avatar-preset",
-      JSON.stringify(newPreset)
-    );
+      // Save active avatar for Fitting Studio.
+      localStorage.setItem(
+        "fitfusion-avatar-preset",
+        JSON.stringify(newPreset)
+      );
 
-    localStorage.setItem(
-      "fitfusion-avatar-gender",
-      avatar.gender
-    );
+      localStorage.setItem(
+        "fitfusion-avatar-gender",
+        newPreset.gender
+      );
 
-    displayNotification(
-      "Your avatar preset was saved."
-    );
+      closeSaveAvatarModal();
+
+      displayNotification(
+        `“${name}” was saved to Avatar Presets.`
+      );
+    } catch (error) {
+      console.error(
+        "Unable to save avatar preset:",
+        error
+      );
+
+      setAvatarPresetNameError(
+        "Unable to save your avatar preset. Please try again."
+      );
+    }
   }
+
+  // =====================================
+  // EQUIP / REMOVE CLOTHING
+  // =====================================
 
   function tryRecommendedItem(item) {
     setEquippedItems((current) => ({
@@ -311,9 +398,9 @@ function FittingStudioPage({ isGuest = false }) {
     setActivePanel("recommendations");
   }
 
-  /* =====================================
-     SAVE OUTFIT POPUP
-  ===================================== */
+  // =====================================
+  // SAVE OUTFIT
+  // =====================================
 
   function saveOutfit() {
     if (isGuest) {
@@ -362,8 +449,8 @@ function FittingStudioPage({ isGuest = false }) {
       "fitfusion-saved-outfits"
     );
 
-    const savedProducts =
-      equippedItemsArray.map((item) => ({
+    const savedProducts = equippedItemsArray.map(
+      (item) => ({
         id: item.id,
         name: item.name,
         seller: item.store,
@@ -373,7 +460,8 @@ function FittingStudioPage({ isGuest = false }) {
         price: item.price,
         quantity: 1,
         image: item.image || "",
-      }));
+      })
+    );
 
     const newOutfit = {
       id: `outfit-${Date.now()}`,
@@ -381,13 +469,13 @@ function FittingStudioPage({ isGuest = false }) {
       occasion: "Casual",
       description: "",
       avatarView: currentView.toLowerCase(),
+
       avatar: {
         ...avatar,
-        cupSize: isFemale
-          ? avatar.cupSize
-          : null,
+        cupSize: isFemale ? avatar.cupSize : null,
         view: currentView,
       },
+
       products: savedProducts,
       items: equippedItemsArray,
       createdAt: new Date().toISOString(),
@@ -414,9 +502,9 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }
 
-  /* =====================================
-     CART
-  ===================================== */
+  // =====================================
+  // CART
+  // =====================================
 
   function continueToCart() {
     if (isGuest) {
@@ -441,9 +529,7 @@ function FittingStudioPage({ isGuest = false }) {
       )
     );
 
-    navigate(
-      "/shopper/fitting-studio/select-items"
-    );
+    navigate("/shopper/fitting-studio/select-items");
   }
 
   return (
@@ -453,19 +539,21 @@ function FittingStudioPage({ isGuest = false }) {
       }`}
     >
       <div className="studio-body">
-        {/* INTRODUCTION */}
+
+        {/* =====================================
+            INTRODUCTION
+        ===================================== */}
 
         <section className="studio-introduction">
           <div>
             <p>VIRTUAL FITTING</p>
 
-            <h1>
-              Customize and try clothing
-            </h1>
+            <h1>Customize and try clothing</h1>
 
             <span>
-              Customize your avatar and switch
-              between Front, Side, and Rear views.
+              Customize your avatar and switch between
+              Front, Side, and Rear views.
+
               {isGuest &&
                 " Your changes are temporary and will be removed when the guest session ends."}
             </span>
@@ -475,21 +563,23 @@ function FittingStudioPage({ isGuest = false }) {
             type="button"
             className="studio-change-gender"
             onClick={() =>
-              navigate(
-                `${basePath}/fitting-studio`
-              )
+              navigate(`${basePath}/fitting-studio`)
             }
           >
             Change Gender
           </button>
         </section>
 
-        {/* WORKSPACE */}
+        {/* =====================================
+            MAIN WORKSPACE
+        ===================================== */}
 
         <div className="studio-workspace">
+
           {/* CUSTOMIZATION PANEL */}
 
           <section className="studio-controls-card">
+
             <div className="studio-panel-tabs">
               <button
                 type="button"
@@ -498,7 +588,9 @@ function FittingStudioPage({ isGuest = false }) {
                     ? "active"
                     : ""
                 }
-                aria-pressed={activePanel === "customize"}
+                aria-pressed={
+                  activePanel === "customize"
+                }
                 onClick={() =>
                   setActivePanel("customize")
                 }
@@ -513,7 +605,9 @@ function FittingStudioPage({ isGuest = false }) {
                     ? "active"
                     : ""
                 }
-                aria-pressed={activePanel === "recommendations"}
+                aria-pressed={
+                  activePanel === "recommendations"
+                }
                 onClick={() =>
                   setActivePanel("recommendations")
                 }
@@ -524,52 +618,97 @@ function FittingStudioPage({ isGuest = false }) {
 
             {activePanel === "customize" ? (
               <div className="studio-customization-panel">
+
                 <div className="studio-selected-gender">
                   <span>Selected Gender</span>
                   <strong>{avatar.gender}</strong>
                 </div>
 
+                {/* HEIGHT AND WEIGHT */}
+
                 <div className="studio-measurement-grid">
-                  <label>
-                    <span>Height</span>
 
-                    <div className="studio-input-unit">
-                      <input
-                        type="number"
-                        min="120"
-                        max="220"
-                        value={avatar.height}
-                        onChange={(event) =>
-                          updateAvatar(
-                            "height",
-                            event.target.value
-                          )
-                        }
-                      />
-                      <span>cm</span>
+                  <div className="studio-slider-field">
+                    <div className="studio-slider-header">
+                      <label htmlFor="studio-height">
+                        Height
+                      </label>
+
+                      <strong>
+                        {avatar.height} cm
+                      </strong>
                     </div>
-                  </label>
 
-                  <label>
-                    <span>Weight</span>
+                    <input
+                      id="studio-height"
+                      className="studio-slider"
+                      type="range"
+                      min="120"
+                      max="218"
+                      step="1"
+                      value={Math.min(
+                        218,
+                        Math.max(
+                          120,
+                          Number(avatar.height) || 160
+                        )
+                      )}
+                      onChange={(event) =>
+                        updateAvatar(
+                          "height",
+                          event.target.value
+                        )
+                      }
+                    />
 
-                    <div className="studio-input-unit">
-                      <input
-                        type="number"
-                        min="30"
-                        max="200"
-                        value={avatar.weight}
-                        onChange={(event) =>
-                          updateAvatar(
-                            "weight",
-                            event.target.value
-                          )
-                        }
-                      />
-                      <span>kg</span>
+                    <div className="studio-slider-limits">
+                      <span>120 cm</span>
+                      <span>218 cm</span>
                     </div>
-                  </label>
+                  </div>
+
+                  <div className="studio-slider-field">
+                    <div className="studio-slider-header">
+                      <label htmlFor="studio-weight">
+                        Weight
+                      </label>
+
+                      <strong>
+                        {avatar.weight} kg
+                      </strong>
+                    </div>
+
+                    <input
+                      id="studio-weight"
+                      className="studio-slider"
+                      type="range"
+                      min="30"
+                      max="200"
+                      step="1"
+                      value={Math.min(
+                        200,
+                        Math.max(
+                          30,
+                          Number(avatar.weight) || 55
+                        )
+                      )}
+                      onChange={(event) =>
+                        updateAvatar(
+                          "weight",
+                          event.target.value
+                        )
+                      }
+                    />
+
+                    <div className="studio-slider-limits">
+                      <span>30 kg</span>
+                      <span>200 kg</span>
+                    </div>
+                  </div>
+
                 </div>
+
+                {/* BODY PROPORTIONS */}
 
                 <ControlGroup
                   label="Shoulder Width"
@@ -580,10 +719,7 @@ function FittingStudioPage({ isGuest = false }) {
                     "Broad",
                   ]}
                   onChange={(value) =>
-                    updateAvatar(
-                      "shoulder",
-                      value
-                    )
+                    updateAvatar("shoulder", value)
                   }
                 />
 
@@ -617,17 +753,9 @@ function FittingStudioPage({ isGuest = false }) {
                   <ControlGroup
                     label="Cup Size"
                     value={avatar.cupSize}
-                    options={[
-                      "A",
-                      "B",
-                      "C",
-                      "D",
-                    ]}
+                    options={["A", "B", "C", "D"]}
                     onChange={(value) =>
-                      updateAvatar(
-                        "cupSize",
-                        value
-                      )
+                      updateAvatar("cupSize", value)
                     }
                   />
                 )}
@@ -645,53 +773,57 @@ function FittingStudioPage({ isGuest = false }) {
                   }
                 />
 
+                {/* SKIN TONE */}
+
                 <div className="studio-skin-section">
                   <span>Skin Tone</span>
 
                   <div className="studio-skin-options">
-                    {SKIN_TONES.map(
-                      (skinTone) => (
-                        <button
-                          key={skinTone.name}
-                          type="button"
-                          className={
-                            avatar.skinTone ===
+                    {SKIN_TONES.map((skinTone) => (
+                      <button
+                        key={skinTone.name}
+                        type="button"
+                        className={
+                          avatar.skinTone ===
+                          skinTone.value
+                            ? "selected"
+                            : ""
+                        }
+                        style={{
+                          backgroundColor:
+                            skinTone.value,
+                        }}
+                        onClick={() =>
+                          updateAvatar(
+                            "skinTone",
                             skinTone.value
-                              ? "selected"
-                              : ""
-                          }
-                          style={{
-                            backgroundColor:
-                              skinTone.value,
-                          }}
-                          onClick={() =>
-                            updateAvatar(
-                              "skinTone",
-                              skinTone.value
-                            )
-                          }
-                          aria-pressed={
-                            avatar.skinTone ===
-                            skinTone.value
-                          }
-                          aria-label={
-                            skinTone.name
-                          }
-                          title={skinTone.name}
-                        />
-                      )
-                    )}
+                          )
+                        }
+                        aria-pressed={
+                          avatar.skinTone ===
+                          skinTone.value
+                        }
+                        aria-label={skinTone.name}
+                        title={skinTone.name}
+                      />
+                    ))}
                   </div>
                 </div>
 
                 <ControlGroup
                   label="Undertone"
                   value={avatar.undertone}
-                  options={["Warm", "Cool", "Neutral"]}
+                  options={[
+                    "Warm",
+                    "Cool",
+                    "Neutral",
+                  ]}
                   onChange={(value) =>
                     updateAvatar("undertone", value)
                   }
                 />
+
+                {/* SAVE AVATAR PRESET */}
 
                 <button
                   type="button"
@@ -708,60 +840,61 @@ function FittingStudioPage({ isGuest = false }) {
                 </button>
               </div>
             ) : (
+
+              /* RECOMMENDATIONS */
+
               <div className="studio-recommendations-panel">
+
                 <p className="studio-recommendation-note">
-                  Sample styling picks for this fitting preview. Select an item to try it on your avatar.
+                  Sample styling picks for this fitting
+                  preview. Select an item to try it
+                  on your avatar.
                 </p>
 
-                {RECOMMENDED_ITEMS.map(
-                  (item) => (
-                    <article
-                      key={item.id}
-                      className="studio-recommendation-item"
+                {RECOMMENDED_ITEMS.map((item) => (
+                  <article
+                    key={item.id}
+                    className="studio-recommendation-item"
+                  >
+                    <div
+                      className={`studio-clothing-thumbnail ${item.category}`}
+                      aria-hidden="true"
                     >
-                      <div
-                        className={`studio-clothing-thumbnail ${item.category}`}
-                        aria-hidden="true"
-                      >
-                        <span />
-                      </div>
+                      <span />
+                    </div>
 
-                      <div className="studio-recommendation-information">
-                        <h3>{item.name}</h3>
-                        <p>{item.store}</p>
-                        <strong>
-                          {formatCurrency(
-                            item.price
-                          )}
-                        </strong>
-                      </div>
+                    <div className="studio-recommendation-information">
+                      <h3>{item.name}</h3>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          tryRecommendedItem(
-                            item
-                          )
-                        }
-                      >
-                        Try Item
-                      </button>
-                    </article>
-                  )
-                )}
+                      <p>{item.store}</p>
+
+                      <strong>
+                        {formatCurrency(item.price)}
+                      </strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        tryRecommendedItem(item)
+                      }
+                    >
+                      Try Item
+                    </button>
+                  </article>
+                ))}
               </div>
             )}
           </section>
 
-          {/* AVATAR PREVIEW */}
+          {/* =====================================
+              AVATAR PREVIEW — CANVAS 2D
+          ===================================== */}
 
           <section className="studio-avatar-card">
+
             <div className="studio-view-buttons">
-              {[
-                "Front",
-                "Side",
-                "Rear",
-              ].map((view) => (
+              {["Front", "Side", "Rear"].map((view) => (
                 <button
                   key={view}
                   type="button"
@@ -769,6 +902,9 @@ function FittingStudioPage({ isGuest = false }) {
                     currentView === view
                       ? "active"
                       : ""
+                  }
+                  aria-pressed={
+                    currentView === view
                   }
                   onClick={() =>
                     setCurrentView(view)
@@ -780,9 +916,7 @@ function FittingStudioPage({ isGuest = false }) {
             </div>
 
             <div className="studio-avatar-label">
-              <span>
-                {avatar.gender} Avatar
-              </span>
+              <span>{avatar.gender} Avatar</span>
 
               <strong>
                 {currentView} View
@@ -790,86 +924,48 @@ function FittingStudioPage({ isGuest = false }) {
             </div>
 
             <div className="studio-avatar-stage">
-              <div
-                className={avatarClassName}
-                style={{
-                  "--avatar-skin":
-                    avatar.skinTone,
-                }}
-              >
-                <div className="studio-avatar-hair" />
 
-                <div className="studio-avatar-head">
-                  {currentView !== "Rear" && (
-                    <>
-                      <span />
-                      <span />
-                    </>
-                  )}
+              <AvatarCanvas
+                avatar={avatar}
+                view={currentView}
+                equippedItems={equippedItems}
+              />
+
+              <div className="studio-avatar-summary">
+                <div>
+                  <span>Gender</span>
+                  <strong>{avatar.gender}</strong>
                 </div>
 
-                <div className="studio-avatar-neck" />
-                <div className="studio-avatar-base-body" />
-                <div className="studio-avatar-left-arm" />
-                <div className="studio-avatar-right-arm" />
-                <div className="studio-avatar-left-leg" />
-                <div className="studio-avatar-right-leg" />
+                <div>
+                  <span>Height</span>
+                  <strong>
+                    {avatar.height} cm
+                  </strong>
+                </div>
 
-                {equippedItems.top && (
-                  <div className="equipped-top" />
-                )}
-
-                {equippedItems.bottom && (
-                  <div className="equipped-bottom" />
-                )}
-
-                {equippedItems.shoes && (
-                  <>
-                    <div className="equipped-shoe-left" />
-                    <div className="equipped-shoe-right" />
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="studio-avatar-summary">
-              <div>
-                <span>Gender</span>
-                <strong>
-                  {avatar.gender}
-                </strong>
-              </div>
-
-              <div>
-                <span>Height</span>
-                <strong>
-                  {avatar.height} cm
-                </strong>
-              </div>
-
-              <div>
-                <span>Weight</span>
-                <strong>
-                  {avatar.weight} kg
-                </strong>
+                <div>
+                  <span>Weight</span>
+                  <strong>
+                    {avatar.weight} kg
+                  </strong>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* EQUIPPED ITEMS */}
+          {/* =====================================
+              EQUIPPED ITEMS
+          ===================================== */}
 
           <aside className="studio-equipped-card">
             <h2>EQUIPPED ITEMS</h2>
 
             {equippedItemsArray.length === 0 ? (
               <div className="studio-empty-equipped">
-                <span aria-hidden="true">
-                  ◇
-                </span>
+                <span aria-hidden="true">◇</span>
 
-                <h3>
-                  No clothing equipped
-                </h3>
+                <h3>No clothing equipped</h3>
 
                 <p>
                   {isGuest
@@ -879,9 +975,8 @@ function FittingStudioPage({ isGuest = false }) {
               </div>
             ) : (
               <div className="studio-equipped-list">
-                {Object.entries(
-                  equippedItems
-                ).map(
+
+                {Object.entries(equippedItems).map(
                   ([category, item]) =>
                     item && (
                       <article
@@ -889,9 +984,7 @@ function FittingStudioPage({ isGuest = false }) {
                         className="studio-equipped-item"
                       >
                         <div>
-                          <span>
-                            {category}
-                          </span>
+                          <span>{category}</span>
 
                           <strong>
                             {item.name}
@@ -901,21 +994,26 @@ function FittingStudioPage({ isGuest = false }) {
                             Size {item.size} •{" "}
                             {item.color}
                           </small>
+
                           <RatingControl
                             key={`${category}-${item.id}`}
                             itemId={item.id}
                             isEquipped={Boolean(item)}
-                            authState={isGuest ? null : readAuthState()}
-                            onGuestRate={openRegistrationPopup}
+                            authState={
+                              isGuest
+                                ? null
+                                : readAuthState()
+                            }
+                            onGuestRate={
+                              openRegistrationPopup
+                            }
                           />
                         </div>
 
                         <button
                           type="button"
                           onClick={() =>
-                            removeEquippedItem(
-                              category
-                            )
+                            removeEquippedItem(category)
                           }
                         >
                           Remove
@@ -967,7 +1065,9 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       </div>
 
-      {/* NOTIFICATION */}
+      {/* =====================================
+          NOTIFICATION
+      ===================================== */}
 
       {notification && (
         <div
@@ -979,7 +1079,132 @@ function FittingStudioPage({ isGuest = false }) {
       )}
 
       {/* =====================================
-          SAVE OUTFIT NAME POPUP
+          SAVE AVATAR PRESET POPUP
+      ===================================== */}
+
+      {showSaveAvatarModal && !isGuest && (
+        <div
+          className="studio-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeSaveAvatarModal();
+            }
+          }}
+        >
+          <section
+            className="studio-save-outfit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-avatar-preset-title"
+          >
+            <button
+              type="button"
+              className="studio-modal-close"
+              onClick={closeSaveAvatarModal}
+              aria-label="Close save avatar preset popup"
+            >
+              ×
+            </button>
+
+            <p className="studio-modal-label">
+              SAVE YOUR AVATAR
+            </p>
+
+            <h2 id="studio-avatar-preset-title">
+              Save Avatar Preset
+            </h2>
+
+            <p className="studio-modal-description">
+              Enter a name for your customized
+              avatar before saving it to
+              Avatar Presets.
+            </p>
+
+            <form
+              onSubmit={confirmSaveAvatarPreset}
+              noValidate
+            >
+              <label
+                className="studio-save-outfit-field"
+                htmlFor="studio-avatar-preset-name"
+              >
+                Preset Name <span>*</span>
+              </label>
+
+              <input
+                id="studio-avatar-preset-name"
+                type="text"
+                className={`studio-save-outfit-input ${
+                  avatarPresetNameError
+                    ? "invalid"
+                    : ""
+                }`}
+                value={avatarPresetName}
+                onChange={(event) => {
+                  setAvatarPresetName(
+                    event.target.value
+                  );
+                  setAvatarPresetNameError("");
+                }}
+                placeholder="e.g. My Everyday Avatar"
+                maxLength={50}
+                autoFocus
+                required
+                aria-invalid={Boolean(
+                  avatarPresetNameError
+                )}
+                aria-describedby={
+                  avatarPresetNameError
+                    ? "studio-avatar-preset-name-error"
+                    : undefined
+                }
+              />
+
+              <div className="studio-save-outfit-hint">
+                {avatarPresetNameError ? (
+                  <span
+                    id="studio-avatar-preset-name-error"
+                    className="studio-save-outfit-error"
+                    role="alert"
+                  >
+                    {avatarPresetNameError}
+                  </span>
+                ) : (
+                  <span>Required field</span>
+                )}
+
+                <span>
+                  {avatarPresetName.length}/50
+                </span>
+              </div>
+
+              <div className="studio-save-outfit-actions">
+                <button
+                  type="button"
+                  className="studio-save-cancel-button"
+                  onClick={closeSaveAvatarModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="studio-save-confirm-button"
+                >
+                  Save Preset
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* =====================================
+          SAVE OUTFIT POPUP
       ===================================== */}
 
       {showSaveOutfitModal && !isGuest && (
@@ -1019,8 +1244,8 @@ function FittingStudioPage({ isGuest = false }) {
             </h2>
 
             <p className="studio-modal-description">
-              Give your outfit a name so you
-              can easily find it in Saved Outfits.
+              Give your outfit a name so you can
+              easily find it in Saved Outfits.
             </p>
 
             <form
@@ -1047,7 +1272,6 @@ function FittingStudioPage({ isGuest = false }) {
                   setOutfitName(
                     event.target.value
                   );
-
                   setOutfitNameError("");
                 }}
                 placeholder="e.g. Weekend Casual"
@@ -1073,9 +1297,7 @@ function FittingStudioPage({ isGuest = false }) {
                     {outfitNameError}
                   </span>
                 ) : (
-                  <span>
-                    Required field
-                  </span>
+                  <span>Required field</span>
                 )}
 
                 <span>
@@ -1104,7 +1326,9 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       )}
 
-      {/* REGISTRATION POPUP */}
+      {/* =====================================
+          REGISTRATION POPUP
+      ===================================== */}
 
       {showRegistrationModal && (
         <div
@@ -1115,9 +1339,7 @@ function FittingStudioPage({ isGuest = false }) {
               event.target ===
               event.currentTarget
             ) {
-              setShowRegistrationModal(
-                false
-              );
+              setShowRegistrationModal(false);
             }
           }}
         >
@@ -1132,9 +1354,7 @@ function FittingStudioPage({ isGuest = false }) {
               className="studio-modal-close"
               aria-label="Close registration popup"
               onClick={() =>
-                setShowRegistrationModal(
-                  false
-                )
+                setShowRegistrationModal(false)
               }
             >
               ×
@@ -1149,15 +1369,15 @@ function FittingStudioPage({ isGuest = false }) {
             </p>
 
             <h2 id="registration-title">
-              Unlock the complete fitting
-              experience
+              Unlock the complete fitting experience
             </h2>
 
             <p className="studio-modal-description">
               Create an account or log in to
-              access recommendations, save
-              avatar presets and outfits, and
-              add clothing items to your cart.
+              save avatar presets and outfits,
+              and add clothing items to your cart.
+              You can continue trying clothing
+              as a Guest.
             </p>
 
             <div className="studio-modal-actions">
@@ -1186,9 +1406,7 @@ function FittingStudioPage({ isGuest = false }) {
               type="button"
               className="studio-modal-continue"
               onClick={() =>
-                setShowRegistrationModal(
-                  false
-                )
+                setShowRegistrationModal(false)
               }
             >
               Continue as Guest
