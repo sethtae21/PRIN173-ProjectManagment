@@ -1,10 +1,30 @@
+/**
+ * frontend/src/services/api.js
+ * FitFusion AI HTTP client with resilience features.
+ *
+ * SESSION-SWAP FIX: all token persistence now goes through session.js (one key,
+ * atomic writes). getToken()/getRefreshToken() read from session.js per request;
+ * refreshAccessToken() updates tokens atomically via session.updateTokens();
+ * clearAuthStorage() clears both canonical and legacy keys via session.clearSession().
+ *
+ * PRESERVED FEATURES:
+ *  - Abort hung requests fast (10s default timeout)
+ *  - Circuit breaker: after a failure, skip network for 20s
+ *  - GET cache + in-flight de-dupe (kills StrictMode double requests)
+ *  - Auto 401-retry with refresh token
+ * Traceability: RT-01 / FR-1.6 / FR-1.7 (auth integrity).
+ */
+import {
+  getAccessToken,
+  getRefreshToken,
+  updateTokens,
+  clearSession,
+} from './session.js';
+
 export const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 /* ==========================================
    RESILIENCE CONFIG
-   - Abort hung requests fast (no more 30s spins)
-   - Circuit breaker: after a failure, skip network for 20s
-   - GET cache + in-flight de-dupe (kills StrictMode double requests)
    ========================================== */
 const DEFAULT_TIMEOUT_MS = 10000;
 const CIRCUIT_OPEN_MS = 20000;
@@ -15,8 +35,11 @@ const inflightRequests = new Map();
 const getCache = new Map();
 const ordersMemoryCache = { byId: new Map() };
 
-const getToken = () => localStorage.getItem('access_token');
-const getRefreshToken = () => localStorage.getItem('refresh_token');
+/* ==========================================
+   SESSION HELPERS (now backed by session.js)
+   ========================================== */
+const getToken = getAccessToken;
+const getRefresh = getRefreshToken;
 
 export class ApiError extends Error {
   constructor(message, status = 0, payload = null) {
@@ -38,15 +61,8 @@ function saveBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-/* ==========================================
-   SESSION HELPERS
-   ========================================== */
 function clearAuthStorage() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('fitfusion-current-user');
-  sessionStorage.removeItem('userRole');
-  sessionStorage.removeItem('userEmail');
+  clearSession(); // erases canonical + all legacy keys atomically
 }
 
 function forceLogout(message) {
@@ -70,10 +86,10 @@ function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
 }
 
 /* ==========================================
-   TOKEN REFRESH
+   TOKEN REFRESH (now atomic via session.js)
    ========================================== */
 async function refreshAccessToken() {
-  const refreshToken = getRefreshToken();
+  const refreshToken = getRefresh();
   if (!refreshToken) {
     forceLogout('Session expired. Please log in again.');
   }
@@ -86,10 +102,7 @@ async function refreshAccessToken() {
     forceLogout('Session expired. Please log in again.');
   }
   const data = await response.json();
-  localStorage.setItem('access_token', data.access);
-  if (data.refresh) {
-    localStorage.setItem('refresh_token', data.refresh);
-  }
+  updateTokens(data.access, data.refresh || null); // atomic write via session.js
   return data.access;
 }
 

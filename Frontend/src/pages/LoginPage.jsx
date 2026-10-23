@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import { authAPI } from "../services/api";
+import { setSession } from "../services/session";
 import "./css/LoginPage.css";
 
 function LoginPage() {
@@ -32,14 +33,6 @@ function LoginPage() {
       // Attempt login via backend API
       const response = await authAPI.login(credentials.email.trim().toLowerCase(), credentials.password);
 
-      // Save tokens
-      if (response.tokens?.access) {
-        localStorage.setItem("access_token", response.tokens.access);
-      }
-      if (response.tokens?.refresh) {
-        localStorage.setItem("refresh_token", response.tokens.refresh);
-      }
-
       // Determine role and extract user data
       const userData = response.user || {};
       const role = userData.role === "seller" ? "seller" : "shopper";
@@ -52,15 +45,16 @@ function LoginPage() {
         store_name: userData.store_name || "",
       };
 
-      localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
-      sessionStorage.setItem("userRole", role);
-      sessionStorage.setItem("userEmail", currentUser.email);
+      // Persist session atomically via session.js (replaces all manual localStorage writes)
+      setSession({
+        access: response.tokens?.access || response.access,
+        refresh: response.tokens?.refresh || response.refresh,
+        user: currentUser,
+      });
 
       if (role === "shopper") {
-        sessionStorage.setItem("registeredAccount", JSON.stringify(currentUser));
         navigate("/shopper/dashboard", { replace: true });
       } else {
-        localStorage.setItem("sellerAccount", JSON.stringify(currentUser));
         navigate("/seller/dashboard", { replace: true });
       }
     } catch (error) {
@@ -84,9 +78,6 @@ function LoginPage() {
   }
 
   function handleGuestEntry() {
-    sessionStorage.setItem("userRole", "guest");
-    sessionStorage.removeItem("userEmail");
-    localStorage.removeItem("fitfusion-current-user");
     navigate("/guest");
   }
 

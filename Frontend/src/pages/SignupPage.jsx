@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
-import { authAPI } from "../services/api"; // Added API import
+import { authAPI } from "../services/api";
+import { setSession } from "../services/session";
 import "./css/SignupPage.css";
 
 const provinces = [
@@ -327,21 +328,17 @@ export default function SignupPage({ role = "shopper" }) {
     scrollTop();
   }
 
-  // ==========================================
-  // UPDATED SUBMIT HANDLER WITH BACKEND INTEGRATION
-  // ==========================================
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (step !== 3 || !validateStep(3)) return;
 
-    // Frontend-only registration logic removed/replaced with API call
     const accountPayload = {
       email: form.email.trim().toLowerCase(),
       full_name: properCase(form.fullName),
       password: form.password,
       password_confirm: form.confirmPassword,
-      role: isSeller ? "seller" : "shopper", // CHANGED: "user" -> "shopper" to match backend
+      role: isSeller ? "seller" : "shopper",
       store_name: isSeller ? form.storeName.trim() : "",
       mobile: form.mobile,
       street: form.street.trim(),
@@ -352,17 +349,9 @@ export default function SignupPage({ role = "shopper" }) {
     };
 
     try {
-      // Call the backend API
       const response = await authAPI.register(accountPayload);
 
       if (response && response.success) {
-        // Store tokens
-        if (response.tokens) {
-          localStorage.setItem("access_token", response.tokens.access);
-          localStorage.setItem("refresh_token", response.tokens.refresh);
-        }
-
-        // Store user info
         const userData = response.user || {};
         const currentUser = {
           id: userData.id,
@@ -372,19 +361,19 @@ export default function SignupPage({ role = "shopper" }) {
           store_name: userData.store_name || (isSeller ? form.storeName.trim() : ""),
         };
 
-        localStorage.setItem("fitfusion-current-user", JSON.stringify(currentUser));
-        sessionStorage.setItem("userRole", currentUser.role);
-        sessionStorage.setItem("userEmail", currentUser.email);
+        // Persist session atomically via session.js (replaces all manual localStorage writes)
+        setSession({
+          access: response.tokens?.access || response.access,
+          refresh: response.tokens?.refresh || response.refresh,
+          user: currentUser,
+        });
 
         if (isSeller) {
-          localStorage.setItem("sellerAccount", JSON.stringify(currentUser));
           navigate("/seller/dashboard", { replace: true });
         } else {
-          localStorage.setItem("registeredAccount", JSON.stringify(currentUser));
           navigate("/shopper/dashboard", { replace: true });
         }
       } else {
-        // Fallback if response structure is weird but no error thrown
         setSubmitError("Registration successful but response format was unexpected.");
       }
 
@@ -394,7 +383,6 @@ export default function SignupPage({ role = "shopper" }) {
       let errorMessage = "Registration failed. Please try again.";
       
       try {
-        // Try to parse the error message from the API
         const errorData = JSON.parse(error.message);
         
         if (errorData.detail) {
@@ -408,14 +396,12 @@ export default function SignupPage({ role = "shopper" }) {
         } else if (errorData.non_field_errors) {
           errorMessage = errorData.non_field_errors[0];
         } else {
-          // Generic fallback
           const firstKey = Object.keys(errorData)[0];
           if (firstKey) {
              errorMessage = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
           }
         }
       } catch (parseError) {
-        // If parsing fails (e.g. "null" string), show generic message
         if (error.message && error.message !== "null") {
             errorMessage = error.message;
         } else {

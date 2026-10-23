@@ -41,17 +41,14 @@ INSTALLED_APPS = [
     'fitfusion.mongo_apps.MongoAdminConfig',
     'fitfusion.mongo_apps.MongoAuthConfig',
     'fitfusion.mongo_apps.MongoContentTypesConfig',
-    
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
-
     # Local apps
     'accounts',
     'catalog',
@@ -70,6 +67,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # DEV INSTRUMENT (identity audit trail for the swapped-profile bug).
+    # Logging-only; delete this single line to disable it completely.
+    'fitfusion.middleware.IdentityAuditMiddleware',
 ]
 
 ROOT_URLCONF = 'fitfusion.urls'
@@ -104,6 +104,7 @@ if not MONGODB_URI:
         raise ImproperlyConfigured('Set MONGODB_URI to the Atlas connection URI outside DEBUG mode.')
 if not DEBUG and not MONGODB_URI.lower().startswith('mongodb+srv://'):
     raise ImproperlyConfigured('Staging must use an Atlas mongodb+srv URI so TLS is enabled.')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django_mongodb_backend',
@@ -130,6 +131,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # MongoDB-native ObjectId primary keys
 DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
+
 AUTH_USER_MODEL = 'accounts.User'
 
 REST_FRAMEWORK = {
@@ -166,10 +168,8 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
-
 # Allow credentials (cookies, authorization headers) for JWT auth
 CORS_ALLOW_CREDENTIALS = True
-
 # Allow specific headers needed for file uploads and JWT
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -182,7 +182,6 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
-
 # Allow methods needed for REST API
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -192,7 +191,6 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
-
 # Allow all origins only in local development (for easier debugging)
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
