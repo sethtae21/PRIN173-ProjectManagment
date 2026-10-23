@@ -1,11 +1,24 @@
+
 /**
- * FitFusion AI - KAN-116 Canvas 2D reference implementation.
- * 14 x 34 control vertices, no WebGL/PixiJS.
- * Every layer shares the exact SAME source grid and destination displacements.
- * Visual approximation only. Not an anatomical model or fit prediction.
+ * FitFusion AI
+ * Weight-responsive 2D Avatar Engine
+ *
+ * Supports:
+ * - Female and Male Standard avatars
+ * - Front, Side, Rear
+ * - Height and weight
+ * - Shoulders, waist, hips, thighs
+ * - Female cup size
+ * - Skin tone and undertone
+ * - Clothing overlays
+ *
+ * IMPORTANT:
+ * The whole avatar uses ONE continuous mesh.
+ * Arms are never separated from shoulders.
  */
-export const GRID_COLS = 14;
-export const GRID_ROWS = 34;
+
+export const GRID_COLS = 37;
+export const GRID_ROWS = 65;
 export const REFERENCE_HEIGHT_CM = 164;
 
 export const BODY_OPTIONS = {
@@ -25,314 +38,1397 @@ export const SKIN_TONES = {
   Deep: "#65432f",
 };
 
-const SILHOUETTES = ["A", "B", "C", "D", "E"];
-export function selectSilhouette(weightKg, heightCm) {
-  const safeHeight = Math.max(1, Number(heightCm) || REFERENCE_HEIGHT_CM);
-  const referenceWeight = Number(weightKg) * (170 / safeHeight) ** 2;
-  const index = referenceWeight < 55 ? 0 : referenceWeight < 75 ? 1 : referenceWeight < 95 ? 2 : referenceWeight < 120 ? 3 : 4;
-  return { referenceWeight, letter: SILHOUETTES[index] };
-}
+// ==========================================
+// UTILITIES
+// ==========================================
 
-export function imageToCanvas(image, width, height) {
+const clamp = (x, min, max) =>
+  Math.max(min, Math.min(max, x));
+
+const lerp = (a, b, t) =>
+  a + (b - a) * t;
+
+const smoothstep = (a, b, x) => {
+  const t = clamp(
+    (x - a) / (b - a || 1),
+    0,
+    1
+  );
+
+  return t * t * (3 - 2 * t);
+};
+
+const gaussian = (x, center, width) => {
+  const z = (x - center) / width;
+
+  return Math.exp(-0.5 * z * z);
+};
+
+const option = (value, low, high) => {
+  const s = String(value || "").toLowerCase();
+
+  if (s === low.toLowerCase()) return -1;
+  if (s === high.toLowerCase()) return 1;
+
+  return 0;
+};
+
+function newCanvas(width, height) {
   const canvas = document.createElement("canvas");
+
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.clearRect(0, 0, width, height);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(image, 0, 0, width, height);
+
   return canvas;
 }
 
-/**
- * Detect the actual silhouette, not the blank margin of the exported PNG.
- * Perimeter pixels with alpha>=50 count as body, with noise rejected by row counts.
- * Results are in the same canvas coordinates used by all image layers.
- */
+// ==========================================
+// SILHOUETTE SELECTION
+// ==========================================
+
+export function selectSilhouette(
+  weightKg,
+  heightCm
+) {
+  const height = clamp(
+    Number(heightCm) || 164,
+    120,
+    218
+  );
+
+  const weight = clamp(
+    Number(weightKg) || 58,
+    30,
+    200
+  );
+
+  const referenceWeight =
+    weight * (170 / height) ** 2;
+
+  const letter =
+    referenceWeight < 55
+      ? "A"
+      : referenceWeight < 75
+        ? "B"
+        : referenceWeight < 95
+          ? "C"
+          : referenceWeight < 120
+            ? "D"
+            : "E";
+
+  return {
+    letter,
+    referenceWeight,
+  };
+}
+
+// ==========================================
+// IMAGE TO CANVAS
+// ==========================================
+
+export function imageToCanvas(
+  image,
+  width,
+  height
+) {
+  if (!image) return null;
+
+  const canvas = newCanvas(width, height);
+
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) return null;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  ctx.drawImage(
+    image,
+    0,
+    0,
+    width,
+    height
+  );
+
+  return canvas;
+}
+
+// ==========================================
+// DETECT AVATAR BOUNDS
+// ==========================================
+
 export function detectBodyBounds(canvas) {
   if (!canvas) return null;
-  const w = canvas.width, h = canvas.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  const { width, height } = canvas;
+
+  const ctx = canvas.getContext("2d", {
+    willReadFrequently: true,
+  });
+
   if (!ctx) return null;
-  const { data } = ctx.getImageData(0, 0, w, h);
-  const scanStep = Math.max(1, Math.floor(w / 450));
-  const minPixels = Math.max(2, Math.floor(w / (250 * scanStep)));
-  let left = w, right = -1, top = h, bottom = -1;
+
+  const pixels = ctx.getImageData(
+    0,
+    0,
+    width,
+    height
+  ).data;
+
+  let left = width;
+  let right = -1;
+  let top = height;
+  let bottom = -1;
+
   const rows = [];
-  for (let y = 0; y < h; y += scanStep) {
-    let rowL = w, rowR = -1, count = 0;
-    for (let x = 0; x < w; x += scanStep) {
-      if (data[(y * w + x) * 4 + 3] < 50) continue;
-      count++;
-      rowL = Math.min(rowL, x);
-      rowR = Math.max(rowR, x);
+
+  for (let y = 0; y < height; y++) {
+    let rowLeft = width;
+    let rowRight = -1;
+
+    for (let x = 0; x < width; x++) {
+      const index = (y * width + x) * 4;
+
+      if (pixels[index + 3] < 45) {
+        continue;
+      }
+
+      rowLeft = Math.min(rowLeft, x);
+      rowRight = Math.max(rowRight, x);
     }
-    if (count < minPixels) continue;
-    rows.push({ y, left: rowL, right: rowR });
-    left = Math.min(left, rowL);
-    right = Math.max(right, rowR);
+
+    if (rowRight < rowLeft) {
+      continue;
+    }
+
+    rows.push({
+      y,
+      left: rowLeft,
+      right: rowRight,
+    });
+
+    left = Math.min(left, rowLeft);
+    right = Math.max(right, rowRight);
+
     top = Math.min(top, y);
     bottom = Math.max(bottom, y);
   }
-  if (right < left || bottom <= top) return null;
-  const width = Math.max(1, right - left);
-  const height = Math.max(1, bottom - top);
-  // The padded ROI protects the hands and garment overlays from being cropped.
-  const xPad = Math.max(8, width * 0.20);
-  const yPad = Math.max(5, height * 0.05);
-  const roi = {
-    x0: Math.max(0, left - xPad),
-    x1: Math.min(w, right + xPad),
-    y0: Math.max(0, top - yPad),
-    y1: Math.min(h, bottom + yPad),
-  };
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
   return {
-    left, right, top, bottom, width, height,
+    left,
+    right,
+    top,
+    bottom,
+    rows,
+
+    width: right - left,
+    height: bottom - top,
+
     cx: (left + right) / 2,
-    roi, rows,
+
+    roi: {
+      x0: 0,
+      x1: width - 1,
+      y0: 0,
+      y1: height - 1,
+    },
   };
 }
 
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const region = (t, center, radius) => {
-  const u = Math.abs(t - center) / radius;
-  return u >= 1 ? 0 : (1 - u * u) ** 2;
-};
+// ==========================================
+// CONTINUOUS BODY DEFORMATION
+// ==========================================
 
-/**
- * Height uses the detected body from head to feet, moving the head as a rigid
- * block rather than changing its length. Foot pixel remains fixed.
- */
-function heightShift(bodyT, fullHeight, requestedCm) {
-  const delta = clamp((requestedCm - REFERENCE_HEIGHT_CM) / REFERENCE_HEIGHT_CM, -0.18, 0.34);
-  const total = fullHeight * delta * 0.79;
-  const legs = total * 0.61;
-  const torso = total * 0.39;
-  if (bodyT >= 1) return 0;
-  if (bodyT >= 0.56) return -legs * (1 - bodyT) / 0.44;
-  if (bodyT >= 0.14) return -legs - torso * (0.56 - bodyT) / 0.42;
-  return -legs - torso; // head moves together, never stretches
-}
+export function makeLattice(
+  width,
+  height,
+  bounds,
+  config = {}
+) {
+  if (!bounds) {
+    return { lattice: [] };
+  }
 
-/**
- * The local horizontal influence fades to zero outside the body envelope.
- * Vertical regions reference the detected body height, NOT entire PNG height.
- * Thus shoulders stop at the neck; the head does not deform sideways.
- */
-export function makeLattice(width, height, bounds, config) {
-  const { view, heightCm, shoulders, waist, hips, thighs, cup, strength = 1 } = config;
-  const sign = (value, neg, pos) => value === pos ? 1 : value === neg ? -1 : 0;
-  const s = sign(shoulders, "Narrow", "Broad");
-  const w = sign(waist, "Slim", "Curvy");
-  const h = sign(hips, "Slim", "Wide");
-  const t = sign(thighs, "Slim", "Thick");
-  const b = ({ A: -0.9, B: 0, C: 0.55, D: 1 })[cup] ?? 0;
-  const roi = bounds.roi;
+  const gender =
+    String(config.gender).toLowerCase() === "male"
+      ? "male"
+      : "female";
+
+  const view = String(
+    config.view || "front"
+  ).toLowerCase();
+
+  const sideView = view === "side";
+
+  const heightCm = clamp(
+    Number(config.heightCm) || 164,
+    120,
+    218
+  );
+
+  const weightKg = clamp(
+    Number(config.weightKg) ||
+      (gender === "male" ? 70 : 58),
+    30,
+    200
+  );
+
+  const baseline =
+    gender === "male" ? 70 : 58;
+
+  // Height-aware weight index.
+  // Used only for visual avatar proportions.
+  const referenceWeight =
+    weightKg * (164 / heightCm) ** 2;
+
+  const weightChange = clamp(
+    Math.log(
+      Math.max(1, referenceWeight) / baseline
+    ) / Math.log(200 / baseline),
+    -0.9,
+    1.35
+  );
+
+  const positive = Math.max(
+    0,
+    weightChange
+  );
+
+  const negative = Math.min(
+    0,
+    weightChange
+  );
+
+  // ========================================
+  // MANUAL BODY CONTROLS
+  // ========================================
+
+  const shoulder = option(
+    config.shoulders,
+    "Narrow",
+    "Broad"
+  );
+
+  const waist = option(
+    config.waist,
+    "Slim",
+    "Curvy"
+  );
+
+  const hips = option(
+    config.hips,
+    "Slim",
+    "Wide"
+  );
+
+  const thighs = option(
+    config.thighs,
+    "Slim",
+    "Thick"
+  );
+
+  const cup =
+    gender === "female"
+      ? ({
+          A: -0.8,
+          B: 0,
+          C: 0.55,
+          D: 1,
+        }[
+          String(
+            config.cup || "B"
+          ).toUpperCase()
+        ] ?? 0)
+      : 0;
+
+  const strength = clamp(
+    Number(config.strength ?? 1),
+    0,
+    1
+  );
+
+  // ========================================
+  // HEIGHT ADJUSTMENT
+  // ========================================
+
+  const desiredHeightShift =
+    bounds.height *
+    (heightCm / 164 - 1) *
+    0.62;
+
+  const heightShift = clamp(
+    desiredHeightShift,
+    -bounds.height * 0.16,
+    Math.max(0, bounds.top - 12)
+  );
+
+  // ========================================
+  // CANVAS SAFETY
+  // ========================================
+
+  const halfWidth = Math.max(
+    1,
+    bounds.width / 2
+  );
+
+  const leftRoom = Math.max(
+    10,
+    bounds.left - 8
+  );
+
+  const rightRoom = Math.max(
+    10,
+    width - bounds.right - 8
+  );
+
+  const maxExpansion =
+    Math.min(leftRoom, rightRoom) /
+    halfWidth;
+
   const lattice = [];
-  const sideAttenuation = view === "side" ? 0.42 : 1;
-  for (let row = 0; row < GRID_ROWS; row++) {
-    const sy = roi.y0 + ((roi.y1 - roi.y0) * row) / (GRID_ROWS - 1);
-    const bodyT = (sy - bounds.top) / bounds.height;
-    const shoulderInfluence = region(bodyT, 0.215, 0.097);
-    const waistInfluence = region(bodyT, 0.435, 0.10);
-    const hipInfluence = region(bodyT, 0.575, 0.102);
-    const thighInfluence = region(bodyT, 0.715, 0.125);
-    const chestInfluence = region(bodyT, 0.320, 0.088);
-    const dxAmount =
-      s * shoulderInfluence * 0.105 * sideAttenuation +
-      w * waistInfluence * 0.093 * sideAttenuation +
-      h * hipInfluence * 0.11 * sideAttenuation +
-      t * thighInfluence * 0.09 * sideAttenuation +
-      b * chestInfluence * 0.032 * (view === "side" ? 0 : 1);
-    for (let col = 0; col < GRID_COLS; col++) {
-      const sx = roi.x0 + ((roi.x1 - roi.x0) * col) / (GRID_COLS - 1);
-      const xRelative = (sx - bounds.cx) / (bounds.width / 2);
-      const xFalloff = Math.max(0, 1 - (Math.abs(xRelative) / 1.65) ** 2);
-      let dx = bounds.width * dxAmount * xRelative * xFalloff * strength;
-      if (view === "side") {
-        // Chest variant render is recommended for production. This limited
-        // localized displacement is only a quick experimental cup-size test.
-        const facing = config.sideFacing === "right" ? 1 : -1;
-        dx += facing * bounds.width * b * chestInfluence * 0.042 * xFalloff * strength;
+
+  // ========================================
+  // BUILD DEFORMATION ROWS
+  // ========================================
+
+  for (
+    let row = 0;
+    row < GRID_ROWS;
+    row++
+  ) {
+    const sy =
+      ((height - 1) * row) /
+      (GRID_ROWS - 1);
+
+    const t =
+      (sy - bounds.top) /
+      Math.max(1, bounds.height);
+
+    // Smooth overlapping body regions.
+    // No abrupt separation at shoulders.
+    const shoulderBand = gaussian(
+      t,
+      0.245,
+      0.095
+    );
+
+    const chestBand = gaussian(
+      t,
+      0.335,
+      0.105
+    );
+
+    const bellyBand = gaussian(
+      t,
+      0.465,
+      0.115
+    );
+
+    const hipBand = gaussian(
+      t,
+      0.585,
+      0.105
+    );
+
+    const thighBand = gaussian(
+      t,
+      0.705,
+      0.105
+    );
+
+    const calfBand = gaussian(
+      t,
+      0.845,
+      0.075
+    );
+
+    // Protect head and feet.
+    const bodyFade =
+      smoothstep(0.12, 0.23, t) *
+      (
+        1 -
+        smoothstep(0.90, 1.01, t)
+      );
+
+    // ======================================
+    // AUTOMATIC WEIGHT PROPORTIONS
+    // ======================================
+
+    const weightGrowth =
+      positive *
+        (
+          0.14 * shoulderBand +
+          0.22 * chestBand +
+          0.46 * bellyBand +
+          0.35 * hipBand +
+          0.26 * thighBand +
+          0.13 * calfBand
+        ) +
+      negative *
+        (
+          0.10 * shoulderBand +
+          0.18 * chestBand +
+          0.30 * bellyBand +
+          0.23 * hipBand +
+          0.17 * thighBand +
+          0.08 * calfBand
+        );
+
+    // ======================================
+    // MANUAL PROPORTION REFINEMENTS
+    // ======================================
+
+    const manualGrowth =
+      shoulder * 0.055 * shoulderBand +
+      waist * 0.07 * bellyBand +
+      hips * 0.075 * hipBand +
+      thighs * 0.065 * thighBand +
+      cup *
+        (sideView ? 0.065 : 0.025) *
+        chestBand;
+
+    const requestedGrowth = clamp(
+      (
+        weightGrowth +
+        manualGrowth
+      ) *
+        bodyFade *
+        strength,
+      -0.24,
+      0.72
+    );
+
+    // Expand the entire body continuously.
+    // Arms move outward with the torso.
+    const growth = Math.min(
+      requestedGrowth,
+      Math.max(
+        0,
+        maxExpansion * 0.96
+      )
+    );
+
+    // Keep feet anchored.
+    const dy =
+      -heightShift *
+      (
+        1 -
+        smoothstep(0.13, 1, t)
+      );
+
+    const rowPoints = [];
+
+    // ======================================
+    // BUILD HORIZONTAL CONTROL POINTS
+    // ======================================
+
+    for (
+      let col = 0;
+      col < GRID_COLS;
+      col++
+    ) {
+      const sx =
+        ((width - 1) * col) /
+        (GRID_COLS - 1);
+
+      const nx =
+        (sx - bounds.cx) /
+        halfWidth;
+
+      const absX = Math.abs(nx);
+
+      // Whole-body scaling keeps shoulder
+      // and upper-arm pixels connected.
+      const scale =
+        1 +
+        growth *
+          (sideView ? 0.82 : 1);
+
+      let dx =
+        (sx - bounds.cx) *
+        (scale - 1);
+
+      // ====================================
+      // FRONT / REAR BELLY AND HIP SHAPE
+      // ====================================
+
+      if (!sideView) {
+        const localBelly =
+          positive *
+            0.17 *
+            bellyBand +
+          Math.max(0, waist) *
+            0.025 *
+            bellyBand;
+
+        const localHips =
+          positive *
+          0.09 *
+          hipBand;
+
+        dx +=
+          Math.tanh(nx * 5) *
+          halfWidth *
+          (
+            localBelly +
+            localHips
+          ) *
+          gaussian(
+            absX,
+            0.38,
+            0.32
+          ) *
+          bodyFade *
+          strength;
+      } else {
+        // ==================================
+        // SIDE-VIEW BODY PROJECTION
+        // ==================================
+
+        const facing =
+          config.sideFacing === "right"
+            ? 1
+            : -1;
+
+        dx +=
+          facing *
+          halfWidth *
+          (
+            positive *
+              0.12 *
+              bellyBand +
+            positive *
+              0.045 *
+              chestBand +
+            Math.max(0, waist) *
+              0.035 *
+              bellyBand
+          ) *
+          gaussian(
+            nx,
+            0,
+            0.62
+          ) *
+          bodyFade *
+          strength;
       }
-      const dy = heightShift(bodyT, bounds.height, heightCm);
-      lattice.push({
-        src: { x: sx, y: sy },
-        dst: { x: sx + dx, y: sy + dy },
+
+      rowPoints.push({
+        src: {
+          x: sx,
+          y: sy,
+        },
+
+        dst: {
+          x: sx + dx,
+          y: sy + dy,
+        },
       });
     }
+
+    // ======================================
+    // PREVENT FOLDED MESH / BROKEN ARMS
+    // ======================================
+
+    for (
+      let col = 1;
+      col < rowPoints.length;
+      col++
+    ) {
+      const previous =
+        rowPoints[col - 1];
+
+      const current =
+        rowPoints[col];
+
+      const minimum =
+        previous.dst.x +
+        (
+          current.src.x -
+          previous.src.x
+        ) *
+          0.24;
+
+      current.dst.x = Math.max(
+        current.dst.x,
+        minimum
+      );
+    }
+
+    lattice.push(...rowPoints);
   }
-  return { lattice };
+
+  return {
+    lattice,
+    weightChange,
+    referenceWeight,
+    heightCm,
+  };
 }
 
-function getAffine(a, b, c) {
-  const [s0, s1, s2] = [a.src, b.src, c.src];
-  const [d0, d1, d2] = [a.dst, b.dst, c.dst];
-  const den = s0.x * (s1.y - s2.y) + s1.x * (s2.y - s0.y) + s2.x * (s0.y - s1.y);
-  if (Math.abs(den) < 1e-5) return null;
-  const A = (d0.x * (s1.y - s2.y) + d1.x * (s2.y - s0.y) + d2.x * (s0.y - s1.y)) / den;
-  const C = (d0.x * (s2.x - s1.x) + d1.x * (s0.x - s2.x) + d2.x * (s1.x - s0.x)) / den;
-  const E = (d0.x * (s1.x * s2.y - s2.x * s1.y) + d1.x * (s2.x * s0.y - s0.x * s2.y) + d2.x * (s0.x * s1.y - s1.x * s0.y)) / den;
-  const B = (d0.y * (s1.y - s2.y) + d1.y * (s2.y - s0.y) + d2.y * (s0.y - s1.y)) / den;
-  const D = (d0.y * (s2.x - s1.x) + d1.y * (s0.x - s2.x) + d2.y * (s1.x - s0.x)) / den;
-  const F = (d0.y * (s1.x * s2.y - s2.x * s1.y) + d1.y * (s2.x * s0.y - s0.x * s2.y) + d2.y * (s0.x * s1.y - s1.x * s0.y)) / den;
-  return [A, B, C, D, E, F];
+// ==========================================
+// SMOOTH CANVAS RENDERING
+// ==========================================
+
+export function renderLayer(
+  ctx,
+  source,
+  mesh
+) {
+  if (
+    !ctx ||
+    !source ||
+    !mesh?.lattice?.length
+  ) {
+    return;
+  }
+
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+
+  const sourceCtx = source.getContext(
+    "2d",
+    {
+      willReadFrequently: true,
+    }
+  );
+
+  if (!sourceCtx) return;
+
+  const src = sourceCtx.getImageData(
+    0,
+    0,
+    width,
+    height
+  ).data;
+
+  const out = ctx.createImageData(
+    width,
+    height
+  );
+
+  const dst = out.data;
+  const points = mesh.lattice;
+
+  // ========================================
+  // INVERSE PIXEL MAPPING
+  // ========================================
+
+  for (
+    let y = 0;
+    y < height;
+    y++
+  ) {
+    const py = y + 0.5;
+
+    if (
+      py < points[0].dst.y ||
+      py >
+        points[
+          (GRID_ROWS - 1) *
+            GRID_COLS
+        ].dst.y
+    ) {
+      continue;
+    }
+
+    let low = 0;
+    let high = GRID_ROWS - 1;
+
+    while (high - low > 1) {
+      const mid =
+        (low + high) >> 1;
+
+      if (
+        points[
+          mid * GRID_COLS
+        ].dst.y <= py
+      ) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    const top = low * GRID_COLS;
+    const bottom = high * GRID_COLS;
+
+    const y0 = points[top].dst.y;
+    const y1 = points[bottom].dst.y;
+
+    const fy = clamp(
+      (py - y0) /
+        Math.max(
+          0.00001,
+          y1 - y0
+        ),
+      0,
+      1
+    );
+
+    const sy = lerp(
+      points[top].src.y,
+      points[bottom].src.y,
+      fy
+    );
+
+    const xDest = new Float32Array(
+      GRID_COLS
+    );
+
+    for (
+      let c = 0;
+      c < GRID_COLS;
+      c++
+    ) {
+      xDest[c] = lerp(
+        points[top + c].dst.x,
+        points[bottom + c].dst.x,
+        fy
+      );
+    }
+
+    // ======================================
+    // SAMPLE HORIZONTAL PIXELS
+    // ======================================
+
+    for (
+      let x = 0;
+      x < width;
+      x++
+    ) {
+      const px = x + 0.5;
+
+      if (
+        px < xDest[0] ||
+        px > xDest[GRID_COLS - 1]
+      ) {
+        continue;
+      }
+
+      let a = 0;
+      let b = GRID_COLS - 1;
+
+      while (b - a > 1) {
+        const mid = (a + b) >> 1;
+
+        if (xDest[mid] <= px) {
+          a = mid;
+        } else {
+          b = mid;
+        }
+      }
+
+      const fx = clamp(
+        (px - xDest[a]) /
+          Math.max(
+            0.00001,
+            xDest[b] -
+              xDest[a]
+          ),
+        0,
+        1
+      );
+
+      const sx = lerp(
+        points[top + a].src.x,
+        points[top + b].src.x,
+        fx
+      );
+
+      if (
+        sx < 0 ||
+        sy < 0 ||
+        sx >= width - 1 ||
+        sy >= height - 1
+      ) {
+        continue;
+      }
+
+      // ====================================
+      // BILINEAR PIXEL SAMPLING
+      // ====================================
+
+      const u = clamp(
+        sx - 0.5,
+        0,
+        width - 1
+      );
+
+      const v = clamp(
+        sy - 0.5,
+        0,
+        height - 1
+      );
+
+      const ix = Math.floor(u);
+      const iy = Math.floor(v);
+
+      const jx = Math.min(
+        width - 1,
+        ix + 1
+      );
+
+      const jy = Math.min(
+        height - 1,
+        iy + 1
+      );
+
+      const tx = u - ix;
+      const ty = v - iy;
+
+      const indices = [
+        (iy * width + ix) * 4,
+        (iy * width + jx) * 4,
+        (jy * width + ix) * 4,
+        (jy * width + jx) * 4,
+      ];
+
+      const weights = [
+        (1 - tx) * (1 - ty),
+        tx * (1 - ty),
+        (1 - tx) * ty,
+        tx * ty,
+      ];
+
+      let alpha = 0;
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+
+      for (
+        let k = 0;
+        k < 4;
+        k++
+      ) {
+        const index = indices[k];
+
+        const opacity =
+          (src[index + 3] / 255) *
+          weights[k];
+
+        alpha += opacity;
+
+        red +=
+          src[index] *
+          opacity;
+
+        green +=
+          src[index + 1] *
+          opacity;
+
+        blue +=
+          src[index + 2] *
+          opacity;
+      }
+
+      if (alpha <= 0.0001) {
+        continue;
+      }
+
+      const dest =
+        (y * width + x) * 4;
+
+      dst[dest] =
+        red / alpha;
+
+      dst[dest + 1] =
+        green / alpha;
+
+      dst[dest + 2] =
+        blue / alpha;
+
+      dst[dest + 3] =
+        alpha * 255;
+    }
+  }
+
+  // Use an offscreen canvas so transparent
+  // clothing layers composite correctly.
+  const layer = newCanvas(
+    width,
+    height
+  );
+
+  layer
+    .getContext("2d")
+    .putImageData(
+      out,
+      0,
+      0
+    );
+
+  ctx.drawImage(
+    layer,
+    0,
+    0
+  );
 }
 
-function drawTriangle(ctx, source, a, b, c) {
-  const mat = getAffine(a, b, c);
-  if (!mat) return;
+// ==========================================
+// OPTIONAL DEBUG GRID
+// ==========================================
+
+export function renderGrid(
+  ctx,
+  mesh
+) {
+  if (
+    !ctx ||
+    !mesh?.lattice?.length
+  ) {
+    return;
+  }
+
   ctx.save();
-  ctx.beginPath();
-  const centroid = { x: (a.dst.x + b.dst.x + c.dst.x) / 3, y: (a.dst.y + b.dst.y + c.dst.y) / 3 };
-  function edge(p) {
-    const dx = p.x - centroid.x, dy = p.y - centroid.y;
-    const norm = Math.hypot(dx, dy) || 1;
-    return { x: p.x + 0.5 * dx / norm, y: p.y + 0.5 * dy / norm };
+
+  ctx.strokeStyle =
+    "rgba(172,112,28,0.45)";
+
+  ctx.lineWidth = 0.7;
+
+  for (
+    let row = 0;
+    row < GRID_ROWS;
+    row++
+  ) {
+    ctx.beginPath();
+
+    for (
+      let col = 0;
+      col < GRID_COLS;
+      col++
+    ) {
+      const p =
+        mesh.lattice[
+          row * GRID_COLS +
+            col
+        ].dst;
+
+      if (col === 0) {
+        ctx.moveTo(
+          p.x,
+          p.y
+        );
+      } else {
+        ctx.lineTo(
+          p.x,
+          p.y
+        );
+      }
+    }
+
+    ctx.stroke();
   }
-  const p0 = edge(a.dst), p1 = edge(b.dst), p2 = edge(c.dst);
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(p1.x, p1.y);
-  ctx.lineTo(p2.x, p2.y);
-  ctx.closePath();
-  ctx.clip();
-  ctx.transform(...mat);
-  const sx = Math.max(0, Math.floor(Math.min(a.src.x, b.src.x, c.src.x) - 2));
-  const sy = Math.max(0, Math.floor(Math.min(a.src.y, b.src.y, c.src.y) - 2));
-  const ex = Math.min(source.width, Math.ceil(Math.max(a.src.x, b.src.x, c.src.x) + 2));
-  const ey = Math.min(source.height, Math.ceil(Math.max(a.src.y, b.src.y, c.src.y) + 2));
-  if (ex > sx && ey > sy) ctx.drawImage(source, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy);
+
   ctx.restore();
 }
 
-export function renderLayer(ctx, source, mesh) {
-  if (!source || !mesh) return;
-  const { lattice } = mesh;
-  for (let r = 0; r < GRID_ROWS - 1; r++) {
-    for (let c = 0; c < GRID_COLS - 1; c++) {
-      const k = r * GRID_COLS + c;
-      const tl = lattice[k], tr = lattice[k + 1], bl = lattice[k + GRID_COLS], br = lattice[k + GRID_COLS + 1];
-      drawTriangle(ctx, source, tl, tr, br);
-      drawTriangle(ctx, source, tl, br, bl);
-    }
-  }
-}
+// ==========================================
+// SKIN TONE
+// ==========================================
 
-export function renderGrid(ctx, mesh, bounds) {
-  if (!mesh) return;
-  ctx.save();
-  ctx.strokeStyle = "rgba(195, 128, 30, .65)";
-  ctx.lineWidth = 1;
-  for (let row = 0; row < GRID_ROWS; row++) {
-    ctx.beginPath();
-    for (let col = 0; col < GRID_COLS; col++) {
-      const p = mesh.lattice[row * GRID_COLS + col].dst;
-      if (col === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-    }
-    ctx.stroke();
+export function tintBody(
+  source,
+  tone,
+  undertone = "Neutral"
+) {
+  if (
+    !source ||
+    tone == null ||
+    tone === "Original"
+  ) {
+    return source;
   }
-  for (let col = 0; col < GRID_COLS; col++) {
-    ctx.beginPath();
-    for (let row = 0; row < GRID_ROWS; row++) {
-      const p = mesh.lattice[row * GRID_COLS + col].dst;
-      if (row === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-    }
-    ctx.stroke();
-  }
-  // Draw landmark bars so developers can inspect the ACTUAL calibrated zones.
-  const landmarkY = [0.215, 0.32, 0.435, 0.575, 0.715];
-  const names = ["Shoulders", "Cup", "Waist", "Hips", "Thighs"];
-  ctx.font = "11px Arial";
-  ctx.fillStyle = "#9b6f2c";
-  landmarkY.forEach((t, i) => {
-    const y = bounds.top + t * bounds.height;
-    ctx.fillText(names[i], Math.max(3, bounds.left - 95), y);
-  });
-  ctx.restore();
-}
 
-function rgb(hex) { return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)); }
-export function tintBody(source, tone, undertone) {
-  if (!source || tone === "Original") return source;
-  const canvas = document.createElement("canvas");
-  canvas.width = source.width; canvas.height = source.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return source;
-  ctx.drawImage(source, 0, 0);
-  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const [r0, g0, b0] = rgb(SKIN_TONES[tone] || SKIN_TONES.Fair);
-  const offsets = undertone === "Warm" ? [6, 3, -7] : undertone === "Cool" ? [-4, 0, 9] : [0, 0, 0];
-  for (let i = 0; i < frame.data.length; i += 4) {
-    if (frame.data[i + 3] < 5) continue;
-    const luma = (frame.data[i] * .2126 + frame.data[i + 1] * .7152 + frame.data[i + 2] * .0722) / 255;
-    const brightness = clamp(0.75 + (luma - 0.5) * 0.65, 0.50, 1.08);
-    frame.data[i] = clamp(Math.round((r0 + offsets[0]) * brightness), 0, 255);
-    frame.data[i + 1] = clamp(Math.round((g0 + offsets[1]) * brightness), 0, 255);
-    frame.data[i + 2] = clamp(Math.round((b0 + offsets[2]) * brightness), 0, 255);
+  const hex =
+    typeof tone === "string" &&
+    /^#[0-9a-f]{6}$/i.test(tone)
+      ? tone
+      : (
+          SKIN_TONES[tone] ||
+          SKIN_TONES.Fair
+        );
+
+  const rgb = [1, 3, 5].map(
+    (i) =>
+      parseInt(
+        hex.slice(i, i + 2),
+        16
+      )
+  );
+
+  const offset =
+    String(undertone).toLowerCase() ===
+    "warm"
+      ? [5, 2, -4]
+      : String(
+          undertone
+        ).toLowerCase() === "cool"
+        ? [-3, 0, 6]
+        : [0, 0, 0];
+
+  const canvas = newCanvas(
+    source.width,
+    source.height
+  );
+
+  const ctx = canvas.getContext(
+    "2d",
+    {
+      willReadFrequently: true,
+    }
+  );
+
+  ctx.drawImage(
+    source,
+    0,
+    0
+  );
+
+  const frame = ctx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  const data = frame.data;
+
+  let total = 0;
+  let count = 0;
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+    if (data[i + 3] < 45) {
+      continue;
+    }
+
+    total +=
+      (
+        data[i] * 0.21 +
+        data[i + 1] * 0.72 +
+        data[i + 2] * 0.07
+      ) /
+      255;
+
+    count++;
   }
-  ctx.putImageData(frame, 0, 0);
+
+  if (!count) {
+    return canvas;
+  }
+
+  const average =
+    total / count;
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+    if (data[i + 3] < 5) {
+      continue;
+    }
+
+    const luminance =
+      (
+        data[i] * 0.21 +
+        data[i + 1] * 0.72 +
+        data[i + 2] * 0.07
+      ) /
+      255;
+
+    const light = clamp(
+      1 +
+        (
+          luminance -
+          average
+        ) *
+          0.95,
+      0.67,
+      1.23
+    );
+
+    for (
+      let k = 0;
+      k < 3;
+      k++
+    ) {
+      data[i + k] = clamp(
+        (
+          rgb[k] +
+          offset[k]
+        ) *
+          light,
+        0,
+        255
+      );
+    }
+  }
+
+  ctx.putImageData(
+    frame,
+    0,
+    0
+  );
+
   return canvas;
 }
 
-/**
- * Draws a clearly labeled ILLUSTRATIVE piece for a real catalog item.
- * CatalogPage currently stores emoji + metadata, not three registered PNGs.
- * This is not a photo conversion, and cannot prove actual seller-photo fit.
- */
-export function catalogIllustration(product, bounds, view, width, height) {
-  if (!product || !bounds) return null;
-  const canvas = document.createElement("canvas");
-  canvas.width = width; canvas.height = height;
+// ==========================================
+// CLOTHING ILLUSTRATIONS
+// ==========================================
+
+export function catalogIllustration(
+  product,
+  bounds,
+  view,
+  width,
+  height
+) {
+  if (
+    !product ||
+    !bounds
+  ) {
+    return null;
+  }
+
+  const canvas = newCanvas(
+    width,
+    height
+  );
+
   const ctx = canvas.getContext("2d");
-  const bw = bounds.width, bh = bounds.height;
-  const cx = bounds.cx;
-  const fy = (p) => bounds.top + bh * p;
-  const fx = (p) => cx + bw * p;
-  const isSide = view === "side";
-  const originalColor = String(product.colors?.[0] || "Ivory").toLowerCase();
+
   const colors = {
-    ivory: "#e4ddc8", beige: "#c6ad82", black: "#36302c", sand: "#baa183",
-    brown: "#80604a", cream: "#e1ceac", gold: "#c5a447", blue: "#6b88aa",
-    navy: "#3e5671", olive: "#75794e", white: "#ebebdf",
+    ivory: "#e4ddc8",
+    beige: "#c6ad82",
+    black: "#36302c",
+    sand: "#baa183",
+    brown: "#80604a",
+    cream: "#e1ceac",
+    gold: "#c5a447",
+    blue: "#6b88aa",
+    navy: "#3e5671",
+    olive: "#75794e",
+    white: "#ebebdf",
+    charcoal: "#4a494b",
+    red: "#ae554e",
+    pink: "#d69ca5",
+    green: "#788b68",
   };
-  ctx.fillStyle = colors[originalColor] || "#c4a77b";
-  ctx.strokeStyle = "rgba(48,32,17,.55)";
-  ctx.lineWidth = Math.max(0.8, width / 750);
+
+  const color = String(
+    product.colors?.[0] ||
+      product.color ||
+      "Ivory"
+  ).toLowerCase();
+
+  ctx.fillStyle =
+    colors[color] ||
+    (
+      color.startsWith("#")
+        ? color
+        : "#c4a77b"
+    );
+
+  ctx.strokeStyle =
+    "rgba(48,32,17,0.55)";
+
+  ctx.lineWidth = 1;
   ctx.lineJoin = "round";
 
-  function poly(coords) {
+  const X = (p) =>
+    bounds.cx +
+    bounds.width * p;
+
+  const Y = (p) =>
+    bounds.top +
+    bounds.height * p;
+
+  const poly = (points) => {
     ctx.beginPath();
-    coords.forEach(([x, y], i) => i ? ctx.lineTo(fx(x), fy(y)) : ctx.moveTo(fx(x), fy(y)));
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  }
-  const category = String(product.category || "Tops").toLowerCase();
-  const sleeve = category.includes("outer") ? 0.10 : 0.06;
-  if (category.includes("top") || category.includes("outer")) {
-    if (isSide) {
-      poly([[-0.19, .22], [0.15, .21], [0.21, .3], [0.17, .47], [-0.14, .47], [-0.20, .34]]);
+
+    points.forEach(
+      ([x, y], i) => {
+        if (i) {
+          ctx.lineTo(
+            X(x),
+            Y(y)
+          );
+        } else {
+          ctx.moveTo(
+            X(x),
+            Y(y)
+          );
+        }
+      }
+    );
+
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  const category = String(
+    product.category || "Tops"
+  ).toLowerCase();
+
+  const name = String(
+    product.name || ""
+  ).toLowerCase();
+
+  const side =
+    String(view).toLowerCase() ===
+    "side";
+
+  if (
+    category.includes("top") ||
+    category.includes("outer")
+  ) {
+    poly(
+      side
+        ? [
+            [-0.19, 0.22],
+            [0.15, 0.21],
+            [0.21, 0.30],
+            [0.17, 0.47],
+            [-0.14, 0.47],
+            [-0.20, 0.34],
+          ]
+        : [
+            [-0.21, 0.21],
+            [-0.34, 0.24],
+            [-0.36, 0.32],
+            [-0.24, 0.33],
+            [-0.18, 0.46],
+            [0.18, 0.46],
+            [0.24, 0.33],
+            [0.36, 0.32],
+            [0.34, 0.24],
+            [0.21, 0.21],
+            [0.12, 0.20],
+            [-0.12, 0.20],
+          ]
+    );
+  } else if (
+    category.includes("bottom")
+  ) {
+    if (name.includes("skirt")) {
+      poly(
+        side
+          ? [
+              [-0.16, 0.48],
+              [0.17, 0.48],
+              [0.27, 0.70],
+              [-0.23, 0.70],
+            ]
+          : [
+              [-0.18, 0.48],
+              [0.18, 0.48],
+              [0.34, 0.70],
+              [-0.34, 0.70],
+            ]
+      );
     } else {
-      poly([[-.21,.21],[-.34,.24],[-.36,.24+sleeve],[-.24,.33],[-.18,.46],[.18,.46],[.24,.33],[.36,.24+sleeve],[.34,.24],[.21,.21],[.12,.20],[-.12,.20]]);
+      poly(
+        side
+          ? [
+              [-0.18, 0.51],
+              [0.19, 0.51],
+              [0.19, 0.83],
+              [-0.09, 0.83],
+              [-0.07, 0.62],
+              [-0.17, 0.83],
+              [-0.29, 0.83],
+            ]
+          : [
+              [-0.22, 0.51],
+              [0.22, 0.51],
+              [0.22, 0.60],
+              [0.12, 0.84],
+              [0.01, 0.84],
+              [0, 0.64],
+              [-0.02, 0.84],
+              [-0.14, 0.84],
+              [-0.22, 0.60],
+            ]
+      );
     }
-  } else if (category.includes("bottom")) {
-    if (product.name.toLowerCase().includes("skirt")) {
-      poly(isSide ? [[-.16,.48],[.17,.48],[.27,.70],[-.23,.70]] : [[-.18,.48],[.18,.48],[.34,.70],[-.34,.70]]);
+  } else if (
+    category.includes("dress")
+  ) {
+    poly(
+      side
+        ? [
+            [-0.17, 0.22],
+            [0.17, 0.22],
+            [0.14, 0.49],
+            [0.31, 0.75],
+            [-0.26, 0.75],
+            [-0.13, 0.48],
+          ]
+        : [
+            [-0.20, 0.21],
+            [-0.32, 0.24],
+            [-0.35, 0.31],
+            [-0.20, 0.34],
+            [-0.13, 0.47],
+            [-0.34, 0.76],
+            [0.34, 0.76],
+            [0.13, 0.47],
+            [0.20, 0.34],
+            [0.35, 0.31],
+            [0.32, 0.24],
+            [0.20, 0.21],
+          ]
+    );
+  } else if (
+    category.includes("footwear") ||
+    category.includes("shoe")
+  ) {
+    if (side) {
+      poly([
+        [-0.18, 0.955],
+        [-0.03, 0.955],
+        [0.10, 0.972],
+        [0.12, 0.995],
+        [-0.20, 0.995],
+      ]);
+
+      poly([
+        [0.03, 0.955],
+        [0.18, 0.955],
+        [0.28, 0.975],
+        [0.28, 0.995],
+        [0, 0.995],
+      ]);
     } else {
-      poly(isSide ? [[-.18,.51],[.19,.51],[.19,.83],[-.09,.83],[-.07,.62],[-.17,.83],[-.29,.83]] : [[-.22,.51],[.22,.51],[.22,.6],[.12,.84],[.01,.84],[0,.64],[-.02,.84],[-.14,.84],[-.22,.6]]);
+      poly([
+        [-0.20, 0.955],
+        [-0.04, 0.955],
+        [-0.03, 0.995],
+        [-0.24, 0.995],
+      ]);
+
+      poly([
+        [0.04, 0.955],
+        [0.20, 0.955],
+        [0.24, 0.995],
+        [0.03, 0.995],
+      ]);
     }
-  } else if (category.includes("dress")) {
-    poly(isSide ? [[-.17,.22],[.17,.22],[.14,.49],[.31,.75],[-.26,.75],[-.13,.48]] : [[-.2,.21],[-.32,.24],[-.35,.31],[-.20,.34],[-.13,.47],[-.34,.76],[.34,.76],[.13,.47],[.2,.34],[.35,.31],[.32,.24],[.20,.21]]);
   } else {
     return null;
   }
-  // Subtle seams identify this as illustration, not the real seller photo.
-  ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = "#392818";
-  ctx.beginPath();
-  ctx.moveTo(fx(0), fy(category.includes("bottom") ? .52 : .24));
-  ctx.lineTo(fx(0), fy(category.includes("bottom") ? .82 : .45));
-  ctx.stroke(); ctx.restore();
+
   return canvas;
 }

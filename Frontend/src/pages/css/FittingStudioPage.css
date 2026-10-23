@@ -1,4 +1,3 @@
-
 /* ==========================================
    FITFUSION AI - FITTING STUDIO
 ========================================== */
@@ -31,7 +30,9 @@
   padding: 42px 0 70px;
 }
 
-/* INTRODUCTION */
+/* ==========================================
+   INTRODUCTION
+========================================== */
 
 .studio-introduction {
   display: flex;
@@ -83,7 +84,9 @@
   background: #8e641f;
 }
 
-/* WORKSPACE */
+/* ==========================================
+   WORKSPACE
+========================================== */
 
 .studio-workspace {
   display: grid;
@@ -107,7 +110,9 @@
     0 12px 30px rgba(70, 52, 26, 0.05);
 }
 
-/* TABS */
+/* ==========================================
+   TABS
+========================================== */
 
 .studio-panel-tabs {
   display: grid;
@@ -140,7 +145,9 @@
   );
 }
 
-/* CUSTOMIZATION */
+/* ==========================================
+   CUSTOMIZATION
+========================================== */
 
 .studio-customization-panel,
 .studio-recommendations-panel {
@@ -166,6 +173,10 @@
 .studio-selected-gender strong {
   color: #8e641f;
 }
+
+/* ==========================================
+   HEIGHT & WEIGHT MEASUREMENT GRID
+========================================== */
 
 .studio-measurement-grid {
   display: grid;
@@ -210,6 +221,96 @@
   font-size: 10px;
 }
 
+/* ==========================================
+   HEIGHT & WEIGHT SLIDERS
+   Preserved for future integration
+========================================== */
+
+.studio-slider-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.studio-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.studio-slider-header label {
+  color: #29251f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.studio-slider-header strong {
+  color: #8e641f;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-slider {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin: 9px 0;
+  border: 0;
+  border-radius: 999px;
+  outline-offset: 5px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #e2d1af;
+  cursor: pointer;
+}
+
+.studio-slider::-webkit-slider-thumb {
+  width: 19px;
+  height: 19px;
+  border: 3px solid #fffdf9;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #b57e20;
+  box-shadow:
+    0 1px 6px rgba(23, 19, 15, 0.24);
+  cursor: grab;
+}
+
+.studio-slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 3px solid #fffdf9;
+  border-radius: 50%;
+  background: #b57e20;
+  box-shadow:
+    0 1px 6px rgba(23, 19, 15, 0.24);
+  cursor: grab;
+}
+
+.studio-slider:focus-visible {
+  outline: 2px solid #8e641f;
+}
+
+.studio-slider-limits {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #81766a;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ==========================================
+   BODY CONTROL GROUPS
+========================================== */
+
 .studio-control-group {
   margin-bottom: 22px;
 }
@@ -253,7 +354,9 @@
   font-weight: 700;
 }
 
-/* SKIN TONES */
+/* ==========================================
+   SKIN TONES
+========================================== */
 
 .studio-skin-section {
   margin-bottom: 26px;
@@ -280,7 +383,9 @@
     0 0 0 4px #d7af4b;
 }
 
-/* SAVE AVATAR PRESET */
+/* ==========================================
+   SAVE AVATAR PRESET
+========================================== */
 
 .studio-save-preset,
 .studio-registration-button {
@@ -315,7 +420,9 @@
   background: #8e641f;
 }
 
-/* RECOMMENDATIONS */
+/* ==========================================
+   RECOMMENDATIONS
+========================================== */
 
 .studio-recommendation-note {
   margin: 0 0 18px;
@@ -404,7 +511,9 @@
   cursor: pointer;
 }
 
-/* AVATAR PREVIEW */
+/* ==========================================
+   AVATAR PREVIEW
+========================================== */
 
 .studio-avatar-card {
   padding: 24px;
@@ -450,11 +559,19 @@
   font-size: 11px;
 }
 
+/* UPDATED:
+   Keeps avatar and summary inside the same
+   preview stage without overlapping.
+*/
+
 .studio-avatar-stage {
   position: relative;
-  display: grid;
-  min-height: 510px;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 545px;
+  padding: 16px 12px;
   overflow: hidden;
   border: 1px solid #e2d8c7;
   background:
@@ -468,21 +585,28 @@
 
 .studio-avatar-stage::before {
   position: absolute;
+  top: 44%;
+  left: 50%;
   width: 370px;
   height: 370px;
-  border: 1px solid
-    rgba(181, 126, 32, 0.2);
+  border: 1px solid rgba(181, 126, 32, 0.2);
   border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
   content: "";
 }
 
-/* AVATAR BODY */
+/* ==========================================
+   EXISTING AVATAR BODY
+   Preserved for integration compatibility
+========================================== */
 
 .studio-avatar {
   --avatar-skin: #dca77d;
 
   position: relative;
   z-index: 1;
+  flex: 0 0 445px;
   width: 210px;
   height: 445px;
   transition: transform 0.2s ease;
@@ -655,7 +779,9 @@
   width: 49px;
 }
 
-/* CLOTHING LAYERS */
+/* ==========================================
+   CLOTHING LAYERS
+========================================== */
 
 .equipped-top {
   position: absolute;
@@ -716,14 +842,25 @@
   right: 47px;
 }
 
-/* AVATAR INFORMATION */
+/* ==========================================
+   AVATAR INFORMATION
+========================================== */
+
+/* UPDATED:
+   Full-width summary below the avatar.
+*/
 
 .studio-avatar-summary {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns:
     repeat(3, minmax(0, 1fr));
+  flex-shrink: 0;
   gap: 9px;
-  margin-top: 15px;
+  width: 100%;
+  max-width: 440px;
+  margin-top: 12px;
 }
 
 .studio-avatar-summary div {
@@ -743,7 +880,9 @@
   font-size: 10px;
 }
 
-/* EQUIPPED ITEMS */
+/* ==========================================
+   EQUIPPED ITEMS
+========================================== */
 
 .studio-equipped-card {
   padding: 25px;
@@ -825,7 +964,9 @@
   cursor: pointer;
 }
 
-/* ACTION BUTTONS */
+/* ==========================================
+   ACTION BUTTONS
+========================================== */
 
 .studio-open-recommendations,
 .studio-save-outfit,
@@ -877,7 +1018,9 @@
   background: #8e641f;
 }
 
-/* NOTIFICATION */
+/* ==========================================
+   NOTIFICATION
+========================================== */
 
 .studio-notification {
   position: fixed;
@@ -890,7 +1033,8 @@
   border-radius: 10px;
   color: #fffdf9;
   background: #17130f;
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.2);
   font-size: 12px;
   font-weight: 700;
 }
@@ -910,7 +1054,9 @@
   backdrop-filter: blur(4px);
 }
 
-/* REGISTRATION MODAL */
+/* ==========================================
+   REGISTRATION MODAL
+========================================== */
 
 .studio-registration-modal {
   position: relative;
@@ -1209,7 +1355,7 @@
   }
 
   .studio-avatar-stage {
-    min-height: 470px;
+    min-height: 545px;
   }
 }
 
@@ -1225,7 +1371,8 @@
   }
 
   .studio-measurement-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 
   .studio-customization-panel,
@@ -1246,7 +1393,7 @@
   }
 
   .studio-avatar-stage {
-    min-height: 450px;
+    min-height: 545px;
   }
 
   .studio-notification {
@@ -1254,4 +1401,81 @@
     bottom: 12px;
     max-width: calc(100% - 24px);
   }
+}
+
+/* ==========================================
+   EXPORTED 2D AVATAR IMAGES
+========================================== */
+
+/* Preserves existing avatar image cropping. */
+
+.studio-avatar {
+  overflow: hidden;
+}
+
+/* The PNG already contains its Side view.
+   Do not squash it a second time. */
+
+.studio-avatar.side {
+  transform: none;
+}
+
+.studio-avatar-image,
+.studio-avatar-color {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  display: block;
+  width: 210px;
+  height: 420px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Skin-tone mask uses the same PNG path
+   supplied by the Fitting Studio JSX. */
+
+.studio-avatar-color {
+  z-index: 1;
+  background-color: var(--avatar-skin);
+
+  -webkit-mask-image: var(--avatar-mask);
+  mask-image: var(--avatar-mask);
+
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+
+  -webkit-mask-position: center;
+  mask-position: center;
+
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Retain shading and details of the
+   original Blender-exported PNG. */
+
+.studio-avatar-image {
+  z-index: 2;
+  object-fit: fill;
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+}
+
+/* Existing female avatar alignment. */
+
+.studio-avatar.female .studio-avatar-image,
+.studio-avatar.female .studio-avatar-color {
+  top: -145px;
+  width: 300px;
+  height: 600px;
+}
+
+/* Existing male avatar alignment. */
+
+.studio-avatar.male .studio-avatar-image,
+.studio-avatar.male .studio-avatar-color {
+  top: 10px;
+  width: 210px;
+  height: 420px;
 }
