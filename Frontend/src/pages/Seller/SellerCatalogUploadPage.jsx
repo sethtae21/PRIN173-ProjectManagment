@@ -54,6 +54,10 @@ const TAG_OPTIONS = {
   ],
 };
 
+// KAN-FIX: Extended polling to handle long batches (~150s for 3 items)
+const POLL_INTERVAL_MS = 2500;
+const MAX_POLL_ATTEMPTS = 240; // 240 * 2.5s = 10 minutes
+
 function getSellerStoreName() {
   const storageKeys = [
     "fitfusion-current-user",
@@ -206,7 +210,46 @@ function analyzeCsvText(text) {
     })
     .filter((record) => record.name !== "");
 
-  return { productRows, missingColumns };
+  return { productRows, missingColumns, header: normalizedHeader };
+}
+
+// KAN-FIX: Helper to detect hex color in rejection reason
+function extractHexFromReason(reason) {
+  const match = String(reason || "").match(/#[0-9a-fA-F]{6}/);
+  return match ? match[0] : null;
+}
+
+// KAN-FIX: Convert hex to color family
+function hexToColorFamily(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+
+  if (max < 70) return "Black";
+  if (min > 195) return "White";
+
+  const delta = max - min;
+  if (delta < 30) return "Neutral";
+
+  let hue = 0;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+
+  hue = (hue * 60 + 360) % 360;
+
+  if (lightness < 120 && hue >= 15 && hue < 45) return "Brown";
+  if (hue < 15 || hue >= 345) return "Red";
+  if (hue < 45) return "Orange";
+  if (hue < 70) return "Yellow";
+  if (hue < 165) return "Green";
+  if (hue < 255) return "Blue";
+  if (hue < 285) return "Purple";
+  return "Pink";
 }
 
 /* ==========================================
@@ -217,10 +260,12 @@ function SellerCatalogUploadPage() {
 
   const [storeName] = useState(getSellerStoreName);
   const [csvFile, setCsvFile] = useState(null);
+  const [csvData, setCsvData] = useState(null); // KAN-FIX: Store parsed CSV for correction
   const [images, setImages] = useState(initialImages);
   const [errors, setErrors] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
+  const [corrections, setCorrections] = useState({}); // KAN-FIX: Store edits for rejected items
 
   const [isDownloadingTemplate, setIsDownloadingTemplate] =
     useState(false);
@@ -258,6 +303,7 @@ function SellerCatalogUploadPage() {
 
     if (!file) {
       setCsvFile(null);
+      setCsvData(null);
       return;
     }
 
@@ -265,6 +311,7 @@ function SellerCatalogUploadPage() {
 
     if (extension !== "csv") {
       setCsvFile(null);
+      setCsvData(null);
       setErrors((current) => ({
         ...current,
         csv: "Please upload a valid CSV file.",
@@ -275,6 +322,7 @@ function SellerCatalogUploadPage() {
 
     if (file.size > MAX_FILE_BYTES) {
       setCsvFile(null);
+      setCsvData(null);
       setErrors((current) => ({
         ...current,
         csv: "The CSV file must not exceed 5 MB.",
@@ -285,6 +333,16 @@ function SellerCatalogUploadPage() {
 
     setCsvFile(file);
     setErrors((current) => ({ ...current, csv: "" }));
+
+    // KAN-FIX: Parse and store CSV data immediately
+    file.text().then((text) => {
+      try {
+        const { productRows, header } = analyzeCsvText(text);
+        setCsvData({ rows: productRows, header });
+      } catch (err) {
+        console.error("CSV parse error:", err);
+      }
+    });
   }
 
   /* ---------- Multi-file image drop zones (FR-4.2) ---------- */
@@ -364,7 +422,7 @@ function SellerCatalogUploadPage() {
 
     try {
       const csvText = await csvFile.text();
-      const { productRows } = analyzeCsvText(csvText);
+      const { productRows, header } = analyzeCsvText(csvText);
 
       if (productRows.length === 0) {
         setErrors({ csv: "The CSV file does not contain any product records." });
@@ -436,6 +494,9 @@ function SellerCatalogUploadPage() {
         return;
       }
 
+      // KAN-FIX: Store CSV data for potential correction
+      setCsvData({ rows: productRows, header });
+
       const formData = new FormData();
       formData.append("csv_file", csvFile);
       [...images.front, ...images.side, ...images.rear].forEach((item) => {
@@ -483,7 +544,7 @@ function SellerCatalogUploadPage() {
     }
   }
 
-  /* ---------- Batch report polling ---------- */
+  /* ---------- Batch report polling (KAN-FIX: Extended timeout) ---------- */
   function pollBatchReport(batchId, attempts) {
     pollTimer.current = setTimeout(async () => {
       try {
@@ -494,7 +555,8 @@ function SellerCatalogUploadPage() {
           return;
         }
 
-        if (attempts >= 30) {
+        // KAN-FIX: Increased max attempts from 30 to MAX_POLL_ATTEMPTS (10 minutes)
+        if (attempts >= MAX_POLL_ATTEMPTS) {
           setValidationResult({
             type: "processing",
             title: "Still processing",
@@ -518,7 +580,7 @@ function SellerCatalogUploadPage() {
         }
         pollBatchReport(batchId, attempts + 1);
       }
-    }, 2500);
+    }, POLL_INTERVAL_MS);
   }
 
   async function finishWithReport(batchId, report) {
@@ -534,11 +596,13 @@ function SellerCatalogUploadPage() {
         });
 
         details = reportEntries.map(([itemId, reasons]) => ({
+          id: itemId,
           name: nameById[itemId] || `Item ${itemId.slice(0, 8)}`,
           reasons: Array.isArray(reasons) ? reasons : [reasons],
         }));
       } catch {
         details = reportEntries.map(([itemId, reasons]) => ({
+          id: itemId,
           name: `Item ${itemId.slice(0, 8)}`,
           reasons: Array.isArray(reasons) ? reasons : [reasons],
         }));
@@ -575,6 +639,7 @@ function SellerCatalogUploadPage() {
         message:
           report.rejection_report?.error ||
           "The backend could not process this batch.",
+        batchId,
       });
     } else if (report.rejected_count > 0) {
       setValidationResult({
@@ -582,16 +647,134 @@ function SellerCatalogUploadPage() {
         title: `Processing complete — ${report.accepted_count} accepted, ${report.rejected_count} rejected`,
         message: `${report.total_items} item(s) processed for ${storeName}. Rejected items are listed below and on the Product Validation page.`,
         details,
+        batchId,
       });
     } else {
       setValidationResult({
         type: "success",
         title: "Catalog validated successfully",
         message: `${report.accepted_count} product(s) published to ${storeName}.`,
+        batchId,
       });
     }
 
     setIsProcessing(false);
+  }
+
+  /* ---------- KAN-FIX: Re-upload corrected rows ---------- */
+  async function handleReuploadCorrected() {
+    if (!csvData || !csvFile) return;
+
+    const rejectedNames = new Set(
+      (validationResult?.details || []).map((d) => d.name)
+    );
+
+    // Filter to only rejected rows
+    const rejectedRows = csvData.rows.filter((row) =>
+      rejectedNames.has(row.name)
+    );
+
+    if (rejectedRows.length === 0) return;
+
+    // Apply corrections
+    const correctedRows = rejectedRows.map((row) => ({
+      ...row,
+      ...(corrections[row.name] || {}),
+    }));
+
+    // Build corrected CSV
+    const csvLines = [csvData.header.join(",")];
+    correctedRows.forEach((row) => {
+      const line = csvData.header
+        .map((col) => {
+          const value = String(row[col] || "");
+          // Quote if contains comma, quote, or newline
+          return /[,"\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+        })
+        .join(",");
+      csvLines.push(line);
+    });
+
+    const csvBlob = new Blob([csvLines.join("\n")], { type: "text/csv" });
+    const correctedFile = new File([csvBlob], "corrected_catalog.csv", {
+      type: "text/csv",
+    });
+
+    // Collect only images for rejected rows
+    const rejectedImages = [];
+    correctedRows.forEach((row) => {
+      ["front", "side", "rear"].forEach((view) => {
+        const filename = row[`${view}_image_filename`];
+        const imageItem = images[view].find(
+          (img) =>
+            img.file.name.toLowerCase() === filename.toLowerCase() ||
+            fileStem(img.file.name) === fileStem(filename)
+        );
+        if (imageItem) rejectedImages.push(imageItem.file);
+      });
+    });
+
+    // Build form data
+    const formData = new FormData();
+    formData.append("csv_file", correctedFile);
+    rejectedImages.forEach((file) => formData.append("images", file));
+
+    setIsProcessing(true);
+    setValidationResult({
+      type: "processing",
+      title: "Re-uploading corrected items…",
+      message: `Processing ${correctedRows.length} corrected product(s).`,
+    });
+    setCorrections({});
+
+    try {
+      const response = await catalogAPI.upload(formData);
+
+      if (!response || !response.batch_id) {
+        setValidationResult({
+          type: "error",
+          title: "Re-upload failed",
+          message: response?.error || "The backend did not return a batch ID.",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      pollBatchReport(response.batch_id, 0);
+    } catch (error) {
+      console.error("Re-upload failed:", error);
+      setValidationResult({
+        type: "error",
+        title: "Re-upload rejected",
+        message: error?.message || "The corrected catalog could not be uploaded.",
+      });
+      setIsProcessing(false);
+    }
+  }
+
+  /* ---------- KAN-FIX: Handle correction input change ---------- */
+  function handleCorrectionChange(itemName, field, value) {
+    setCorrections((prev) => ({
+      ...prev,
+      [itemName]: {
+        ...(prev[itemName] || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  /* ---------- KAN-FIX: Apply detected color from rejection reason ---------- */
+  function applyDetectedColor(itemName, hex) {
+    const family = hexToColorFamily(hex);
+    setCorrections((prev) => ({
+      ...prev,
+      [itemName]: {
+        ...(prev[itemName] || {}),
+        color: family,
+        color_description: `${family} (${hex}) as photographed`,
+        color_family: family,
+      },
+    }));
   }
 
   /* ---------- Reset ---------- */
@@ -599,15 +782,30 @@ function SellerCatalogUploadPage() {
     if (pollTimer.current) clearTimeout(pollTimer.current);
 
     setCsvFile(null);
+    setCsvData(null);
     setImages(initialImages);
     setErrors({});
     setValidationResult(null);
+    setCorrections({});
     setTemplateError("");
     setIsProcessing(false);
 
     const csvInput = document.getElementById("catalog-csv");
     if (csvInput) csvInput.value = "";
   }
+
+  // KAN-FIX: Check if any corrections have been made
+  const hasCorrections = Object.keys(corrections).length > 0 &&
+    Object.values(corrections).some((c) => Object.keys(c).length > 0);
+
+  // KAN-FIX: Check if any items were accepted
+  const hasAcceptedItems = validationResult?.type === "success" &&
+    (validationResult.title.includes("accepted") || !validationResult.title.includes("rejected"));
+
+  // KAN-FIX: batch reached a terminal status (completed/failed) — only then
+  // may the report / navigation / re-upload actions be shown.
+  const batchFinished =
+    !!validationResult && validationResult.type !== "processing";
 
   return (
     <main className="seller-upload-page">
@@ -739,6 +937,7 @@ function SellerCatalogUploadPage() {
                   type="button"
                   onClick={() => {
                     setCsvFile(null);
+                    setCsvData(null);
                     setValidationResult(null);
                     const input =
                       document.getElementById("catalog-csv");
@@ -820,6 +1019,70 @@ function SellerCatalogUploadPage() {
                           <>
                             <strong>{entry.name}:</strong>{" "}
                             {entry.reasons.join(" • ")}
+
+                            {/* KAN-FIX: Show correction UI for rejected items with color issues */}
+                            {entry.reasons.some((r) => extractHexFromReason(r)) && (
+                              <div className="seller-correction-controls" style={{ marginTop: "12px", padding: "12px", background: "#f9f9f9", borderRadius: "6px" }}>
+                                {(() => {
+                                  const hex = extractHexFromReason(entry.reasons.join(" "));
+                                  const family = hexToColorFamily(hex);
+                                  const currentCorrections = corrections[entry.name] || {};
+                                  const originalRow = csvData?.rows.find((r) => r.name === entry.name);
+
+                                  return (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="seller-correction-apply"
+                                        onClick={() => applyDetectedColor(entry.name, hex)}
+                                        style={{
+                                          marginBottom: "12px",
+                                          padding: "8px 14px",
+                                          fontSize: "13px",
+                                          background: "#8a6d1f",
+                                          color: "white",
+                                          border: "none",
+                                          borderRadius: "4px",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Use detected color {hex} → {family}
+                                      </button>
+
+                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                                        <div>
+                                          <label style={{ fontSize: "11px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Color</label>
+                                          <input
+                                            type="text"
+                                            value={currentCorrections.color ?? originalRow?.color ?? ""}
+                                            onChange={(e) => handleCorrectionChange(entry.name, "color", e.target.value)}
+                                            style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid #ccc", borderRadius: "4px" }}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: "11px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Color Description</label>
+                                          <input
+                                            type="text"
+                                            value={currentCorrections.color_description ?? originalRow?.color_description ?? ""}
+                                            onChange={(e) => handleCorrectionChange(entry.name, "color_description", e.target.value)}
+                                            style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid #ccc", borderRadius: "4px" }}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: "11px", fontWeight: "bold", display: "block", marginBottom: "4px" }}>Color Family</label>
+                                          <input
+                                            type="text"
+                                            value={currentCorrections.color_family ?? originalRow?.color_family ?? ""}
+                                            onChange={(e) => handleCorrectionChange(entry.name, "color_family", e.target.value)}
+                                            style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid #ccc", borderRadius: "4px" }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
                           </>
                         )}
                       </li>
@@ -828,19 +1091,71 @@ function SellerCatalogUploadPage() {
                 )}
             </div>
 
-            {validationResult.type === "success" && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Navigate with batch_id so validation page can fetch real data
-                  const batchId = validationResult.batchId || "";
-                  navigate(
-                    `/seller/validation${batchId ? `?batch=${batchId}` : ""}`
-                  );
-                }}
-              >
-                View Validation
-              </button>
+            {/* KAN-FIX: Action buttons appear ONLY after the batch finishes
+                (completed/failed). Hidden while status is "processing". */}
+            {batchFinished && (
+              <div className="seller-validation-actions" style={{ marginTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                {validationResult.type === "success" && hasAcceptedItems && (
+                  <button
+                    type="button"
+                    className="seller-validation-nav"
+                    onClick={() => navigate("/seller/product-listings")}
+                    style={{
+                      padding: "10px 20px",
+                      background: "#8a6d1f",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Go to Product Listings
+                  </button>
+                )}
+
+                {validationResult.type === "success" && hasCorrections && (
+                  <button
+                    type="button"
+                    className="seller-validation-reupload"
+                    onClick={handleReuploadCorrected}
+                    disabled={isProcessing}
+                    style={{
+                      padding: "10px 20px",
+                      background: hasCorrections ? "#28a745" : "#ccc",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: hasCorrections && !isProcessing ? "pointer" : "not-allowed",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {isProcessing ? "Re-uploading…" : "Re-upload corrected rows"}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="seller-validation-view"
+                  onClick={() => {
+                    const batchId = validationResult.batchId || "";
+                    navigate(
+                      `/seller/validation${batchId ? `?batch=${batchId}` : ""}`
+                    );
+                  }}
+                  style={{
+                    padding: "10px 20px",
+                    background: "white",
+                    color: "#8a6d1f",
+                    border: "2px solid #8a6d1f",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  View Full Validation Report
+                </button>
+              </div>
             )}
           </section>
         )}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { catalogAPI } from "../../services/api";
+import { API_URL, catalogAPI } from "../../services/api";
 import "../css/SellerProductListingsPage.css";
 
 // Map backend status to UI status
@@ -22,6 +22,43 @@ function formatPrice(price) {
     style: "currency",
     currency: "PHP",
   }).format(Number(price) || 0);
+}
+
+/* Build an absolute backend URL from the serialized image path (/media/…).
+   Same helper used by CatalogPage / SellerItemDetailsPage so the browser
+   reaches the GridFS stream served by catalog.views.page_views.serve_gridfs_media. */
+function mediaUrl(path) {
+  if (!path) return "";
+  if (String(path).startsWith("http")) return path;
+  return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
+}
+
+/* FIX: renders the REAL rembg-processed front-view PNG inside the gold tile.
+   The old initial-letter placeholder is kept only as a fallback for items
+   that have no processed asset yet, or if the image request fails. */
+function ProductThumb({ product }) {
+  const [failed, setFailed] = useState(false);
+  const source = product.front_image ? mediaUrl(product.front_image) : "";
+  const initial = (product.name || "P").charAt(0).toUpperCase();
+
+  if (!source || failed) {
+    return (
+      <div className="spl-product-image" aria-hidden="true">
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <div className="spl-product-image">
+      <img
+        src={source}
+        alt={product.name || "Product"}
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
 }
 
 function SellerProductListingsPage() {
@@ -259,16 +296,13 @@ function SellerProductListingsPage() {
                 <tbody>
                   {filteredProducts.map((product) => {
                     const reportStatus = normalizeStatus(product.status);
-                    // Get first letter for placeholder image
-                    const initial = (product.name || "P").charAt(0).toUpperCase();
 
                     return (
                       <tr key={product.id}>
                         <td>
                           <div className="spl-product">
-                            <div className="spl-product-image" aria-hidden="true">
-                              {initial}
-                            </div>
+                            {/* FIX: real processed front PNG instead of the letter tile */}
+                            <ProductThumb product={product} />
                             <div className="spl-product-information">
                               <strong>{product.name || "Unnamed Product"}</strong>
                               <span>{product.color || "No color"}</span>

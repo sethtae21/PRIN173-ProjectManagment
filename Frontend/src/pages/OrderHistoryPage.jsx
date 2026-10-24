@@ -132,10 +132,13 @@ function mergeOrderLists(primary, secondary) {
 
 /* Instant first paint: memory cache (this session) + localStorage (last visit) */
 function initialOrders() {
-  const cached = getCachedOrders().map(normalizeBackendOrder);
+  const cached = (Array.isArray(getCachedOrders()) ? getCachedOrders() : []).map(normalizeBackendOrder);
+
+
   const stored = readArray(ORDERS_STORAGE_KEY)
     .filter((entry) => isRealOrderId(entry?.id))
     .map(normalizeStoredOrder);
+   
   return mergeOrderLists(cached, stored);
 }
 

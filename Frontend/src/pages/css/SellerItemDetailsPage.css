@@ -237,12 +237,14 @@
   gap: 13px;
 }
 
+/* FIX: the card no longer forces a tall rectangle. Its height now hugs
+   label + square stage + filename, so no dead space remains. */
 .seller-item-asset {
   display: flex;
   min-width: 0;
-  min-height: 390px;
   align-items: center;
   flex-direction: column;
+  gap: 10px;
   padding: 16px 12px;
   background: #f8f5ef;
   border: 1px solid #e2d8c7;
@@ -253,6 +255,19 @@
   color: #b57e20;
   font-size: 9px;
   font-weight: 800;
+}
+
+/* FIX: SQUARE stage (aspect-ratio 1 / 1) instead of the stretched rectangle.
+   The img inside is centered by the inline flex rules, and object-fit:
+   contain keeps the (alpha-cropped) garment undistorted in the middle. */
+.seller-item-asset-stage {
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.seller-item-asset-stage img {
+  display: block;
 }
 
 .seller-item-garment {
@@ -273,7 +288,7 @@
 
 .seller-item-garment-body {
   width: 90px;
-  height: 170px;
+  height: 90px;
   background:
     linear-gradient(
       180deg,
@@ -998,10 +1013,7 @@
 
   .seller-item-assets {
     grid-template-columns: 1fr;
-  }
-
-  .seller-item-asset {
-    min-height: 270px;
+    max-width: 420px;
   }
 
   .shopper-preview-product {

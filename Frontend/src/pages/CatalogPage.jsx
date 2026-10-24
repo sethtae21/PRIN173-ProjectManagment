@@ -67,7 +67,7 @@ function CatalogPage({ isGuest = false }) {
 
     async function fetchProducts() {
       try {
-        const data = await catalogAPI.getAll();
+        const data = await catalogAPI.list();
         if (isMounted) {
           const normalized = Array.isArray(data)
             ? data.map((p) => ({
