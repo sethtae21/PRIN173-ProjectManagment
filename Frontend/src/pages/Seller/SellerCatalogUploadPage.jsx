@@ -280,12 +280,21 @@ function SellerCatalogUploadPage() {
   }, []);
 
   /* ---------- Template download (FR-4.1) ---------- */
-  async function handleDownloadTemplate() {
+  function handleDownloadTemplate() {
     setIsDownloadingTemplate(true);
     setTemplateError("");
 
     try {
-      await catalogAPI.downloadTemplate();
+      // FIX: catalogAPI.downloadTemplate() simply returns the URL string.
+      // We must trigger the actual browser download using a temporary anchor tag.
+      const downloadUrl = catalogAPI.downloadTemplate();
+      
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "fitfusion_catalog_template.csv"; // Fallback filename
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
       console.error("Template download failed:", error);
       setTemplateError(
@@ -1095,11 +1104,12 @@ function SellerCatalogUploadPage() {
                 (completed/failed). Hidden while status is "processing". */}
             {batchFinished && (
               <div className="seller-validation-actions" style={{ marginTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                {/* ✅ FIX: Changed from /seller/product-listings to /seller/listings */}
                 {validationResult.type === "success" && hasAcceptedItems && (
                   <button
                     type="button"
                     className="seller-validation-nav"
-                    onClick={() => navigate("/seller/product-listings")}
+                    onClick={() => navigate("/seller/listings")}
                     style={{
                       padding: "10px 20px",
                       background: "#8a6d1f",

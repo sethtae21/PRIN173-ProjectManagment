@@ -353,6 +353,17 @@ function App() {
             element={<SellerProductListingsPage />}
           />
 
+          {/* ✅ FIX: Safety-net redirect for old /seller/product-listings links */}
+          <Route
+            path="product-listings"
+            element={
+              <Navigate
+                to="/seller/listings"
+                replace
+              />
+            }
+          />
+
           {/* SELLER ITEM DETAILS */}
           <Route
             path="listings/:listingId"

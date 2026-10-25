@@ -10,6 +10,41 @@ function normalizeStatus(status) {
   return "Pending";
 }
 
+/* ✅ FIX: Map color names/descriptions to actual hex codes for the swatch */
+function getColorHex(colorName, colorDescription) {
+  // 1. Try to extract a hex code directly from color_description (e.g., "Pure White (#FFFFFF)")
+  const hexMatch = String(colorDescription || "").match(/#([0-9a-fA-F]{3}){1,2}\b/);
+  if (hexMatch) return hexMatch[0];
+
+  // 2. Map common color names to hex values
+  const nameMap = {
+    white: "#FFFFFF",
+    black: "#111111",
+    red: "#D32F2F",
+    blue: "#1976D2",
+    green: "#388E3C",
+    yellow: "#FBC02D",
+    orange: "#F57C00",
+    purple: "#7B1FA2",
+    pink: "#C2185B",
+    brown: "#5D4037",
+    gray: "#757575",
+    grey: "#757575",
+    beige: "#F5F5DC",
+    navy: "#000080",
+    gold: "#FFD700",
+    silver: "#C0C0C0",
+  };
+
+  const lowerName = String(colorName || "").toLowerCase();
+  for (const [key, hex] of Object.entries(nameMap)) {
+    if (lowerName.includes(key)) return hex;
+  }
+
+  // 3. Fallback to the original theme gold if nothing matches
+  return "#c89a43";
+}
+
 /* Build an absolute backend URL from the serialized image path (/media/…) */
 function mediaUrl(path) {
   if (!path) return "";
@@ -987,7 +1022,11 @@ function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, v
           <div className="shopper-preview-color">
             <strong>Color</strong>
             <div>
-              <span />
+              {/* ✅ FIX: Apply the computed hex color inline, falling back to gold only if unrecognized */}
+              <span 
+                className="shopper-preview-color-swatch"
+                style={{ backgroundColor: getColorHex(product.color, product.color_description) }} 
+              />
               <p>
                 {product.color}
                 <small>{product.color_description}</small>

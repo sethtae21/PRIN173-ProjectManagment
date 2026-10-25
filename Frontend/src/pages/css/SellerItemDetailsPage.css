@@ -650,13 +650,16 @@
   gap: 11px;
 }
 
-.shopper-preview-color > div > span {
+/* ✅ FIX: Replaced hard-coded gold background with dynamic class.
+   Added an inset shadow so light colors (like white) remain visible 
+   against the white card background. */
+.shopper-preview-color-swatch {
   width: 32px;
   height: 32px;
-  background: #c89a43;
   border: 2px solid #fffdf9;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px #b57e20;
+  box-shadow: 0 0 0 1px #b57e20, inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background-color: #c89a43; /* Fallback only if inline style fails */
 }
 
 .shopper-preview-color p {
