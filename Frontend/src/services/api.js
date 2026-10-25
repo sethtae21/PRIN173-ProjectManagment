@@ -27,7 +27,23 @@
 // CheckoutPage.handleConfirmOrder calls placeOrder(); canonical name is
 // checkout(). placeOrder is restored as an alias so the simulated checkout
 // (FR-6.5/6.6) POSTs to /checkout/ again.
+//
+// KAN-FIX (SWAP SUSPECT): unified session state. This file now imports
+// getAccessToken, setSession, clearSession, etc. from ./session.js instead
+// of maintaining a parallel local copy. This prevents the frontend from
+// sending stale tokens after login/logout.
 // ============================================================================
+
+import { 
+  getAccessToken, 
+  getRefreshToken, 
+  clearSession, 
+  setSession,
+  updateTokens 
+} from './session.js';
+
+// Re-export so pages importing from api.js still work
+export { getAccessToken, getRefreshToken, clearSession, setSession };
 
 const API_BASE = (
   import.meta.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -139,38 +155,11 @@ function findToken(kind) {
 }
 
 // ----------------------------------------------------------------------------
-// Session helpers
+// Session helpers (Delegated to session.js, but keeping getStoredUser here)
 // ----------------------------------------------------------------------------
-export function getAccessToken() { return findToken('access'); }
-export function getRefreshToken() { return findToken('refresh'); }
 export function getStoredUser() {
   try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
   catch { return null; }
-}
-export function setSession(tokens, user) {
-  const access = tokens?.access || tokens?.tokens?.access || null;
-  const refresh = tokens?.refresh || tokens?.tokens?.refresh || null;
-  try {
-    if (access) localStorage.setItem(ACCESS_KEY, access);
-    if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch { /* ignore */ }
-  invalidateCache('*');
-}
-export function clearSession() {
-  const kill = new Set([...SESSION_BLOB_KEYS, ACCESS_KEY, REFRESH_KEY, ...ACCESS_ALIASES, ...REFRESH_ALIASES]);
-  for (const store of eachStore()) {
-    try {
-      const removals = [];
-      for (let i = 0; i < store.length; i += 1) {
-        const key = store.key(i);
-        const raw = store.getItem(key) || '';
-        if (kill.has(key) || looksLikeJwt(raw)) removals.push(key);
-      }
-      removals.forEach((k) => store.removeItem(k));
-    } catch { /* ignore */ }
-  }
-  invalidateCache('*');
 }
 
 // ----------------------------------------------------------------------------
@@ -224,7 +213,7 @@ let refreshPromise = null;
 function tryRefreshAccessToken() {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    const refresh = findToken('refresh');
+    const refresh = getRefreshToken();
     if (!refresh) return false;
     try {
       const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
@@ -234,8 +223,10 @@ function tryRefreshAccessToken() {
       });
       if (!res.ok) return false;
       const data = await res.json();
-      if (data.access) localStorage.setItem(ACCESS_KEY, data.access);
-      if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
+      if (data.access) {
+        // FIX: Use session.js updateTokens to atomically update memory + storage
+        updateTokens(data.access, data.refresh || null);
+      }
       return Boolean(data.access);
     } catch {
       return false;
@@ -257,7 +248,8 @@ function redirectToLogin() {
 export async function performJsonRequest(method, path, body, options = {}) {
   const headers = { Accept: 'application/json', ...(options.headers || {}) };
   const auth = options.auth !== false;
-  const token = auth ? (options.token ?? findToken('access')) : null;
+  // FIX: Read token per-request from session.js instead of local findToken
+  const token = auth ? (options.token ?? getAccessToken()) : null;
   if (auth && token) headers.Authorization = `Bearer ${token}`;
 
   let payload;
@@ -460,7 +452,8 @@ export const authApi = {
   login(email, password) {
     return performJsonRequest('POST', '/auth/login/', { email, password }, { auth: false })
       .then((d) => {
-        if (d?.tokens) setSession(d.tokens, d.user);
+        // FIX: Use session.js setSession to atomically update memory + storage
+        if (d?.tokens) setSession({ access: d.tokens.access, refresh: d.tokens.refresh, user: d.user });
         return d;
       });
   },

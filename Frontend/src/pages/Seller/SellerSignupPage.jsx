@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
 import { authAPI } from "../../services/api";
+import { setSession } from "../../services/session"; // FIX: Import canonical session manager
 import "../css/SellerSignupPage.css";
 
 const provinces = [
@@ -410,11 +411,7 @@ function SellerSignupPage() {
       const response = await authAPI.register(sellerPayload);
 
       if (response && response.success && response.tokens) {
-        // 3. Persist JWT tokens
-        localStorage.setItem("access_token", response.tokens.access);
-        localStorage.setItem("refresh_token", response.tokens.refresh);
-
-        // 4. Build the current-user object for the seller dashboard
+        // 3. Build the current-user object for the seller dashboard
         const userData = response.user || {};
         const sellerAccount = {
           id: userData.id,
@@ -432,21 +429,14 @@ function SellerSignupPage() {
           }
         };
 
-        // 5. Save to the storage keys the dashboard reads
-        localStorage.setItem(
-          "fitfusion-current-user",
-          JSON.stringify(sellerAccount)
-        );
-        localStorage.setItem(
-          "sellerAccount",
-          JSON.stringify(sellerAccount)
-        );
-        sessionStorage.setItem(
-          "sellerAccount",
-          JSON.stringify(sellerAccount)
-        );
-        sessionStorage.setItem("userRole", "seller");
-        sessionStorage.setItem("userEmail", sellerAccount.email);
+        // ✅ FIX: ATOMIC PERSISTENCE via session.js
+        // Replaces manual localStorage.setItem calls that caused the SWAP SUSPECT bug.
+        // This updates the canonical key AND the in-memory mirror BEFORE navigation.
+        setSession({
+          access: response.tokens.access,
+          refresh: response.tokens.refresh,
+          user: sellerAccount,
+        });
 
         // 6. Redirect to seller dashboard
         navigate("/seller/dashboard", { replace: true });

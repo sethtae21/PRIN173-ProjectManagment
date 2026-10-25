@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   NavLink,
@@ -8,6 +7,8 @@ import {
 } from "react-router-dom";
 
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { authAPI } from "../services/api";
+import { clearSession } from "../services/session"; // FIX: Import canonical clearer
 import "./SellerLayout.css";
 
 const sellerNavigation = [
@@ -186,19 +187,28 @@ function SellerLayout() {
     setLogoutModalOpen(false);
   }
 
-  function handleLogout() {
-    setLogoutModalOpen(false);
-    setSidebarOpen(false);
+  // ✅ FIX: Proper logout sequence to prevent SWAP SUSPECT
+  async function handleLogout() {
+    try {
+      // 1. Blacklist the refresh token on the backend
+      await authAPI.logout();
+    } catch (e) {
+      console.warn("Logout API call failed, clearing local session anyway.", e);
+    }
+
+    // 2. Wipe in-memory mirror + canonical + ALL legacy keys atomically
+    clearSession();
 
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
     sessionStorage.removeItem("sellerAccount");
     sessionStorage.removeItem("registeredAccount");
 
-    // Keep seller profiles and products saved.
-    localStorage.removeItem("fitfusion-current-user");
+    setLogoutModalOpen(false);
+    setSidebarOpen(false);
 
-    navigate("/login", { replace: true });
+    // 3. Force a hard reload so no stale React closures or module-level caches survive
+    window.location.href = "/login";
   }
 
   return (
