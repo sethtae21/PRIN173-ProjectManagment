@@ -259,10 +259,17 @@
   cursor: pointer;
 }
 
-/* Real Product Image Styles */
+/* Real Product Image Styles
+   FIX: the alpha-cropped data-URL from useAlphaCrop is tight around the
+   garment, so centering this <img> now centers the GARMENT itself.
+   display:block + auto dimensions keep it perfectly centered by the
+   parent's `place-items: center` while object-fit guards distortion. */
 .catalog-product-image {
   position: relative;
   z-index: 1;
+  display: block;
+  width: auto;
+  height: auto;
   max-width: 90%;
   max-height: 90%;
   object-fit: contain;
@@ -274,7 +281,8 @@
   transform: scale(1.05) translateY(-5px);
 }
 
-/* NEW: Clean Placeholder Styles (Replaces Emojis) */
+/* NEW: Clean Placeholder Styles (Replaces Emojis)
+   Rendered only when the asset is missing or fails to load. */
 .catalog-product-placeholder {
   display: flex;
   align-items: center;

@@ -14,6 +14,19 @@
 //
 // KAN-FIX (signup 400): performJsonRequest parses the DRF error body and throws
 // ApiError{status,data}; register() normalizes legacy payload key aliases.
+//
+// KAN-FIX ("cartAPI.addItem is not a function" on ProductDetails / Buy Again /
+// cart remove): several shopper pages still call the LEGACY cart method names
+// (addItem / removeItem) and legacy readers (catalogAPI.getAll,
+// checkoutAPI.getOrders). Canonical names are add / remove / list / ordersApi;
+// the legacy names are restored here as aliases so EVERY call site works
+// regardless of spelling — same "keep BOTH spellings forever" policy used for
+// the authAPI/catalogAPI object aliases at the bottom of this file.
+//
+// KAN-FIX ("checkoutAPI.placeOrder is not a function" on CheckoutPage):
+// CheckoutPage.handleConfirmOrder calls placeOrder(); canonical name is
+// checkout(). placeOrder is restored as an alias so the simulated checkout
+// (FR-6.5/6.6) POSTs to /checkout/ again.
 // ============================================================================
 
 const API_BASE = (
@@ -392,7 +405,7 @@ export function getCachedBatchReport(batchId, force = true) {
   );
 }
 
-// ---- presets / outfits (FR-2.8, FR-5.5) ----
+// ---- presets / outfits (FR-2.8 / FR-5.5) ----
 export function getCachedPresets(force = false) {
   return cachedGet('presets', '/presets/', { force });
 }
@@ -492,6 +505,8 @@ export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
 // ----------------------------------------------------------------------------
 export const catalogApi = {
   list(params = {}) { return getCachedCatalog(params); },
+  // KAN-FIX legacy alias: OrderHistory/OrderDetails image sync call getAll()
+  getAll(params = {}) { return getCachedCatalog(params); },
   get(id) { return getCachedCatalogItem(id); },
   downloadTemplate() { return `${API_BASE}/catalog/download-template/`; },
   downloadPackage() { return `${API_BASE}/catalog/download-package/`; },
@@ -540,24 +555,74 @@ export const outfitsApi = {
 
 // ----------------------------------------------------------------------------
 // Commerce — mirrors Backend/commerce/urls.py (mutations bust the cache)
+//
+// KAN-FIX ("cartAPI.addItem is not a function"): ProductDetailsPage,
+// OrderHistoryPage and OrderDetailsPage still call the LEGACY names
+// addItem / removeItem, while ShoppingCartPage calls removeItem too.
+// Canonical names are add / remove; legacy names are kept as aliases so
+// every existing call site works without touching four page files.
 // ----------------------------------------------------------------------------
+function cartAdd(catalog_item, quantity = 1) {
+  return thenInvalidate(
+    performJsonRequest('POST', '/cart/add_item/', { catalog_item, quantity }),
+    ['cart'],
+  );
+}
+function cartUpdateQuantity(catalog_item, quantity) {
+  return thenInvalidate(
+    performJsonRequest('PATCH', '/cart/update_quantity/', { catalog_item, quantity }),
+    ['cart'],
+  );
+}
+function cartRemove(catalog_item) {
+  return thenInvalidate(
+    performJsonRequest('DELETE', '/cart/remove_item/', { catalog_item }),
+    ['cart'],
+  );
+}
+function cartRemoveSelected(catalog_items) {
+  return thenInvalidate(
+    performJsonRequest('POST', '/cart/remove_selected/', { catalog_items }),
+    ['cart'],
+  );
+}
+function cartClear() {
+  return thenInvalidate(performJsonRequest('DELETE', '/cart/clear/'), ['cart']);
+}
+
 export const cartApi = {
   get: () => getCachedCart(),
   items: () => getCachedCartItems(),
-  add: (catalog_item, quantity = 1) =>
-    thenInvalidate(performJsonRequest('POST', '/cart/add_item/', { catalog_item, quantity }), ['cart']),
-  updateQuantity: (catalog_item, quantity) =>
-    thenInvalidate(performJsonRequest('PATCH', '/cart/update_quantity/', { catalog_item, quantity }), ['cart']),
-  remove: (catalog_item) =>
-    thenInvalidate(performJsonRequest('DELETE', '/cart/remove_item/', { catalog_item }), ['cart']),
-  removeSelected: (catalog_items) =>
-    thenInvalidate(performJsonRequest('POST', '/cart/remove_selected/', { catalog_items }), ['cart']),
-  clear: () => thenInvalidate(performJsonRequest('DELETE', '/cart/clear/'), ['cart']),
+  // canonical names
+  add: cartAdd,
+  updateQuantity: cartUpdateQuantity,
+  remove: cartRemove,
+  removeSelected: cartRemoveSelected,
+  clear: cartClear,
+  // legacy aliases (backward compatibility — keep BOTH spellings forever)
+  addItem: cartAdd,
+  removeItem: cartRemove,
 };
 
+// ----------------------------------------------------------------------------
+// Checkout — mirrors Backend/commerce checkout endpoint (FR-6.5 / FR-6.6)
+// KAN-FIX ("checkoutAPI.placeOrder is not a function"): CheckoutPage calls
+// placeOrder(); canonical name is checkout(). Both spellings are kept.
+// ----------------------------------------------------------------------------
+function checkoutPlace(payload) {
+  return thenInvalidate(
+    performJsonRequest('POST', '/checkout/', payload),
+    ['cart', 'orders'],
+  );
+}
+
 export const checkoutApi = {
-  checkout: (payload) =>
-    thenInvalidate(performJsonRequest('POST', '/checkout/', payload), ['cart', 'orders']),
+  checkout: checkoutPlace,
+  // legacy alias used by CheckoutPage.handleConfirmOrder
+  placeOrder: checkoutPlace,
+  // legacy aliases used by OrderHistory/OrderDetails background sync
+  getOrders: () => getCachedOrders(),
+  getOrder: (orderId) => getCachedOrder(orderId),
 };
 
 export const ordersApi = {

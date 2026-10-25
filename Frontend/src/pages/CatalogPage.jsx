@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_URL, cartAPI, catalogAPI } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CatalogPage.css";
 
 const categories = [
@@ -42,6 +43,36 @@ function formatCurrency(value) {
     currency: "PHP",
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
+}
+
+/* ==========================================
+   FIX (garment not centered in card):
+   rembg PNGs carry uneven transparent margins, so centering the raw canvas
+   leaves the garment sitting high/low inside the frame. CatalogPreview runs
+   every asset through the shared useAlphaCrop pipeline (hole-repair + union
+   crop of all garment components) so the GARMENT is what gets centered and
+   maximized. Falls back to the category placeholder chip on load failure.
+========================================== */
+function CatalogPreview({ src, alt, category }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  if (!src || failed) {
+    return (
+      <div className="catalog-product-placeholder">
+        <span className="catalog-placeholder-category">{category}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={cropped || src}
+      alt={alt}
+      className="catalog-product-image"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function CatalogPage({ isGuest = false }) {
@@ -164,7 +195,11 @@ function CatalogPage({ isGuest = false }) {
     setCartError("");
 
     try {
-      await cartAPI.addItem(product.id);
+      // ✅ FIX: api.js exposes cartAPI.add(catalog_item, quantity) — there is
+      // no "addItem" method. The old call threw TypeError, so the server-side
+      // cart (POST /cart/add_item/, FR-6.2) was never updated and the badge
+      // stayed at 0.
+      await cartAPI.add(product.id, 1);
 
       const cart = readCart();
       const existingIndex = cart.findIndex((item) => item.id === product.id);
@@ -296,27 +331,13 @@ function CatalogPage({ isGuest = false }) {
                   onClick={() => openProductDetails(product)}
                   aria-label={`View ${product.name}`}
                 >
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="catalog-product-image"
-                      onError={(e) => {
-                        // If image fails, hide it and show placeholder
-                        e.target.style.display = "none";
-                        e.target.nextSibling.style.display = "flex";
-                      }}
-                    />
-                  ) : null}
-                  {/* Fallback placeholder */}
-                  <div
-                    className="catalog-product-placeholder"
-                    style={{ display: product.imageUrl ? "none" : "flex" }}
-                  >
-                    <span className="catalog-placeholder-category">
-                      {product.displayCategory}
-                    </span>
-                  </div>
+                  {/* Alpha-cropped, centered garment preview with a clean
+                      placeholder fallback (no DOM sibling hacks). */}
+                  <CatalogPreview
+                    src={product.imageUrl}
+                    alt={product.name}
+                    category={product.displayCategory}
+                  />
                 </button>
 
                 <div className="catalog-product-content">

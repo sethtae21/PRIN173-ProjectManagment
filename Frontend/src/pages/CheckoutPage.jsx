@@ -87,84 +87,72 @@ function CheckoutPage() {
     paymentMethod: "Cash on Delivery",
   });
 
+  /* ==========================================
+     FIX (autofill from database):
+     The old code checked for `localStorage.getItem("access_token")` (a legacy
+     key that doesn't exist in the current session) and used a raw fetch()
+     call. This rewrite uses authAPI.getProfile() which is JWT-aware (handles
+     token refresh automatically), maps the MongoDB-backed profile fields
+     correctly, and falls back to cached user data if the network fails.
+     All fields remain fully editable (controlled inputs, no readOnly).
+  ========================================== */
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchUserProfile() {
       try {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          const storedUser = localStorage.getItem("fitfusion-user");
-          if (storedUser) {
-            const userData = JSON.parse(storedUser);
-            setForm((prevForm) => ({
-              ...prevForm,
-              fullName: userData.full_name || userData.name || "",
-              email: userData.email || "",
-              contactNumber: userData.mobile || userData.phone || "",
-              street: userData.street || "",
-              city: userData.city || userData.barangay || "",
-              province: userData.province || "",
-              postalCode: userData.postal_code || userData.postalCode || "",
-            }));
-          }
-          setIsLoadingUserData(false);
-          return;
-        }
-        const response = await fetch(`${API_URL}/auth/user/profile/`, {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (response.ok) {
-          const profileResponse = await response.json();
-          const userData = profileResponse.user || profileResponse;
-          setForm((prevForm) => ({
-            ...prevForm,
-            fullName: userData.full_name || userData.name || "",
-            email: userData.email || "",
-            contactNumber: userData.mobile || userData.phone || userData.contact_number || "",
-            street: userData.street || userData.address?.street || "",
-            city: userData.city || userData.barangay || userData.address?.city || "",
-            province: userData.province || userData.address?.province || "",
-            postalCode: userData.postal_code || userData.postalCode || userData.address?.postal_code || "",
-          }));
-        } else {
-          const storedUser = localStorage.getItem("fitfusion-user");
-          if (storedUser) {
-            const userData = JSON.parse(storedUser);
-            setForm((prevForm) => ({
-              ...prevForm,
-              fullName: userData.full_name || userData.name || "",
-              email: userData.email || "",
-              contactNumber: userData.mobile || userData.phone || "",
-              street: userData.street || "",
-              city: userData.city || userData.barangay || "",
-              province: userData.province || "",
-              postalCode: userData.postal_code || userData.postalCode || "",
-            }));
-          }
-        }
+        // Use the JWT-aware API client that handles token refresh automatically
+        const profileData = await authAPI.getProfile();
+        
+        if (!isMounted) return;
+
+        // Map the backend profile fields to the form
+        const userData = profileData?.user || profileData || {};
+        
+        setForm((prevForm) => ({
+          ...prevForm,
+          fullName: userData.full_name || userData.name || prevForm.fullName || "",
+          email: userData.email || prevForm.email || "",
+          contactNumber: userData.mobile || userData.phone || userData.contact_number || prevForm.contactNumber || "",
+          street: userData.street || userData.address?.street || prevForm.street || "",
+          city: userData.city || userData.barangay || userData.address?.city || prevForm.city || "",
+          province: userData.province || userData.address?.province || prevForm.province || "",
+          postalCode: userData.postal_code || userData.postalCode || userData.address?.postal_code || prevForm.postalCode || "",
+        }));
       } catch (error) {
-        console.error("Failed to fetch user profile:", error);
+        console.error("Failed to fetch user profile from database:", error);
+        
+        if (!isMounted) return;
+
+        // Fallback to cached user data if the network request fails
         const storedUser = localStorage.getItem("fitfusion-user");
         if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setForm((prevForm) => ({
-            ...prevForm,
-            fullName: userData.full_name || userData.name || "",
-            email: userData.email || "",
-            contactNumber: userData.mobile || userData.phone || "",
-            street: userData.street || "",
-            city: userData.city || userData.barangay || "",
-            province: userData.province || "",
-            postalCode: userData.postal_code || userData.postalCode || "",
-          }));
+          try {
+            const userData = JSON.parse(storedUser);
+            setForm((prevForm) => ({
+              ...prevForm,
+              fullName: userData.full_name || userData.name || prevForm.fullName || "",
+              email: userData.email || prevForm.email || "",
+              contactNumber: userData.mobile || userData.phone || prevForm.contactNumber || "",
+              street: userData.street || prevForm.street || "",
+              city: userData.city || userData.barangay || prevForm.city || "",
+              province: userData.province || prevForm.province || "",
+              postalCode: userData.postal_code || userData.postalCode || prevForm.postalCode || "",
+            }));
+          } catch {
+            // Ignore JSON parse errors
+          }
         }
       } finally {
-        setIsLoadingUserData(false);
+        if (isMounted) setIsLoadingUserData(false);
       }
     }
+
     fetchUserProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -280,6 +268,7 @@ function CheckoutPage() {
     setIsSubmitting(true);
     setOrderError("");
     try {
+      // Update the user's profile with the checkout information
       await authAPI.updateProfile({
         full_name: form.fullName.trim(),
         mobile: form.contactNumber.trim(),
@@ -288,12 +277,15 @@ function CheckoutPage() {
         province: form.province,
         postal_code: form.postalCode.trim(),
       });
+      
       const address = [
         form.street.trim(),
         form.city.trim(),
         form.province,
         form.postalCode.trim(),
       ].filter(Boolean).join(", ");
+      
+      // Place the order using the checkout API (placeOrder alias is now available)
       const order = await checkoutAPI.placeOrder({
         recipient_name: form.fullName.trim(),
         recipient_email: form.email.trim(),
@@ -306,6 +298,7 @@ function CheckoutPage() {
           color: item.color || item.selectedColor || "",
         })),
       });
+      
       const orderItems = order.items.map((item) => {
         const checkoutItem = checkoutItems.find(
           (candidate) =>
@@ -329,6 +322,7 @@ function CheckoutPage() {
             "",
         };
       });
+      
       const newOrder = {
         id: order.id,
         orderNumber: order.order_number || order.id,
@@ -356,6 +350,7 @@ function CheckoutPage() {
         shippingFee: Number(order.shipping_fee),
         total: Number(order.total_amount),
       };
+      
       localStorage.setItem("fitfusion-last-order", JSON.stringify(newOrder));
       const storedOrders = readStoredArray("fitfusion-orders");
       localStorage.setItem(
@@ -365,6 +360,7 @@ function CheckoutPage() {
       removePurchasedItemsFromCart();
       localStorage.removeItem(CHECKOUT_STORAGE_KEY);
       setShowConfirmation(false);
+      
       navigate("/shopper/order-confirmation", {
         replace: true,
         state: {
@@ -378,9 +374,11 @@ function CheckoutPage() {
       let message = "We couldn't place your order. Please try again.";
       try {
         const details = JSON.parse(error.message);
-        message = details.detail || message;
+        message = details.detail || details.error || message;
       } catch {
-        // Keep the clear checkout error when the API returned a non-JSON failure.
+        if (error.message && error.message !== "null") {
+          message = error.message;
+        }
       }
       setOrderError(message);
     } finally {
