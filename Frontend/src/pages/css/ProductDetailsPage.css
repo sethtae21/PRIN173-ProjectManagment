@@ -142,9 +142,11 @@
   min-width: 0;
 }
 
+/* FIX: square display box — the old min-height: 530px made it a tall
+   rectangle; aspect-ratio 1/1 keeps it a perfect square at any width. */
 .product-details-image-container {
   width: 100%;
-  min-height: 530px;
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -183,7 +185,6 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  min-height: 530px;
 }
 
 .product-details-placeholder span {
@@ -199,12 +200,12 @@
 }
 
 /* ==========================================
-   FRONT / SIDE / REAR BUTTONS
+   FRONT / REAR BUTTONS (Side view removed)
 ========================================== */
 
 .product-view-buttons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-top: 16px;
 }
@@ -877,13 +878,8 @@
     padding: 18px;
   }
 
-  .product-details-image-container {
-    min-height: 350px;
-  }
-
-  .product-details-placeholder {
-    min-height: 350px;
-  }
+  /* FIX: removed the old min-height: 350px overrides so the
+     image container keeps its square aspect-ratio on mobile. */
 
   .product-main-actions,
   .guest-product-modal-actions {

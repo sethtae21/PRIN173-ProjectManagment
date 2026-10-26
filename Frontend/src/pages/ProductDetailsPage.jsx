@@ -72,8 +72,9 @@ function ProductDetailsPage({ isGuest = false }) {
         if (isMounted) {
           setProduct({
             ...data,
+            // FIX: Side view removed — the backend pipeline only stores
+            // Front and Rear assets, so the Side button was dead UI.
             frontImageUrl: mediaUrl(data.front_image),
-            sideImageUrl: mediaUrl(data.side_image),
             rearImageUrl: mediaUrl(data.rear_image),
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
             sellerName: data.store_name || "FitFusion Store",
@@ -205,10 +206,9 @@ function ProductDetailsPage({ isGuest = false }) {
     );
   }
 
+  // FIX: Side view removed — only Front / Rear assets exist.
   const currentImage =
-    selectedView === "front" ? product.frontImageUrl :
-    selectedView === "side" ? product.sideImageUrl :
-    product.rearImageUrl;
+    selectedView === "front" ? product.frontImageUrl : product.rearImageUrl;
 
   return (
     <main className="product-details-page">
@@ -255,9 +255,11 @@ function ProductDetailsPage({ isGuest = false }) {
                 </div>
               )}
             </div>
+            {/* FIX: Side button removed — only Front / Rear remain */}
             <div className="product-view-buttons">
-              {["front", "side", "rear"].map((view) => {
-                const hasImage = view === "front" ? product.frontImageUrl : view === "side" ? product.sideImageUrl : product.rearImageUrl;
+              {["front", "rear"].map((view) => {
+                const hasImage =
+                  view === "front" ? product.frontImageUrl : product.rearImageUrl;
                 return (
                   <button
                     key={view}
