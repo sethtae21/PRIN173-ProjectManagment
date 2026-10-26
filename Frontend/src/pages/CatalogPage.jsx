@@ -13,6 +13,16 @@ const categories = [
   "Footwear",
 ];
 
+// Size filter entries rendered inside the "Filter By" dropdown.
+const SIZE_FILTERS = [
+  { value: "XS", label: "Size: Extra Small" },
+  { value: "S", label: "Size: Small" },
+  { value: "M", label: "Size: Medium" },
+  { value: "L", label: "Size: Large" },
+  { value: "XL", label: "Size: Extra Large" },
+  { value: "XXL", label: "Size: XXL" },
+];
+
 // Helper to construct image URLs exactly like the Seller page does
 function mediaUrl(path) {
   if (!path) return null;
@@ -85,7 +95,9 @@ function CatalogPage({ isGuest = false }) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [sortOption, setSortOption] = useState("featured");
+  // Single "Filter By" control: price options sort the grid,
+  // size options filter the grid, "all" shows everything unsorted.
+  const [filterOption, setFilterOption] = useState("all");
   const [cartCount, setCartCount] = useState(getCartCount());
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState("");
@@ -142,6 +154,11 @@ function CatalogPage({ isGuest = false }) {
   const filteredProducts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
 
+    // If the chosen filter option is one of the size codes, apply size filtering.
+    const selectedSize = SIZE_FILTERS.some((s) => s.value === filterOption)
+      ? filterOption
+      : null;
+
     const filtered = products.filter((product) => {
       const matchesSearch =
         !query ||
@@ -153,15 +170,20 @@ function CatalogPage({ isGuest = false }) {
         selectedCategory === "All" ||
         product.displayCategory === selectedCategory;
 
-      return matchesSearch && matchesCategory;
+      const matchesSize =
+        !selectedSize ||
+        String(product.size || "").toUpperCase() === selectedSize;
+
+      return matchesSearch && matchesCategory && matchesSize;
     });
 
+    // Price options restored: they sort the (already filtered) result set.
     return [...filtered].sort((a, b) => {
-      if (sortOption === "price-low") return a.price - b.price;
-      if (sortOption === "price-high") return b.price - a.price;
+      if (filterOption === "price-low") return a.price - b.price;
+      if (filterOption === "price-high") return b.price - a.price;
       return 0;
     });
-  }, [products, searchText, selectedCategory, sortOption]);
+  }, [products, searchText, selectedCategory, filterOption]);
 
   function showGuestRestriction(action) {
     setModalAction(action);
@@ -238,7 +260,7 @@ function CatalogPage({ isGuest = false }) {
   function clearFilters() {
     setSearchText("");
     setSelectedCategory("All");
-    setSortOption("featured");
+    setFilterOption("all");
   }
 
   return (
@@ -284,14 +306,19 @@ function CatalogPage({ isGuest = false }) {
           </label>
 
           <label className="catalog-filter-field">
-            <span>Sort By</span>
+            <span>Filter By</span>
             <select
-              value={sortOption}
-              onChange={(event) => setSortOption(event.target.value)}
+              value={filterOption}
+              onChange={(event) => setFilterOption(event.target.value)}
             >
-              <option value="featured">Featured</option>
+              <option value="all">All Sizes</option>
               <option value="price-low">Price: Low to High</option>
               <option value="price-high">Price: High to Low</option>
+              {SIZE_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
         </section>
@@ -304,7 +331,7 @@ function CatalogPage({ isGuest = false }) {
           </p>
           {(searchText ||
             selectedCategory !== "All" ||
-            sortOption !== "featured") && (
+            filterOption !== "all") && (
             <button type="button" onClick={clearFilters}>
               Clear filters
             </button>
