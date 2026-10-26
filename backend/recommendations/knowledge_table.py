@@ -64,21 +64,21 @@ PROPORTION_SHADING = {
 
 # --- Size range table (display-only, expert-encoded) -------------------------
 # Maps categorical sizes to standard unisex adult chest/body girth ranges in
-# BOTH units so the UI can show "M - 38-40 in - 96-102 cm". Display-only:
+# CM so the UI can show "M (96-102 cm)". Display-only:
 # never stored, never scored. Sellers input SML labels ONLY (see
-# validate_size_label); inch/cm entries are rejected at upload/edit time.
+# validate_size_label); cm entries are rejected at upload/edit time.
 SIZE_RANGE_TABLE = {
-    'XS': {'inches': (30, 32), 'cm': (76, 81)},
-    'S':  {'inches': (34, 36), 'cm': (86, 91)},
-    'M':  {'inches': (38, 40), 'cm': (96, 102)},
-    'L':  {'inches': (42, 44), 'cm': (107, 112)},
-    'XL': {'inches': (46, 48), 'cm': (117, 122)},
-    'XXL': {'inches': (50, 52), 'cm': (127, 132)},
+    'XS': {'cm': (76, 81)},
+    'S':  {'cm': (86, 91)},
+    'M':  {'cm': (96, 102)},
+    'L':  {'cm': (107, 112)},
+    'XL': {'cm': (117, 122)},
+    'XXL': {'cm': (127, 132)},
 }
 
 # --- Size label validation (CSV upload + listing edits) ----------------------
-# Sellers must enter categorical labels only; measured sizes ("32 inches",
-# "96 cm") are rejected with a descriptive reason (FR-4.7-style report,
+# Sellers must enter categorical labels only; measured sizes (e.g., "96 cm")
+# are rejected with a descriptive reason (FR-4.7-style report,
 # FR-4.8 display; supports OBJ-09 data quality). Footwear additionally accepts
 # regional shoe codes (US 9, EU 40, UK 8).
 CLOTHING_SIZE_OPTIONS = ('XS', 'S', 'M', 'L', 'XL', 'XXL')
@@ -95,7 +95,7 @@ def validate_size_label(size_text, category=''):
 
     Clothing (tops/bottoms/dresses/outerwear): label must be XS-XXL.
     Footwear: XS-XXL or a regional code (US 9, EU 40, UK 8).
-    Any inch/cm/measured entry is rejected for every category.
+    Any cm/measured entry is rejected for every category.
     Empty values pass here - presence is enforced by the required-field rule.
     """
     raw = str(size_text or '').strip()
@@ -111,7 +111,7 @@ def validate_size_label(size_text, category=''):
             if cat == 'footwear' else "."
         )
         return False, (
-            f"Invalid size '{raw}': measurements in inches or cm are not accepted. "
+            f"Invalid size '{raw}': measured values with units (e.g., cm) are not accepted. "
             f"Enter a standard size label ({', '.join(CLOTHING_SIZE_OPTIONS)}){suffix}"
         )
 
@@ -121,15 +121,15 @@ def validate_size_label(size_text, category=''):
         return False, (
             f"Invalid size '{raw}'. Footwear sizes must be regional codes "
             f"(e.g., US 9, EU 40, UK 8) or standard labels "
-            f"({', '.join(CLOTHING_SIZE_OPTIONS)}); inch/cm measurements are not accepted."
+            f"({', '.join(CLOTHING_SIZE_OPTIONS)}); cm measurements are not accepted."
         )
 
     if key in CLOTHING_SIZE_OPTIONS:
         return True, None
     return False, (
         f"Invalid size '{raw}'. Use standard clothing sizes only: "
-        f"{', '.join(CLOTHING_SIZE_OPTIONS)}. Do not enter inch or cm measurements; "
-        f"the product page shows both units automatically."
+        f"{', '.join(CLOTHING_SIZE_OPTIONS)}. Do not enter cm measurements; "
+        f"the product page shows the cm range automatically."
     )
 
 
@@ -137,7 +137,7 @@ def get_size_ranges(size_text):
     """
     Convert a categorical size label (XS-XXL) to its display ranges.
 
-    Returns {'label', 'inches', 'cm'} or None for footwear / regional /
+    Returns {'label', 'cm'} or None for footwear / regional /
     unknown sizes. Case- and whitespace-insensitive (" m " -> "M").
     Display-only: never used for scoring or validation.
     """
@@ -149,8 +149,7 @@ def get_size_ranges(size_text):
         return None
     return {
         'label': key,
-        'inches': f"{entry['inches'][0]}-{entry['inches'][1]} in",
-        'cm': f"{entry['cm'][0]}-{entry['cm'][1]} cm",
+        'cm': f"({entry['cm'][0]}-{entry['cm'][1]} cm)",
     }
 
 
@@ -190,4 +189,4 @@ def infer_shade(color_description: str) -> str:
     for level, keywords in SHADE_KEYWORDS.items():
         if any(k in text for k in keywords):
             return level
-    return DEFAULT_SHADE    
+    return DEFAULT_SHADE

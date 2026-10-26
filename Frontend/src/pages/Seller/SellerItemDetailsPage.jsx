@@ -468,13 +468,14 @@ function SellerItemDetailsPage() {
     return views[selectedView];
   }, [product, selectedView]);
 
+  // Pure-cm size bracket: backend serializer now returns size_cm already
+  // formatted as a bracket, e.g. "(96-102 cm)". No inch representation exists.
   const sizeDisplay = useMemo(() => {
     if (!product) return null;
     const label = product.size || "";
-    const inches = product.size_inches;
     const cm = product.size_cm;
-    if (inches && cm) {
-      return `${label} · ${inches} · ${cm}`;
+    if (cm) {
+      return `${label} ${cm}`; // renders as e.g. "M (96-102 cm)"
     }
     return label;
   }, [product]);
@@ -712,8 +713,8 @@ function SellerItemDetailsPage() {
                   required
                 />
                 <small className="seller-item-edit-hint">
-                  Clothing: standard labels only (XS, S, M, L, XL, XXL). Inch/cm measurements are rejected automatically.
-                  Footwear: regional codes (e.g., US 9, EU 40). The product page shows the inch and cm ranges automatically.
+                  Clothing: standard labels only (XS, S, M, L, XL, XXL). Measured cm entries are rejected automatically.
+                  Footwear: regional codes (e.g., US 9, EU 40). The product page shows the cm range bracket automatically.
                 </small>
               </label>
               <EditField label="Color" name="color" value={editForm.color} onChange={handleEditChange} required />

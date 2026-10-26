@@ -12,8 +12,7 @@ class CatalogItemSerializer(serializers.ModelSerializer):
     batch = serializers.CharField(read_only=True, source='batch_id', allow_null=True)
 
     # Computed at serialization time - NOT stored in MongoDB.
-    # Gives the UI all three representations: "M", "38-40 in", "96-102 cm".
-    size_inches = serializers.SerializerMethodField()
+    # Gives the UI the cm bracket representation: "(96-102 cm)".
     size_cm = serializers.SerializerMethodField()
 
     class Meta:
@@ -21,10 +20,6 @@ class CatalogItemSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['seller', 'store_name', 'status', 'rejection_reasons',
                             'created_at', 'updated_at', 'batch']
-
-    def get_size_inches(self, obj):
-        ranges = get_size_ranges(obj.size)
-        return ranges['inches'] if ranges else None
 
     def get_size_cm(self, obj):
         ranges = get_size_ranges(obj.size)

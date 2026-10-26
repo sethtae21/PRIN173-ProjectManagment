@@ -78,7 +78,7 @@ function ProductDetailsPage({ isGuest = false }) {
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
             sellerName: data.store_name || "FitFusion Store",
             availableSize: data.size || "M",
-            sizeDisplay: `${data.size || "M"} ${data.size_inches ? `· ${data.size_inches}` : ""} ${data.size_cm ? `· ${data.size_cm}` : ""}`,
+            sizeDisplay: `${data.size || "M"} ${data.size_cm ? data.size_cm : ""}`,
           });
         }
       } catch (err) {

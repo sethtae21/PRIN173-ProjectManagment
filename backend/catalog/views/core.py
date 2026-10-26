@@ -131,9 +131,9 @@ SELLER_IMAGE_GUIDELINES = (
     'the front image color automatically; you do not need to remove the background yourself.\n'
     'The Rear view must show the garment worn on a mannequin or hanging, photographed '
     'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
-    'SIZE RULE: enter standard size labels ONLY - XS, S, M, L, XL, or XXL. Do NOT type inch or '
-    'cm measurements (e.g., "32 inches", "96 cm"); they are rejected automatically. The product '
-    'page displays the equivalent inch and cm ranges for standard sizes on its own. '
+    'SIZE RULE: enter standard size labels ONLY - XS, S, M, L, XL, or XXL. Do NOT type '
+    'cm measurements (e.g., "96 cm"); they are rejected automatically. The product '
+    'page displays the equivalent cm range bracket for standard sizes on its own. '
     'Footwear uses regional shoe sizes (e.g., "US 9", "EU 40", "UK 8").\n'
     'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
 )
@@ -148,8 +148,8 @@ def build_catalog_template_csv():
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
             f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
             'Separate multiple tags with commas. '
-            'SIZE RULE: enter standard size labels ONLY (XS, S, M, L, XL, XXL) - inch or cm measurements are rejected; '
-            'the product page shows the inch and cm ranges automatically. Footwear: regional sizes (e.g., "US 9", "EU 40").'
+            'SIZE RULE: enter standard size labels ONLY (XS, S, M, L, XL, XXL) - cm measurements are rejected; '
+            'the product page shows the cm range bracket automatically. Footwear: regional sizes (e.g., "US 9", "EU 40").'
         ),
         *([''] * (len(CATALOG_CSV_COLUMNS) - 1)),
     ])
