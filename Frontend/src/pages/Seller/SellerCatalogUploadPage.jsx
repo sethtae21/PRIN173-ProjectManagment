@@ -136,6 +136,18 @@ function fileStem(fileName) {
   return fileName.split(".").slice(0, -1).join(".").toLowerCase();
 }
 
+function viewTokenFromName(fileName) {
+  const stem = fileStem(fileName);
+  if (stem.includes("rear") || stem.includes("back")) return "Rear";
+  if (stem.includes("front")) return "Front";
+  if (stem.includes("side")) return "Side";
+  return null;
+}
+
+function stripViewSuffix(stem) {
+  return stem.replace(/_(front|rear|back|side)$/i, "");
+}
+
 function getInvalidCsvTags(productRows) {
   const errors = [];
 
@@ -197,6 +209,17 @@ function analyzeCsvText(text) {
       normalizedHeader.forEach((column, index) => {
         record[column] = cleanCell(row[index]);
       });
+
+      // Legacy 3-view template fix: data rows written without a side value
+      // shift the rear filename into side_image_filename, leaving the rear
+      // column empty. Move it back so mapping/validation see the real name.
+      const sideValue = record.side_image_filename || "";
+      const rearValue = record.rear_image_filename || "";
+      if (!rearValue && sideValue && !fileStem(sideValue).includes("side")) {
+        record.rear_image_filename = sideValue;
+        record.side_image_filename = "";
+      }
+
       return record;
     })
     .filter((record) => record.name !== "");
@@ -226,8 +249,8 @@ function hexToColorFamily(hex) {
 
   let hue = 0;
   if (max === r) hue = ((g - b) / delta) % 6;
-  else if (max === g) hue = (b - r) / delta + 2;
-  else hue = (r - g) / delta + 4;
+  else if (max === g) hue = ((b - r) / delta) + 2;
+  else hue = ((r - g) / delta) + 4;
 
   hue = (hue * 60 + 360) % 360;
 
@@ -435,42 +458,130 @@ function SellerCatalogUploadPage() {
         return;
       }
 
-      const uploaded = [
-        ...images.front.map((i) => i.file.name),
-        ...images.rear.map((i) => i.file.name),
-      ];
-      const uploadedExact = new Set(uploaded.map((n) => n.toLowerCase()));
-      const uploadedStems = new Set(uploaded.map((n) => fileStem(n)));
+      // ---- Bin-aware filename mapping validation (FR-4.2 drop zones) ----
+      const bins = {
+        Front: images.front.map((i) => i.file.name),
+        Rear: images.rear.map((i) => i.file.name),
+      };
+      const binExact = {
+        Front: new Set(bins.Front.map((n) => n.toLowerCase())),
+        Rear: new Set(bins.Rear.map((n) => n.toLowerCase())),
+      };
+      const binStems = {
+        Front: new Set(bins.Front.map((n) => fileStem(n))),
+        Rear: new Set(bins.Rear.map((n) => fileStem(n))),
+      };
+      const inBin = (bin, name) =>
+        binExact[bin].has(String(name).toLowerCase()) ||
+        binStems[bin].has(fileStem(name));
+      const findBin = (name) => {
+        if (inBin("Front", name)) return "Front";
+        if (inBin("Rear", name)) return "Rear";
+        return null;
+      };
 
-      const missingFiles = [];
+      // Filenames referenced by the CSV front/rear columns.
+      const csvReferenced = new Set();
+      productRows.forEach((row) => {
+        ["front_image_filename", "rear_image_filename"].forEach((col) => {
+          const value = (row[col] || "").trim();
+          if (value) {
+            csvReferenced.add(value.toLowerCase());
+            csvReferenced.add(fileStem(value));
+          }
+        });
+      });
+
+      const mappingErrors = [];
+      const reportedNames = new Set();
+
+      // 1) Per CSV row: wrong bin / not uploaded / empty column.
       productRows.forEach((row, index) => {
         const rowLabel = `Row ${index + 2} (${row.name || "unnamed"})`;
         [
           ["front_image_filename", "Front"],
           ["rear_image_filename", "Rear"],
         ].forEach(([column, label]) => {
+          const other = label === "Front" ? "Rear" : "Front";
           const csvName = (row[column] || "").trim();
-          if (!csvName) {
-            missingFiles.push(`${rowLabel}: ${label} filename column is empty.`);
+
+          if (csvName) {
+            const bin = findBin(csvName);
+            if (bin === label) return;
+            if (bin === other) {
+              mappingErrors.push(
+                `${rowLabel}: this filename is in the wrong submission bin — "${csvName}" is in the ${other} View bin but must be in the ${label} View bin.`
+              );
+              reportedNames.add(csvName.toLowerCase());
+            } else {
+              mappingErrors.push(
+                `${rowLabel}: ${label} View file "${csvName}" was not uploaded in any bin.`
+              );
+            }
             return;
           }
-          const ok =
-            uploadedExact.has(csvName.toLowerCase()) ||
-            uploadedStems.has(fileStem(csvName));
-          if (!ok) {
-            missingFiles.push(
-              `${rowLabel}: ${label} file "${csvName}" was not uploaded.`
+
+          // Empty CSV column: locate the likely file for this row + view.
+          const otherCsv = (row[`${other.toLowerCase()}_image_filename`] || "").trim();
+          const productStem = otherCsv
+            ? stripViewSuffix(fileStem(otherCsv))
+            : "";
+          const candidate = [...bins.Front, ...bins.Rear]
+            .map((n) => ({ name: n, bin: findBin(n) }))
+            .find(({ name }) => {
+              if (viewTokenFromName(name) !== label) return false;
+              if (!productStem) return true;
+              return stripViewSuffix(fileStem(name)) === productStem;
+            });
+
+          if (candidate && candidate.bin === other) {
+            mappingErrors.push(
+              `${rowLabel}: this filename is in the wrong submission bin — "${candidate.name}" is in the ${other} View bin but must be in the ${label} View bin.`
+            );
+            reportedNames.add(candidate.name.toLowerCase());
+          } else if (candidate) {
+            mappingErrors.push(
+              `${rowLabel}: ${label} filename column is empty, but "${candidate.name}" is sitting in the ${label} View bin — add "${candidate.name}" to the CSV ${column} column.`
+            );
+            reportedNames.add(candidate.name.toLowerCase());
+          } else {
+            mappingErrors.push(
+              `${rowLabel}: ${label} filename column is empty and no matching ${label} View file was uploaded.`
             );
           }
         });
       });
 
-      if (missingFiles.length > 0) {
+      // 2) Files uploaded in a bin that no CSV row references.
+      [["Front", bins.Front], ["Rear", bins.Rear]].forEach(([binLabel, names]) => {
+        names.forEach((name) => {
+          const key = name.toLowerCase();
+          if (reportedNames.has(key)) return;
+          if (csvReferenced.has(key) || csvReferenced.has(fileStem(name))) return;
+
+          const token = viewTokenFromName(name);
+          let hint = "";
+          if (token === "Side") {
+            hint = " Side-view photos are not accepted — remove it from the bin.";
+          } else if (token && token !== binLabel) {
+            hint = ` It looks like a ${token} View photo — move it to the ${token} View bin and list it in the CSV.`;
+          } else {
+            hint = ` Add it to the CSV ${binLabel.toLowerCase()}_image_filename column or remove it from the bin.`;
+          }
+
+          mappingErrors.push(
+            `"${name}" in the ${binLabel} View bin is not listed in the CSV.${hint}`
+          );
+        });
+      });
+
+      if (mappingErrors.length > 0) {
         setValidationResult({
           type: "error",
           title: "Filename mapping failed",
-          message: missingFiles.slice(0, 6).join(" "),
-          details: missingFiles.slice(0, 6),
+          message:
+            "Fix the submission bins and CSV filename columns, then submit again:",
+          details: mappingErrors,
         });
         setIsProcessing(false);
         return;

@@ -657,6 +657,18 @@ class CatalogViewSet(viewsets.ModelViewSet):
         data_lines = lines[header_index:]
         reader = csv.DictReader(data_lines)
         rows = [row for row in reader if any(row.values())]
+
+        # Legacy 3-view template fix: data rows written without a side value
+        # shift the rear filename into side_image_filename, leaving the rear
+        # column empty. Move it back so mapping/validation see the real name.
+        for row in rows:
+            rear_value = (row.get('rear_image_filename') or '').strip()
+            side_value = (row.get('side_image_filename') or '').strip()
+            side_stem = os.path.splitext(side_value)[0].lower() if side_value else ''
+            if not rear_value and side_value and 'side' not in side_stem:
+                row['rear_image_filename'] = side_value
+                row['side_image_filename'] = ''
+
         if len(rows) > settings.MAX_BATCH_ITEMS:
             return Response({'error': f'Upload exceeds maximum of {settings.MAX_BATCH_ITEMS} items.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(rows) == 0:
