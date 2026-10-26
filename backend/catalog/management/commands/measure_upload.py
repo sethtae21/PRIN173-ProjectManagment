@@ -88,7 +88,7 @@ class Command(BaseCommand):
             'name', 'description', 'category', 'size', 'color',
             'color_description', 'color_family', 'price',
             'style_tags', 'occasion_tags',
-            'front_image_filename', 'side_image_filename', 'rear_image_filename',
+            'front_image_filename', 'rear_image_filename',
         ])
         for i in range(1, item_count + 1):
             writer.writerow([
@@ -96,13 +96,13 @@ class Command(BaseCommand):
                 f'Automated test product {i} for Criterion 4 / OBJ-08.',
                 'tops', 'M', 'Red', 'Bright Red', 'red', '599.00',
                 'casual, minimalist', 'everyday, summer',
-                'timing_front.jpg', 'timing_side.jpg', 'timing_rear.jpg',
+                'timing_front.jpg', 'timing_rear.jpg',
             ])
         return output.getvalue().encode('utf-8')
 
     def _simulate_upload(self, seller):
         """Mimic CatalogViewSet.upload() without going through HTTP: parse CSV,
-        create the batch + pending CatalogItem rows, attach the three dummy
+        create the batch + pending CatalogItem rows, attach the two dummy
         images to GridFS, then hand the batch_id to the real background worker."""
         csv_bytes = self._build_csv_bytes(TARGET_ITEMS)
         image_bytes = self._build_dummy_image_bytes(
@@ -128,9 +128,6 @@ class Command(BaseCommand):
             'timing_front.jpg': SimpleUploadedFile(
                 'timing_front.jpg', image_bytes, 'image/jpeg'
             ),
-            'timing_side.jpg': SimpleUploadedFile(
-                'timing_side.jpg', image_bytes, 'image/jpeg'
-            ),
             'timing_rear.jpg': SimpleUploadedFile(
                 'timing_rear.jpg', image_bytes, 'image/jpeg'
             ),
@@ -153,10 +150,9 @@ class Command(BaseCommand):
                 batch=batch,
                 status='processing',
             )
-            # Persist the three original views in GridFS (the worker reads them).
+            # Persist the two original views in GridFS (the worker reads them).
             for field_name, csv_col in [
                 ('front_image', 'front_image_filename'),
-                ('side_image', 'side_image_filename'),
                 ('rear_image', 'rear_image_filename'),
             ]:
                 csv_name = row.get(csv_col, '').strip()
@@ -181,7 +177,7 @@ class Command(BaseCommand):
         ))
 
         # 1) Warm the shared rembg session so first-item inference is fair.
-        self.stdout.write('⏳ Warming rembg session...')
+        self.stdout.write(' Warming rembg session...')
         t_warm = time.time()
         get_shared_rembg_session()
         self.stdout.write(self.style.SUCCESS(

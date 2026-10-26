@@ -46,8 +46,10 @@ class CartItem(models.Model):
 class Order(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
-    # NEW: human-readable order number, stored NOT NULL and unique.
-    order_number = models.CharField(max_length=32, unique=True, editable=False)
+    # Human-readable order number, stored NOT NULL and unique.
+    # FIX: callable default stops `makemigrations` from prompting for a
+    # one-off value when this field is added to pre-existing rows.
+    order_number = models.CharField(max_length=32, unique=True, editable=False, default=generate_order_number)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     recipient_name = models.CharField(max_length=255, blank=True)
     recipient_email = models.EmailField(blank=True)

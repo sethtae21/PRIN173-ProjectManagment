@@ -38,7 +38,6 @@ class CatalogTagValidationTests(SimpleTestCase):
             'style_tags': 'Casual, minimalist',
             'occasion_tags': 'Everyday, summer',
             'front_image_filename': 'front.png',
-            'side_image_filename': 'side.png',
             'rear_image_filename': 'rear.png',
         }
 
@@ -62,11 +61,12 @@ class CatalogTagValidationTests(SimpleTestCase):
 class CatalogValidationAndCRUDTests(TestCase):
     def setUp(self):
         self.client = APIClient()
+        # FIX: Added full_name and removed invalid 'username' argument
         self.seller = User.objects.create_user(
-            username='seller1', email='seller@test.com', password='Test123!@#',
+            full_name='Test Seller', email='seller@test.com', password='Test123!@#',
             role='seller', store_name='Test Store')
         self.user = User.objects.create_user(
-            username='user1', email='user@test.com', password='Test123!@#', role='user')
+            full_name='Test User', email='user@test.com', password='Test123!@#', role='user')
         
         # Valid 1x1 pixel PNG (will fail dimension check, but good for structure)
         self.valid_img = SimpleUploadedFile(
@@ -77,8 +77,8 @@ class CatalogValidationAndCRUDTests(TestCase):
 
     def _get_valid_csv(self):
         return (
-            "name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n"
-            "Test Shirt,A nice shirt,tops,M,White,Pure white,neutral,20.00,casual,everyday,test_front.jpg,test_side.jpg,test_rear.jpg\n"
+            "name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n"
+            "Test Shirt,A nice shirt,tops,M,White,Pure white,neutral,20.00,casual,everyday,test_front.jpg,test_rear.jpg\n"
         )
 
     @staticmethod
@@ -91,20 +91,23 @@ class CatalogValidationAndCRUDTests(TestCase):
     # --- PERMISSIONS ---
     def test_guest_cannot_upload(self):
         csv_file = SimpleUploadedFile("test.csv", self._get_valid_csv().encode(), content_type="text/csv")
-        res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': [self.valid_img]*3}, format='multipart')
+        # FIX: 2 images instead of 3
+        res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': [self.valid_img]*2}, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_regular_user_cannot_upload(self):
         self.client.force_authenticate(user=self.user)
         csv_file = SimpleUploadedFile("test.csv", self._get_valid_csv().encode(), content_type="text/csv")
-        res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': [self.valid_img]*3}, format='multipart')
+        # FIX: 2 images instead of 3
+        res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': [self.valid_img]*2}, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     # --- VALIDATION: FILE SIZE ---
     def test_rejects_oversized_image(self):
         self.client.force_authenticate(user=self.seller)
         csv_file = SimpleUploadedFile("test.csv", self._get_valid_csv().encode(), content_type="text/csv")
-        images = [self.valid_img, self.valid_img, self.oversized_img]
+        # FIX: 2 images instead of 3
+        images = [self.valid_img, self.oversized_img]
         res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('5 MB', res.data['error'])
@@ -113,7 +116,8 @@ class CatalogValidationAndCRUDTests(TestCase):
     def test_rejects_missing_view_images(self):
         self.client.force_authenticate(user=self.seller)
         csv_file = SimpleUploadedFile("test.csv", self._get_valid_csv().encode(), content_type="text/csv")
-        images = [self.valid_img, self.valid_img] # Only 2 images instead of 3
+        # FIX: 1 image instead of 2 (was 2 instead of 3)
+        images = [self.valid_img] 
         res = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Missing view images', res.data['error'])
@@ -132,8 +136,9 @@ class CatalogValidationAndCRUDTests(TestCase):
             guidelines = package.read('seller_image_guidelines.txt').decode()
         template_response = self.client.get('/catalog/download-template/')
         self.assertEqual(template, template_response.content.decode('utf-8'))
-        self.assertIn('front_image_filename,side_image_filename,rear_image_filename', template)
-        self.assertIn('Front, Side, and Rear', guidelines)
+        # FIX: Updated assertions to remove Side view references
+        self.assertIn('front_image_filename,rear_image_filename', template)
+        self.assertIn('Front and Rear', guidelines)
         self.assertIn('800 x 800 pixels', guidelines)
         self.assertIn('Use style_tags from: casual, minimalist', template)
         self.assertIn('Use only these style_tags: casual, minimalist', guidelines)
@@ -147,9 +152,10 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.assertEqual(len(lines), 4)
         self.assertTrue(lines[0].startswith('"📝 HOW TO UPLOAD:'))
         self.assertEqual(lines[1], '')
+        # FIX: Removed side_image_filename from expected header
         self.assertEqual(
             lines[2],
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename',
+            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename',
         )
         self.assertTrue(lines[3].startswith('Example Product,'))
         self.assertIn('Replace the example row', lines[0])
@@ -158,9 +164,10 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.client.force_authenticate(user=self.seller)
         template = self.client.get('/catalog/download-template/').content.decode()
         csv_file = SimpleUploadedFile('template.csv', template.encode(), content_type='text/csv')
+        # FIX: 2 images instead of 3
         images = [
             SimpleUploadedFile(f'{view}.png', self._png_bytes((10, 10)), content_type='image/png')
-            for view in ('front', 'side', 'rear')
+            for view in ('front', 'rear')
         ]
 
         with patch(
@@ -173,19 +180,22 @@ class CatalogValidationAndCRUDTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         item = CatalogItem.objects.get(batch_id=response.data['batch_id'])
-        self.assertEqual(item.name, 'Classic White Shirt')
+        # FIX: Match the actual template example row name
+        self.assertEqual(item.name, 'Example Product')
         self.assertIn('Image too small', str(item.rejection_reasons))
 
     def test_upload_reports_missing_fields_and_undersized_images(self):
         self.client.force_authenticate(user=self.seller)
+        # FIX: Removed side_image_filename from CSV
         csv_content = (
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
-            'Test Shirt,,tops,M,White,Pure white,neutral,20.00,casual,everyday,front.png,side.png,rear.png\n'
+            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n'
+            'Test Shirt,,tops,M,White,Pure white,neutral,20.00,casual,everyday,front.png,rear.png\n'
         )
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode(), content_type='text/csv')
+        # FIX: 2 images instead of 3
         images = [
             SimpleUploadedFile(f'{view}.png', self._png_bytes((10, 10)), content_type='image/png')
-            for view in ('front', 'side', 'rear')
+            for view in ('front', 'rear')
         ]
 
         with patch(
@@ -209,9 +219,10 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.client.force_authenticate(user=self.seller)
         csv_content = self._get_valid_csv()
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode(), content_type='text/csv')
+        # FIX: 2 images instead of 3
         images = [
             SimpleUploadedFile(f'{view}.png', self._png_bytes(), content_type='image/png')
-            for view in ('different_front', 'different_side', 'different_rear')
+            for view in ('different_front', 'different_rear')
         ]
 
         with patch(
@@ -231,15 +242,17 @@ class CatalogValidationAndCRUDTests(TestCase):
 
     def test_successful_upload_derives_color_palette_tags(self):
         self.client.force_authenticate(user=self.seller)
+        # FIX: Removed side_image_filename from CSV
         csv_content = (
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename\n'
-            'Red Shirt,desc,tops,M,Red,Bright red,red,20.00,casual,everyday,front.png,side.png,rear.png\n'
+            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n'
+            'Red Shirt,desc,tops,M,Red,Bright red,red,20.00,casual,everyday,front.png,rear.png\n'
         )
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode(), content_type='text/csv')
         image_bytes = self._png_bytes(color=(210, 24, 35, 128))
+        # FIX: 2 images instead of 3
         images = [
             SimpleUploadedFile(f'{view}.png', image_bytes, content_type='image/png')
-            for view in ('front', 'side', 'rear')
+            for view in ('front', 'rear')
         ]
 
         with (
@@ -304,7 +317,8 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_seller_cannot_manage_other_sellers_items(self):
-        other_seller = User.objects.create_user(username='seller2', email='s2@t.com', password='Test123!@#', role='seller', store_name='Other')
+        # FIX: Added full_name and removed invalid 'username' argument
+        other_seller = User.objects.create_user(full_name='Other Seller', email='s2@t.com', password='Test123!@#', role='seller', store_name='Other')
         item = CatalogItem.objects.create(
             name='Other Item', description='desc', category='tops', size='M',
             color='White', color_description='white', color_family='neutral', price=10.0,
@@ -345,6 +359,7 @@ class CatalogValidationAndCRUDTests(TestCase):
                 f'/catalog/my-listings/{item.id}/',
                 {'name': 'Should Not Persist', 'front_image': image}, format='multipart')
 
+        # FIX: Corrected variable name from res to response
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         item.refresh_from_db()
         self.assertEqual(item.name, 'White Shirt')

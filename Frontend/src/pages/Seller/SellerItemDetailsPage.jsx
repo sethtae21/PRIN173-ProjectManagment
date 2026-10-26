@@ -10,13 +10,10 @@ function normalizeStatus(status) {
   return "Pending";
 }
 
-/* ✅ FIX: Map color names/descriptions to actual hex codes for the swatch */
 function getColorHex(colorName, colorDescription) {
-  // 1. Try to extract a hex code directly from color_description (e.g., "Pure White (#FFFFFF)")
   const hexMatch = String(colorDescription || "").match(/#([0-9a-fA-F]{3}){1,2}\b/);
   if (hexMatch) return hexMatch[0];
 
-  // 2. Map common color names to hex values
   const nameMap = {
     white: "#FFFFFF",
     black: "#111111",
@@ -41,43 +38,28 @@ function getColorHex(colorName, colorDescription) {
     if (lowerName.includes(key)) return hex;
   }
 
-  // 3. Fallback to the original theme gold if nothing matches
   return "#c89a43";
 }
 
-/* Build an absolute backend URL from the serialized image path (/media/…) */
 function mediaUrl(path) {
   if (!path) return "";
   if (String(path).startsWith("http")) return path;
   return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
 }
 
-/* Checkerboard backdrop so the rembg alpha channel is visible */
 const CHECKER = {
   backgroundImage: "repeating-conic-gradient(#efe8d8 0% 25%, #fbf7ec 0% 50%)",
   backgroundSize: "16px 16px",
 };
 
-/* ==========================================
-   ALPHA NORMALIZATION PIPELINE
-   1. fillTransparentHoles — rembg (white-on-white shots) sometimes deletes
-      pockets INSIDE the garment (see Side/Rear holes). We flood-fill the
-      "outside" transparent region from the image borders; any transparent
-      pixel NOT reached is an enclosed hole and is inpainted by growing the
-      rim colour inward (BFS), restoring a solid garment.
-   2. scanLargestComponentBox — crops to the largest connected opaque region
-      so border rings / specks / haze can never stretch the crop box.
-   Threshold ladder 128 → 64 → 24 (128 matches backend: alpha < 128 = bg).
-========================================== */
 const ALPHA_STEPS = [128, 64, 24];
-const MIN_COMPONENT_AREA = 24; // px at scan scale; ignores dust
+const MIN_COMPONENT_AREA = 24;
 
 function fillTransparentHoles(imageData) {
   const { data, width: w, height: h } = imageData;
   const total = w * h;
   const isTransparent = (i) => data[i * 4 + 3] <= ALPHA_STEPS[0];
 
-  /* 1. Flood-fill the OUTSIDE transparent region from all four borders. */
   const outside = new Uint8Array(total);
   const stack = new Int32Array(total);
   let sp = 0;
@@ -103,7 +85,6 @@ function fillTransparentHoles(imageData) {
     pushOutside(i + w);
   }
 
-  /* 2. Holes = transparent pixels never reached from the border. */
   const known = new Uint8Array(total);
   let holeCount = 0;
   for (let i = 0; i < total; i += 1) {
@@ -134,7 +115,6 @@ function fillTransparentHoles(imageData) {
     return [r / n, g / n, b / n];
   };
 
-  /* Seed the BFS with hole pixels that touch solid garment pixels. */
   for (let i = 0; i < total; i += 1) {
     if (!isTransparent(i) || outside[i] || inQueue[i]) continue;
     const x = i % w;
@@ -149,7 +129,6 @@ function fillTransparentHoles(imageData) {
     }
   }
 
-  /* Grow the rim colour inward until every hole pixel is solid. */
   let filled = 0;
   while (qHead < qTail) {
     const i = queue[qHead++];
@@ -249,11 +228,6 @@ function scanLargestComponentBox(data, sw, sh, threshold) {
   return bestBox;
 }
 
-/* Trims the transparent margins around the rembg cutout, repairs enclosed
-   holes, and re-emits a tightly cropped PNG data-URL, so the garment (not
-   the canvas) is what gets centered and scaled inside the square stage.
-   If the canvas is tainted (CORS) or anything else fails, we keep the
-   original image — never broken. */
 function useAlphaCrop(src) {
   const [cropped, setCropped] = useState(null);
 
@@ -278,14 +252,10 @@ function useAlphaCrop(src) {
         const fullCtx = full.getContext("2d");
         fullCtx.drawImage(probe, 0, 0);
 
-        /* FIX (over-crop holes): repair enclosed transparent pockets BEFORE
-           anything else, so the repaired garment is what gets cropped and
-           displayed. */
         const fullImage = fullCtx.getImageData(0, 0, w, h);
         const holesFilled = fillTransparentHoles(fullImage);
         if (holesFilled > 0) fullCtx.putImageData(fullImage, 0, 0);
 
-        /* Scan on a downscaled copy for speed (max 512px) */
         const scanMax = 512;
         const scale = Math.min(1, scanMax / Math.max(w, h));
         const sw = Math.max(1, Math.round(w * scale));
@@ -311,8 +281,6 @@ function useAlphaCrop(src) {
 
         const { minX, minY, maxX, maxY } = box;
 
-        /* Garment component genuinely fills the canvas → nothing to trim.
-           Still publish the repaired canvas when holes were filled. */
         const coversWidth = maxX - minX + 1 >= sw * 0.98;
         const coversHeight = maxY - minY + 1 >= sh * 0.98;
         if (coversWidth && coversHeight) {
@@ -325,7 +293,6 @@ function useAlphaCrop(src) {
           return;
         }
 
-        /* Map back to full-resolution coords with a small safety pad */
         const padScan = Math.max(1, Math.round(Math.max(maxX - minX, maxY - minY) * 0.03));
         const cx1 = Math.max(0, (minX - padScan) / scale);
         const cy1 = Math.max(0, (minY - padScan) / scale);
@@ -344,13 +311,12 @@ function useAlphaCrop(src) {
         console.info("[alpha-crop] cropped", src, { threshold: usedThreshold, box, cw, ch, holesFilled });
         if (!cancelled) setCropped(crop.toDataURL("image/png"));
       } catch (err) {
-        /* Tainted canvas (CORS) or decode issue → keep the original image */
         console.warn("Alpha-crop skipped, using original asset:", err);
       }
     };
 
     probe.onerror = () => {
-      /* the visible <img> onError handles the silhouette fallback */
+      // the visible <img> onError handles the silhouette fallback
     };
     probe.src = src;
 
@@ -362,8 +328,6 @@ function useAlphaCrop(src) {
   return cropped;
 }
 
-/* Renders the real transparent PNG (hole-repaired + alpha-cropped so the
-   garment is centered); falls back to the silhouette only on load failure */
 function AssetImage({
   src,
   alt,
@@ -499,16 +463,11 @@ function SellerItemDetailsPage() {
     if (!product) return null;
     const views = {
       front: { label: "FRONT PNG", fileName: product.front_image || "front_image.png" },
-      side: { label: "SIDE PNG", fileName: product.side_image || "side_image.png" },
       rear: { label: "REAR PNG", fileName: product.rear_image || "rear_image.png" },
     };
     return views[selectedView];
   }, [product, selectedView]);
 
-  /* Derived three-value size display for the UI.
-     size_inches / size_cm come from the backend serializer (computed from
-     SIZE_RANGE_TABLE in knowledge_table.py). Footwear / unknown sizes have
-     both fields null, so we fall back to the raw size label only. */
   const sizeDisplay = useMemo(() => {
     if (!product) return null;
     const label = product.size || "";
@@ -651,7 +610,7 @@ function SellerItemDetailsPage() {
       <header className="seller-item-header">
         <div>
           <h1>22A — SELLER ITEM DETAILS</h1>
-          <p>Complete owned-product metadata and processed Front/Side/Rear assets</p>
+          <p>Complete owned-product metadata and processed Front/Rear assets</p>
         </div>
         <span className="seller-item-role">SELLER</span>
       </header>
@@ -808,13 +767,9 @@ function SellerItemDetailsPage() {
   );
 }
 
-/* ==========================================
-   SELLER MODE — real rembg transparent PNGs
-========================================== */
 function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
   const imageViews = [
     { label: "FRONT PNG", path: product.front_image },
-    { label: "SIDE PNG", path: product.side_image },
     { label: "REAR PNG", path: product.rear_image },
   ];
 
@@ -827,7 +782,7 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
         <div>
           <p>SELLER ITEM DETAILS</p>
           <h2>{product.name}</h2>
-          <span>Full metadata and processed Front/Side/Rear transparent assets.</span>
+          <span>Full metadata and processed Front/Rear transparent assets.</span>
         </div>
         <span className={`seller-item-status seller-item-status-${product.status.toLowerCase()}`}>
           {product.status}
@@ -849,7 +804,7 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
         <article className="seller-item-assets-card">
           <div className="seller-item-card-heading">
             <p>PROCESSED PRODUCT ASSETS</p>
-            <h3>Three-view images</h3>
+            <h3>Two-view images</h3>
           </div>
 
           <div className="seller-item-assets">
@@ -857,10 +812,6 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
               <div className="seller-item-asset" key={imageView.label}>
                 <span>{imageView.label}</span>
 
-                {/* REAL IMAGE: rembg-processed transparent PNG streamed from GridFS.
-                    AssetImage now (1) repairs enclosed transparent holes left by
-                    rembg over-removal and (2) crops to the garment component, so
-                    every view renders solid, centered, and maximized. */}
                 <div
                   className="seller-item-asset-stage"
                   style={{
@@ -897,8 +848,6 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
           <MetadataRow label="Description" value={product.description} />
           <MetadataRow label="Category" value={product.category} />
 
-          {/* Three-value size display (SML label + inch range + cm range).
-              For footwear / unknown sizes, falls back to the raw size label. */}
           <MetadataRow label="Size" value={sizeDisplay} />
 
           <MetadataRow label="Color" value={product.color} />
@@ -923,16 +872,12 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
   );
 }
 
-/* ==========================================
-   SHOPPER PREVIEW — same real image, shopper framing
-========================================== */
 function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, viewInformation, formatPrice }) {
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
   const occasionTags = Array.isArray(product.occasion_tags) ? product.occasion_tags : [];
 
   const viewPaths = {
     front: product.front_image,
-    side: product.side_image,
     rear: product.rear_image,
   };
   const currentPath = viewPaths[selectedView] || "";
@@ -978,7 +923,7 @@ function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, v
           </div>
 
           <div className="shopper-preview-thumbnails">
-            {["front", "side", "rear"].map((view) => (
+            {["front", "rear"].map((view) => (
               <button
                 type="button"
                 key={view}
@@ -1008,12 +953,10 @@ function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, v
           <div className="shopper-preview-selection">
             <strong>Available Sizes</strong>
             <div>
-              {/* Three-value size display for shoppers */}
               <button type="button" disabled className="shopper-preview-size-chip">
                 {sizeDisplay}
               </button>
             </div>
-            {/* SRS §1.2 compliance disclaimer */}
             <small className="shopper-preview-size-disclaimer">
               Standard size chart for reference only. FitFusion AI does not predict your size and does not guarantee physical fit.
             </small>
@@ -1022,7 +965,6 @@ function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, v
           <div className="shopper-preview-color">
             <strong>Color</strong>
             <div>
-              {/* ✅ FIX: Apply the computed hex color inline, falling back to gold only if unrecognized */}
               <span 
                 className="shopper-preview-color-swatch"
                 style={{ backgroundColor: getColorHex(product.color, product.color_description) }} 

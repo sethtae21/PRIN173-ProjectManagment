@@ -61,7 +61,6 @@ class CatalogItem(models.Model):
     seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)
     front_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/front/', blank=True, null=True)
-    side_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/side/', blank=True, null=True)
     rear_image = models.ImageField(storage=gridfs_storage, upload_to='catalog/rear/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     rejection_reasons = models.JSONField(default=list, blank=True)
@@ -87,10 +86,10 @@ class CatalogItem(models.Model):
 @receiver(post_delete, sender=CatalogItem)
 def cleanup_catalog_images(sender, instance, **kwargs):
     """
-    Cascade-delete all three image objects from GridFS 
+    Cascade-delete both image objects from GridFS
     when a listing is deleted to prevent orphaned files and protect free-tier quota.
     """
-    for field_name in ['front_image', 'side_image', 'rear_image']:
+    for field_name in ['front_image', 'rear_image']:
         file_field = getattr(instance, field_name)
         if file_field and file_field.name:
             # save=False prevents an unnecessary extra DB save since the model is being deleted

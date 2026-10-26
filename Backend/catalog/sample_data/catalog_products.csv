@@ -1,11 +1,2 @@
-name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,side_image_filename,rear_image_filename
-Classic White Tee,"A comfortable, breathable cotton t-shirt perfect for daily wear.",Tops,M,White,Pure White,Neutral,599.00,"Casual, Minimalist","Everyday, Summer",white_tee_front.png,white_tee_side.png,white_tee_rear.png
-Linen Camp-Collar Shirt,"A relaxed linen shirt with a camp collar for hot, humid days.",Tops,L,Beige,Sand Beige,Warm,899.00,"Casual, Resort","Summer, Everyday",linen_shirt_front.png,linen_shirt_side.png,linen_shirt_rear.png
-Slim Chino Pants,"Tailored cotton chinos with a slim, tapered leg for smart-casual wear.",Bottoms,32 inches,Khaki,Light Khaki,Warm,1099.00,"Classic, Work","Office, Everyday",chino_front.png,chino_side.png,chino_rear.png
-Dark Wash Denim Jeans,"Sturdy denim jeans in a deep, dark indigo wash.",Bottoms,30 inches,Blue,Indigo Blue,Cool,1299.00,"Casual, Streetwear","Everyday, Weekend",denim_front.png,denim_side.png,denim_rear.png
-Satin Slip Dress,"A sleek satin slip dress with a smooth, fluid drape.",dresses,S,Black,Jet Black,Neutral,1499.00,"Elegant, Minimalist","Evening, Formal",slip_dress_front.png,slip_dress_side.png,slip_dress_rear.png
-Floral Summer Dress,"A breezy floral-print dress for sunny, outdoor days.",dresses,M,Red,Coral Red,Warm,1399.00,"Romantic, Resort","Summer, Vacation",floral_dress_front.png,floral_dress_side.png,floral_dress_rear.png
-Wool Blend Overcoat,"A structured wool-blend overcoat for cold, formal occasions.",Outerwear,L,Gray,Heather Gray,Neutral,2499.00,"Classic, Formal","Winter, Office",overcoat_front.png,overcoat_side.png,overcoat_rear.png
-Quilted Puffer Jacket,"A lightweight quilted puffer with a warm, olive-toned shell.",Outerwear,XL,Green,Olive Green,Warm,1999.00,"Streetwear, Sporty","Winter, Outdoor",puffer_front.png,puffer_side.png,puffer_rear.png
-Court Leather Sneakers,"Clean leather sneakers with a minimal, low-profile court sole.",Footwear,US 9,White,Off-White,Neutral,1799.00,"Minimalist, Streetwear","Everyday, Weekend",sneakers_front.png,sneakers_side.png,sneakers_rear.png
-Suede Loafer Shoes,"Polished suede loafers in a rich, chestnut brown tone.",Footwear,EU 40,Brown,Chestnut Brown,Warm,1599.00,"Classic, Formal","Office, Formal",loafers_front.png,loafers_side.png,loafers_rear.png
+name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename
+Classic White Tee,"A comfortable, breathable cotton t-shirt perfect for daily wear.",Tops,M,White,Pure White,Neutral,599.00,"Casual, Minimalist","Everyday, Summer",white_tee_front.png,white_tee_rear.png

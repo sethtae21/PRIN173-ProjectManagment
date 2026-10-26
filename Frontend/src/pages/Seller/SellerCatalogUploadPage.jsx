@@ -15,13 +15,11 @@ const requiredColumns = [
   "style_tags",
   "occasion_tags",
   "front_image_filename",
-  "side_image_filename",
   "rear_image_filename",
 ];
 
 const initialImages = {
   front: [],
-  side: [],
   rear: [],
 };
 
@@ -54,9 +52,8 @@ const TAG_OPTIONS = {
   ],
 };
 
-// KAN-FIX: Extended polling to handle long batches (~150s for 3 items)
 const POLL_INTERVAL_MS = 2500;
-const MAX_POLL_ATTEMPTS = 240; // 240 * 2.5s = 10 minutes
+const MAX_POLL_ATTEMPTS = 240;
 
 function getSellerStoreName() {
   const storageKeys = [
@@ -88,9 +85,6 @@ function getSellerStoreName() {
   return "Maison Aurelia";
 }
 
-/* ==========================================
-   QUOTE-AWARE CSV PARSER
-========================================== */
 function parseCsvRows(text) {
   const rows = [];
   let current = "";
@@ -164,9 +158,6 @@ function getInvalidCsvTags(productRows) {
   return errors;
 }
 
-/* ==========================================
-   CSV ANALYZER (FIXED FOR item_name / name)
-========================================== */
 function analyzeCsvText(text) {
   const rows = parseCsvRows(text);
 
@@ -213,13 +204,11 @@ function analyzeCsvText(text) {
   return { productRows, missingColumns, header: normalizedHeader };
 }
 
-// KAN-FIX: Helper to detect hex color in rejection reason
 function extractHexFromReason(reason) {
   const match = String(reason || "").match(/#[0-9a-fA-F]{6}/);
   return match ? match[0] : null;
 }
 
-// KAN-FIX: Convert hex to color family
 function hexToColorFamily(hex) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -252,23 +241,19 @@ function hexToColorFamily(hex) {
   return "Pink";
 }
 
-/* ==========================================
-   PAGE COMPONENT
-========================================== */
 function SellerCatalogUploadPage() {
   const navigate = useNavigate();
 
   const [storeName] = useState(getSellerStoreName);
   const [csvFile, setCsvFile] = useState(null);
-  const [csvData, setCsvData] = useState(null); // KAN-FIX: Store parsed CSV for correction
+  const [csvData, setCsvData] = useState(null);
   const [images, setImages] = useState(initialImages);
   const [errors, setErrors] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
-  const [corrections, setCorrections] = useState({}); // KAN-FIX: Store edits for rejected items
+  const [corrections, setCorrections] = useState({});
 
-  const [isDownloadingTemplate, setIsDownloadingTemplate] =
-    useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [templateError, setTemplateError] = useState("");
 
   const pollTimer = useRef(null);
@@ -279,19 +264,15 @@ function SellerCatalogUploadPage() {
     };
   }, []);
 
-  /* ---------- Template download (FR-4.1) ---------- */
   function handleDownloadTemplate() {
     setIsDownloadingTemplate(true);
     setTemplateError("");
 
     try {
-      // FIX: catalogAPI.downloadTemplate() simply returns the URL string.
-      // We must trigger the actual browser download using a temporary anchor tag.
       const downloadUrl = catalogAPI.downloadTemplate();
-      
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = "fitfusion_catalog_template.csv"; // Fallback filename
+      link.download = "fitfusion_catalog_template.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -305,7 +286,6 @@ function SellerCatalogUploadPage() {
     }
   }
 
-  /* ---------- CSV selection ---------- */
   function handleCsvChange(event) {
     const file = event.target.files?.[0];
     setValidationResult(null);
@@ -343,7 +323,6 @@ function SellerCatalogUploadPage() {
     setCsvFile(file);
     setErrors((current) => ({ ...current, csv: "" }));
 
-    // KAN-FIX: Parse and store CSV data immediately
     file.text().then((text) => {
       try {
         const { productRows, header } = analyzeCsvText(text);
@@ -354,7 +333,6 @@ function SellerCatalogUploadPage() {
     });
   }
 
-  /* ---------- Multi-file image drop zones (FR-4.2) ---------- */
   function handleImageAdd(view, event) {
     const addedFiles = Array.from(event.target.files || []);
     event.target.value = "";
@@ -364,7 +342,6 @@ function SellerCatalogUploadPage() {
 
     const allNames = [
       ...images.front,
-      ...images.side,
       ...images.rear,
     ].map((item) => item.file.name.toLowerCase());
 
@@ -411,7 +388,6 @@ function SellerCatalogUploadPage() {
     setValidationResult(null);
   }
 
-  /* ---------- Submit → backend /catalog/upload/ ---------- */
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -419,7 +395,6 @@ function SellerCatalogUploadPage() {
 
     if (!csvFile) nextErrors.csv = "Please upload your catalog CSV file.";
     if (images.front.length === 0) nextErrors.front = "At least one Front View image is required.";
-    if (images.side.length === 0) nextErrors.side = "At least one Side View image is required.";
     if (images.rear.length === 0) nextErrors.rear = "At least one Rear View image is required.";
 
     setErrors(nextErrors);
@@ -462,7 +437,6 @@ function SellerCatalogUploadPage() {
 
       const uploaded = [
         ...images.front.map((i) => i.file.name),
-        ...images.side.map((i) => i.file.name),
         ...images.rear.map((i) => i.file.name),
       ];
       const uploadedExact = new Set(uploaded.map((n) => n.toLowerCase()));
@@ -473,7 +447,6 @@ function SellerCatalogUploadPage() {
         const rowLabel = `Row ${index + 2} (${row.name || "unnamed"})`;
         [
           ["front_image_filename", "Front"],
-          ["side_image_filename", "Side"],
           ["rear_image_filename", "Rear"],
         ].forEach(([column, label]) => {
           const csvName = (row[column] || "").trim();
@@ -503,12 +476,11 @@ function SellerCatalogUploadPage() {
         return;
       }
 
-      // KAN-FIX: Store CSV data for potential correction
       setCsvData({ rows: productRows, header });
 
       const formData = new FormData();
       formData.append("csv_file", csvFile);
-      [...images.front, ...images.side, ...images.rear].forEach((item) => {
+      [...images.front, ...images.rear].forEach((item) => {
         formData.append("images", item.file);
       });
 
@@ -553,7 +525,6 @@ function SellerCatalogUploadPage() {
     }
   }
 
-  /* ---------- Batch report polling (KAN-FIX: Extended timeout) ---------- */
   function pollBatchReport(batchId, attempts) {
     pollTimer.current = setTimeout(async () => {
       try {
@@ -564,7 +535,6 @@ function SellerCatalogUploadPage() {
           return;
         }
 
-        // KAN-FIX: Increased max attempts from 30 to MAX_POLL_ATTEMPTS (10 minutes)
         if (attempts >= MAX_POLL_ATTEMPTS) {
           setValidationResult({
             type: "processing",
@@ -670,7 +640,6 @@ function SellerCatalogUploadPage() {
     setIsProcessing(false);
   }
 
-  /* ---------- KAN-FIX: Re-upload corrected rows ---------- */
   async function handleReuploadCorrected() {
     if (!csvData || !csvFile) return;
 
@@ -678,26 +647,22 @@ function SellerCatalogUploadPage() {
       (validationResult?.details || []).map((d) => d.name)
     );
 
-    // Filter to only rejected rows
     const rejectedRows = csvData.rows.filter((row) =>
       rejectedNames.has(row.name)
     );
 
     if (rejectedRows.length === 0) return;
 
-    // Apply corrections
     const correctedRows = rejectedRows.map((row) => ({
       ...row,
       ...(corrections[row.name] || {}),
     }));
 
-    // Build corrected CSV
     const csvLines = [csvData.header.join(",")];
     correctedRows.forEach((row) => {
       const line = csvData.header
         .map((col) => {
           const value = String(row[col] || "");
-          // Quote if contains comma, quote, or newline
           return /[,"\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
         })
         .join(",");
@@ -709,10 +674,9 @@ function SellerCatalogUploadPage() {
       type: "text/csv",
     });
 
-    // Collect only images for rejected rows
     const rejectedImages = [];
     correctedRows.forEach((row) => {
-      ["front", "side", "rear"].forEach((view) => {
+      ["front", "rear"].forEach((view) => {
         const filename = row[`${view}_image_filename`];
         const imageItem = images[view].find(
           (img) =>
@@ -723,7 +687,6 @@ function SellerCatalogUploadPage() {
       });
     });
 
-    // Build form data
     const formData = new FormData();
     formData.append("csv_file", correctedFile);
     rejectedImages.forEach((file) => formData.append("images", file));
@@ -761,7 +724,6 @@ function SellerCatalogUploadPage() {
     }
   }
 
-  /* ---------- KAN-FIX: Handle correction input change ---------- */
   function handleCorrectionChange(itemName, field, value) {
     setCorrections((prev) => ({
       ...prev,
@@ -772,7 +734,6 @@ function SellerCatalogUploadPage() {
     }));
   }
 
-  /* ---------- KAN-FIX: Apply detected color from rejection reason ---------- */
   function applyDetectedColor(itemName, hex) {
     const family = hexToColorFamily(hex);
     setCorrections((prev) => ({
@@ -786,7 +747,6 @@ function SellerCatalogUploadPage() {
     }));
   }
 
-  /* ---------- Reset ---------- */
   function handleReset() {
     if (pollTimer.current) clearTimeout(pollTimer.current);
 
@@ -803,16 +763,12 @@ function SellerCatalogUploadPage() {
     if (csvInput) csvInput.value = "";
   }
 
-  // KAN-FIX: Check if any corrections have been made
   const hasCorrections = Object.keys(corrections).length > 0 &&
     Object.values(corrections).some((c) => Object.keys(c).length > 0);
 
-  // KAN-FIX: Check if any items were accepted
   const hasAcceptedItems = validationResult?.type === "success" &&
     (validationResult.title.includes("accepted") || !validationResult.title.includes("rejected"));
 
-  // KAN-FIX: batch reached a terminal status (completed/failed) — only then
-  // may the report / navigation / re-upload actions be shown.
   const batchFinished =
     !!validationResult && validationResult.type !== "processing";
 
@@ -832,7 +788,7 @@ function SellerCatalogUploadPage() {
 
           <p>
             Upload your CSV product list and provide the
-            Front, Side, and Rear images for every product
+            Front and Rear images for every product
             row. Filenames must match the CSV columns.
           </p>
         </section>
@@ -963,7 +919,7 @@ function SellerCatalogUploadPage() {
             <div className="seller-upload-card-heading">
               <div>
                 <p>STEP 2</p>
-                <h2>Three-view product images</h2>
+                <h2>Two-view product images</h2>
               </div>
 
               <span className="seller-upload-required">
@@ -974,7 +930,7 @@ function SellerCatalogUploadPage() {
             <p className="seller-upload-image-note">
               Each drop zone accepts multiple files — one per
               CSV row. Filenames must match the CSV
-              front/side/rear filename columns.
+              front/rear filename columns.
             </p>
 
             <div className="seller-image-grid">
@@ -983,15 +939,6 @@ function SellerCatalogUploadPage() {
                 title="Front View"
                 files={images.front}
                 error={errors.front}
-                onAdd={handleImageAdd}
-                onRemove={handleImageRemove}
-              />
-
-              <ImageUploader
-                view="side"
-                title="Side View"
-                files={images.side}
-                error={errors.side}
                 onAdd={handleImageAdd}
                 onRemove={handleImageRemove}
               />
@@ -1029,7 +976,6 @@ function SellerCatalogUploadPage() {
                             <strong>{entry.name}:</strong>{" "}
                             {entry.reasons.join(" • ")}
 
-                            {/* KAN-FIX: Show correction UI for rejected items with color issues */}
                             {entry.reasons.some((r) => extractHexFromReason(r)) && (
                               <div className="seller-correction-controls" style={{ marginTop: "12px", padding: "12px", background: "#f9f9f9", borderRadius: "6px" }}>
                                 {(() => {
@@ -1100,11 +1046,8 @@ function SellerCatalogUploadPage() {
                 )}
             </div>
 
-            {/* KAN-FIX: Action buttons appear ONLY after the batch finishes
-                (completed/failed). Hidden while status is "processing". */}
             {batchFinished && (
               <div className="seller-validation-actions" style={{ marginTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                {/* ✅ FIX: Changed from /seller/product-listings to /seller/listings */}
                 {validationResult.type === "success" && hasAcceptedItems && (
                   <button
                     type="button"
@@ -1193,9 +1136,6 @@ function SellerCatalogUploadPage() {
   );
 }
 
-/* ==========================================
-   MULTI-FILE IMAGE DROP ZONE
-========================================== */
 function ImageUploader({ view, title, files, error, onAdd, onRemove }) {
   const inputId = `${view}-product-image`;
 

@@ -8,7 +8,6 @@ const sizes = ["XS", "S", "M", "L", "XL", "XXL"];
 
 function EditSellerListingPage() {
   const navigate = useNavigate();
-  // FIX: Check all possible parameter names from App.jsx routes
   const params = useParams();
   const productId = params.listingId || params.itemId || params.productId;
 
@@ -25,17 +24,16 @@ function EditSellerListingPage() {
     price: "",
   });
 
-  const [images, setImages] = useState({ front: null, side: null, rear: null });
-  const [imageFiles, setImageFiles] = useState({ front: null, side: null, rear: null });
-  const [imageNames, setImageNames] = useState({ front: "", side: "", rear: "" });
-  const [replacementImages, setReplacementImages] = useState({ front: false, side: false, rear: false });
+  const [images, setImages] = useState({ front: null, rear: null });
+  const [imageFiles, setImageFiles] = useState({ front: null, rear: null });
+  const [imageNames, setImageNames] = useState({ front: "", rear: "" });
+  const [replacementImages, setReplacementImages] = useState({ front: false, rear: false });
 
   const [errors, setErrors] = useState({});
   const [fileError, setFileError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch product from backend with timeout
   useEffect(() => {
     let isMounted = true;
     let timeoutId = null;
@@ -76,7 +74,6 @@ function EditSellerListingPage() {
           });
           setImageNames({
             front: data.front_image || "",
-            side: data.side_image || "",
             rear: data.rear_image || "",
           });
         }
@@ -134,10 +131,8 @@ function EditSellerListingPage() {
       return;
     }
 
-    // Store the actual File object for upload
     setImageFiles((prev) => ({ ...prev, [view]: file }));
 
-    // Create preview URL
     const reader = new FileReader();
     reader.onload = () => {
       setImages((prev) => ({ ...prev, [view]: reader.result }));
@@ -176,7 +171,6 @@ function EditSellerListingPage() {
     return Object.keys(nextErrors).length === 0;
   }
 
-  // Submit to backend (FormData for image uploads)
   async function handleSubmit(event) {
     event.preventDefault();
     if (!validateForm()) return;
@@ -193,9 +187,7 @@ function EditSellerListingPage() {
       formDataToSend.append("color", formData.color.trim());
       formDataToSend.append("price", formData.price);
 
-      // Append images only if they were replaced
       if (imageFiles.front) formDataToSend.append("front_image", imageFiles.front);
-      if (imageFiles.side) formDataToSend.append("side_image", imageFiles.side);
       if (imageFiles.rear) formDataToSend.append("rear_image", imageFiles.rear);
 
       console.log("Submitting update for product:", productId);
@@ -354,7 +346,7 @@ function EditSellerListingPage() {
             <div className="listing-image-heading">
               <div>
                 <h2>Product Images</h2>
-                <p>Upload or re-upload the Front, Side, and Rear views of the garment.</p>
+                <p>Upload or re-upload the Front and Rear views of the garment.</p>
               </div>
               <span>JPG, PNG or WEBP · Maximum 5 MB each</span>
             </div>
@@ -370,15 +362,6 @@ function EditSellerListingPage() {
                 replaced={replacementImages.front}
                 onChange={(event) => handleImageChange("front", event)}
                 onRemove={() => removeReplacement("front")}
-              />
-              <ProductImageUpload
-                view="side"
-                label="Side View"
-                image={images.side}
-                fileName={imageNames.side}
-                replaced={replacementImages.side}
-                onChange={(event) => handleImageChange("side", event)}
-                onRemove={() => removeReplacement("side")}
               />
               <ProductImageUpload
                 view="rear"

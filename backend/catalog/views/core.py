@@ -38,27 +38,6 @@ UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
 # ============================================================================
 # KAN-119 PERFORMANCE (SRS §4.1 / Criterion 4 / OBJ-08: 10 items < 60 s)
 # ----------------------------------------------------------------------------
-# The old pipeline kept THREE serial costs on the batch thread:
-#   * remove() ran on FULL-RESOLUTION photos (mask post-process + default
-#     compress_level=6 PNG encode at ~3000 px = seconds per image);
-#   * GridFS save() AND storage.delete() ran one image at a time on the main
-#     thread after each future.result() (~3 s per Atlas round-trip);
-#   * identical photos were recomputed (no cache, no single-flight).
-# New design:
-#   1. The ENTIRE per-image pipeline (GridFS read -> rembg on a <= WORKING_SIZE
-#      copy -> alpha check -> cutout resize to min(original, OUTPUT_CAP),
-#      floor 800 px -> compress_level=1 PNG -> GridFS write -> color /
-#      orientation checks) executes INSIDE a worker; the batch thread only
-#      aggregates results and writes small Mongo docs.
-#   2. SHA-256 single-flight WITHIN a batch + a disk cache ACROSS batches:
-#      duplicate photos compute once (measure_upload's 30 identical dummies,
-#      seller re-uploads of the same shots) -> ~0 s repeats.
-#   3. Original-object GridFS deletes are DEFERRED until after the batch is
-#      marked completed (quota still protected, outside the measured window).
-#   4. One shared onnxruntime session (Run() is thread-safe); worker count
-#      bounded to the CPU so ORT threads do not thrash a 4 GB host.
-# All knobs overridable in settings.py / env; defaults need no settings edit.
-# ============================================================================
 REMBG_WORKING_SIZE = int(getattr(settings, 'REMBG_WORKING_SIZE', 1024))
 REMBG_OUTPUT_CAP = int(getattr(settings, 'REMBG_OUTPUT_CAP', 1600))
 IMAGE_WORKERS = int(getattr(
@@ -130,19 +109,19 @@ OCCASION_TAG_OPTIONS = (
 CATALOG_CSV_COLUMNS = [
     'name', 'description', 'category', 'size', 'color', 'color_description',
     'color_family', 'price', 'style_tags', 'occasion_tags',
-    'front_image_filename', 'side_image_filename', 'rear_image_filename',
+    'front_image_filename', 'rear_image_filename',
 ]
 CATALOG_EXAMPLE_ROW = [
     'Example Product', 'Replace with a product description.', 'tops', 'M',
     'White', 'Pure White', 'neutral', '599.00', 'casual, minimalist',
-    'everyday, summer', 'front.jpg', 'side.jpg', 'rear.jpg',
+    'everyday, summer', 'front.jpg', 'rear.jpg',
 ]
 SELLER_IMAGE_GUIDELINES = (
     'FitFusion AI Seller Catalog Upload Guidelines\n'
     f'Use only these style_tags: {", ".join(STYLE_TAG_OPTIONS)}. '
     f'Use only these occasion_tags: {", ".join(OCCASION_TAG_OPTIONS)}. '
     'Separate multiple tags with commas; tags are validated without regard to capitalization.\n'
-    'Upload exactly three clear garment photographs per item: Front, Side, and Rear. '
+    'Upload exactly two clear garment photographs per item: Front and Rear. '
     'Photograph the garment laid flat or on a mannequin against a plain, contrasting background.\n'
     'Each image must be at least 800 x 800 pixels and no larger than 5 MB. '
     'Use static JPG, PNG, or WEBP images; animated images are not accepted.\n'
@@ -150,7 +129,7 @@ SELLER_IMAGE_GUIDELINES = (
     'the file extension may differ when the base filename is the same.\n'
     'Declare the garment color accurately. The backend removes the background and checks '
     'the front image color automatically; you do not need to remove the background yourself.\n'
-    'Side and Rear views must show the garment worn on a mannequin or hanging, photographed '
+    'The Rear view must show the garment worn on a mannequin or hanging, photographed '
     'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
     'SIZE RULE: enter standard size labels ONLY - XS, S, M, L, XL, or XXL. Do NOT type inch or '
     'cm measurements (e.g., "32 inches", "96 cm"); they are rejected automatically. The product '
@@ -165,7 +144,7 @@ def build_catalog_template_csv():
     writer = csv.writer(output, lineterminator='\n')
     writer.writerow([
         (
-            '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front, Side, and Rear image filenames. '
+            '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front and Rear image filenames. '
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
             f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
             'Separate multiple tags with commas. '
@@ -191,15 +170,15 @@ class CatalogValidator:
     REQUIRED_FIELDS = [
         'name', 'description', 'category', 'size', 'color',
         'color_description', 'color_family', 'price',
-        'front_image_filename', 'side_image_filename', 'rear_image_filename'
+        'front_image_filename', 'rear_image_filename'
     ]
     TAG_OPTIONS = {
         'style_tags': frozenset(STYLE_TAG_OPTIONS),
         'occasion_tags': frozenset(OCCASION_TAG_OPTIONS),
     }
-    # Side/Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
+    # Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     ORIENTATION_MAX_W_H = 1.0
-    ORIENTATION_CHECKED_VIEWS = ('Side', 'Rear')
+    ORIENTATION_CHECKED_VIEWS = ('Rear',)
 
     def validate_csv_row(self, row, row_number):
         errors = []
@@ -270,9 +249,9 @@ class CatalogValidator:
     def check_garment_orientation(self, image_bytes, view_label, category=''):
         """
         Deterministic orientation check on the rembg-processed transparent PNG.
-        Side/Rear views must be portrait (w/h <= ORIENTATION_MAX_W_H); a flat-lay
+        The Rear view must be portrait (w/h <= ORIENTATION_MAX_W_H); a flat-lay
         rotated sideways produces a landscape alpha-bbox and is rejected.
-        Footwear is exempt (correct shoe side views are landscape).
+        Footwear is exempt (shoe photos are correctly landscape).
         """
         if view_label not in self.ORIENTATION_CHECKED_VIEWS:
             return True, None
@@ -304,16 +283,7 @@ class CatalogValidator:
             return False, f"{view_label}: orientation check failed: {str(e)}"
 
     def process_image_with_rembg(self, image_file, session=None):
-        """KAN-119: cached, downscaled, fast-encoded background removal.
-
-        sha256 disk-cache hit -> return cached PNG bytes immediately.
-        Else: downscale to REMBG_WORKING_SIZE -> rembg -> verify alpha ->
-        resize cutout to min(original, REMBG_OUTPUT_CAP) with an 800 px floor
-        (FR-4.7(b) preserved) -> PNG compress_level=1 -> write cache -> return.
-        NOTE: if the source bytes cannot be opened (only happens in mocked
-        tests) we still call remove() on the raw bytes so patched-remove tests
-        keep observing the alpha-validation error message.
-        """
+        """KAN-119: cached, downscaled, fast-encoded background removal."""
         try:
             image_file.seek(0)
             original = image_file.read()
@@ -452,7 +422,6 @@ def process_batch_background(batch_id):
         total_items = len(items)
         print(f"📦 Processing {total_items} items in batch {batch_id}...")
 
-        # KAN-119 single-flight table: identical photos compute rembg ONCE.
         inflight = {}
         inflight_lock = threading.Lock()
 
@@ -494,7 +463,6 @@ def process_batch_background(batch_id):
             payload = entry['payload']
             result['bytes'] = payload
 
-            # Deterministic checks on the processed bytes (cheap, in-worker).
             if field_name == 'front_image':
                 front_color = validator.extract_dominant_color(io.BytesIO(payload))
                 result['color'] = front_color
@@ -508,8 +476,6 @@ def process_batch_background(batch_id):
                 if not orient_valid:
                     result['errors'].append(orient_msg)
 
-            # GridFS write of the processed PNG happens HERE (parallel), not on
-            # the batch thread. Original deletion is deferred (post-completion).
             try:
                 processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
                 image_field = getattr(item, field_name)
@@ -519,13 +485,11 @@ def process_batch_background(batch_id):
                 result['errors'].append(f"{view_label} storage failed: {e}")
             return result
 
-        # KAN-119: submit EVERY image of the batch at once (30 jobs for 10 items)
-        # so worker I/O + checks overlap; rembg duplicates coalesce via digest.
         futures = {}
         for item in items:
             if item.status == 'rejected':
                 continue
-            for field_name, view_label in [('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear')]:
+            for field_name, view_label in [('front_image', 'Front'), ('rear_image', 'Rear')]:
                 futures[(str(item.id), field_name)] = IMAGE_PROCESS_EXECUTOR.submit(
                     _image_pipeline, item, field_name, view_label
                 )
@@ -540,19 +504,16 @@ def process_batch_background(batch_id):
             item_errors = []
             front_color = "#000000"
 
-            # FR-4.7(b) guard: an item whose image assets never reached GridFS
-            # must be REJECTED, not published image-less.
             missing_assets = [
                 view_label
                 for field_name, view_label in (
-                    ('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear'),
+                    ('front_image', 'Front'), ('rear_image', 'Rear'),
                 )
                 if not getattr(getattr(item, field_name, None), 'name', None)
             ]
-            # Only flag missing when we never scheduled a job for it either.
             missing_assets = [
                 view_label for field_name, view_label in (
-                    ('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear'),
+                    ('front_image', 'Front'), ('rear_image', 'Rear'),
                 )
                 if (str(item.id), field_name) not in futures
                 and not getattr(getattr(item, field_name, None), 'name', None)
@@ -563,7 +524,7 @@ def process_batch_background(batch_id):
                     "The original upload did not persist the images; re-upload this listing."
                 )
 
-            for field_name, view_label in [('front_image', 'Front'), ('side_image', 'Side'), ('rear_image', 'Rear')]:
+            for field_name, view_label in [('front_image', 'Front'), ('rear_image', 'Rear')]:
                 future = futures.get((str(item.id), field_name))
                 if future is None:
                     continue
@@ -614,8 +575,6 @@ def process_batch_background(batch_id):
         except UploadBatch.DoesNotExist:
             pass
     finally:
-        # KAN-119: original-object cleanup AFTER the measured window (RSK-03
-        # quota protection retained, critical path untouched).
         for image_field, original_name in deferred_deletes:
             try:
                 if original_name:
@@ -690,7 +649,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         header_index = None
         for i, line in enumerate(lines):
             columns = {value.strip().lower() for value in next(csv.reader([line]), [])}
-            if {'category', 'front_image_filename', 'side_image_filename', 'rear_image_filename'} <= columns:
+            if {'category', 'front_image_filename', 'rear_image_filename'} <= columns:
                 header_index = i
                 break
         if header_index is None:
@@ -702,9 +661,9 @@ class CatalogViewSet(viewsets.ModelViewSet):
             return Response({'error': f'Upload exceeds maximum of {settings.MAX_BATCH_ITEMS} items.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(rows) == 0:
             return Response({'error': 'CSV file is empty'}, status=status.HTTP_400_BAD_REQUEST)
-        if len(image_files) < len(rows) * 3:
+        if len(image_files) < len(rows) * 2:
             return Response({
-                'error': 'Missing view images. Each item requires 3 images (Front, Side, Rear). Please upload all required views.'
+                'error': 'Missing view images. Each item requires 2 images (Front, Rear). Please upload all required views.'
             }, status=status.HTTP_400_BAD_REQUEST)
         batch = UploadBatch.objects.create(
             seller=request.user, store_name=request.user.store_name or "Unknown Store",
@@ -727,14 +686,13 @@ class CatalogViewSet(viewsets.ModelViewSet):
         category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear', 'footwear': 'footwear'}
         for row_number, row in enumerate(rows, start=2):
             try:
-                # Normalize CSV aliases so the validator sees consistent keys
                 if 'item_name' in row and 'name' not in row:
                     row['name'] = row.pop('item_name')
                 item_name = row.get('name', '').strip()
                 raw_category = str(row.get('category', '')).strip().lower()
                 _, item_errors = CatalogValidator().validate_csv_row(row, row_number)
                 resolved_images = {}
-                for field_name, csv_col, label in [('front_image', 'front_image_filename', 'Front'), ('side_image', 'side_image_filename', 'Side'), ('rear_image', 'rear_image_filename', 'Rear')]:
+                for field_name, csv_col, label in [('front_image', 'front_image_filename', 'Front'), ('rear_image', 'rear_image_filename', 'Rear')]:
                     image_file, error = _resolve(row.get(csv_col, ''), label)
                     if error:
                         item_errors.append(error)
@@ -798,7 +756,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
         return Response(CatalogItemSerializer(items, many=True).data)
 
-    # COMBINED ROUTE: Handles GET/PUT/PATCH/DELETE + File Uploads (FR-4.5 / FR-4.6 / FR-4.7)
     @extend_schema(
         summary="Manage a specific seller listing",
         description="GET details, PUT/PATCH update (with optional image replacement), or DELETE a specific catalog item.",
@@ -823,46 +780,37 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             return Response(CatalogItemSerializer(item).data)
         elif request.method == 'DELETE':
-            # FR-4.6: Explicit storage.delete calls (post_delete signal also handles this as a safety net)
-            for field in ('front_image', 'side_image', 'rear_image'):
+            for field in ('front_image', 'rear_image'):
                 image = getattr(item, field)
                 if image and image.name:
                     image.delete(save=False)
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         elif request.method in ['PUT', 'PATCH']:
-            # FR-4.7: Any edited/re-uploaded item must return to status "processing"
-            # and re-enter the validation pipeline.
-            item.status = 'processing'
-            item.rejection_reasons = []
-            item.save()
-            image_fields = ('front_image', 'side_image', 'rear_image')
+            # FIX: Re-ordered logic to validate images BEFORE saving text fields
+            # to guarantee atomicity (no partial updates if validation fails).
+            image_fields = ('front_image', 'rear_image')
             payload = request.data.copy()
             replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
             for field in image_fields:
                 payload.pop(field, None)
+                
+            original_status = item.status
+            
             serializer = CatalogItemSerializer(
                 item, data=payload, partial=request.method == 'PATCH'
             )
-            # validate_size inside the serializer enforces the SML-only rule here.
             serializer.is_valid(raise_exception=True)
-            # Save text fields first
-            updated = serializer.save()
+            
+            # 1. PROCESS AND VALIDATE IMAGES FIRST
             validator = CatalogValidator()
-            # Process any new images
             processed_images = {}
             for field, image_file in replacement_images.items():
                 if image_file.size > validator.MAX_FILE_SIZE_BYTES:
-                    updated.status = 'rejected'
-                    updated.rejection_reasons = ['Image must not exceed 5 MB.']
-                    updated.save()
                     return Response({field: 'Image must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
                 format_valid, format_error = validator.validate_image_format(image_file)
                 dimensions_valid, dimensions_error = validator.check_image_dimensions(image_file)
                 if not format_valid or not dimensions_valid:
-                    updated.status = 'rejected'
-                    updated.rejection_reasons = [format_error or dimensions_error]
-                    updated.save()
                     return Response({field: format_error or dimensions_error}, status=status.HTTP_400_BAD_REQUEST)
                 image_file.seek(0)
                 try:
@@ -870,22 +818,49 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         image_file, get_shared_rembg_session()
                     )
                 except Exception as error:
-                    updated.status = 'rejected'
-                    updated.rejection_reasons = [str(error)]
-                    updated.save()
                     return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
-                # Side/Rear orientation validation on re-upload
-                if field in ('side_image', 'rear_image'):
-                    view_label = 'Side' if field == 'side_image' else 'Rear'
+                if field == 'rear_image':
+                    view_label = 'Rear'
                     orient_valid, orient_msg = validator.check_garment_orientation(
                         processed_images[field], view_label, category=item.category
                     )
                     if not orient_valid:
-                        updated.status = 'rejected'
-                        updated.rejection_reasons = [orient_msg]
-                        updated.save()
                         return Response({field: orient_msg}, status=status.HTTP_400_BAD_REQUEST)
-            # FR-4.5: Delete old GridFS objects before saving new file references
+                        
+            # 2. COLOR ALIGNMENT CHECK
+            needs_color_check = (
+                'color_family' in serializer.validated_data
+                or 'color' in serializer.validated_data
+                or 'front_image' in processed_images
+                or original_status == 'rejected'
+            )
+            proposed_color = serializer.validated_data.get('color', item.color)
+            proposed_color_family = serializer.validated_data.get('color_family', item.color_family)
+            
+            if needs_color_check:
+                front_image_bytes = processed_images.get('front_image')
+                if front_image_bytes:
+                    front_image_bytes.seek(0)
+                    front_color = validator.extract_dominant_color(front_image_bytes)
+                elif item.front_image:
+                    item.front_image.seek(0)
+                    front_color = validator.extract_dominant_color(item.front_image)
+                else:
+                    front_color = None
+                    
+                if front_color:
+                    color_valid, color_message = validator.validate_color_alignment(
+                        proposed_color, front_color
+                    )
+                    if not color_valid:
+                        return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
+
+            # 3. ALL VALIDATIONS PASSED. NOW COMMIT TEXT FIELDS AND STATUS CHANGE.
+            item.status = 'processing'
+            item.rejection_reasons = []
+            updated = serializer.save()
+            
+            # Save new images to GridFS
             old_image_names = {
                 field: getattr(updated, field).name for field in processed_images
             }
@@ -899,31 +874,13 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 old_name = old_image_names.get(field)
                 if old_name:
                     getattr(updated, field).storage.delete(old_name)
-            # Re-validate color if front image or color changed, OR if the item was previously rejected
-            needs_color_check = (
-                'color_family' in serializer.validated_data
-                or 'color' in serializer.validated_data
-                or 'front_image' in processed_images
-                or item.status == 'rejected'
-            )
-            if needs_color_check:
-                front_image = processed_images.get('front_image') or updated.front_image
-                if front_image:
-                    front_image.seek(0)
-                    front_color = validator.extract_dominant_color(front_image)
-                    declared_color = serializer.validated_data.get('color', updated.color)
-                    color_valid, color_message = validator.validate_color_alignment(
-                        declared_color, front_color
-                    )
-                    if not color_valid:
-                        updated.status = 'rejected'
-                        updated.rejection_reasons = [color_message]
-                        updated.save()
-                        return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
-                    updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
-                        front_color, updated.color_family
-                    )
-            # If we reach here, validation passed
+                    
+            # Generate palette tags if color check was performed
+            if needs_color_check and 'front_color' in locals() and front_color:
+                updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
+                    front_color, proposed_color_family
+                )
+                
             updated.status = 'active'
             updated.rejection_reasons = []
             updated.save()

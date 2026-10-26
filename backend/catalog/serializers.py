@@ -61,10 +61,10 @@ class CSVUploadSerializer(serializers.Serializer):
     csv_file = serializers.FileField()
     images = serializers.ListField(
         child=serializers.FileField(),
-        max_length=30,
+        max_length=20,  # 2 views (Front, Rear) x 10 items (MAX_BATCH_ITEMS)
         write_only=True
     )
-    
+
     def validate_csv_file(self, value):
         if not value.name.lower().endswith('.csv'):
             raise serializers.ValidationError("File must be a CSV.")
