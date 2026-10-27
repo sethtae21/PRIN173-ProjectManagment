@@ -1,7 +1,28 @@
-import { useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  imageToCanvas,
+  detectBodyBounds,
+  tintBody,
+} from "./Shopper/canvasWarp2D";
+
 import "./css/ChooseAvatarGenderPage.css";
+
+const PREVIEW_WIDTH = 480;
+const PREVIEW_HEIGHT = 660;
+
+
+const AVATAR_IMAGES = {
+  Male: "/Avatars/Male_Standard/Male_Standard_front.png",
+  Female: "/Avatars/Female_Standard/Female_Standard_front.png",
+};
+
+
+// ==========================================
+// GENDER HELPERS
+// ==========================================
 
 function normalizeGender(value) {
   if (
@@ -35,23 +56,180 @@ function getSavedGender(isGuest) {
   );
 }
 
+// ==========================================
+// ACTUAL BLENDER AVATAR PREVIEW
+// ==========================================
+
+function AvatarPreview({ gender }) {
+  const canvasRef = useRef(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    let cancelled = false;
+
+    const image = new Image();
+
+    setError(false);
+
+    image.onload = () => {
+      if (cancelled) return;
+
+      try {
+        canvas.width = PREVIEW_WIDTH;
+        canvas.height = PREVIEW_HEIGHT;
+
+        ctx.clearRect(
+          0,
+          0,
+          PREVIEW_WIDTH,
+          PREVIEW_HEIGHT
+        );
+
+        // Prepare a smaller copy of the Blender PNG.
+        const source = imageToCanvas(
+          image,
+          360,
+          720
+        );
+
+        const bounds = detectBodyBounds(source);
+
+        if (!bounds) {
+          setError(true);
+          return;
+        }
+
+        // Apply the same default skin tone used
+        // in the actual Fitting Studio.
+        const tinted = tintBody(
+          source,
+          "#dca77d",
+          "Neutral"
+        );
+
+        const paddingX = 30;
+        const paddingY = 20;
+
+        const availableWidth =
+          PREVIEW_WIDTH - paddingX * 2;
+
+        const availableHeight =
+          PREVIEW_HEIGHT - paddingY * 2;
+
+        // Crop the transparent empty space so
+        // both avatars appear at a similar size.
+        const scale = Math.min(
+          availableWidth / bounds.width,
+          availableHeight / bounds.height
+        );
+
+        const drawWidth = bounds.width * scale;
+        const drawHeight = bounds.height * scale;
+
+        const drawX =
+          (PREVIEW_WIDTH - drawWidth) / 2;
+
+        const drawY =
+          PREVIEW_HEIGHT -
+          paddingY -
+          drawHeight;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        ctx.drawImage(
+          tinted,
+          bounds.left,
+          bounds.top,
+          bounds.width,
+          bounds.height,
+          drawX,
+          drawY,
+          drawWidth,
+          drawHeight
+        );
+      } catch (err) {
+        console.error(
+          "Avatar preview error:",
+          err
+        );
+
+        if (!cancelled) {
+          setError(true);
+        }
+      }
+    };
+
+    image.onerror = () => {
+      if (!cancelled) {
+        setError(true);
+      }
+    };
+
+    image.src = AVATAR_IMAGES[gender];
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [gender]);
+
+  return (
+    <div
+      className={`gender-avatar-preview rendered ${gender.toLowerCase()}`}
+      aria-hidden="true"
+    >
+      <div className="gender-avatar-preview-glow" />
+
+      <canvas
+        ref={canvasRef}
+        className="gender-avatar-canvas"
+        width={PREVIEW_WIDTH}
+        height={PREVIEW_HEIGHT}
+      />
+
+      {error && (
+        <span className="gender-avatar-error">
+          Avatar preview unavailable
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN PAGE
+// ==========================================
+
 function ChooseAvatarGenderPage({
   isGuest = false,
 }) {
   const navigate = useNavigate();
 
   const [selectedGender, setSelectedGender] =
-    useState(() =>
-      getSavedGender(isGuest)
-    );
+    useState(() => getSavedGender(isGuest));
 
   const basePath = isGuest
     ? "/guest"
     : "/shopper";
 
+  // ========================================
+  // SAVE SELECTED GENDER
+  // ========================================
+
   function saveSelectedGender(gender) {
     const normalizedGender =
       normalizeGender(gender);
+
+    if (!normalizedGender) return;
 
     const storage = isGuest
       ? sessionStorage
@@ -69,16 +247,13 @@ function ChooseAvatarGenderPage({
     setSelectedGender(normalizedGender);
   }
 
-  function handleContinue() {
-    if (!selectedGender) {
-      return;
-    }
+  // ========================================
+  // CONTINUE TO FITTING STUDIO
+  // ========================================
 
-    /*
-     * Save the current value again before
-     * navigating to ensure the next page
-     * receives the selected gender.
-     */
+  function handleContinue() {
+    if (!selectedGender) return;
+
     saveSelectedGender(selectedGender);
 
     navigate(
@@ -89,6 +264,9 @@ function ChooseAvatarGenderPage({
   return (
     <main className="gender-page">
       <div className="gender-page-content">
+
+        {/* PAGE HEADING */}
+
         <section className="gender-introduction">
           <p>AVATAR CUSTOMIZATION</p>
 
@@ -100,7 +278,12 @@ function ChooseAvatarGenderPage({
           </span>
         </section>
 
+        {/* GENDER SELECTION CARDS */}
+
         <section className="gender-options">
+
+          {/* MALE AVATAR */}
+
           <button
             type="button"
             className={`gender-card ${
@@ -115,22 +298,11 @@ function ChooseAvatarGenderPage({
               selectedGender === "Male"
             }
           >
-            <div
-              className="gender-avatar-preview male"
-              aria-hidden="true"
-            >
-              <div className="gender-avatar-hair" />
-              <div className="gender-avatar-head" />
-              <div className="gender-avatar-neck" />
-              <div className="gender-avatar-body" />
-              <div className="gender-avatar-left-arm" />
-              <div className="gender-avatar-right-arm" />
-              <div className="gender-avatar-left-leg" />
-              <div className="gender-avatar-right-leg" />
-            </div>
+            <AvatarPreview gender="Male" />
 
             <div className="gender-card-information">
               <p>MALE AVATAR</p>
+
               <h2>Male</h2>
 
               <span>
@@ -147,6 +319,8 @@ function ChooseAvatarGenderPage({
             </div>
           </button>
 
+          {/* FEMALE AVATAR */}
+
           <button
             type="button"
             className={`gender-card ${
@@ -161,22 +335,11 @@ function ChooseAvatarGenderPage({
               selectedGender === "Female"
             }
           >
-            <div
-              className="gender-avatar-preview female"
-              aria-hidden="true"
-            >
-              <div className="gender-avatar-hair" />
-              <div className="gender-avatar-head" />
-              <div className="gender-avatar-neck" />
-              <div className="gender-avatar-body" />
-              <div className="gender-avatar-left-arm" />
-              <div className="gender-avatar-right-arm" />
-              <div className="gender-avatar-left-leg" />
-              <div className="gender-avatar-right-leg" />
-            </div>
+            <AvatarPreview gender="Female" />
 
             <div className="gender-card-information">
               <p>FEMALE AVATAR</p>
+
               <h2>Female</h2>
 
               <span>
@@ -193,6 +356,8 @@ function ChooseAvatarGenderPage({
             </div>
           </button>
         </section>
+
+        {/* PAGE ACTIONS */}
 
         <section className="gender-actions">
           <button

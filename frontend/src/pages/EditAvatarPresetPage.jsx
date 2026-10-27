@@ -1,17 +1,19 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
 
-import {
-  NavLink,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
-
-import fitFusionLogo from "../assets/fitfusion-logo.svg";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/EditAvatarPresetPage.css";
+
+// =====================================================
+// FITFUSION AI — EDIT AVATAR PRESET
+// Uses the existing shared ShopperLayout.
+// No separate sidebar or page header.
+// =====================================================
+
+const PRESETS_KEY = "fitfusion-avatar-presets";
+const ACTIVE_KEY = "fitfusion-avatar-preset";
+const GENDER_KEY = "fitfusion-avatar-gender";
+const EDITING_KEY = "fitfusion-editing-avatar-preset";
 
 const DEFAULT_PRESET = {
   id: "",
@@ -39,146 +41,367 @@ const SKIN_TONES = [
   "#603a28",
 ];
 
+const VIEWS = ["front", "side", "rear"];
+
+// =====================================================
+// STORAGE HELPERS
+// =====================================================
+
 function readStorageArray(key) {
   try {
-    const parsedValue = JSON.parse(
+    const value = JSON.parse(
       localStorage.getItem(key) || "[]"
     );
 
-    return Array.isArray(parsedValue)
-      ? parsedValue
-      : [];
+    return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
 
+function readStorageObject(key) {
+  try {
+    return JSON.parse(
+      localStorage.getItem(key) || "null"
+    );
+  } catch {
+    return null;
+  }
+}
+
+// =====================================================
+// AVATAR HELPERS
+// =====================================================
+
 function calculateBodyType(height, weight) {
-  const heightInMeters =
-    Number(height) / 100;
+  const meters = Number(height) / 100;
+  const kg = Number(weight);
 
   if (
-    !heightInMeters ||
-    !Number(weight)
+    !Number.isFinite(meters) ||
+    !Number.isFinite(kg) ||
+    meters <= 0 ||
+    kg <= 0
   ) {
     return "Balanced";
   }
 
-  const bmi =
-    Number(weight) /
-    (heightInMeters * heightInMeters);
+  const index = kg / (meters * meters);
 
-  if (bmi < 18.5) {
-    return "Slim";
-  }
-
-  if (bmi < 25) {
-    return "Balanced";
-  }
-
-  if (bmi < 30) {
-    return "Full";
-  }
+  if (index < 18.5) return "Slim";
+  if (index < 25) return "Balanced";
+  if (index < 30) return "Full";
 
   return "Curve";
 }
 
 function normalizePreset(preset, index = 0) {
-  const height =
-    Number(preset.height) || 165;
+  const gender =
+    String(preset?.gender).toLowerCase() === "male"
+      ? "Male"
+      : "Female";
+
+  const height = Number(preset?.height) || 165;
 
   const weight =
-    Number(preset.weight) || 58;
+    Number(preset?.weight) ||
+    (gender === "Male" ? 70 : 58);
 
   return {
-    id:
-      preset.id ||
-      preset.presetId ||
-      `custom-preset-${index}`,
+    ...DEFAULT_PRESET,
+    ...preset,
 
-    name:
-      preset.name ||
-      preset.presetName ||
-      "Custom Avatar",
+    id: String(
+      preset?.id ||
+      preset?.presetId ||
+      `custom-${index}`
+    ),
 
-    gender: preset.gender || "Female",
+    name: String(
+      preset?.name ||
+      preset?.presetName ||
+      "Custom Avatar"
+    ),
 
+    gender,
     height,
-
     weight,
 
     skinTone:
-      preset.skinTone ||
-      preset.skinColor ||
+      preset?.skinTone ||
+      preset?.skinColor ||
       "#d9aa82",
 
     undertone:
-      preset.undertone || "Neutral",
+      preset?.undertone || "Neutral",
 
     shoulder:
-      preset.shoulder ||
-      preset.shoulderWidth ||
+      preset?.shoulder ||
+      preset?.shoulderWidth ||
       "Balanced",
 
     waist:
-      preset.waist ||
-      preset.waistSize ||
+      preset?.waist ||
+      preset?.waistSize ||
       "Regular",
 
     hip:
-      preset.hip ||
-      preset.hipSize ||
+      preset?.hip ||
+      preset?.hipSize ||
       "Balanced",
 
     thigh:
-      preset.thigh ||
-      preset.thighSize ||
+      preset?.thigh ||
+      preset?.thighSize ||
       "Regular",
 
-    cupSize: preset.cupSize || "B",
+    cupSize:
+      gender === "Female"
+        ? preset?.cupSize || "B"
+        : null,
 
-    bodyType:
-      preset.bodyType ||
-      calculateBodyType(
-        height,
-        weight
-      ),
+    bodyType: calculateBodyType(
+      height,
+      weight
+    ),
 
-    builtIn: Boolean(preset.builtIn),
-
-    createdAt:
-      preset.createdAt ||
-      new Date().toISOString(),
-
-    updatedAt:
-      preset.updatedAt || null,
+    builtIn: Boolean(preset?.builtIn),
   };
 }
 
-function EditAvatarPresetPage() {
+// =====================================================
+// FORM SECTION
+// =====================================================
+
+function FormSection({
+  number,
+  title,
+  description,
+  children,
+}) {
+  return (
+    <section className="edit-avatar-form-section">
+      <div className="edit-avatar-section-heading">
+        <span className="edit-avatar-section-number">
+          {number}
+        </span>
+
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+// =====================================================
+// HEIGHT / WEIGHT FIELD
+// =====================================================
+
+function RangeField({
+  id,
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  error,
+  onChange,
+}) {
+  const numericValue = Number(value);
+
+  const sliderValue =
+    value !== "" && Number.isFinite(numericValue)
+      ? Math.min(max, Math.max(min, numericValue))
+      : min;
+
+  return (
+    <div
+      className={`edit-avatar-range-field ${
+        error ? "has-error" : ""
+      }`}
+    >
+      <div className="edit-avatar-range-heading">
+        <label htmlFor={id}>
+          {label}
+        </label>
+
+        <div>
+          <input
+            type="number"
+            aria-label={`${label} in ${unit}`}
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(event) =>
+              onChange(event.target.value)
+            }
+          />
+
+          <span>{unit}</span>
+        </div>
+      </div>
+
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={sliderValue}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+      />
+
+      <div className="edit-avatar-range-limits">
+        <span>
+          {min} {unit}
+        </span>
+
+        <span>
+          {max} {unit}
+        </span>
+      </div>
+
+      {error && (
+        <small className="edit-avatar-error-message">
+          {error}
+        </small>
+      )}
+    </div>
+  );
+}
+
+// =====================================================
+// SELECT FIELD
+// =====================================================
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}) {
+  const currentValue = String(value ?? "");
+
+  const availableOptions = options.includes(
+    currentValue
+  )
+    ? options
+    : [currentValue, ...options].filter(Boolean);
+
+  return (
+    <label className="edit-avatar-select-field">
+      <span>{label}</span>
+
+      <select
+        value={currentValue}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+      >
+        {availableOptions.map((option) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// =====================================================
+// SUMMARY ITEM
+// =====================================================
+
+function SummaryItem({
+  label,
+  value,
+}) {
+  return (
+    <div className="edit-avatar-summary-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+// =====================================================
+// CONFIRMATION MODAL
+// =====================================================
+
+function Modal({
+  children,
+  onClose,
+  titleId,
+}) {
+  return (
+    <div
+      className="edit-avatar-modal-backdrop"
+      onMouseDown={(event) => {
+        if (
+          event.target === event.currentTarget
+        ) {
+          onClose();
+        }
+      }}
+    >
+      <section
+        className="edit-avatar-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        {children}
+      </section>
+    </div>
+  );
+}
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
+
+export default function EditAvatarPresetPage() {
   const navigate = useNavigate();
   const { presetId } = useParams();
 
-  const [formData, setFormData] =
-    useState(DEFAULT_PRESET);
+  // ---------------------------------------------------
+  // STATES
+  // ---------------------------------------------------
 
-  const [originalPreset, setOriginalPreset] =
-    useState(null);
+  const [formData, setFormData] = useState({
+    ...DEFAULT_PRESET,
+  });
 
-  const [previewView, setPreviewView] =
-    useState("front");
+  const [
+    originalPreset,
+    setOriginalPreset,
+  ] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    previewView,
+    setPreviewView,
+  ] = useState("front");
 
-  const [notFound, setNotFound] =
-    useState(false);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  const [errors, setErrors] =
-    useState({});
+  const [errors, setErrors] = useState({});
 
-  const [toastMessage, setToastMessage] =
-    useState("");
+  const [
+    toastMessage,
+    setToastMessage,
+  ] = useState("");
 
   const [
     showDeleteModal,
@@ -190,106 +413,96 @@ function EditAvatarPresetPage() {
     setShowDiscardModal,
   ] = useState(false);
 
+  // ---------------------------------------------------
+  // LOAD SAVED AVATAR
+  // ---------------------------------------------------
+
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "instant",
-    });
+    window.scrollTo(0, 0);
 
-    const savedPresets =
-      readStorageArray(
-        "fitfusion-avatar-presets"
-      ).map(normalizePreset);
+    setLoading(true);
+    setNotFound(false);
 
-    let selectedPreset =
-      savedPresets.find(
-        (preset) =>
-          String(preset.id) ===
-          String(presetId)
+    const presets = readStorageArray(
+      PRESETS_KEY
+    ).map(normalizePreset);
+
+    let selected = presets.find(
+      (preset) =>
+        String(preset.id) === String(presetId)
+    );
+
+    if (!selected) {
+      const editing = readStorageObject(
+        EDITING_KEY
       );
 
-    if (!selectedPreset) {
-      const editingPresetText =
-        localStorage.getItem(
-          "fitfusion-editing-avatar-preset"
-        );
-
-      if (editingPresetText) {
-        try {
-          const editingPreset =
-            normalizePreset(
-              JSON.parse(
-                editingPresetText
-              )
-            );
-
-          if (
-            String(editingPreset.id) ===
-            String(presetId)
-          ) {
-            selectedPreset =
-              editingPreset;
-          }
-        } catch {
-          // Invalid localStorage data is ignored.
-        }
+      if (
+        editing &&
+        String(
+          editing.id || editing.presetId
+        ) === String(presetId)
+      ) {
+        selected = normalizePreset(editing);
       }
     }
 
-    if (!selectedPreset) {
+    if (!selected || selected.builtIn) {
       setNotFound(true);
       setLoading(false);
       return;
     }
 
-    setFormData(selectedPreset);
-    setOriginalPreset(selectedPreset);
+    setFormData(selected);
+    setOriginalPreset(selected);
+
+    setErrors({});
+    setPreviewView("front");
+
     setLoading(false);
   }, [presetId]);
+
+  // ---------------------------------------------------
+  // NOTIFICATION
+  // ---------------------------------------------------
 
   useEffect(() => {
     if (!toastMessage) {
       return undefined;
     }
 
-    const toastTimer =
-      window.setTimeout(() => {
-        setToastMessage("");
-      }, 2600);
+    const timer = window.setTimeout(() => {
+      setToastMessage("");
+    }, 3000);
 
     return () => {
-      window.clearTimeout(toastTimer);
+      window.clearTimeout(timer);
     };
   }, [toastMessage]);
 
-  const cartCount = useMemo(() => {
-    return readStorageArray(
-      "fitfusion-cart-items"
-    ).reduce((total, item) => {
-      return (
-        total +
-        (Number(item.quantity) || 1)
-      );
-    }, 0);
-  }, []);
+  // ---------------------------------------------------
+  // CALCULATED BODY TYPE
+  // ---------------------------------------------------
 
-  const bodyType = useMemo(() => {
-    return calculateBodyType(
-      formData.height,
-      formData.weight
-    );
-  }, [
-    formData.height,
-    formData.weight,
-  ]);
+  const bodyType = useMemo(
+    () =>
+      calculateBodyType(
+        formData.height,
+        formData.weight
+      ),
+    [formData.height, formData.weight]
+  );
+
+  // ---------------------------------------------------
+  // DETECT UNSAVED CHANGES
+  // ---------------------------------------------------
 
   const hasChanges = useMemo(() => {
     if (!originalPreset) {
       return false;
     }
 
-    const fieldsToCompare = [
+    const fields = [
       "name",
       "gender",
       "height",
@@ -303,309 +516,365 @@ function EditAvatarPresetPage() {
       "cupSize",
     ];
 
-    return fieldsToCompare.some(
+    return fields.some(
       (field) =>
-        String(formData[field]) !==
-        String(originalPreset[field])
+        String(formData[field] ?? "") !==
+        String(originalPreset[field] ?? "")
     );
   }, [formData, originalPreset]);
 
+  // ---------------------------------------------------
+  // LIVE CANVAS PREVIEW DATA
+  // ---------------------------------------------------
+
+  const previewAvatar = useMemo(
+    () => ({
+      ...formData,
+      bodyType,
+    }),
+    [formData, bodyType]
+  );
+
+  // ---------------------------------------------------
+  // UPDATE FIELD
+  // ---------------------------------------------------
+
   function updateField(field, value) {
-    setFormData((currentData) => ({
-      ...currentData,
+    setFormData((current) => ({
+      ...current,
+
       [field]: value,
+
+      ...(field === "gender"
+        ? {
+            cupSize:
+              value === "Female"
+                ? current.cupSize || "B"
+                : null,
+          }
+        : {}),
     }));
 
-    if (errors[field]) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [field]: "",
-      }));
-    }
+    setErrors((current) => ({
+      ...current,
+      [field]: "",
+    }));
   }
+
+  // ---------------------------------------------------
+  // VALIDATION
+  // ---------------------------------------------------
 
   function validateForm() {
     const nextErrors = {};
-    const trimmedName =
-      formData.name.trim();
 
-    if (!trimmedName) {
+    const name = String(
+      formData.name || ""
+    ).trim();
+
+    if (!name) {
       nextErrors.name =
-        "Avatar name is required. Enter a descriptive name so you can identify this preset later.";
-    } else if (
-      trimmedName.length < 3
-    ) {
+        "Avatar name is required. Please enter a name for your saved avatar.";
+    } else if (name.length < 3) {
       nextErrors.name =
-        "Avatar name is too short. Please enter at least 3 characters.";
-    } else if (
-      trimmedName.length > 30
-    ) {
+        "Avatar name must contain at least 3 characters.";
+    } else if (name.length > 50) {
       nextErrors.name =
-        "Avatar name is too long. Please limit the name to 30 characters.";
+        "Avatar name must not exceed 50 characters.";
+    } else {
+      const duplicate = readStorageArray(
+        PRESETS_KEY
+      ).some(
+        (preset) =>
+          String(preset.id) !==
+            String(formData.id) &&
+          String(
+            preset.name ||
+              preset.presetName ||
+              ""
+          )
+            .trim()
+            .toLowerCase() ===
+            name.toLowerCase()
+      );
+
+      if (
+        name.toLowerCase() ===
+        "fitfusion standard"
+      ) {
+        nextErrors.name =
+          "This name is reserved for the built-in avatar. Please choose another name.";
+      } else if (duplicate) {
+        nextErrors.name =
+          "Another saved avatar already uses this name. Please choose a unique name.";
+      }
     }
 
-    const height =
-      Number(formData.height);
+    const height = Number(formData.height);
+    const weight = Number(formData.weight);
 
-    if (!height) {
+    if (
+      formData.height === "" ||
+      !Number.isFinite(height)
+    ) {
       nextErrors.height =
-        "Height is required because it is used to calculate the avatar's body proportions.";
-    } else if (height < 120) {
+        "Height is required. Please enter a value between 120 and 218.4 cm.";
+    } else if (
+      height < 120 ||
+      height > 218.4
+    ) {
       nextErrors.height =
-        "The entered height is below the supported range. Please enter at least 120 cm.";
-    } else if (height > 220) {
-      nextErrors.height =
-        "The entered height exceeds the supported range. Please enter 220 cm or below.";
+        "Height must be between 120 and 218.4 cm.";
     }
 
-    const weight =
-      Number(formData.weight);
-
-    if (!weight) {
+    if (
+      formData.weight === "" ||
+      !Number.isFinite(weight)
+    ) {
       nextErrors.weight =
-        "Weight is required because it is used together with height to determine the avatar body type.";
-    } else if (weight < 30) {
+        "Weight is required. Please enter a value between 30 and 200 kg.";
+    } else if (
+      weight < 30 ||
+      weight > 200
+    ) {
       nextErrors.weight =
-        "The entered weight is below the supported range. Please enter at least 30 kg.";
-    } else if (weight > 200) {
-      nextErrors.weight =
-        "The entered weight exceeds the supported range. Please enter 200 kg or below.";
+        "Weight must be between 30 and 200 kg.";
     }
 
     setErrors(nextErrors);
 
     return (
-      Object.keys(nextErrors).length ===
-      0
+      Object.keys(nextErrors).length === 0
     );
   }
+
+  // ---------------------------------------------------
+  // BUILD UPDATED PRESET
+  // ---------------------------------------------------
 
   function buildUpdatedPreset() {
     return {
       ...formData,
+
       name: formData.name.trim(),
+
       height: Number(formData.height),
       weight: Number(formData.weight),
+
+      gender: formData.gender,
+
+      cupSize:
+        formData.gender === "Female"
+          ? formData.cupSize || "B"
+          : null,
+
       bodyType,
       builtIn: false,
+
       updatedAt: new Date().toISOString(),
     };
   }
 
-  function updateActivePreset(
-    updatedPreset
-  ) {
-    const activePresetText =
-      localStorage.getItem(
-        "fitfusion-avatar-preset"
-      );
+  // ---------------------------------------------------
+  // SAVE TO LOCAL STORAGE
+  // ---------------------------------------------------
 
-    if (!activePresetText) {
-      return;
-    }
+  function persistPreset(updatedPreset) {
+    const presets = readStorageArray(
+      PRESETS_KEY
+    );
 
-    try {
-      const activePreset =
-        JSON.parse(activePresetText);
-
-      if (
-        String(activePreset.id) ===
+    const existingIndex = presets.findIndex(
+      (preset) =>
+        String(preset.id) ===
         String(updatedPreset.id)
-      ) {
-        localStorage.setItem(
-          "fitfusion-avatar-preset",
-          JSON.stringify(
-            updatedPreset
-          )
-        );
-      }
-    } catch {
-      // Invalid active preset does not prevent saving.
-    }
-  }
+    );
 
-  function savePreset() {
-    if (!validateForm()) {
-      setToastMessage(
-        "Please correct the highlighted fields before saving."
-      );
-
-      return;
-    }
-
-    const savedPresets =
-      readStorageArray(
-        "fitfusion-avatar-presets"
-      ).map(normalizePreset);
-
-    const updatedPreset =
-      buildUpdatedPreset();
-
-    const existingIndex =
-      savedPresets.findIndex(
-        (preset) =>
-          String(preset.id) ===
-          String(presetId)
-      );
-
-    let nextPresets;
+    const nextPresets = [...presets];
 
     if (existingIndex >= 0) {
-      nextPresets = savedPresets.map(
-        (preset, index) =>
-          index === existingIndex
-            ? updatedPreset
-            : preset
-      );
+      nextPresets[existingIndex] =
+        updatedPreset;
     } else {
-      nextPresets = [
-        ...savedPresets,
-        updatedPreset,
-      ];
+      nextPresets.push(updatedPreset);
     }
 
     localStorage.setItem(
-      "fitfusion-avatar-presets",
+      PRESETS_KEY,
       JSON.stringify(nextPresets)
     );
 
     localStorage.setItem(
-      "fitfusion-editing-avatar-preset",
+      EDITING_KEY,
       JSON.stringify(updatedPreset)
     );
 
-    updateActivePreset(updatedPreset);
-
-    setOriginalPreset(updatedPreset);
-    setFormData(updatedPreset);
-
-    setToastMessage(
-      "Avatar preset updated successfully."
+    const activePreset = readStorageObject(
+      ACTIVE_KEY
     );
 
-    window.setTimeout(() => {
-      navigate(
-        "/shopper/avatar-presets"
+    if (
+      activePreset &&
+      String(activePreset.id) ===
+        String(updatedPreset.id)
+    ) {
+      localStorage.setItem(
+        ACTIVE_KEY,
+        JSON.stringify(updatedPreset)
       );
-    }, 700);
+
+      localStorage.setItem(
+        GENDER_KEY,
+        updatedPreset.gender
+      );
+    }
+
+    setFormData(updatedPreset);
+    setOriginalPreset(updatedPreset);
   }
+
+  // ---------------------------------------------------
+  // SAVE CHANGES
+  // ---------------------------------------------------
+
+  function savePreset(event) {
+    event?.preventDefault();
+
+    if (!validateForm()) {
+      setToastMessage(
+        "Please correct the highlighted fields before saving."
+      );
+      return;
+    }
+
+    try {
+      const updatedPreset =
+        buildUpdatedPreset();
+
+      persistPreset(updatedPreset);
+
+      navigate("/shopper/avatar-presets");
+    } catch (error) {
+      console.error(
+        "Unable to save avatar preset:",
+        error
+      );
+
+      setToastMessage(
+        "Unable to save changes. Please try again."
+      );
+    }
+  }
+
+  // ---------------------------------------------------
+  // USE IN FITTING STUDIO
+  // ---------------------------------------------------
 
   function useInFittingStudio() {
     if (!validateForm()) {
       setToastMessage(
         "Please correct the avatar details before continuing."
       );
-
       return;
     }
 
-    const updatedPreset =
-      buildUpdatedPreset();
-
-    const savedPresets =
-      readStorageArray(
-        "fitfusion-avatar-presets"
-      ).map(normalizePreset);
-
-    const presetExists =
-      savedPresets.some(
-        (preset) =>
-          String(preset.id) ===
-          String(updatedPreset.id)
+    if (hasChanges) {
+      setToastMessage(
+        "Please save your changes before using this avatar."
       );
-
-    const nextPresets =
-      presetExists
-        ? savedPresets.map((preset) =>
-            String(preset.id) ===
-            String(updatedPreset.id)
-              ? updatedPreset
-              : preset
-          )
-        : [
-            ...savedPresets,
-            updatedPreset,
-          ];
-
-    localStorage.setItem(
-      "fitfusion-avatar-presets",
-      JSON.stringify(nextPresets)
-    );
-
-    localStorage.setItem(
-      "fitfusion-avatar-preset",
-      JSON.stringify(updatedPreset)
-    );
-
-    localStorage.setItem(
-      "fitfusion-avatar-gender",
-      updatedPreset.gender.toLowerCase()
-    );
-
-    navigate(
-      "/shopper/fitting-studio/customize"
-    );
-  }
-
-  function confirmDelete() {
-    const savedPresets =
-      readStorageArray(
-        "fitfusion-avatar-presets"
-      );
-
-    const remainingPresets =
-      savedPresets.filter(
-        (preset) =>
-          String(preset.id) !==
-          String(presetId)
-      );
-
-    localStorage.setItem(
-      "fitfusion-avatar-presets",
-      JSON.stringify(
-        remainingPresets
-      )
-    );
-
-    const activePresetText =
-      localStorage.getItem(
-        "fitfusion-avatar-preset"
-      );
-
-    if (activePresetText) {
-      try {
-        const activePreset =
-          JSON.parse(activePresetText);
-
-        if (
-          String(activePreset.id) ===
-          String(presetId)
-        ) {
-          localStorage.removeItem(
-            "fitfusion-avatar-preset"
-          );
-        }
-      } catch {
-        // Invalid stored data is ignored.
-      }
+      return;
     }
 
-    localStorage.removeItem(
-      "fitfusion-editing-avatar-preset"
-    );
+    try {
+      const selectedPreset =
+        buildUpdatedPreset();
 
-    setShowDeleteModal(false);
-
-    setToastMessage(
-      "Avatar preset deleted successfully."
-    );
-
-    window.setTimeout(() => {
-      navigate(
-        "/shopper/avatar-presets"
+      localStorage.setItem(
+        ACTIVE_KEY,
+        JSON.stringify(selectedPreset)
       );
-    }, 650);
+
+      localStorage.setItem(
+        GENDER_KEY,
+        selectedPreset.gender
+      );
+
+      navigate(
+        "/shopper/fitting-studio/customize"
+      );
+    } catch (error) {
+      console.error(
+        "Unable to load avatar:",
+        error
+      );
+
+      setToastMessage(
+        "Unable to open this avatar in Fitting Studio."
+      );
+    }
   }
+
+  // ---------------------------------------------------
+  // DELETE PRESET
+  // ---------------------------------------------------
+
+  function confirmDelete() {
+    try {
+      const remaining = readStorageArray(
+        PRESETS_KEY
+      ).filter(
+        (preset) =>
+          String(preset.id) !==
+          String(formData.id)
+      );
+
+      localStorage.setItem(
+        PRESETS_KEY,
+        JSON.stringify(remaining)
+      );
+
+      const activePreset = readStorageObject(
+        ACTIVE_KEY
+      );
+
+      if (
+        activePreset &&
+        String(activePreset.id) ===
+          String(formData.id)
+      ) {
+        localStorage.removeItem(ACTIVE_KEY);
+      }
+
+      const editingPreset = readStorageObject(
+        EDITING_KEY
+      );
+
+      if (
+        editingPreset &&
+        String(editingPreset.id) ===
+          String(formData.id)
+      ) {
+        localStorage.removeItem(EDITING_KEY);
+      }
+
+      setShowDeleteModal(false);
+
+      navigate("/shopper/avatar-presets");
+    } catch (error) {
+      console.error(
+        "Unable to delete avatar:",
+        error
+      );
+
+      setToastMessage(
+        "Unable to delete this avatar. Please try again."
+      );
+    }
+  }
+
+  // ---------------------------------------------------
+  // BACK / CANCEL
+  // ---------------------------------------------------
 
   function handleCancel() {
     if (hasChanges) {
@@ -613,52 +882,25 @@ function EditAvatarPresetPage() {
       return;
     }
 
-    navigate(
-      "/shopper/avatar-presets"
-    );
+    navigate("/shopper/avatar-presets");
   }
 
-  function handleLogout() {
-    const confirmed = window.confirm(
-      "Are you sure you want to log out?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    sessionStorage.removeItem(
-      "userRole"
-    );
-
-    sessionStorage.removeItem(
-      "userEmail"
-    );
-
-    sessionStorage.removeItem(
-      "registeredAccount"
-    );
-
-    localStorage.removeItem(
-      "fitfusion-current-user"
-    );
-
-    navigate("/login");
-  }
+  // =====================================================
+  // LOADING
+  // =====================================================
 
   if (loading) {
     return (
       <main className="edit-avatar-loading">
-        <div>
-          <span className="edit-avatar-loader" />
-
-          <p>
-            Loading avatar preset...
-          </p>
-        </div>
+        <div className="edit-avatar-loader" />
+        <p>Loading avatar preset...</p>
       </main>
     );
   }
+
+  // =====================================================
+  // NOT FOUND
+  // =====================================================
 
   if (notFound) {
     return (
@@ -671,17 +913,15 @@ function EditAvatarPresetPage() {
           </h1>
 
           <span>
-            The avatar preset may have been
-            removed, or the selected link may
-            be incorrect.
+            The preset may have been deleted,
+            or the selected link may be incorrect.
+            Built-in avatars cannot be edited here.
           </span>
 
           <button
             type="button"
             onClick={() =>
-              navigate(
-                "/shopper/avatar-presets"
-              )
+              navigate("/shopper/avatar-presets")
             }
           >
             Return to Avatar Presets
@@ -691,238 +931,141 @@ function EditAvatarPresetPage() {
     );
   }
 
+  // =====================================================
+  // MAIN PAGE
+  // =====================================================
+
   return (
     <main className="edit-avatar-page">
-      <aside className="edit-avatar-sidebar">
-        <div className="edit-avatar-logo">
-          <img
-            src={fitFusionLogo}
-            alt="FitFusion AI"
-          />
-        </div>
 
-        <nav className="edit-avatar-navigation">
-          <NavLink
-            to="/shopper/dashboard"
-            className="edit-avatar-nav-link"
-          >
-            Dashboard
-          </NavLink>
+      {/*
+        NO EXTRA HEADER.
+        ShopperLayout handles shared navigation.
+      */}
 
-          <NavLink
-            to="/shopper/fitting-studio"
-            className="edit-avatar-nav-link"
-          >
-            Fitting Studio
-          </NavLink>
+      <div className="edit-avatar-body">
 
-          <NavLink
-            to="/shopper/avatar-presets"
-            className={() =>
-              "edit-avatar-nav-link active"
-            }
-          >
-            Avatar Presets
-          </NavLink>
+        {/* =========================================
+            PAGE TITLE
+        ========================================= */}
 
-          <NavLink
-            to="/shopper/catalog"
-            className="edit-avatar-nav-link"
-          >
-            Catalog
-          </NavLink>
+        <section className="edit-avatar-title-row">
+          <div className="edit-avatar-title-copy">
 
-          <NavLink
-            to="/shopper/saved-outfits"
-            className="edit-avatar-nav-link"
-          >
-            Saved Outfits
-          </NavLink>
-
-          <NavLink
-            to="/shopper/orders"
-            className="edit-avatar-nav-link"
-          >
-            Order History
-          </NavLink>
-
-          <NavLink
-            to="/shopper/account"
-            className="edit-avatar-nav-link"
-          >
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          type="button"
-          className="edit-avatar-logout"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </aside>
-
-      <section className="edit-avatar-content">
-        <header className="edit-avatar-header">
-          <div>
-            <p className="edit-avatar-page-code">
-              08 — EDIT AVATAR PRESET
-            </p>
-
-            <p className="edit-avatar-description">
-              Update your saved 2D avatar
-              profile
-            </p>
-          </div>
-
-          <div className="edit-avatar-header-actions">
             <button
               type="button"
-              className="edit-avatar-cart"
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
-              aria-label={`Open cart with ${cartCount} items`}
+              className="edit-avatar-back"
+              onClick={handleCancel}
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-
-                <circle
-                  cx="10"
-                  cy="20"
-                  r="1"
-                />
-
-                <circle
-                  cx="18"
-                  cy="20"
-                  r="1"
-                />
-              </svg>
-
-              <span>{cartCount}</span>
+              ← Back to Avatar Presets
             </button>
 
-            <div className="edit-avatar-role">
-              REGISTERED SHOPPER
-            </div>
+            <h1>Edit your avatar</h1>
+
+            <p>
+              Customize your saved avatar and
+              review the changes using the Front,
+              Side, and Rear views.
+            </p>
           </div>
-        </header>
 
-        <div className="edit-avatar-body">
-          <section className="edit-avatar-title-row">
-            <div>
-              <button
-                type="button"
-                className="edit-avatar-back"
-                onClick={handleCancel}
-              >
-                ← Back to Avatar Presets
-              </button>
+          <div
+            className={`edit-avatar-save-status ${
+              hasChanges ? "changed" : ""
+            }`}
+            role="status"
+          >
+            <span />
 
-              <h1>Edit your avatar</h1>
+            {hasChanges
+              ? "Unsaved changes"
+              : "All changes saved"}
+          </div>
+        </section>
 
-              <p>
-                Update your information and
-                review the changes using the
-                Front, Side, and Rear views.
-              </p>
-            </div>
+        {/* =========================================
+            TWO-COLUMN WORKSPACE
+        ========================================= */}
 
-            <div
-              className={
-                hasChanges
-                  ? "edit-avatar-save-status changed"
-                  : "edit-avatar-save-status"
-              }
+        <section className="edit-avatar-workspace">
+
+          {/* =====================================
+              LEFT: AVATAR CUSTOMIZATION
+          ===================================== */}
+
+          <form
+            className="edit-avatar-form"
+            onSubmit={savePreset}
+          >
+
+            {/* PRESET INFORMATION */}
+
+            <FormSection
+              number="01"
+              title="Preset information"
+              description="Give your avatar a recognizable name."
             >
-              <span />
+              <div className="edit-avatar-field">
+                <label htmlFor="avatar-name">
+                  Avatar name
+                </label>
 
-              {hasChanges
-                ? "Unsaved changes"
-                : "All changes saved"}
-            </div>
-          </section>
+                <input
+                  id="avatar-name"
+                  type="text"
+                  maxLength={50}
+                  value={formData.name}
+                  className={
+                    errors.name ? "field-error" : ""
+                  }
+                  placeholder="Example: Everyday Avatar"
+                  onChange={(event) =>
+                    updateField(
+                      "name",
+                      event.target.value
+                    )
+                  }
+                />
 
-          <section className="edit-avatar-workspace">
-            <form
-              className="edit-avatar-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                savePreset();
-              }}
-            >
-              <FormSection
-                number="01"
-                title="Preset information"
-                description="Give your avatar a recognizable name."
-              >
-                <div className="edit-avatar-field">
-                  <label htmlFor="avatar-name">
-                    Avatar name
-                  </label>
-
-                  <input
-                    id="avatar-name"
-                    type="text"
-                    maxLength="30"
-                    value={formData.name}
+                <div className="edit-avatar-field-footer">
+                  <small
                     className={
                       errors.name
-                        ? "field-error"
+                        ? "edit-avatar-error-message"
                         : ""
                     }
-                    placeholder="Example: Everyday Avatar"
-                    onChange={(event) =>
-                      updateField(
-                        "name",
-                        event.target.value
-                      )
-                    }
-                  />
+                  >
+                    {errors.name ||
+                      "Use a unique name containing 3–50 characters."}
+                  </small>
 
-                  <div className="edit-avatar-field-footer">
-                    {errors.name ? (
-                      <small className="edit-avatar-error-message">
-                        {errors.name}
-                      </small>
-                    ) : (
-                      <small>
-                        Use a name containing
-                        3–30 characters.
-                      </small>
-                    )}
-
-                    <small>
-                      {formData.name.length}
-                      /30
-                    </small>
-                  </div>
+                  <small>
+                    {formData.name.length}/50
+                  </small>
                 </div>
-              </FormSection>
+              </div>
+            </FormSection>
 
-              <FormSection
-                number="02"
-                title="Avatar gender"
-                description="Select the body model used for the avatar and clothing display."
-              >
-                <div className="edit-avatar-gender-options">
-                  {[
-                    "Female",
-                    "Male",
-                  ].map((gender) => (
+            {/* AVATAR GENDER */}
+
+            <FormSection
+              number="02"
+              title="Avatar gender"
+              description="Choose the body model used for your 2D avatar."
+            >
+              <div className="edit-avatar-gender-options">
+                {["Female", "Male"].map(
+                  (gender) => (
                     <button
                       key={gender}
                       type="button"
                       className={
-                        formData.gender ===
-                        gender
+                        formData.gender === gender
                           ? "active"
                           : ""
+                      }
+                      aria-pressed={
+                        formData.gender === gender
                       }
                       onClick={() =>
                         updateField(
@@ -937,359 +1080,420 @@ function EditAvatarPresetPage() {
                           : "♂"}
                       </span>
 
-                      <strong>
-                        {gender}
-                      </strong>
+                      <strong>{gender}</strong>
                     </button>
-                  ))}
-                </div>
-              </FormSection>
-
-              <FormSection
-                number="03"
-                title="Body measurements"
-                description="Height and weight are used to estimate the avatar's general body type."
-              >
-                <div className="edit-avatar-measurement-grid">
-                  <RangeField
-                    id="avatar-height"
-                    label="Height"
-                    value={formData.height}
-                    min={120}
-                    max={220}
-                    unit="cm"
-                    error={errors.height}
-                    onChange={(value) =>
-                      updateField(
-                        "height",
-                        Number(value)
-                      )
-                    }
-                  />
-
-                  <RangeField
-                    id="avatar-weight"
-                    label="Weight"
-                    value={formData.weight}
-                    min={30}
-                    max={200}
-                    unit="kg"
-                    error={errors.weight}
-                    onChange={(value) =>
-                      updateField(
-                        "weight",
-                        Number(value)
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="edit-avatar-body-result">
-                  <div>
-                    <span>
-                      Calculated body type
-                    </span>
-
-                    <small>
-                      Based on the current
-                      height and weight values
-                    </small>
-                  </div>
-
-                  <strong>{bodyType}</strong>
-                </div>
-              </FormSection>
-
-              <FormSection
-                number="04"
-                title="Skin tone"
-                description="Select the skin tone displayed by the 2D avatar."
-              >
-                <div className="edit-avatar-skin-options">
-                  {SKIN_TONES.map(
-                    (skinTone, index) => (
-                      <button
-                        key={skinTone}
-                        type="button"
-                        className={
-                          formData.skinTone ===
-                          skinTone
-                            ? "active"
-                            : ""
-                        }
-                        style={{
-                          "--skin-color":
-                            skinTone,
-                        }}
-                        aria-label={`Select skin tone ${
-                          index + 1
-                        }`}
-                        onClick={() =>
-                          updateField(
-                            "skinTone",
-                            skinTone
-                          )
-                        }
-                      >
-                        <span />
-                      </button>
-                    )
-                  )}
-                </div>
-
-                <div className="edit-avatar-select-grid">
-                  <SelectField
-                    label="Undertone"
-                    value={formData.undertone}
-                    options={["Warm", "Cool", "Neutral"]}
-                    onChange={(value) =>
-                      updateField("undertone", value)
-                    }
-                  />
-                </div>
-              </FormSection>
-
-              <FormSection
-                number="05"
-                title="Body proportions"
-                description="These fields provide additional details for the 2D avatar representation."
-              >
-                <div className="edit-avatar-select-grid">
-                  <SelectField
-                    label="Shoulder"
-                    value={
-                      formData.shoulder
-                    }
-                    options={[
-                      "Narrow",
-                      "Balanced",
-                      "Broad",
-                    ]}
-                    onChange={(value) =>
-                      updateField(
-                        "shoulder",
-                        value
-                      )
-                    }
-                  />
-
-                  <SelectField
-                    label="Waist"
-                    value={formData.waist}
-                    options={[
-                      "Slim",
-                      "Regular",
-                      "Full",
-                    ]}
-                    onChange={(value) =>
-                      updateField(
-                        "waist",
-                        value
-                      )
-                    }
-                  />
-
-                  <SelectField
-                    label="Hip"
-                    value={formData.hip}
-                    options={[
-                      "Narrow",
-                      "Balanced",
-                      "Wide",
-                    ]}
-                    onChange={(value) =>
-                      updateField(
-                        "hip",
-                        value
-                      )
-                    }
-                  />
-
-                  <SelectField
-                    label="Thigh"
-                    value={formData.thigh}
-                    options={[
-                      "Slim",
-                      "Regular",
-                      "Full",
-                    ]}
-                    onChange={(value) =>
-                      updateField(
-                        "thigh",
-                        value
-                      )
-                    }
-                  />
-
-                  {formData.gender ===
-                    "Female" && (
-                    <SelectField
-                      label="Cup size"
-                      value={
-                        formData.cupSize
-                      }
-                      options={[
-                        "A",
-                        "B",
-                        "C",
-                        "D",
-                        "DD",
-                      ]}
-                      onChange={(value) =>
-                        updateField(
-                          "cupSize",
-                          value
-                        )
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="edit-avatar-proportion-note">
-                  <strong>
-                    Important:
-                  </strong>
-
-                  <span>
-                    These values are used to
-                    visually adjust the avatar.
-                    Final clothing sizes are
-                    still determined by the
-                    product information
-                    provided by the seller.
-                  </span>
-                </div>
-              </FormSection>
-
-              <div className="edit-avatar-form-actions">
-                <button
-                  type="button"
-                  className="edit-avatar-cancel-button"
-                  onClick={handleCancel}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="edit-avatar-save-button"
-                  disabled={!hasChanges}
-                >
-                  Save Changes
-                </button>
+                  )
+                )}
               </div>
-            </form>
+            </FormSection>
 
-            <aside className="edit-avatar-preview-panel">
-              <div className="edit-avatar-preview-heading">
-                <div>
-                  <p>LIVE 2D PREVIEW</p>
+            {/* BODY MEASUREMENTS */}
 
-                  <h2>
-                    {formData.name ||
-                      "Custom Avatar"}
-                  </h2>
-                </div>
-
-                <span>{bodyType}</span>
-              </div>
-
-              <div className="edit-avatar-view-buttons">
-                {[
-                  "front",
-                  "side",
-                  "rear",
-                ].map((view) => (
-                  <button
-                    key={view}
-                    type="button"
-                    className={
-                      previewView === view
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() =>
-                      setPreviewView(view)
-                    }
-                  >
-                    {view}
-                  </button>
-                ))}
-              </div>
-
-              <div className="edit-avatar-preview-stage">
-                <AvatarFigure
-                  preset={formData}
-                  view={previewView}
-                  bodyType={bodyType}
-                />
-
-                <span className="edit-avatar-view-label">
-                  {previewView.toUpperCase()}{" "}
-                  VIEW
-                </span>
-              </div>
-
-              <div className="edit-avatar-summary">
-                <SummaryItem
-                  label="Gender"
-                  value={formData.gender}
-                />
-
-                <SummaryItem
+            <FormSection
+              number="03"
+              title="Body measurements"
+              description="Adjust your height and weight to determine the avatar's general body shape."
+            >
+              <div className="edit-avatar-measurement-grid">
+                <RangeField
+                  id="avatar-height"
                   label="Height"
-                  value={`${formData.height} cm`}
-                />
-
-                <SummaryItem
-                  label="Weight"
-                  value={`${formData.weight} kg`}
-                />
-
-                <SummaryItem
-                  label="Body type"
-                  value={bodyType}
-                />
-
-                <SummaryItem
-                  label="Shoulder"
-                  value={
-                    formData.shoulder
+                  value={formData.height}
+                  min={120}
+                  max={218.4}
+                  step={0.1}
+                  unit="cm"
+                  error={errors.height}
+                  onChange={(value) =>
+                    updateField(
+                      "height",
+                      value
+                    )
                   }
                 />
 
-                <SummaryItem
-                  label="Waist"
-                  value={formData.waist}
+                <RangeField
+                  id="avatar-weight"
+                  label="Weight"
+                  value={formData.weight}
+                  min={30}
+                  max={200}
+                  step={1}
+                  unit="kg"
+                  error={errors.weight}
+                  onChange={(value) =>
+                    updateField(
+                      "weight",
+                      value
+                    )
+                  }
                 />
               </div>
 
+              <div className="edit-avatar-body-result">
+                <div>
+                  <span>
+                    Calculated body type
+                  </span>
+
+                  <small>
+                    Based on height and weight
+                  </small>
+                </div>
+
+                <strong>{bodyType}</strong>
+              </div>
+            </FormSection>
+
+            {/* SKIN TONE */}
+
+            <FormSection
+              number="04"
+              title="Skin tone"
+              description="Select the skin tone and undertone for your avatar."
+            >
+              <div className="edit-avatar-skin-options">
+                {SKIN_TONES.map(
+                  (skinTone, index) => (
+                    <button
+                      key={skinTone}
+                      type="button"
+                      className={
+                        formData.skinTone ===
+                        skinTone
+                          ? "active"
+                          : ""
+                      }
+                      style={{
+                        "--skin-color":
+                          skinTone,
+                      }}
+                      aria-label={`Skin tone ${
+                        index + 1
+                      }`}
+                      aria-pressed={
+                        formData.skinTone ===
+                        skinTone
+                      }
+                      onClick={() =>
+                        updateField(
+                          "skinTone",
+                          skinTone
+                        )
+                      }
+                    >
+                      <span />
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="edit-avatar-select-grid edit-avatar-undertone">
+                <SelectField
+                  label="Undertone"
+                  value={formData.undertone}
+                  options={[
+                    "Warm",
+                    "Cool",
+                    "Neutral",
+                  ]}
+                  onChange={(value) =>
+                    updateField(
+                      "undertone",
+                      value
+                    )
+                  }
+                />
+              </div>
+            </FormSection>
+
+            {/* BODY PROPORTIONS */}
+
+            <FormSection
+              number="05"
+              title="Body proportions"
+              description="Fine-tune the proportions of your 2D avatar."
+            >
+              <div className="edit-avatar-select-grid">
+
+                <SelectField
+                  label="Shoulder"
+                  value={formData.shoulder}
+                  options={[
+                    "Narrow",
+                    "Average",
+                    "Balanced",
+                    "Broad",
+                  ]}
+                  onChange={(value) =>
+                    updateField(
+                      "shoulder",
+                      value
+                    )
+                  }
+                />
+
+                <SelectField
+                  label="Waist"
+                  value={formData.waist}
+                  options={[
+                    "Slim",
+                    "Average",
+                    "Regular",
+                    "Full",
+                  ]}
+                  onChange={(value) =>
+                    updateField(
+                      "waist",
+                      value
+                    )
+                  }
+                />
+
+                <SelectField
+                  label="Hip"
+                  value={formData.hip}
+                  options={[
+                    "Narrow",
+                    "Average",
+                    "Balanced",
+                    "Wide",
+                  ]}
+                  onChange={(value) =>
+                    updateField(
+                      "hip",
+                      value
+                    )
+                  }
+                />
+
+                <SelectField
+                  label="Thigh"
+                  value={formData.thigh}
+                  options={[
+                    "Slim",
+                    "Average",
+                    "Regular",
+                    "Full",
+                  ]}
+                  onChange={(value) =>
+                    updateField(
+                      "thigh",
+                      value
+                    )
+                  }
+                />
+
+                {formData.gender ===
+                  "Female" && (
+                  <SelectField
+                    label="Cup size"
+                    value={
+                      formData.cupSize || "B"
+                    }
+                    options={[
+                      "A",
+                      "B",
+                      "C",
+                      "D",
+                    ]}
+                    onChange={(value) =>
+                      updateField(
+                        "cupSize",
+                        value
+                      )
+                    }
+                  />
+                )}
+              </div>
+
+              <div className="edit-avatar-proportion-note">
+                <strong>Note:</strong>
+
+                <span>
+                  These settings control your
+                  avatar's visual proportions.
+                  Clothing sizes are determined
+                  separately by the seller's
+                  product information.
+                </span>
+              </div>
+            </FormSection>
+
+            {/* FORM ACTIONS */}
+
+            <div className="edit-avatar-form-actions">
               <button
                 type="button"
-                className="edit-avatar-use-button"
-                onClick={
-                  useInFittingStudio
-                }
+                className="edit-avatar-cancel-button"
+                onClick={handleCancel}
               >
-                Use in Fitting Studio
+                Cancel
               </button>
 
               <button
-                type="button"
-                className="edit-avatar-delete-button"
-                onClick={() =>
-                  setShowDeleteModal(true)
-                }
+                type="submit"
+                className="edit-avatar-save-button"
+                disabled={!hasChanges}
               >
-                Delete Avatar Preset
+                Save Changes
               </button>
-            </aside>
-          </section>
-        </div>
-      </section>
+            </div>
+          </form>
+
+          {/* =====================================
+              RIGHT: LIVE AVATAR PREVIEW
+          ===================================== */}
+
+          <aside className="edit-avatar-preview-panel">
+
+            <div className="edit-avatar-preview-heading">
+              <div>
+                <p>LIVE 2D PREVIEW</p>
+
+                <h2>
+                  {formData.name ||
+                    "Custom Avatar"}
+                </h2>
+              </div>
+
+              <span>{bodyType}</span>
+            </div>
+
+            {/* FRONT / SIDE / REAR */}
+
+            <div
+              className="edit-avatar-view-buttons"
+              role="group"
+              aria-label="Avatar preview view"
+            >
+              {VIEWS.map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  className={
+                    previewView === view
+                      ? "active"
+                      : ""
+                  }
+                  aria-pressed={
+                    previewView === view
+                  }
+                  onClick={() =>
+                    setPreviewView(view)
+                  }
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+
+            {/* BLENDER-RENDERED CANVAS 2D */}
+
+            <div className="edit-avatar-preview-stage">
+              <div className="edit-avatar-rendered-figure">
+                <AvatarCanvas
+                  avatar={previewAvatar}
+                  view={previewView}
+                  equippedItems={{}}
+                />
+              </div>
+
+              <span className="edit-avatar-view-label">
+                {previewView.toUpperCase()} VIEW
+              </span>
+            </div>
+
+            {/* AVATAR SUMMARY */}
+
+            <div className="edit-avatar-summary">
+
+              <SummaryItem
+                label="Gender"
+                value={formData.gender}
+              />
+
+              <SummaryItem
+                label="Height"
+                value={`${formData.height} cm`}
+              />
+
+              <SummaryItem
+                label="Weight"
+                value={`${formData.weight} kg`}
+              />
+
+              <SummaryItem
+                label="Body type"
+                value={bodyType}
+              />
+
+              <SummaryItem
+                label="Shoulder"
+                value={formData.shoulder}
+              />
+
+              <SummaryItem
+                label="Waist"
+                value={formData.waist}
+              />
+
+              <SummaryItem
+                label="Hip"
+                value={formData.hip}
+              />
+
+              <SummaryItem
+                label="Thigh"
+                value={formData.thigh}
+              />
+
+              {formData.gender ===
+                "Female" && (
+                <SummaryItem
+                  label="Cup size"
+                  value={
+                    formData.cupSize || "B"
+                  }
+                />
+              )}
+
+              <SummaryItem
+                label="Undertone"
+                value={formData.undertone}
+              />
+            </div>
+
+            {/* PREVIEW ACTIONS */}
+
+            <button
+              type="button"
+              className="edit-avatar-use-button"
+              onClick={useInFittingStudio}
+            >
+              Use in Fitting Studio
+            </button>
+
+            <button
+              type="button"
+              className="edit-avatar-delete-button"
+              onClick={() =>
+                setShowDeleteModal(true)
+              }
+            >
+              Delete Avatar Preset
+            </button>
+          </aside>
+        </section>
+      </div>
+
+      {/* =========================================
+          DELETE CONFIRMATION
+      ========================================= */}
 
       {showDeleteModal && (
         <Modal
+          titleId="edit-avatar-delete-title"
           onClose={() =>
             setShowDeleteModal(false)
           }
@@ -1302,15 +1506,15 @@ function EditAvatarPresetPage() {
             DELETE AVATAR PRESET
           </p>
 
-          <h2>
-            Delete “{formData.name}”?
+          <h2 id="edit-avatar-delete-title">
+            Delete "{formData.name}"?
           </h2>
 
           <span>
-            This preset will be permanently
-            removed. Your saved outfits and
-            previous orders will not be
-            deleted.
+            This avatar preset will be
+            permanently removed. Your saved
+            outfits and previous orders will
+            not be deleted.
           </span>
 
           <div className="edit-avatar-modal-actions">
@@ -1334,8 +1538,13 @@ function EditAvatarPresetPage() {
         </Modal>
       )}
 
+      {/* =========================================
+          DISCARD CONFIRMATION
+      ========================================= */}
+
       {showDiscardModal && (
         <Modal
+          titleId="edit-avatar-discard-title"
           onClose={() =>
             setShowDiscardModal(false)
           }
@@ -1348,15 +1557,14 @@ function EditAvatarPresetPage() {
             UNSAVED CHANGES
           </p>
 
-          <h2>
+          <h2 id="edit-avatar-discard-title">
             Discard your changes?
           </h2>
 
           <span>
-            The changes made to this avatar
-            have not been saved. Leaving this
-            page will restore the previously
-            saved values.
+            Your latest changes have not been
+            saved. Leaving this page will keep
+            the previously saved avatar details.
           </span>
 
           <div className="edit-avatar-modal-actions">
@@ -1384,6 +1592,10 @@ function EditAvatarPresetPage() {
         </Modal>
       )}
 
+      {/* =========================================
+          NOTIFICATION
+      ========================================= */}
+
       {toastMessage && (
         <div
           className="edit-avatar-toast"
@@ -1395,211 +1607,3 @@ function EditAvatarPresetPage() {
     </main>
   );
 }
-
-function FormSection({
-  number,
-  title,
-  description,
-  children,
-}) {
-  return (
-    <section className="edit-avatar-form-section">
-      <div className="edit-avatar-section-heading">
-        <span>{number}</span>
-
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-      </div>
-
-      {children}
-    </section>
-  );
-}
-
-function RangeField({
-  id,
-  label,
-  value,
-  min,
-  max,
-  unit,
-  error,
-  onChange,
-}) {
-  return (
-    <div
-      className={
-        error
-          ? "edit-avatar-range-field has-error"
-          : "edit-avatar-range-field"
-      }
-    >
-      <div className="edit-avatar-range-heading">
-        <label htmlFor={id}>
-          {label}
-        </label>
-
-        <div>
-          <input
-            type="number"
-            min={min}
-            max={max}
-            value={value}
-            onChange={(event) =>
-              onChange(
-                event.target.value
-              )
-            }
-          />
-
-          <span>{unit}</span>
-        </div>
-      </div>
-
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-      />
-
-      <div className="edit-avatar-range-limits">
-        <span>
-          {min} {unit}
-        </span>
-
-        <span>
-          {max} {unit}
-        </span>
-      </div>
-
-      {error && (
-        <small className="edit-avatar-error-message">
-          {error}
-        </small>
-      )}
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-}) {
-  return (
-    <label className="edit-avatar-select-field">
-      <span>{label}</span>
-
-      <select
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-      >
-        {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-          >
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function SummaryItem({
-  label,
-  value,
-}) {
-  return (
-    <div className="edit-avatar-summary-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function Modal({
-  children,
-  onClose,
-}) {
-  return (
-    <div
-      className="edit-avatar-modal-backdrop"
-      role="presentation"
-      onMouseDown={onClose}
-    >
-      <section
-        className="edit-avatar-modal"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(event) =>
-          event.stopPropagation()
-        }
-      >
-        {children}
-      </section>
-    </div>
-  );
-}
-
-function AvatarFigure({
-  preset,
-  view,
-  bodyType,
-}) {
-  const genderClass =
-    preset.gender === "Male"
-      ? "male"
-      : "female";
-
-  const bodyTypeClass =
-    bodyType.toLowerCase();
-
-  return (
-    <div
-      className={[
-        "edit-avatar-figure",
-        `edit-avatar-figure-${genderClass}`,
-        `edit-avatar-figure-${view}`,
-        `edit-avatar-figure-${bodyTypeClass}`,
-      ].join(" ")}
-      style={{
-        "--avatar-skin":
-          preset.skinTone ||
-          "#d9aa82",
-      }}
-      aria-label={`${preset.gender} avatar ${view} view`}
-    >
-      <div className="edit-avatar-figure-head">
-        <span />
-      </div>
-
-      <div className="edit-avatar-figure-neck" />
-
-      <div className="edit-avatar-figure-body">
-        <div className="edit-avatar-figure-shirt" />
-      </div>
-
-      <div className="edit-avatar-figure-arm left" />
-
-      <div className="edit-avatar-figure-arm right" />
-
-      <div className="edit-avatar-figure-leg left" />
-
-      <div className="edit-avatar-figure-leg right" />
-    </div>
-  );
-}
-
-export default EditAvatarPresetPage;

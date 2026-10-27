@@ -1,53 +1,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/EditSavedOutfitPage.css";
 
-/* ==========================================
-   DEFAULT OUTFIT
-========================================== */
+const OUTFITS_KEY = "fitfusion-saved-outfits";
+const CART_KEY = "fitfusion-cart";
+const EDITING_KEY = "fitfusion-editing-outfit";
 
-const defaultOutfit = {
-  id: "outfit-1",
-  name: "Weekend Casual",
-  occasion: "Casual",
-  description:
-    "A comfortable outfit prepared for casual events and weekend activities.",
-  avatarView: "front",
-  createdAt: "2026-10-01",
-  products: [
-    {
-      id: "product-1",
-      name: "Classic Beige Top",
-      seller: "Luna Clothing",
-      category: "Top",
-      size: "M",
-      color: "Beige",
-      quantity: 1,
-      price: 699,
-      image: "",
-    },
-    {
-      id: "product-2",
-      name: "High-Waist Denim Pants",
-      seller: "Urban Threads",
-      category: "Bottom",
-      size: "M",
-      color: "Blue",
-      quantity: 1,
-      price: 899,
-      image: "",
-    },
-  ],
-};
+const VIEWS = ["front", "side", "rear"];
 
-const avatarViews = [
-  { id: "front", label: "Front" },
-  { id: "side", label: "Side" },
-  { id: "rear", label: "Rear" },
-];
-
-const occasionOptions = [
+const OCCASIONS = [
   "Casual",
   "Formal",
   "Business",
@@ -58,247 +21,430 @@ const occasionOptions = [
   "Other",
 ];
 
-const sizeOptions = [
-  "XXS", "XS", "S", "M", "L", "XL", "2XL",
+const SIZES = [
+  "XXS",
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "2XL",
 ];
 
-/* ==========================================
-   STORAGE HELPERS
-========================================== */
+const DEFAULT_AVATAR = {
+  gender: "Female",
+  height: 165,
+  weight: 58,
+  skinTone: "#d9aa82",
+  undertone: "Neutral",
+  shoulder: "Average",
+  waist: "Average",
+  hip: "Average",
+  thigh: "Average",
+  cupSize: "B",
+};
 
-function getStoredItems(key) {
+function readArray(key) {
   try {
-    const value = localStorage.getItem(key);
-    const parsed = value ? JSON.parse(value) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const value = JSON.parse(
+      localStorage.getItem(key) || "[]"
+    );
+
+    return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
 
-function normalizeProduct(product, index) {
+function normalizeProduct(item, index) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const selectedSize =
+    item.selectedSize || item.size || "M";
+
   return {
-    ...product,
-    id:
-      product?.id ||
-      product?.productId ||
-      `outfit-product-${index + 1}`,
-    name:
-      product?.name ||
-      product?.productName ||
-      product?.title ||
-      `Garment ${index + 1}`,
-    seller:
-      product?.seller ||
-      product?.sellerName ||
-      product?.storeName ||
-      "FitFusion Seller",
-    category:
-      product?.category ||
-      product?.type ||
-      "Clothing",
-    size:
-      product?.size ||
-      product?.selectedSize ||
-      "M",
-    color:
-      product?.color ||
-      product?.selectedColor ||
-      "Default",
+    ...item,
+
+    id: String(
+      item.id ||
+        item.productId ||
+        `garment-${index}`
+    ),
+
+    name: String(
+      item.name ||
+        item.productName ||
+        item.title ||
+        `Garment ${index + 1}`
+    ),
+
+    seller: String(
+      item.seller ||
+        item.store ||
+        item.sellerName ||
+        "Seller unavailable"
+    ),
+
+    category: String(
+      item.category ||
+        item.type ||
+        "Clothing"
+    ),
+
+    selectedSize,
+    size: selectedSize,
+
+    color: String(
+      item.color ||
+        item.selectedColor ||
+        "Default"
+    ),
+
     quantity: Math.max(
       1,
-      Number(product?.quantity) || 1
+      Math.floor(Number(item.quantity) || 1)
     ),
-    price: Number(product?.price) || 0,
+
+    price: Math.max(
+      0,
+      Number(item.price) || 0
+    ),
+
     image:
-      product?.image ||
-      product?.imageUrl ||
-      product?.thumbnail ||
+      item.image ||
+      item.imageUrl ||
+      item.thumbnail ||
       "",
   };
 }
 
-function normalizeOutfit(outfit) {
-  const products =
-    outfit?.products ||
-    outfit?.items ||
-    outfit?.garments ||
-    [];
+function normalizeOutfit(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const items = Array.isArray(raw.products)
+    ? raw.products
+    : Array.isArray(raw.items)
+      ? raw.items
+      : [];
+
+  const savedAvatar =
+    raw.avatar &&
+    typeof raw.avatar === "object"
+      ? raw.avatar
+      : {};
+
+  const requestedView = String(
+    raw.avatarView || raw.view || "front"
+  ).toLowerCase();
 
   return {
-    ...outfit,
-    id:
-      outfit?.id ||
-      outfit?.outfitId ||
-      `outfit-${Date.now()}`,
-    name:
-      outfit?.name ||
-      outfit?.outfitName ||
-      "Saved Outfit",
-    occasion:
-      outfit?.occasion ||
-      outfit?.style ||
-      "Casual",
-    description:
-      outfit?.description ||
-      outfit?.notes ||
-      "",
-    avatarView:
-      outfit?.avatarView ||
-      outfit?.view ||
-      "front",
-    createdAt:
-      outfit?.createdAt ||
-      new Date().toISOString(),
-    products: Array.isArray(products)
-      ? products.map(normalizeProduct)
-      : [],
+    ...raw,
+
+    id: String(
+      raw.id ||
+        raw.outfitId ||
+        ""
+    ),
+
+    name: String(
+      raw.name ||
+        raw.outfitName ||
+        "Saved Outfit"
+    ),
+
+    occasion: String(
+      raw.occasion || "Casual"
+    ),
+
+    description: String(
+      raw.description ||
+        raw.notes ||
+        ""
+    ),
+
+    avatarView: VIEWS.includes(requestedView)
+      ? requestedView
+      : "front",
+
+    avatar: {
+      ...DEFAULT_AVATAR,
+      ...savedAvatar,
+
+      gender:
+        savedAvatar.gender ||
+        raw.gender ||
+        DEFAULT_AVATAR.gender,
+
+      skinTone:
+        savedAvatar.skinTone ||
+        raw.skinTone ||
+        DEFAULT_AVATAR.skinTone,
+    },
+
+    products: items
+      .map(normalizeProduct)
+      .filter(Boolean),
   };
 }
 
 function getCartCount() {
-  return getStoredItems("fitfusion-cart").reduce(
-    (total, item) =>
-      total + Math.max(1, Number(item.quantity) || 1),
+  return readArray(CART_KEY).reduce(
+    (sum, item) =>
+      sum +
+      Math.max(
+        1,
+        Number(item.quantity) || 1
+      ),
     0
   );
 }
 
-/* ==========================================
-   MAIN COMPONENT
-========================================== */
+function getSlot(item) {
+  const text = `${
+    item.category || ""
+  } ${item.name || ""}`.toLowerCase();
 
-function EditSavedOutfitPage() {
+  if (/dress|gown|jumpsuit/.test(text)) {
+    return "dress";
+  }
+
+  if (
+    /outer|jacket|coat|blazer|cardigan/.test(
+      text
+    )
+  ) {
+    return "outerwear";
+  }
+
+  if (
+    /shoe|footwear|sneaker|boot|sandal/.test(
+      text
+    )
+  ) {
+    return "shoes";
+  }
+
+  if (
+    /bottom|pant|trouser|jean|skirt|short/.test(
+      text
+    )
+  ) {
+    return "bottom";
+  }
+
+  if (
+    /top|shirt|blouse|sweater|hoodie|polo/.test(
+      text
+    )
+  ) {
+    return "top";
+  }
+
+  return null;
+}
+
+function makeEquippedItems(products) {
+  const result = {};
+
+  products.forEach((product) => {
+    const slot = getSlot(product);
+
+    if (slot) {
+      result[slot] = product;
+    }
+  });
+
+  return result;
+}
+
+function money(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
+}
+
+function CartIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
+      <circle cx="10" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+    </svg>
+  );
+}
+
+export default function EditSavedOutfitPage() {
   const navigate = useNavigate();
+
   const { outfitId } = useParams();
 
-  const [outfit, setOutfit] = useState(defaultOutfit);
-  const [originalOutfit, setOriginalOutfit] =
-    useState(defaultOutfit);
+  const [outfit, setOutfit] = useState(null);
 
-  const [selectedView, setSelectedView] =
+  const [original, setOriginal] =
+    useState(null);
+
+  const [view, setView] =
     useState("front");
 
   const [cartCount, setCartCount] =
     useState(getCartCount);
 
-  const [errors, setErrors] = useState({});
-  const [notice, setNotice] = useState("");
-  const [modal, setModal] = useState(null);
+  const [errors, setErrors] =
+    useState({});
 
-  /* ======================================
-     LOAD SAVED OUTFIT
-  ====================================== */
+  const [modal, setModal] =
+    useState(null);
+
+  const [notice, setNotice] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  // ============================================
+  // LOAD SAVED OUTFIT
+  // ============================================
 
   useEffect(() => {
-    const savedOutfits = getStoredItems(
-      "fitfusion-saved-outfits"
+    const stored = readArray(OUTFITS_KEY);
+
+    const found = stored.find(
+      (item) =>
+        String(
+          item.id || item.outfitId
+        ) === String(outfitId)
     );
 
-    const selectedOutfit = savedOutfits.find(
-      (saved) =>
-        String(saved.id || saved.outfitId) ===
-        String(outfitId)
-    );
-
-    let editingOutfit = null;
-
-    try {
-      const stored = localStorage.getItem(
-        "fitfusion-editing-outfit"
-      );
-
-      if (stored) {
-        const parsed = JSON.parse(stored);
-
-        if (
-          String(parsed?.id || parsed?.outfitId) ===
-          String(outfitId)
-        ) {
-          editingOutfit = parsed;
-        }
-      }
-    } catch {
-      editingOutfit = null;
-    }
-
-    const resolved = normalizeOutfit(
-      selectedOutfit ||
-      editingOutfit ||
-      {
-        ...defaultOutfit,
-        id: outfitId || defaultOutfit.id,
-      }
-    );
+    const resolved = found
+      ? normalizeOutfit(found)
+      : null;
 
     setOutfit(resolved);
-    setOriginalOutfit(resolved);
-    setSelectedView(resolved.avatarView || "front");
+
+    setOriginal(
+      resolved
+        ? structuredClone(resolved)
+        : null
+    );
+
+    setView(
+      resolved?.avatarView || "front"
+    );
+
     setErrors({});
     setNotice("");
+    setLoading(false);
 
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
+    window.scrollTo(0, 0);
   }, [outfitId]);
 
-  /* ======================================
-     CART COUNT
-  ====================================== */
+  // ============================================
+  // CART COUNT
+  // ============================================
 
   useEffect(() => {
-    const refreshCart = () => {
+    const update = () => {
       setCartCount(getCartCount());
     };
 
-    refreshCart();
+    window.addEventListener(
+      "storage",
+      update
+    );
 
     window.addEventListener(
       "fitfusion-cart-updated",
-      refreshCart
+      update
     );
-
-    window.addEventListener("storage", refreshCart);
 
     return () => {
       window.removeEventListener(
-        "fitfusion-cart-updated",
-        refreshCart
+        "storage",
+        update
       );
-      window.removeEventListener("storage", refreshCart);
+
+      window.removeEventListener(
+        "fitfusion-cart-updated",
+        update
+      );
     };
   }, []);
 
-  /* ======================================
-     CALCULATIONS
-  ====================================== */
+  // ============================================
+  // NOTIFICATION
+  // ============================================
 
-  const outfitTotal = useMemo(
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(
+      () => setNotice(""),
+      3500
+    );
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [notice]);
+
+  // ============================================
+  // LIVE AVATAR LAYERS
+  // ============================================
+
+  const layers = useMemo(
     () =>
-      outfit.products.reduce(
-        (total, product) =>
-          total +
-          product.price * product.quantity,
+      makeEquippedItems(
+        outfit?.products || []
+      ),
+    [outfit?.products]
+  );
+
+  // ============================================
+  // TOTAL
+  // ============================================
+
+  const total = useMemo(
+    () =>
+      (outfit?.products || []).reduce(
+        (sum, product) =>
+          sum +
+          product.price *
+            product.quantity,
         0
       ),
-    [outfit.products]
+    [outfit?.products]
   );
 
-  const hasChanges = useMemo(
-    () =>
-      JSON.stringify(outfit) !==
-        JSON.stringify(originalOutfit) ||
-      selectedView !== originalOutfit.avatarView,
-    [outfit, originalOutfit, selectedView]
+  // ============================================
+  // UNSAVED CHANGES
+  // ============================================
+
+  const hasChanges = Boolean(
+    outfit &&
+      original &&
+      (
+        JSON.stringify(outfit) !==
+          JSON.stringify(original) ||
+        view !== original.avatarView
+      )
   );
 
-  /* ======================================
-     UPDATE OUTFIT
-  ====================================== */
+  // ============================================
+  // UPDATE BASIC INFORMATION
+  // ============================================
 
-  function updateOutfitField(event) {
+  function updateField(event) {
     const { name, value } = event.target;
 
     setOutfit((current) => ({
@@ -310,776 +456,996 @@ function EditSavedOutfitPage() {
       ...current,
       [name]: "",
     }));
-
-    setNotice("");
   }
 
-  function updateProduct(productId, field, value) {
+  // ============================================
+  // UPDATE CLOTHING
+  // ============================================
+
+  function updateProduct(index, changes) {
     setOutfit((current) => ({
       ...current,
-      products: current.products.map((product) =>
-        product.id === productId
-          ? {
-              ...product,
-              [field]:
-                field === "quantity"
-                  ? Math.max(1, Number(value) || 1)
-                  : value,
-            }
-          : product
+
+      products: current.products.map(
+        (product, i) =>
+          i === index
+            ? {
+                ...product,
+                ...changes,
+              }
+            : product
       ),
     }));
 
-    setNotice("");
+    setErrors((current) => ({
+      ...current,
+      products: "",
+    }));
   }
 
-  function removeProduct(productId) {
+  // ============================================
+  // REMOVE CLOTHING
+  // ============================================
+
+  function removeProduct(index) {
     setOutfit((current) => ({
       ...current,
+
       products: current.products.filter(
-        (product) => product.id !== productId
+        (_, i) => i !== index
       ),
     }));
-
-    setNotice(
-      "The garment was removed from this outfit."
-    );
   }
 
-  /* ======================================
-     VALIDATION
-  ====================================== */
+  // ============================================
+  // VALIDATION
+  // ============================================
 
-  function validateOutfit() {
-    const nextErrors = {};
+  function validate() {
+    const next = {};
 
-    if (!outfit.name.trim()) {
-      nextErrors.name =
+    const trimmedName =
+      outfit.name.trim();
+
+    if (!trimmedName) {
+      next.name =
         "Please enter an outfit name.";
+    } else if (
+      trimmedName.length < 3
+    ) {
+      next.name =
+        "Use at least 3 characters.";
+    } else if (
+      trimmedName.length > 50
+    ) {
+      next.name =
+        "Use 50 characters or fewer.";
     }
 
     if (!outfit.occasion) {
-      nextErrors.occasion =
+      next.occasion =
         "Please select an occasion.";
     }
 
-    if (outfit.products.length === 0) {
-      nextErrors.products =
+    if (!outfit.products.length) {
+      next.products =
         "Add at least one garment before saving.";
     }
 
-    setErrors(nextErrors);
+    const duplicate = readArray(
+      OUTFITS_KEY
+    ).some(
+      (item) =>
+        String(
+          item.id || item.outfitId
+        ) !== outfit.id &&
+        String(
+          item.name ||
+            item.outfitName ||
+            ""
+        )
+          .trim()
+          .toLowerCase() ===
+          trimmedName.toLowerCase()
+    );
 
-    return Object.keys(nextErrors).length === 0;
+    if (duplicate) {
+      next.name =
+        "An outfit with this name already exists.";
+    }
+
+    setErrors(next);
+
+    return (
+      Object.keys(next).length === 0
+    );
   }
 
-  /* ======================================
-     SAVE CHANGES
-  ====================================== */
+  // ============================================
+  // SAVE CHANGES
+  // ============================================
 
   function saveOutfit() {
-    if (!validateOutfit()) {
+    if (!outfit || !validate()) {
       setNotice(
         "Please correct the highlighted fields."
       );
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
-
       return;
     }
 
-    const updatedOutfit = {
+    const updatedProducts =
+      outfit.products.map((item) => ({
+        ...item,
+        selectedSize: item.size,
+      }));
+
+    const nextOutfit = {
       ...outfit,
-      avatarView: selectedView,
-      updatedAt: new Date().toISOString(),
+
+      name: outfit.name.trim(),
+
+      description:
+        outfit.description.trim(),
+
+      avatarView: view,
+
+      products: updatedProducts,
+
+      items: updatedProducts.map(
+        (item) => ({ ...item })
+      ),
+
+      updatedAt:
+        new Date().toISOString(),
     };
 
-    const savedOutfits = getStoredItems(
-      "fitfusion-saved-outfits"
-    );
+    try {
+      const all = readArray(
+        OUTFITS_KEY
+      );
 
-    const existingIndex = savedOutfits.findIndex(
-      (saved) =>
-        String(saved.id || saved.outfitId) ===
-        String(updatedOutfit.id)
-    );
+      const index = all.findIndex(
+        (item) =>
+          String(
+            item.id || item.outfitId
+          ) === outfit.id
+      );
 
-    const updatedOutfits =
-      existingIndex >= 0
-        ? savedOutfits.map((saved, index) =>
-            index === existingIndex
-              ? updatedOutfit
-              : saved
-          )
-        : [...savedOutfits, updatedOutfit];
+      if (index === -1) {
+        setNotice(
+          "This outfit no longer exists in your saved collection."
+        );
 
-    localStorage.setItem(
-      "fitfusion-saved-outfits",
-      JSON.stringify(updatedOutfits)
-    );
+        return;
+      }
 
-    localStorage.setItem(
-      "fitfusion-editing-outfit",
-      JSON.stringify(updatedOutfit)
-    );
+      all[index] = nextOutfit;
 
-    setOriginalOutfit(updatedOutfit);
-    setOutfit(updatedOutfit);
-    setNotice("Outfit changes saved.");
+      localStorage.setItem(
+        OUTFITS_KEY,
+        JSON.stringify(all)
+      );
 
-    navigate("/shopper/saved-outfits");
+      localStorage.removeItem(
+        EDITING_KEY
+      );
+
+      window.dispatchEvent(
+        new Event(
+          "fitfusion-outfits-updated"
+        )
+      );
+
+      navigate(
+        "/shopper/saved-outfits"
+      );
+    } catch {
+      setNotice(
+        "Unable to save your changes. Please try again."
+      );
+    }
   }
 
-  /* ======================================
-     DELETE OUTFIT
-  ====================================== */
+  // ============================================
+  // DELETE OUTFIT
+  // ============================================
 
   function deleteOutfit() {
-    const savedOutfits = getStoredItems(
-      "fitfusion-saved-outfits"
-    );
+    if (!outfit) {
+      return;
+    }
 
-    const remaining = savedOutfits.filter(
-      (saved) =>
-        String(saved.id || saved.outfitId) !==
-        String(outfit.id)
-    );
+    try {
+      const remaining = readArray(
+        OUTFITS_KEY
+      ).filter(
+        (item) =>
+          String(
+            item.id || item.outfitId
+          ) !== outfit.id
+      );
 
-    localStorage.setItem(
-      "fitfusion-saved-outfits",
-      JSON.stringify(remaining)
-    );
+      localStorage.setItem(
+        OUTFITS_KEY,
+        JSON.stringify(remaining)
+      );
 
-    localStorage.removeItem(
-      "fitfusion-editing-outfit"
-    );
+      localStorage.removeItem(
+        EDITING_KEY
+      );
 
-    setModal(null);
-    navigate("/shopper/saved-outfits");
+      window.dispatchEvent(
+        new Event(
+          "fitfusion-outfits-updated"
+        )
+      );
+
+      navigate(
+        "/shopper/saved-outfits"
+      );
+    } catch {
+      setModal(null);
+
+      setNotice(
+        "Unable to delete this outfit. Please try again."
+      );
+    }
   }
 
-  /* ======================================
-     DISCARD CHANGES
-  ====================================== */
-
-  function confirmDiscard() {
-    setOutfit(originalOutfit);
-    setSelectedView(
-      originalOutfit.avatarView || "front"
-    );
-
-    setErrors({});
-    setModal(null);
-
-    navigate("/shopper/saved-outfits");
-  }
+  // ============================================
+  // LEAVE PAGE
+  // ============================================
 
   function leavePage() {
     if (hasChanges) {
       setModal("discard");
+    } else {
+      navigate(
+        "/shopper/saved-outfits"
+      );
+    }
+  }
+
+  // ============================================
+  // OPEN FITTING STUDIO
+  // ============================================
+
+  function openFittingStudio() {
+    if (hasChanges) {
+      setNotice(
+        "Save your changes before opening Fitting Studio."
+      );
+
       return;
     }
 
-    navigate("/shopper/saved-outfits");
-  }
-
-  /* ======================================
-     OPEN FITTING STUDIO
-  ====================================== */
-
-  function openFittingStudio() {
     localStorage.setItem(
       "fitfusion-active-outfit",
-      JSON.stringify({
-        ...outfit,
-        avatarView: selectedView,
-      })
+      JSON.stringify(outfit)
     );
 
-    navigate("/shopper/fitting-studio/customize");
+    navigate(
+      "/shopper/fitting-studio/customize"
+    );
   }
+
+  // ============================================
+  // OPEN CATALOG
+  // ============================================
 
   function openCatalog() {
+    if (hasChanges) {
+      setNotice(
+        "Save your changes before browsing the catalog."
+      );
+
+      return;
+    }
+
     localStorage.setItem(
-      "fitfusion-editing-outfit",
-      JSON.stringify({
-        ...outfit,
-        avatarView: selectedView,
-      })
+      EDITING_KEY,
+      JSON.stringify(outfit)
     );
 
-    navigate("/shopper/catalog");
+    navigate(
+      "/shopper/catalog"
+    );
   }
 
-  /* ======================================
-     RENDER
-  ====================================== */
+  // ============================================
+  // LOADING
+  // ============================================
+
+  if (loading) {
+    return (
+      <main className="edit-outfit-page">
+        <p className="edit-outfit-message">
+          Loading saved outfit...
+        </p>
+      </main>
+    );
+  }
+
+  // ============================================
+  // OUTFIT NOT FOUND
+  // ============================================
+
+  if (!outfit) {
+    return (
+      <main className="edit-outfit-page">
+        <div className="edit-outfit-not-found">
+          <h1>Outfit not found</h1>
+
+          <p>
+            This outfit may have been
+            deleted or is no longer in
+            your saved collection.
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                "/shopper/saved-outfits"
+              )
+            }
+          >
+            Back to Saved Outfits
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // ============================================
+  // MAIN PAGE
+  // ============================================
 
   return (
     <main className="edit-outfit-page">
-      {/* =====================================
-          NO SIDEBAR HERE
-          ShopperLayout.jsx provides it.
-      ===================================== */}
 
-      <section className="edit-outfit-content">
-        {/* HEADER */}
+      {/* HEADER */}
 
-        <header className="edit-outfit-header">
+      <header className="edit-outfit-header">
+        <button
+          type="button"
+          className="edit-outfit-back-button"
+          onClick={leavePage}
+        >
+          ← Back to Saved Outfits
+        </button>
+
+        <button
+          type="button"
+          className="edit-outfit-cart-button"
+          onClick={() =>
+            navigate("/shopper/cart")
+          }
+          aria-label={`Open shopping cart with ${cartCount} items`}
+        >
+          <CartIcon />
+
+          <span>{cartCount}</span>
+        </button>
+      </header>
+
+      {/* MAIN CONTENT */}
+
+      <div className="edit-outfit-body">
+
+        {notice && (
+          <p
+            className="edit-outfit-notice"
+            role="status"
+          >
+            {notice}
+          </p>
+        )}
+
+        {/* INTRODUCTION */}
+
+        <div className="edit-outfit-introduction">
           <div>
-            <button
-              type="button"
-              className="edit-outfit-back-button"
-              onClick={leavePage}
-            >
-              ← Back to Saved Outfits
-            </button>
+            <p className="edit-outfit-eyebrow">
+              OUTFIT EDITOR
+            </p>
 
-            <h1>Edit Saved Outfit</h1>
+            <h1>
+              Refine your saved look
+            </h1>
 
-            <p>
-              Update your outfit details and selected
-              garments.
+            <p className="edit-outfit-intro-description">
+              Update your outfit details and
+              clothing items while previewing
+              your saved 2D avatar.
             </p>
           </div>
 
-          <div className="edit-outfit-header-actions">
-            <button
-              type="button"
-              className="edit-outfit-cart-button"
-              onClick={() => navigate("/shopper/cart")}
-              aria-label={`Open shopping cart with ${cartCount} items`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
-                <circle cx="10" cy="20" r="1" />
-                <circle cx="18" cy="20" r="1" />
-              </svg>
+          <span
+            className={`edit-outfit-unsaved-status${
+              hasChanges ? " changed" : ""
+            }`}
+          >
+            <i aria-hidden="true" />
 
-              <span>{cartCount}</span>
-            </button>
-          </div>
-        </header>
+            {hasChanges
+              ? "Unsaved changes"
+              : "All changes saved"}
+          </span>
+        </div>
 
-        {/* BODY */}
+        {/* EDITOR LAYOUT */}
 
-        <div className="edit-outfit-body">
-          {notice && (
-            <div
-              className="edit-outfit-notice"
-              role="status"
-            >
-              {notice}
-            </div>
-          )}
+        <div className="edit-outfit-layout">
 
-          {/* INTRODUCTION */}
+          {/* LEFT: AVATAR PREVIEW */}
 
-          <section className="edit-outfit-introduction">
-            <div>
-              <p>OUTFIT EDITOR</p>
+          <section className="edit-outfit-preview-card">
 
-              <h2>Refine your saved look</h2>
+            <div className="edit-outfit-card-heading">
+              <div>
+                <p>2D AVATAR PREVIEW</p>
+
+                <h2>{outfit.name}</h2>
+              </div>
 
               <span>
-                Change the outfit details,
-                garments, sizes, colors, and
-                quantities before saving.
+                {view.toUpperCase()}
               </span>
             </div>
 
-            <div className="edit-outfit-unsaved-status">
-              <span
-                className={
-                  hasChanges
-                    ? "status-dot changed"
-                    : "status-dot"
-                }
-              />
+            {/* REAL CANVAS 2D AVATAR */}
 
-              {hasChanges
-                ? "Unsaved changes"
-                : "All changes saved"}
+            <div className="edit-outfit-avatar-preview">
+              <AvatarCanvas
+                avatar={outfit.avatar}
+                view={view}
+                equippedItems={layers}
+              />
             </div>
+
+            {/* FRONT / SIDE / REAR */}
+
+            <div
+              className="edit-outfit-view-buttons"
+              role="group"
+              aria-label="Avatar viewing angle"
+            >
+              {VIEWS.map((angle) => (
+                <button
+                  key={angle}
+                  type="button"
+                  className={
+                    view === angle
+                      ? "active"
+                      : ""
+                  }
+                  aria-pressed={
+                    view === angle
+                  }
+                  onClick={() =>
+                    setView(angle)
+                  }
+                >
+                  {angle
+                    .charAt(0)
+                    .toUpperCase() +
+                    angle.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* AVATAR DETAILS */}
+
+            <div className="edit-outfit-avatar-metadata">
+              <span>
+                {outfit.avatar.gender}
+              </span>
+
+              <span>
+                {outfit.avatar.height} cm
+              </span>
+
+              <span>
+                {outfit.avatar.weight} kg
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="edit-outfit-studio-button"
+              onClick={openFittingStudio}
+            >
+              Open Fitting Studio
+            </button>
           </section>
 
-          {/* EDITOR GRID */}
+          {/* RIGHT: OUTFIT EDITOR */}
 
-          <div className="edit-outfit-layout">
-            {/* =================================
-                AVATAR PREVIEW
-            ================================= */}
+          <div className="edit-outfit-editor-column">
 
-            <section className="edit-outfit-preview-card">
-              <div className="edit-outfit-card-heading">
+            {/* BASIC INFORMATION */}
+
+            <section className="edit-outfit-form-card">
+
+              <div className="edit-outfit-section-heading">
                 <div>
-                  <p>2D AVATAR PREVIEW</p>
-                  <h2>{outfit.name}</h2>
+                  <p>
+                    OUTFIT INFORMATION
+                  </p>
+
+                  <h2>
+                    Basic details
+                  </h2>
                 </div>
 
-                <span>
-                  {selectedView.toUpperCase()}
-                </span>
+                <span>* Required</span>
               </div>
 
-              <div
-                className={`edit-outfit-avatar-preview ${selectedView}`}
-              >
-                <div className="edit-avatar-head" />
-                <div className="edit-avatar-neck" />
+              <div className="edit-outfit-form-grid">
 
-                <div className="edit-avatar-body">
-                  <div className="edit-avatar-top">
-                    {outfit.products[0]?.name ||
-                      "No top selected"}
-                  </div>
+                {/* OUTFIT NAME */}
 
-                  <div className="edit-avatar-bottom">
-                    {outfit.products[1]?.name ||
-                      "No bottom selected"}
-                  </div>
-                </div>
+                <label className="edit-outfit-field">
+                  <span>
+                    Outfit Name *
+                  </span>
 
-                <div className="edit-avatar-legs">
-                  <span />
-                  <span />
-                </div>
-              </div>
-
-              {/* FRONT / SIDE / REAR */}
-
-              <div className="edit-outfit-view-buttons">
-                {avatarViews.map((view) => (
-                  <button
-                    key={view.id}
-                    type="button"
+                  <input
+                    type="text"
+                    name="name"
+                    maxLength={50}
+                    value={outfit.name}
                     className={
-                      selectedView === view.id
-                        ? "active"
+                      errors.name
+                        ? "input-error"
                         : ""
                     }
-                    onClick={() =>
-                      setSelectedView(view.id)
-                    }
-                  >
-                    {view.label}
-                  </button>
-                ))}
-              </div>
+                    onChange={updateField}
+                  />
 
-              <button
-                type="button"
-                className="edit-outfit-studio-button"
-                onClick={openFittingStudio}
-              >
-                Open in Fitting Studio
-              </button>
+                  <small>
+                    {outfit.name.length}/50
+                  </small>
+
+                  {errors.name && (
+                    <em>{errors.name}</em>
+                  )}
+                </label>
+
+                {/* OCCASION */}
+
+                <label className="edit-outfit-field">
+                  <span>
+                    Occasion *
+                  </span>
+
+                  <select
+                    name="occasion"
+                    value={outfit.occasion}
+                    onChange={updateField}
+                  >
+                    {!OCCASIONS.includes(
+                      outfit.occasion
+                    ) && (
+                      <option
+                        value={
+                          outfit.occasion
+                        }
+                      >
+                        {outfit.occasion}
+                      </option>
+                    )}
+
+                    {OCCASIONS.map(
+                      (option) => (
+                        <option
+                          key={option}
+                          value={option}
+                        >
+                          {option}
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  {errors.occasion && (
+                    <em>
+                      {errors.occasion}
+                    </em>
+                  )}
+                </label>
+
+                {/* DESCRIPTION */}
+
+                <label className="edit-outfit-field full-width">
+                  <span>
+                    Description or Notes
+                  </span>
+
+                  <textarea
+                    name="description"
+                    maxLength={250}
+                    rows={4}
+                    value={
+                      outfit.description
+                    }
+                    onChange={updateField}
+                    placeholder="Describe your saved look..."
+                  />
+
+                  <small>
+                    {
+                      outfit.description
+                        .length
+                    }
+                    /250
+                  </small>
+                </label>
+              </div>
             </section>
 
-            {/* =================================
-                EDITOR COLUMN
-            ================================= */}
+            {/* SELECTED GARMENTS */}
 
-            <div className="edit-outfit-editor-column">
-              {/* BASIC DETAILS */}
+            <section className="edit-outfit-products-card">
 
-              <section className="edit-outfit-form-card">
-                <div className="edit-outfit-section-heading">
-                  <div>
-                    <p>OUTFIT INFORMATION</p>
-                    <h2>Basic details</h2>
-                  </div>
-
-                  <span>
-                    Fields marked * are required
-                  </span>
-                </div>
-
-                <div className="edit-outfit-form-grid">
-                  {/* OUTFIT NAME */}
-
-                  <label className="edit-outfit-field">
-                    <span>Outfit Name *</span>
-
-                    <input
-                      type="text"
-                      name="name"
-                      value={outfit.name}
-                      onChange={updateOutfitField}
-                      className={
-                        errors.name
-                          ? "input-error"
-                          : ""
-                      }
-                      placeholder="Enter an outfit name"
-                      maxLength={50}
-                    />
-
-                    <small>
-                      {outfit.name.length}/50
-                    </small>
-
-                    {errors.name && (
-                      <em>{errors.name}</em>
-                    )}
-                  </label>
-
-                  {/* OCCASION */}
-
-                  <label className="edit-outfit-field">
-                    <span>Occasion *</span>
-
-                    <select
-                      name="occasion"
-                      value={outfit.occasion}
-                      onChange={updateOutfitField}
-                      className={
-                        errors.occasion
-                          ? "input-error"
-                          : ""
-                      }
-                    >
-                      <option value="">
-                        Select occasion
-                      </option>
-
-                      {occasionOptions.map(
-                        (occasion) => (
-                          <option
-                            key={occasion}
-                            value={occasion}
-                          >
-                            {occasion}
-                          </option>
-                        )
-                      )}
-                    </select>
-
-                    {errors.occasion && (
-                      <em>{errors.occasion}</em>
-                    )}
-                  </label>
-
-                  {/* DESCRIPTION */}
-
-                  <label className="edit-outfit-field full-width">
-                    <span>
-                      Description or Notes
-                    </span>
-
-                    <textarea
-                      name="description"
-                      value={outfit.description}
-                      onChange={updateOutfitField}
-                      placeholder="Describe the outfit, styling choices, or where you plan to wear it."
-                      maxLength={250}
-                      rows={4}
-                    />
-
-                    <small>
-                      {outfit.description.length}/250
-                    </small>
-                  </label>
-                </div>
-              </section>
-
-              {/* =================================
-                  SELECTED GARMENTS
-              ================================= */}
-
-              <section className="edit-outfit-products-card">
-                <div className="edit-outfit-section-heading">
-                  <div>
-                    <p>SELECTED GARMENTS</p>
-
-                    <h2>
-                      {outfit.products.length}{" "}
-                      {outfit.products.length === 1
-                        ? "item"
-                        : "items"}
-                    </h2>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="edit-outfit-add-product"
-                    onClick={openCatalog}
-                  >
-                    + Add Garment
-                  </button>
-                </div>
-
-                {errors.products && (
-                  <p className="edit-outfit-products-error">
-                    {errors.products}
+              <div className="edit-outfit-section-heading">
+                <div>
+                  <p>
+                    SELECTED GARMENTS
                   </p>
-                )}
 
-                {outfit.products.length > 0 ? (
-                  <div className="edit-outfit-products-list">
-                    {outfit.products.map(
-                      (product, index) => (
-                        <article
-                          key={`${product.id}-${index}`}
-                          className="edit-outfit-product"
-                        >
-                          {/* GARMENT IMAGE */}
+                  <h2>
+                    {
+                      outfit.products
+                        .length
+                    }{" "}
+                    {
+                      outfit.products
+                        .length === 1
+                        ? "item"
+                        : "items"
+                    }
+                  </h2>
+                </div>
 
-                          <div className="edit-outfit-product-image">
-                            {product.image ? (
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                              />
-                            ) : (
-                              <span>
-                                {product.category
-                                  .slice(0, 1)
-                                  .toUpperCase()}
-                              </span>
+                <button
+                  type="button"
+                  className="edit-outfit-add-product"
+                  onClick={openCatalog}
+                >
+                  + Browse Catalog
+                </button>
+              </div>
+
+              {errors.products && (
+                <p className="edit-outfit-products-error">
+                  {errors.products}
+                </p>
+              )}
+
+              {outfit.products.length ? (
+                <div className="edit-outfit-products-list">
+
+                  {outfit.products.map(
+                    (product, index) => (
+                      <article
+                        className="edit-outfit-product"
+                        key={`${product.id}-${index}`}
+                      >
+
+                        {/* GARMENT IMAGE */}
+
+                        <div className="edit-outfit-product-image">
+                          {product.image ? (
+                            <img
+                              src={
+                                product.image
+                              }
+                              alt={
+                                product.name
+                              }
+                            />
+                          ) : (
+                            <span aria-hidden="true">
+                              ♧
+                            </span>
+                          )}
+                        </div>
+
+                        {/* PRODUCT DETAILS */}
+
+                        <div className="edit-outfit-product-information">
+                          <span>
+                            {
+                              product.seller
+                            }
+                          </span>
+
+                          <h3>
+                            {
+                              product.name
+                            }
+                          </h3>
+
+                          <p>
+                            {
+                              product.category
+                            }
+                          </p>
+
+                          <strong>
+                            {money(
+                              product.price
                             )}
+                          </strong>
+                        </div>
 
-                            <small>{index + 1}</small>
-                          </div>
+                        {/* OPTIONS */}
 
-                          {/* GARMENT DETAILS */}
+                        <div className="edit-outfit-product-options">
 
-                          <div className="edit-outfit-product-information">
+                          {/* SIZE */}
+
+                          <label>
                             <span>
-                              {product.seller}
+                              Size
                             </span>
 
-                            <h3>
-                              {product.name}
-                            </h3>
+                            <select
+                              value={
+                                product.size
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                updateProduct(
+                                  index,
+                                  {
+                                    size:
+                                      event
+                                        .target
+                                        .value,
 
-                            <p>
-                              {product.category}
-                            </p>
-
-                            <strong>
-                              ₱
-                              {product.price.toLocaleString(
-                                "en-PH"
+                                    selectedSize:
+                                      event
+                                        .target
+                                        .value,
+                                  }
+                                )
+                              }
+                            >
+                              {!SIZES.includes(
+                                product.size
+                              ) && (
+                                <option
+                                  value={
+                                    product.size
+                                  }
+                                >
+                                  {
+                                    product.size
+                                  }
+                                </option>
                               )}
-                            </strong>
-                          </div>
 
-                          {/* GARMENT OPTIONS */}
+                              {SIZES.map(
+                                (size) => (
+                                  <option
+                                    key={
+                                      size
+                                    }
+                                    value={
+                                      size
+                                    }
+                                  >
+                                    {
+                                      size
+                                    }
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </label>
 
-                          <div className="edit-outfit-product-options">
-                            {/* SIZE */}
+                          {/* COLOR */}
 
-                            <label>
-                              <span>Size</span>
+                          <label>
+                            <span>
+                              Color
+                            </span>
 
-                              <select
-                                value={product.size}
-                                onChange={(event) =>
+                            <input
+                              value={
+                                product.color
+                              }
+                              maxLength={
+                                25
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                updateProduct(
+                                  index,
+                                  {
+                                    color:
+                                      event
+                                        .target
+                                        .value,
+                                  }
+                                )
+                              }
+                            />
+                          </label>
+
+                          {/* QUANTITY */}
+
+                          <div className="edit-outfit-quantity-group">
+                            <span>
+                              Quantity
+                            </span>
+
+                            <div className="edit-outfit-quantity">
+                              <button
+                                type="button"
+                                disabled={
+                                  product.quantity <=
+                                  1
+                                }
+                                aria-label={`Decrease ${product.name} quantity`}
+                                onClick={() =>
                                   updateProduct(
-                                    product.id,
-                                    "size",
-                                    event.target.value
+                                    index,
+                                    {
+                                      quantity:
+                                        product.quantity -
+                                        1,
+                                    }
                                   )
                                 }
                               >
-                                {!sizeOptions.includes(
-                                  product.size
-                                ) && (
-                                  <option value={product.size}>
-                                    {product.size}
-                                  </option>
-                                )}
+                                −
+                              </button>
 
-                                {sizeOptions.map((size) => (
-                                  <option
-                                    key={size}
-                                    value={size}
-                                  >
-                                    {size}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                              <strong>
+                                {
+                                  product.quantity
+                                }
+                              </strong>
 
-                            {/* COLOR */}
-
-                            <label>
-                              <span>Color</span>
-
-                              <input
-                                type="text"
-                                value={product.color}
-                                onChange={(event) =>
+                              <button
+                                type="button"
+                                disabled={
+                                  product.quantity >=
+                                  99
+                                }
+                                aria-label={`Increase ${product.name} quantity`}
+                                onClick={() =>
                                   updateProduct(
-                                    product.id,
-                                    "color",
-                                    event.target.value
+                                    index,
+                                    {
+                                      quantity:
+                                        product.quantity +
+                                        1,
+                                    }
                                   )
                                 }
-                                maxLength={25}
-                              />
-                            </label>
-
-                            {/* QUANTITY */}
-
-                            <label>
-                              <span>Quantity</span>
-
-                              <div className="edit-outfit-quantity">
-                                <button
-                                  type="button"
-                                  disabled={
-                                    product.quantity <= 1
-                                  }
-                                  onClick={() =>
-                                    updateProduct(
-                                      product.id,
-                                      "quantity",
-                                      product.quantity - 1
-                                    )
-                                  }
-                                  aria-label="Decrease quantity"
-                                >
-                                  −
-                                </button>
-
-                                <strong>
-                                  {product.quantity}
-                                </strong>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateProduct(
-                                      product.id,
-                                      "quantity",
-                                      product.quantity + 1
-                                    )
-                                  }
-                                  aria-label="Increase quantity"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </label>
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
+                        </div>
 
-                          {/* REMOVE GARMENT */}
+                        {/* REMOVE GARMENT */}
 
-                          <button
-                            type="button"
-                            className="edit-outfit-remove-product"
-                            onClick={() =>
-                              removeProduct(product.id)
-                            }
-                            aria-label={`Remove ${product.name}`}
-                          >
-                            Remove
-                          </button>
-                        </article>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <div className="edit-outfit-empty-products">
-                    <div>＋</div>
-
-                    <h3>
-                      No garments in this outfit
-                    </h3>
-
-                    <p>
-                      Browse the catalog and add
-                      at least one garment.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={openCatalog}
-                    >
-                      Browse Catalog
-                    </button>
-                  </div>
-                )}
-              </section>
-
-              {/* =================================
-                  OUTFIT SUMMARY
-              ================================= */}
-
-              <section className="edit-outfit-summary">
-                <div>
-                  <span>
-                    Estimated outfit total
-                  </span>
-
-                  <strong>
-                    ₱
-                    {outfitTotal.toLocaleString(
-                      "en-PH"
-                    )}
-                  </strong>
+                        <button
+                          type="button"
+                          className="edit-outfit-remove-product"
+                          onClick={() =>
+                            removeProduct(
+                              index
+                            )
+                          }
+                        >
+                          Remove Garment
+                        </button>
+                      </article>
+                    )
+                  )}
                 </div>
+              ) : (
+                <div className="edit-outfit-empty-products">
+                  <h3>
+                    No garments in this outfit
+                  </h3>
 
-                <p>
-                  Product availability, prices,
-                  and sizes are supplied by each seller.
-                </p>
-              </section>
+                  <p>
+                    Save a look with clothing
+                    from Fitting Studio to
+                    display it here.
+                  </p>
 
-              {/* =================================
-                  BOTTOM ACTIONS
-              ================================= */}
+                  <button
+                    type="button"
+                    onClick={
+                      openFittingStudio
+                    }
+                  >
+                    Open Fitting Studio
+                  </button>
+                </div>
+              )}
+            </section>
 
-              <div className="edit-outfit-actions">
+            {/* OUTFIT TOTAL */}
+
+            <section className="edit-outfit-summary">
+              <div>
+                <span>
+                  Estimated outfit total
+                </span>
+
+                <strong>
+                  {money(total)}
+                </strong>
+              </div>
+
+              <p>
+                Prices, stock, and available
+                sizes will be confirmed by
+                sellers during checkout.
+              </p>
+            </section>
+
+            {/* BOTTOM ACTIONS */}
+
+            <div className="edit-outfit-actions">
+
+              <button
+                type="button"
+                className="edit-outfit-delete-button"
+                onClick={() =>
+                  setModal("delete")
+                }
+              >
+                Delete Outfit
+              </button>
+
+              <div>
                 <button
                   type="button"
-                  className="edit-outfit-delete-button"
-                  onClick={() => setModal("delete")}
+                  className="edit-outfit-cancel-button"
+                  onClick={leavePage}
                 >
-                  Delete Outfit
+                  Cancel
                 </button>
 
-                <div>
-                  <button
-                    type="button"
-                    className="edit-outfit-cancel-button"
-                    onClick={leavePage}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    className="edit-outfit-save-button"
-                    onClick={saveOutfit}
-                  >
-                    Save Changes
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="edit-outfit-save-button"
+                  disabled={!hasChanges}
+                  onClick={saveOutfit}
+                >
+                  Save Changes
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* =====================================
-          CONFIRMATION MODALS
-      ===================================== */}
+      {/* CONFIRMATION MODAL */}
 
       {modal && (
         <div
           className="edit-outfit-modal-backdrop"
-          role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
               setModal(null);
             }
           }}
@@ -1090,80 +1456,68 @@ function EditSavedOutfitPage() {
             aria-modal="true"
             aria-labelledby="edit-outfit-modal-title"
           >
-            {modal === "discard" && (
-              <>
-                <div className="edit-outfit-modal-icon">
-                  !
-                </div>
+            <div
+              className={`edit-outfit-modal-icon${
+                modal === "delete"
+                  ? " danger"
+                  : ""
+              }`}
+            >
+              {modal === "delete"
+                ? "×"
+                : "!"}
+            </div>
 
-                <h2 id="edit-outfit-modal-title">
-                  Discard changes?
-                </h2>
+            <h2 id="edit-outfit-modal-title">
+              {modal === "delete"
+                ? "Delete this outfit?"
+                : "Discard changes?"}
+            </h2>
 
-                <p>
-                  Your latest outfit changes have
-                  not been saved.
-                </p>
+            <p>
+              {modal === "delete"
+                ? `“${outfit.name}” will be permanently removed from your saved outfits.`
+                : "Your unsaved changes will be lost."}
+            </p>
 
-                <div className="edit-outfit-modal-actions">
-                  <button
-                    type="button"
-                    className="modal-secondary-button"
-                    onClick={() => setModal(null)}
-                  >
-                    Continue Editing
-                  </button>
+            <div className="edit-outfit-modal-actions">
 
-                  <button
-                    type="button"
-                    className="modal-primary-button"
-                    onClick={confirmDiscard}
-                  >
-                    Discard Changes
-                  </button>
-                </div>
-              </>
-            )}
+              <button
+                type="button"
+                className="modal-secondary-button"
+                onClick={() =>
+                  setModal(null)
+                }
+              >
+                {modal === "delete"
+                  ? "Keep Outfit"
+                  : "Continue Editing"}
+              </button>
 
-            {modal === "delete" && (
-              <>
-                <div className="edit-outfit-modal-icon danger">
-                  ×
-                </div>
-
-                <h2 id="edit-outfit-modal-title">
-                  Delete this outfit?
-                </h2>
-
-                <p>
-                  “{outfit.name}” will be permanently
-                  removed from your saved outfits.
-                </p>
-
-                <div className="edit-outfit-modal-actions">
-                  <button
-                    type="button"
-                    className="modal-secondary-button"
-                    onClick={() => setModal(null)}
-                  >
-                    Keep Outfit
-                  </button>
-
-                  <button
-                    type="button"
-                    className="modal-danger-button"
-                    onClick={deleteOutfit}
-                  >
-                    Delete Outfit
-                  </button>
-                </div>
-              </>
-            )}
+              <button
+                type="button"
+                className={
+                  modal === "delete"
+                    ? "modal-danger-button"
+                    : "modal-primary-button"
+                }
+                onClick={
+                  modal === "delete"
+                    ? deleteOutfit
+                    : () =>
+                        navigate(
+                          "/shopper/saved-outfits"
+                        )
+                }
+              >
+                {modal === "delete"
+                  ? "Delete Outfit"
+                  : "Discard Changes"}
+              </button>
+            </div>
           </section>
         </div>
       )}
     </main>
   );
 }
-
-export default EditSavedOutfitPage;
