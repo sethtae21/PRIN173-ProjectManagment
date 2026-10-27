@@ -4,7 +4,7 @@
 
 **Project Charter**
 
-Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
+Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 
 ## **1\. Project Overview**
 
@@ -23,7 +23,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 | Version | Date | Author(s) | Description of Changes |
 | :---- | :---- | :---- | :---- |
 | 1.0 | 2026-08-29 | Project Group 1 |  |
-| 1.1 | 2026-09-21 | Project Group 1 | Revisions per Panel of Evaluators feedback; Clarified validated avatar height/weight input ranges and target age. |
+| 1.1 | 2026-09-21 | Project Group 1 | Revisions per Panel of Evaluators feedback |
 
 ### **2.2 Referenced Documents**
 
@@ -88,12 +88,12 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 ### **4.1 In-Scope Features**
 
 1. System Authentication & Role-Based Access Control (JWT; Registered User / Guest / Seller; server-side RBAC; ephemeral guest sessions)  
-2. Multi-Angle Avatar System (male/female; height/weight mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions; Front/Side/Rear views) Avatar customization accepts only validated inputs: height 120–220 cm and weight 30–200 kg; the system targets users aged 12 years and older.
+2. Multi-Angle Avatar System (male/female; height/weight mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions rendered by deforming a single base silhouette per gender; Front/Rear views).  Avatar customization accepts only validated inputs: height 120–220 cm and weight 30–200 kg; the system targets users aged 12 years and older.  
 3. Seller-Managed Catalog via CSV upload with automated rembg background removal and Pillow-based validation with rejection reports  
 4. Virtual Try-On 2D Overlay Canvas (per-category item switching, instant view toggling, saved outfit CRUD)  
 5. Explainable Rule-Based Styling Engine (Deterministic Expert System) using weighted tag scoring (color \+3, height contrast \+2, proportion shading \+1, style/occasion \+1) with visible match reasons.  
 6. Mock E-Commerce Flow (persistent cart for Registered Users, full checkout UI, standalone mock payment gateway, order history)  
-7. Catalog browsing and filtering (category, size, color, style, and per-seller Store pages)
+7. Catalog browsing and filtering (category, size, price, and per-seller Store pages)
 
 ### 
 
@@ -106,7 +106,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  |  Version: 1.1  | Date: 2026-09-21
 5. Fully 3D rotatable avatars, WebGL rendering, dynamic cloth physics  
 6. Multi-seller marketplace discovery; external third-party API integrations  
 7. Body tracking, pose detection, fabric simulation  
-8. Cloud-hosted application hosting (application runs on local staging host; only MongoDB Atlas remains cloud-hosted)
+8. Cloud-hosted application hosting (application runs on local staging host; only MongoDB Atlas remains cloud-hosted)  
 9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and weight 30–200 kg); inputs outside these ranges are rejected with descriptive validation errors.
 
 ### 
@@ -186,7 +186,7 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 
 ### **6.1 Project Assumptions & Constraints**
 
-**6.1.1** Assumption: Sellers can follow the CSV template and three-view photo conventions without extensive training (SRS FR-4.1).
+**6.1.1** Assumption: Sellers can follow the CSV template and two-view photo conventions without extensive training (SRS FR-4.1).
 
 **6.1.2** Assumption: rembg will isolate garments without manual editing (SRS FR-4.2).
 
@@ -328,3 +328,4 @@ Signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\
 Name: **MR. JOHN ERICK D. BAUTISTA** 
 
 Signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_     Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+

@@ -1,8 +1,10 @@
 # **Software Requirements Specification (SRS)**
 
-**Product Name:** FitFusion AI – Virtual Try-On & Outfit Simulation System  
- **Author(s):** Duclayan, Seth Martin D.; Lacia, Kahlil Alfonso A.; Tamo, Karol Dein A.; Yap, Carlos Jefferson S.  
- **Date:** 2026-09-21 | Version: 1.1
+**Product Name:** FitFusion AI – Virtual Try-On & Outfit Simulation System
+
+**Author(s):** Duclayan, Seth Martin D.; Lacia, Kahlil Alfonso A.; Tamo, Karol Dein A.; Yap, Carlos Jefferson S.
+
+**Date:** 2026-09-21 \| **Version:** 1.1
 
 ## **1\. Introduction**
 
@@ -12,20 +14,16 @@ This SRS defines the functional and non-functional requirements of the FitFusion
 
 ### **1.2 Scope**
 
-FitFusion AI is a standalone virtual try-on and outfit simulation application with a mock e-commerce flow that allows users to visualize clothing on customized body avatars (male and female), receive personalized styling recommendations powered by a deterministic rule-based expert system, and complete a simulated purchase workflow through a standalone mock payment gateway. The catalog is managed by Sellers through a CSV-upload-based Catalog Admin Dashboard, where Sellers upload clothing items with three-view photographs (Front, Side, Rear) and associated metadata.
+FitFusion AI is a standalone virtual try-on and outfit simulation application with a mock e-commerce flow that allows users to visualize clothing on customized body avatars (male and female), receive personalized styling recommendations powered by a deterministic rule-based expert system, and complete a simulated purchase workflow through a standalone mock payment gateway. The catalog is managed by Sellers through a CSV-upload-based Catalog Admin Dashboard, where Sellers upload clothing items with two-view photographs (Front and Rear) and associated metadata.
 
 The business problem addressed by the MVP is pre-purchase uncertainty — shoppers cannot judge how a garment will look on their body type, skin tone, and personal style before purchase (Charter P1, P3), and retailers bear returns, complaints, and lost sales from uncertain purchases (Charter P4). The MVP addresses this by (a) multi-angle visualization of catalog garments on a personalized avatar and (b) explainable, rule-based style/color recommendations (Heuristic Expert System), thereby improving purchase-decision confidence and reducing return-intent. The MVP does not perform garment-fit prediction: it does not predict size or guarantee physical fit, because physical fit can only be confirmed by wearing the garment; the system reduces uncertainty and return-intent rather than predicting fit (the post-purchase fitting cost of Charter P1 is addressed indirectly via reduced return-intent, Charter OBJ-06).
 
 **Out of Scope:** Real payment processing and merchant fulfillment; user-uploaded photos or clothing images; garment-fit prediction, size prediction, or fit guarantees; custom-trained machine learning, deep-learning, or generative-AI models and any black-box AI component (off-the-shelf image-processing utilities like Pillow and rembg are permitted as fixed preprocessing components for background removal and validation only; the in-scope recommendation component is a deterministic rule-based expert system, i.e., symbolic/heuristic AI, not ML); fully 3D rotatable avatars and WebGL rendering; multi-seller marketplace model; external API integrations with third-party fashion sites; body tracking or fabric simulation; and External cloud hosting (the application runs on the local staging host; only MongoDB Atlas remains cloud-hosted) — all excluded to keep the MVP deliverable within a single semester while preserving the option to extend in future phases; children's and infant clothing categories and pediatric body-proportion modeling (avatar inputs are limited to height 120–220 cm and weight 30–200 kg, targeting users aged 12 years and older).
 
-### 
-
-### 
-
 ### **1.3 Definitions, Acronyms, and Abbreviations**
 
 | Term / Acronym | Definition |
-| ----- | ----- |
+| :---- | :---- |
 | SRS | Software Requirements Specification |
 | API | Application Programming Interface |
 | RBAC | Role-Based Access Control |
@@ -47,12 +45,12 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 
 ### **1.4 References**
 
-* **Figma Wireframes:** [https://www.figma.com/design/Xf2GQEuKbp8JRts4rCkRrX/FitFusion-Wireframe?node-id=0-1\&t=nQa7sxoFwsRrDaT8-1](https://www.figma.com/design/Xf2GQEuKbp8JRts4rCkRrX/FitFusion-Wireframe?node-id=0-1&t=nQa7sxoFwsRrDaT8-1)  
-*  FitFusion AI Entity-Relationship Diagram (ERD) — project GitHub repository: github.com/sethtae21/PRIN173-ProjectManagment (/docs).  
+* **Figma Wireframes:** [https\://www\.figma.com/design/Xf2GQEuKbp8JRts4rCkRrX/FitFusion-Wireframe?node-id=0-1\&t=nQa7sxoFwsRrDaT8-1](https://www.figma.com/design/Xf2GQEuKbp8JRts4rCkRrX/FitFusion-Wireframe?node-id=0-1&t=nQa7sxoFwsRrDaT8-1)  
+* FitFusion AI Entity-Relationship Diagram (ERD) — project GitHub repository: github.com/sethtae21/PRIN173-ProjectManagment (/docs).  
 * IEEE Std 830-1998, *IEEE Recommended Practice for Software Requirements Specifications*.  
 * ISO/IEC/IEEE 29148:2018, Systems and software engineering — Life cycle processes — Requirements engineering.  
-* MongoDB Atlas Documentation (https://www.mongodb.com/docs/atlas).  
-* Django Documentation (https://docs.djangoproject.com) and React Documentation (https://react.dev).
+* MongoDB Atlas Documentation ([https\://www\.mongodb.com/docs/atlas](https://www.mongodb.com/docs/atlas)).  
+* Django Documentation ([https\://docs.djangoproject.com](https://docs.djangoproject.com)) and React Documentation ([https\://react.dev](https://react.dev)).
 
 ## **2\. Overall Description**
 
@@ -77,10 +75,6 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 * **End User Side:** Any device capable of running a modern browser; no special GPU required, since the 2D overlay canvas is rendered via standard HTML/CSS/Canvas APIs.  
 * **Software:** Python 3.13+ with Django 6.x backend; Node.js 20+ with React \+ Vite frontend; MongoDB Atlas cloud database; end users on modern Chrome, Edge, Firefox, or Safari browsers.
 
-### 
-
-### 
-
 ### **2.4 Design and Implementation Constraints**
 
 * **Standalone system:** FitFusion AI operates as a standalone web application with no external service dependencies beyond the cloud database, eliminating vendor lock-in and third-party approval delays during the semester.  
@@ -90,13 +84,9 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 * **Avatar-only visualization:** No user photo upload, body tracking, pose detection, or AI image generation is included, keeping the MVP deterministic and avoiding the privacy and compute costs associated with processing user photos.  
 * **AI positioning:** The MVP contains no custom-trained machine-learning, deep-learning, or generative-AI models and no black-box AI component for recommendation, fit prediction, user profiling, or decision-making. The recommendation component is a deterministic, rule-based Heuristic Expert System (symbolic/heuristic AI) that encodes color theory and style rules into explicit rules and weighted tag scoring, so every recommendation is fully auditable and explainable to users and the panel. Off-the-shelf image utilities (rembg for background removal, Pillow for validation) are permitted as fixed preprocessing/image-processing components; they are not used for recommendation ranking, fit prediction, user profiling, or decision-making. Terminology alignment: when the team states "AI is not part of the MVP", it refers to ML/black-box AI; the deterministic Heuristic Expert System is an in-scope, non-ML component (Charter §4.1, §4.2, §6.1.11).  
 * **No 3D in any scope:** Fully 3D rotatable avatars, dynamic cloth physics, and WebGL rendering are out of scope; the system uses photo-based 2D visualization only, since 3D rendering demands GPU resources and specialized asset pipelines that exceed a single-semester undergraduate build.  
-* **Body-data limitation:** Height, weight, and body proportion inputs are used solely for avatar layer selection and shall not be used for medical, health, or body assessment purposes, preventing accidental medical claims and associated regulatory exposure. Supported input ranges are height 120–220 cm and weight 30–200 kg; values outside these ranges are rejected at validation.
+* **Body-data limitation:** Height, weight, and body proportion inputs are used solely for avatar layer selection and shall not be used for medical, health, or body assessment purposes, preventing accidental medical claims and associated regulatory exposure. Supported input ranges are height 120–220 cm and weight 30–200 kg; values outside these ranges are rejected at validation.  
 * **Cloud free-tier dependency:** The database runs on MongoDB Atlas free tier, limiting storage and connection counts; this is acceptable for MVP-scale load and eliminates infrastructure cost during development. The application itself runs on the local staging host (dedicated local staging server); only the database remains cloud-hosted (Charter §6.1.8).  
 * **Privacy regulation:** The system shall comply with the Data Privacy Act of 2012 (RA 10173\) for all stored user and seller data, a non-negotiable legal baseline for any production-deployable academic project.
-
-## 
-
-## 
 
 ## **3\. Functional Requirements**
 
@@ -116,11 +106,11 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 
 * **FR-2.1 (Gender Selection):** The system shall allow users to create an avatar by selecting the avatar gender (Male or Female), which determines the available body-proportion options.  
 * **FR-2.2 (Preset Avatars):** The system shall allow users to read and select from pre-set 2D body avatars.  
-* **FR-2.3 (Custom Avatar):** The system shall allow users to create a custom avatar preset by entering height and weight, which shall be mapped to a suitable avatar body type. Height and weight inputs shall be validated against the supported ranges of 120–220 cm and 30–200 kg; values outside these ranges shall be rejected with a descriptive error message and shall not update the avatar body type.
+* **FR-2.3 (Custom Avatar):** The system shall allow users to create a custom avatar preset by entering height and weight, which shall be mapped to suitable body-type parameters that deform the single base silhouette of the selected gender. Height and weight inputs shall be validated against the supported ranges of 120–220 cm and 30–200 kg; values outside these ranges shall be rejected with a descriptive error message and shall not update the avatar body type.  
 * **FR-2.4 (Skin Tone and Undertone):** The system shall allow users to select and update a skin-tone shade for their avatar, with an undertone category (warm, cool, or neutral) that is either selected by the user or derived deterministically from the selected shade.  
 * **FR-2.5 (Persistent Preset):** The system shall read and reload the registered user's avatar preset across sessions.  
-* **FR-2.6 (View Switching):** The system shall allow users to update the avatar visualization by toggling between Front, Side, and Rear views, instantly updating the avatar and all equipped clothing to the corresponding 2D assets.  
-* **FR-2.7 (Body Proportions):** The system shall allow users to update the following body proportions, each dynamically swapping the underlying base body layers to ensure clothing aligns correctly:  
+* **FR-2.6 (View Switching):** The system shall allow users to update the avatar visualization by toggling between Front and Rear views, instantly updating the avatar and all equipped clothing to the corresponding 2D assets.  
+* **FR-2.7 (Body Proportions):** The system shall allow users to update the following body proportions, each dynamically deforming the single base body silhouette of the selected gender (procedural client-side deformation in the React canvas, not pre-rendered layer swaps) to ensure clothing overlays remain correctly aligned:  
   * Shoulder width (narrow / average / broad)  
   * Waist (slim / average / curvy)  
   * Hip (slim / average / wide)  
@@ -133,28 +123,24 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 ### **3.3 Clothing Catalog & Filtering**
 
 * **FR-3.1 (Catalog):** The system shall read and maintain a catalog of clothing items organized into categories: Tops, Bottoms, Dresses/One-Piece Outfits, Outerwear, and Footwear.  
-* **FR-3.2 (Metadata):** The system shall read and store metadata per item: name, description, store name, category, size, color, color description, color family, price, style tags, season/occasion tags, compatible color-palette tags, and three 2D image assets (Front, Side, Rear), ensuring users can always identify which Seller provided the item. The compatible color-palette tags (color\_palette\_tags) are system-derived: upon successful validation and publishing, the backend generates them from the item's color\_family value(s) using the encoded color-theory knowledge table (FR-7.1), so Sellers are not required to supply them in the CSV template (stored as CATALOG\_ITEMS.color\_palette\_tags per the project ERD).  
-* **FR-3.3 (Filtering):** The system shall allow users to read, filter, and browse items by category, size, color, style, and store, including a per-seller Store page that lists all items published by that Seller.  
+* **FR-3.2 (Metadata):** The system shall read and store metadata per item: name, description, store name, category, size, color, color description, color family, price, style tags, season/occasion tags, compatible color-palette tags, and two 2D image assets (Front and Rear), ensuring users can always identify which Seller provided the item. The compatible color-palette tags (color\_palette\_tags) are system-derived: upon successful validation and publishing, the backend generates them from the item's color\_family value(s) using the encoded color-theory knowledge table (FR-7.1), so Sellers are not required to supply them in the CSV template (stored as CATALOG\_ITEMS.color\_palette\_tags per the project ERD).  
+* **FR-3.3 (Filtering):** The system shall allow users to read, filter, and browse items by category, size, and price, including a per-seller Store page that lists all items published by that Seller.  
 * **FR-3.4 (User Upload Restriction):** The system shall not permit regular users or Guests to upload their own clothing images, keeping catalog integrity and content moderation within the Seller's responsibility.
-
-### 
 
 ### **3.4 Seller Catalog Management (CSV Upload)**
 
-* **FR-4.1 (CSV Template Download):** The system shall allow Sellers to read and download a CSV template containing all required columns: *name, description, category, size, color, color\_description, color\_family, price, style\_tags, occasion\_tags, front\_image\_filename, side\_image\_filename, rear\_image\_filename.* The template shall include a header row of example values and an instruction sheet explaining the image-filename convention and the requirement that each clothing item must be photographed from three angles — **Front view, Side view, and Rear view** — with the garment laid flat or on a mannequin. Sellers are not required to manually remove backgrounds before uploading.  
-* **FR-4.2 (CSV \+ Image Upload):** The system shall allow Sellers to create new catalog items by uploading a completed CSV file together with the corresponding standard image files (three photos per item). The backend shall automatically process these images using the rembg library to remove backgrounds and generate transparent PNGs. The Seller Dashboard shall present three clearly labeled drop zones — Front View, Side View, Rear View — so the Seller knows which image belongs to which angle. The backend shall automatically associate all uploaded items with the Seller's registered Store Name, eliminating the need for the Seller to type it repeatedly in the CSV. Upon successful validation and publishing, the backend shall likewise automatically derive each item's color\_palette\_tags from its color\_family value(s) using the encoded color-theory knowledge table (FR-7.1); Sellers are not required to provide color\_palette\_tags in the CSV template, and the derived field is stored in the catalog schema (CATALOG\_ITEMS.color\_palette\_tags per the project ERD).  
+* **FR-4.1 (CSV Template Download):** The system shall allow Sellers to read and download a CSV template containing all required columns: *name, description, category, size, color, color\_description, color\_family, price, style\_tags, occasion\_tags, front\_image\_filename, rear\_image\_filename.* The template shall include a header row of example values and an instruction sheet explaining the image-filename convention and the requirement that each clothing item must be photographed from two angles — **Front view and Rear view** — with the garment laid flat or on a mannequin. Sellers are not required to manually remove backgrounds before uploading.  
+* **FR-4.2 (CSV \+ Image Upload):** The system shall allow Sellers to create new catalog items by uploading a completed CSV file together with the corresponding standard image files (two photos per item). The backend shall automatically process these images using the rembg library to remove backgrounds and generate transparent PNGs. The Seller Dashboard shall present two clearly labeled drop zones — Front View and Rear View — so the Seller knows which image belongs to which angle. The backend shall automatically associate all uploaded items with the Seller's registered Store Name, eliminating the need for the Seller to type it repeatedly in the CSV. Upon successful validation and publishing, the backend shall likewise automatically derive each item's color\_palette\_tags from its color\_family value(s) using the encoded color-theory knowledge table (FR-7.1); Sellers are not required to provide color\_palette\_tags in the CSV template, and the derived field is stored in the catalog schema (CATALOG\_ITEMS.color\_palette\_tags per the project ERD).  
 * **FR-4.3 (List Own Listings):** The system shall allow Sellers to read and view a list of all items they have uploaded, including item name, category, upload date, and status (active/rejected).  
 * **FR-4.4 (View Item Details):** The system shall allow Sellers to read and view the full details of any item they have uploaded, including all metadata fields and associated images.  
 * **FR-4.5 (Update Listings):** The system shall allow Sellers to update the metadata and images of items they previously uploaded, including replacing images or modifying tags, descriptions, and categories.  
 * **FR-4.6 (Delete Listings):** The system shall allow Sellers to delete items they previously uploaded permanently from the catalog.  
-* **FR-4.7 (Validation Algorithm):** The system shall validate each uploaded item against a rule set and reject non-conforming items with a descriptive error report. The rule set shall include: (a) all required fields are present, (b) image files exist and are at least 800 x 800 pixels and do not exceed 5 MB per file, (c) the automatically generated transparent PNGs have valid alpha channels, (d) the three view filenames in the CSV match the uploaded image files, and (e) a basic image-text alignment check to detect obvious mismatches (e.g., a "red" item with a blue-dominant image). The algorithm relies on deterministic file-mapping (CSV filename to uploaded file) and dominant-color hex extraction via the Pillow library, avoiding any machine-learning classification.  
+* **FR-4.7 (Validation Algorithm):** The system shall validate each uploaded item against a rule set and reject non-conforming items with a descriptive error report. The rule set shall include: (a) all required fields are present, (b) image files exist and are at least 800 x 800 pixels and do not exceed 5 MB per file, (c) the automatically generated transparent PNGs have valid alpha channels, (d) the two view filenames in the CSV match the uploaded image files, and (e) a basic image-text alignment check to detect obvious mismatches (e.g., a "red" item with a blue-dominant image). The algorithm relies on deterministic file-mapping (CSV filename to uploaded file) and dominant-color hex extraction via the Pillow library, avoiding any machine-learning classification.  
 * **FR-4.8 (Validation Report):** The system shall read, generate, and display a validation report listing accepted items and rejected items with specific reasons for each rejection.
-
-### 
 
 ### **3.5 Virtual Try-On Visualization**
 
-* **FR-5.1 (Canvas Display):** The system shall read and display a multi-angle 2D overlay canvas that layers transparent PNG clothing items over the selected or generated avatar, supporting Front, Side, and Rear views.  
+* **FR-5.1 (Canvas Display):** The system shall read and display a multi-angle 2D overlay canvas that layers transparent PNG clothing items over the selected or generated avatar, supporting Front and Rear views.  
 * **FR-5.2 (Item Switching):** The system shall allow users to update the equipped items by switching items per category (one top, one bottom, one dress/one-piece outfit, one footwear, etc.) on the canvas. A Dress/One-Piece Outfit shall replace both the Top and Bottom slots.  
 * **FR-5.3 (View Switching):** The system shall update the canvas instantly without reloading the page when items are changed or the view angle is switched.  
 * **FR-5.4 (Save Outfit):** The system shall allow registered users to create and save named outfit combinations from their current try-on session.  
@@ -180,9 +166,9 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 The recommendation engine is a deterministic, knowledge-based Heuristic Expert System (rule-based / symbolic AI). It encodes human fashion knowledge (color theory and style rules) into explicit rules and weighted tag scoring. No machine-learning models are used, which ensures every recommendation is fully auditable and explainable to both the user and the panel.
 
 * **FR-7.1 (Profile Match):** The system shall read the user's selected skin tone and undertone, and retrieve catalog items whose color-family tags are listed in the encoded color-theory knowledge table as compatible with that undertone.  
-* **FR-7.2 (Generate Recommendations):** The system shall create and rank recommended items using deterministic weighted metadata tag scoring (content-based filtering): color compatibility (+3), height-appropriate contrast (+2), proportion-appropriate shading (+1), and style/occasion tag match (+1).   
-  Basis of weights: The weights encode the relative visual salience of each factor in human outfit evaluation, drawn from classical color theory and seasonal color-analysis practice encoded in the knowledge table: color harmony dominates first impressions (+3), silhouette/height-appropriate contrast is next most salient (+2), proportion-appropriate shading refines perceived fit (+1), and style/occasion context is least visually salient (+1). The values are expert-encoded from color-theory/styling rules (Charter \[R18\]), not learned from data.  
-  Validation & testing of weights: (a) deterministic unit/regression tests of the scoring function with fixed tag combinations and expected rankings; (b) sensitivity checks — perturbing each weight by ±1 shall not invert the top-1 ranking for canonical avatar profiles; (c) UAT in-app recommendation rating (Charter OBJ-05: ≥80% approval); (d) pre/post UAT confidence and return-intent ratings (Charter OBJ-06); (e) adviser/expert review of the knowledge table and weights at the M2 and M4 gates. Tests (a)–(b) are executed within Validation Algorithm Testing (WBS 1.4.2). If recommendations are judged poor or implausible during testing or UAT, the weights may be tuned in code as a normal development activity, with each tuned value and its rationale recorded in the weights-basis memo; only weight changes after the baseline freeze are baselined changes processed via the CCB (Charter §8).  
+* **FR-7.2 (Generate Recommendations):** The system shall create and rank recommended items using deterministic weighted metadata tag scoring (content-based filtering): color compatibility (+3), height-appropriate contrast (+2), proportion-appropriate shading (+1), and style/occasion tag match (+1).  
+  **Basis of weights:** The weights encode the relative visual salience of each factor in human outfit evaluation, drawn from classical color theory and seasonal color-analysis practice encoded in the knowledge table: color harmony dominates first impressions (+3), silhouette/height-appropriate contrast is next most salient (+2), proportion-appropriate shading refines perceived fit (+1), and style/occasion context is least visually salient (+1). The values are expert-encoded from color-theory/styling rules (Charter \[R18\]), not learned from data.  
+  **Validation & testing of weights:** (a) deterministic unit/regression tests of the scoring function with fixed tag combinations and expected rankings; (b) sensitivity checks — perturbing each weight by ±1 shall not invert the top-1 ranking for canonical avatar profiles; (c) UAT in-app recommendation rating (Charter OBJ-05: ≥80% approval); (d) pre/post UAT confidence and return-intent ratings (Charter OBJ-06); (e) adviser/expert review of the knowledge table and weights at the M2 and M4 gates. Tests (a)–(b) are executed within Validation Algorithm Testing (WBS 1.4.2). If recommendations are judged poor or implausible during testing or UAT, the weights may be tuned in code as a normal development activity, with each tuned value and its rationale recorded in the weights-basis memo; only weight changes after the baseline freeze are baselined changes processed via the CCB (Charter §8).  
 * **FR-7.3 (Display Recommendations):** The system shall read and display the top-ranked items in the Recommendation Panel together with the specific tags and scores that produced each recommendation.  
 * **FR-7.4 (Recommendation Details):** The system shall allow users to read detailed match reasons for any recommended item, showing which rules fired and the points awarded.  
 * **FR-7.5 (Optional In-App Rating):** The system shall provide an optional in-app rating (like/dislike or 1–5) for recommended items and for the fit visualization, captured during UAT sessions to feed the user-based success measures (Charter OBJ-01, OBJ-05). When a Guest clicks the rating control, the system shall display a sign-up/login prompt; ratings shall be persisted only for Registered Users, and Guest ratings shall be aggregated anonymously per session and discarded with the session per FR-1.9. The rating shall never be required to complete core flows.
@@ -192,7 +178,7 @@ The recommendation engine is a deterministic, knowledge-based Heuristic Expert S
 ### **4.1 Performance Requirements**
 
 * **Response Time:** 95% of catalog, filtering, recommendation, and e-commerce API requests must return within 500 milliseconds under normal load, the accepted threshold for a "feels instant" user experience.  
-* **Canvas Rendering:** Overlay changes (switching a clothing item or view angle) shall render within 1 second on a mid-range laptop, keeping the virtual try-on experience fluid and avoiding perceived lag.  
+* **Canvas Rendering:** Overlay changes (switching a clothing item, switching view angle, or adjusting body proportions) shall render within 1 second on a mid-range laptop, keeping the virtual try-on experience fluid and avoiding perceived lag.  
 * **Page Load:** The initial application load shall complete within 3 seconds on a standard campus Wi-Fi connection, aligning with industry benchmarks that show users abandon pages that load beyond 3 seconds.  
 * **CSV Upload:** The system shall process a CSV upload of up to 10 items within 60 seconds, including automated background removal, validation, and image processing, keeping the Seller workflow snappy while 10 items represents a realistic bulk-upload size for an MVP catalog.
 
@@ -220,7 +206,7 @@ The recommendation engine is a deterministic, knowledge-based Heuristic Expert S
 
 ### **5.1 User Interfaces (UI)**
 
-High-level screens (details and layouts in the Figma wireframes – see Section 1.4): Login/Registration screen with role selection (User/Seller), Store Name input (for Sellers), and "Continue as Guest" option; Account Management screen (view/edit profile, delete account); Avatar Creator (gender, height, weight, skin-tone, undertone, body proportion inputs); Avatar Preset Management (list, edit, delete presets); Virtual Try-On Canvas with category switchers and Front/Side/Rear view toggle buttons; Outfit Management (list, load, edit, delete saved outfits); Catalog Browser with filters; per-seller Store page listing all items published by that Seller; Recommendation Panel (with visible match reasons per item); Shopping Cart (Registered Users only); Checkout UI with mock payment gateway; Order History (list and detail views); Seller Dashboard (CSV template download, CSV upload with labeled Front/Side/Rear image drop zones, listings management with edit/delete options, validation reports).
+High-level screens (details and layouts in the Figma wireframes – see Section 1.4): Login/Registration screen with role selection (User/Seller), Store Name input (for Sellers), and "Continue as Guest" option; Account Management screen (view/edit profile, delete account); Avatar Creator (gender, height, weight, skin-tone, undertone, body proportion inputs); Avatar Preset Management (list, edit, delete presets); Virtual Try-On Canvas with category switchers and Front/Rear view toggle buttons; Outfit Management (list, load, edit, delete saved outfits); Catalog Browser with filters; per-seller Store page listing all items published by that Seller; Recommendation Panel (with visible match reasons per item); Shopping Cart (Registered Users only); Checkout UI with mock payment gateway; Order History (list and detail views); Seller Dashboard (CSV template download, CSV upload with labeled Front/Rear image drop zones, listings management with edit/delete options, validation reports).
 
 ### **5.2 Software Interfaces**
 
