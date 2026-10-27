@@ -40,3 +40,8 @@ backend/backups/
 backend/rembg_cache/
 Backend/rembg_cache/
 rembg_cache/
+# Ignore leftover Standard avatar assets
+Frontend/public/Avatars/Female_Standard/
+Frontend/public/Avatars/Male_Standard/
+frontend/public/Avatars/Female_Standard/
+frontend/public/Avatars/Male_Standard/
