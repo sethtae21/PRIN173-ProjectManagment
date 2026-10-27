@@ -35,3 +35,8 @@ media/
 staticfiles/
 *.pyc
 backend/backups/
+
+# Repo hygiene: generated background-removal cache must not be tracked
+backend/rembg_cache/
+Backend/rembg_cache/
+rembg_cache/
