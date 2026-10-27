@@ -1,24 +1,24 @@
-﻿structure.txt
+structure.txt
 .gitignore
 FitFusionAI - SRS.md
 FitFusionAI-Project Charter.md
 FitFusionAI-Project Scope.md
-Frontend/fitfusion-web/src/App.css
-Frontend/src/assets/fitfusion-logo.svg
-Frontend/src/pages/CatalogPage.css
-Frontend/src/pages/CatalogPage.jsx
-Frontend/src/pages/GuestPage.css
-Frontend/src/pages/GuestPage.jsx
-Frontend/src/pages/LoginPage.css
-Frontend/src/pages/LoginPage.jsx
-Frontend/src/pages/ProductDetailsPage.css
-Frontend/src/pages/ProductDetailsPage.jsx
-Frontend/src/pages/SellerStorePage.css
-Frontend/src/pages/SellerStorePage.jsx
-Frontend/src/pages/ShopperDashboard.css
-Frontend/src/pages/ShopperDashboard.jsx
-Frontend/src/pages/SignupPage.css
-Frontend/src/pages/SignupPage.jsx
+frontend/fitfusion-web/src/App.css
+frontend/src/assets/fitfusion-logo.svg
+frontend/src/pages/CatalogPage.css
+frontend/src/pages/CatalogPage.jsx
+frontend/src/pages/GuestPage.css
+frontend/src/pages/GuestPage.jsx
+frontend/src/pages/LoginPage.css
+frontend/src/pages/LoginPage.jsx
+frontend/src/pages/ProductDetailsPage.css
+frontend/src/pages/ProductDetailsPage.jsx
+frontend/src/pages/SellerStorePage.css
+frontend/src/pages/SellerStorePage.jsx
+frontend/src/pages/ShopperDashboard.css
+frontend/src/pages/ShopperDashboard.jsx
+frontend/src/pages/SignupPage.css
+frontend/src/pages/SignupPage.jsx
 README.md
 backend/.env.example
 backend/README.md
