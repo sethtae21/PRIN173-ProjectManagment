@@ -3,8 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { catalogAPI } from "../../services/api";
 import "../css/EditSellerListingPage.css";
 
-const categories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Footwear", "Accessories"];
-const sizes = ["XS", "S", "M", "L", "XL", "XXL"];
+// FIX: category option values must match the backend choices exactly
+// (lowercase); "Accessories" removed — it is not a valid backend category.
+const categories = [
+  { value: "tops", label: "Tops" },
+  { value: "bottoms", label: "Bottoms" },
+  { value: "dresses", label: "Dresses" },
+  { value: "outerwear", label: "Outerwear" },
+  { value: "footwear", label: "Footwear" },
+];
 
 function EditSellerListingPage() {
   const navigate = useNavigate();
@@ -158,7 +165,7 @@ function EditSellerListingPage() {
     if (!formData.name.trim()) nextErrors.name = "Product name is required.";
     if (!formData.description.trim()) nextErrors.description = "Product description is required.";
     if (!formData.category) nextErrors.category = "Please select a category.";
-    if (!formData.size) nextErrors.size = "Please select a size.";
+    if (!formData.size) nextErrors.size = "Please enter a size.";
     if (!formData.color.trim()) nextErrors.color = "Product color is required.";
     const numericPrice = Number(formData.price);
     if (!formData.price || Number.isNaN(numericPrice) || numericPrice <= 0) {
@@ -183,7 +190,7 @@ function EditSellerListingPage() {
       formDataToSend.append("name", formData.name.trim());
       formDataToSend.append("description", formData.description.trim());
       formDataToSend.append("category", formData.category);
-      formDataToSend.append("size", formData.size);
+      formDataToSend.append("size", formData.size.trim());
       formDataToSend.append("color", formData.color.trim());
       formDataToSend.append("price", formData.price);
 
@@ -303,8 +310,8 @@ function EditSellerListingPage() {
               <select name="category" value={formData.category} onChange={handleInputChange}>
                 <option value="">Select category</option>
                 {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
+                  <option key={category.value} value={category.value}>
+                    {category.label}
                   </option>
                 ))}
               </select>
@@ -313,14 +320,14 @@ function EditSellerListingPage() {
 
             <label className="edit-listing-field">
               <span>Size</span>
-              <select name="size" value={formData.size} onChange={handleInputChange}>
-                <option value="">Select size</option>
-                {sizes.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                name="size"
+                value={formData.size}
+                onChange={handleInputChange}
+                placeholder="S, M, or L (or EU 40 / US 9 / UK 7 for footwear)"
+                required
+              />
               {errors.size && <small className="edit-field-error">{errors.size}</small>}
             </label>
           </div>

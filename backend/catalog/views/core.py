@@ -28,7 +28,7 @@ from drf_spectacular.types import OpenApiTypes
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
-# Size-label format rule (sellers input SML only; inch/cm rejected).
+# Size-label format rule (S/M/L only; footwear regional prefixes; cm rejected).
 from recommendations.knowledge_table import validate_size_label
 
 logger = logging.getLogger(__name__)
@@ -131,10 +131,11 @@ SELLER_IMAGE_GUIDELINES = (
     'the front image color automatically; you do not need to remove the background yourself.\n'
     'The Rear view must show the garment worn on a mannequin or hanging, photographed '
     'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
-    'SIZE RULE: enter standard size labels ONLY - XS, S, M, L, XL, or XXL. Do NOT type '
-    'cm measurements (e.g., "96 cm"); they are rejected automatically. The product '
-    'page displays the equivalent cm range bracket for standard sizes on its own. '
-    'Footwear uses regional shoe sizes (e.g., "US 9", "EU 40", "UK 8").\n'
+    'SIZE RULE: clothing sizes are S, M, or L ONLY - XS/XL/XXL and cm measurements '
+    '(e.g., "96 cm") are rejected automatically. The product page displays the cm '
+    'range bracket for standard sizes on its own. Footwear uses regional shoe sizes '
+    'with a region prefix (e.g., "US 9", "EU 40", "UK 7"); the product page shows the '
+    'EU, US and UK equivalents plus the EU-based cm foot-length bracket.\n'
     'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
 )
 
@@ -148,8 +149,10 @@ def build_catalog_template_csv():
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
             f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
             'Separate multiple tags with commas. '
-            'SIZE RULE: enter standard size labels ONLY (XS, S, M, L, XL, XXL) - cm measurements are rejected; '
-            'the product page shows the cm range bracket automatically. Footwear: regional sizes (e.g., "US 9", "EU 40").'
+            'SIZE RULE: clothing sizes are S, M, or L ONLY - cm measurements are rejected; '
+            'the product page shows the cm range bracket automatically. Footwear: regional '
+            'sizes with a region prefix (e.g., "US 9", "EU 40", "UK 7"); all three region '
+            'equivalents are displayed on the product page.'
         ),
         *([''] * (len(CATALOG_CSV_COLUMNS) - 1)),
     ])
@@ -383,7 +386,7 @@ class CatalogValidator:
         try:
             red, green, blue = (
                 int(dominant_hex[index:index + 2], 16) / 255
-                for index in (1, 3, 5)
+                for index in (0, 2, 4)
             )
             hsv = colorsys.rgb_to_hsv(red, green, blue)
         except (ValueError, TypeError):
@@ -509,12 +512,6 @@ def process_batch_background(batch_id):
                 for field_name, view_label in (
                     ('front_image', 'Front'), ('rear_image', 'Rear'),
                 )
-                if not getattr(getattr(item, field_name, None), 'name', None)
-            ]
-            missing_assets = [
-                view_label for field_name, view_label in (
-                    ('front_image', 'Front'), ('rear_image', 'Rear'),
-                )
                 if (str(item.id), field_name) not in futures
                 and not getattr(getattr(item, field_name, None), 'name', None)
             ]
@@ -560,7 +557,7 @@ def process_batch_background(batch_id):
         batch.completed_at = timezone.now()
         batch.save()
         print(f"🏁 BATCH {batch_id} PROCESSING COMPLETE")
-        print(f"⏱️  Total Time: {total_time:.2f} seconds")
+        print(f"️  Total Time: {total_time:.2f} seconds")
         print(f"📊 Accepted: {accepted_count} | Rejected: {rejected_count}")
         print(f"⚡ Average per item: {total_time/max(total_items,1):.2f} seconds")
         print(f"{'='*60}\n")
@@ -771,7 +768,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
     @extend_schema(
         summary="Manage a specific seller listing",
         description="GET details, PUT/PATCH update (with optional image replacement), or DELETE a specific catalog item.",
-        parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description='Item ID')],
+        parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description="Item ID")],
         responses={200: CatalogItemSerializer, 204: None, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
@@ -806,14 +803,14 @@ class CatalogViewSet(viewsets.ModelViewSet):
             replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
             for field in image_fields:
                 payload.pop(field, None)
-                
+
             original_status = item.status
-            
+
             serializer = CatalogItemSerializer(
                 item, data=payload, partial=request.method == 'PATCH'
             )
             serializer.is_valid(raise_exception=True)
-            
+
             # 1. PROCESS AND VALIDATE IMAGES FIRST
             validator = CatalogValidator()
             processed_images = {}
@@ -838,7 +835,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     )
                     if not orient_valid:
                         return Response({field: orient_msg}, status=status.HTTP_400_BAD_REQUEST)
-                        
+
             # 2. COLOR ALIGNMENT CHECK
             needs_color_check = (
                 'color_family' in serializer.validated_data
@@ -848,7 +845,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
             )
             proposed_color = serializer.validated_data.get('color', item.color)
             proposed_color_family = serializer.validated_data.get('color_family', item.color_family)
-            
+
             if needs_color_check:
                 front_image_bytes = processed_images.get('front_image')
                 if front_image_bytes:
@@ -859,7 +856,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     front_color = validator.extract_dominant_color(item.front_image)
                 else:
                     front_color = None
-                    
+
                 if front_color:
                     color_valid, color_message = validator.validate_color_alignment(
                         proposed_color, front_color
@@ -871,7 +868,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
             item.status = 'processing'
             item.rejection_reasons = []
             updated = serializer.save()
-            
+
             # Save new images to GridFS
             old_image_names = {
                 field: getattr(updated, field).name for field in processed_images
@@ -886,13 +883,13 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 old_name = old_image_names.get(field)
                 if old_name:
                     getattr(updated, field).storage.delete(old_name)
-                    
+
             # Generate palette tags if color check was performed
             if needs_color_check and 'front_color' in locals() and front_color:
                 updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
                     front_color, proposed_color_family
                 )
-                
+
             updated.status = 'active'
             updated.rejection_reasons = []
             updated.save()

@@ -63,38 +63,93 @@ PROPORTION_SHADING = {
 }
 
 # --- Size range table (display-only, expert-encoded) -------------------------
+# S/M/L STORE POLICY (KAN-FIX): the store stocks Small, Medium, Large ONLY.
 # Maps categorical sizes to standard unisex adult chest/body girth ranges in
 # CM so the UI can show "M (96-102 cm)". Display-only:
-# never stored, never scored. Sellers input SML labels ONLY (see
+# never stored, never scored. Sellers input S/M/L labels ONLY (see
 # validate_size_label); cm entries are rejected at upload/edit time.
 SIZE_RANGE_TABLE = {
-    'XS': {'cm': (76, 81)},
-    'S':  {'cm': (86, 91)},
-    'M':  {'cm': (96, 102)},
-    'L':  {'cm': (107, 112)},
-    'XL': {'cm': (117, 122)},
-    'XXL': {'cm': (127, 132)},
+    'S': {'cm': (86, 91)},
+    'M': {'cm': (96, 102)},
+    'L': {'cm': (107, 112)},
 }
 
+# --- Footwear regional size table (display-only, expert-encoded) ------------
+# One row per EU size with its US/UK equivalents and the EU-based foot-length
+# bracket in CM. BACKEND CM CALCULATION ALWAYS USES THE EU COLUMN: a US or UK
+# input is first resolved to its EU row, then the EU cm bracket is used.
+# The product page displays all three regional equivalents.
+# Approximation chart (whole sizes only): EU = US + 31, UK = US - 2.
+FOOTWEAR_SIZE_TABLE = (
+    # (eu, us, uk, foot-length cm)
+    (35, 4, 2, (22.0, 22.5)),
+    (36, 5, 3, (22.5, 23.0)),
+    (37, 6, 4, (23.0, 23.5)),
+    (38, 7, 5, (23.5, 24.0)),
+    (39, 8, 6, (24.0, 24.5)),
+    (40, 9, 7, (24.5, 25.0)),
+    (41, 10, 8, (25.0, 25.5)),
+    (42, 11, 9, (25.5, 26.0)),
+    (43, 12, 10, (26.0, 26.5)),
+    (44, 13, 11, (26.5, 27.0)),
+    (45, 14, 12, (27.0, 27.5)),
+    (46, 15, 13, (27.5, 28.0)),
+)
+
 # --- Size label validation (CSV upload + listing edits) ----------------------
-# Sellers must enter categorical labels only; measured sizes (e.g., "96 cm")
-# are rejected with a descriptive reason (FR-4.7-style report,
-# FR-4.8 display; supports OBJ-09 data quality). Footwear additionally accepts
-# regional shoe codes (US 9, EU 40, UK 8).
-CLOTHING_SIZE_OPTIONS = ('XS', 'S', 'M', 'L', 'XL', 'XXL')
-_FOOTWEAR_REGIONAL_RE = re.compile(r'^(?:US|EU|UK)?\s?\d{1,3}(?:\.\d+)?$', re.IGNORECASE)
+# S/M/L STORE POLICY: clothing labels are S, M, L only. Footwear additionally
+# accepts regional shoe codes WITH a region prefix (US 9, EU 40, UK 7); a bare
+# number ("40") is rejected because the region would be ambiguous.
+CLOTHING_SIZE_OPTIONS = ('S', 'M', 'L')
+_FOOTWEAR_REGIONAL_RE = re.compile(r'^(?:US|EU|UK)\s?\d{1,3}(?:\.\d+)?$', re.IGNORECASE)
 _MEASURED_RE = re.compile(
     r'\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)',
     re.IGNORECASE,
 )
 
 
+def _parse_regional(size_text):
+    """Return (prefix, number) for a prefixed regional code, else None."""
+    raw = str(size_text or '').strip()
+    if not _FOOTWEAR_REGIONAL_RE.match(raw):
+        return None
+    prefix = raw[:2].upper()
+    try:
+        return prefix, float(raw[2:].strip())
+    except ValueError:
+        return None
+
+
+def get_footwear_row(size_text):
+    """Find the FOOTWEAR_SIZE_TABLE row matching an EU/US/UK code, else None."""
+    parsed = _parse_regional(size_text)
+    if not parsed:
+        return None
+    prefix, number = parsed
+    index = {'EU': 0, 'US': 1, 'UK': 2}[prefix]
+    for row in FOOTWEAR_SIZE_TABLE:
+        if float(row[index]) == number:
+            return row
+    return None
+
+
+def get_footwear_equivalents(size_text):
+    """Return {'eu','us','uk','cm'} for a regional code, else None.
+    'cm' is ALWAYS the EU-based foot-length bracket."""
+    row = get_footwear_row(size_text)
+    if not row:
+        return None
+    eu, us, uk, cm = row
+    return {'eu': f"EU {eu}", 'us': f"US {us}", 'uk': f"UK {uk}", 'cm': cm}
+
+
 def validate_size_label(size_text, category=''):
     """
     Deterministic size-format rule. Returns (is_valid, error_message_or_None).
 
-    Clothing (tops/bottoms/dresses/outerwear): label must be XS-XXL.
-    Footwear: XS-XXL or a regional code (US 9, EU 40, UK 8).
+    Clothing (tops/bottoms/dresses/outerwear): label must be S, M, or L.
+    Footwear: S/M/L or a prefixed regional code in the supported table
+    (EU 35-46, US 4-15, UK 2-13, whole sizes).
     Any cm/measured entry is rejected for every category.
     Empty values pass here - presence is enforced by the required-field rule.
     """
@@ -116,11 +171,18 @@ def validate_size_label(size_text, category=''):
         )
 
     if cat == 'footwear':
-        if key in CLOTHING_SIZE_OPTIONS or _FOOTWEAR_REGIONAL_RE.match(key):
+        if key in CLOTHING_SIZE_OPTIONS:
             return True, None
+        if _FOOTWEAR_REGIONAL_RE.match(key):
+            if get_footwear_row(key) is not None:
+                return True, None
+            return False, (
+                f"Invalid size '{raw}'. Regional shoe sizes must be whole sizes in the "
+                f"supported range: EU 35-46, US 4-15, or UK 2-13."
+            )
         return False, (
-            f"Invalid size '{raw}'. Footwear sizes must be regional codes "
-            f"(e.g., US 9, EU 40, UK 8) or standard labels "
+            f"Invalid size '{raw}'. Footwear sizes must be regional codes with a region "
+            f"prefix (e.g., US 9, EU 40, UK 7) or standard labels "
             f"({', '.join(CLOTHING_SIZE_OPTIONS)}); cm measurements are not accepted."
         )
 
@@ -135,22 +197,34 @@ def validate_size_label(size_text, category=''):
 
 def get_size_ranges(size_text):
     """
-    Convert a categorical size label (XS-XXL) to its display ranges.
+    Convert a size label to its display ranges.
 
-    Returns {'label', 'cm'} or None for footwear / regional /
-    unknown sizes. Case- and whitespace-insensitive (" m " -> "M").
-    Display-only: never used for scoring or validation.
+    Clothing (S/M/L): {'label', 'cm', 'regions': None}.
+    Footwear regional: {'label', 'cm', 'regions'} where 'cm' is the EU-based
+    foot-length bracket and 'regions' is the triple display string
+    ("EU 40 · US 9 · UK 7").
+    Returns None for unknown sizes. Display-only: never scored, never stored.
     """
     if not size_text:
         return None
-    key = str(size_text).strip().upper()
-    entry = SIZE_RANGE_TABLE.get(key)
-    if not entry:
-        return None
-    return {
-        'label': key,
-        'cm': f"({entry['cm'][0]}-{entry['cm'][1]} cm)",
-    }
+    raw_key = str(size_text).strip().upper()
+
+    entry = SIZE_RANGE_TABLE.get(raw_key)
+    if entry:
+        return {
+            'label': raw_key,
+            'cm': f"({entry['cm'][0]}-{entry['cm'][1]} cm)",
+            'regions': None,
+        }
+
+    equiv = get_footwear_equivalents(raw_key)
+    if equiv:
+        return {
+            'label': raw_key,
+            'cm': f"({equiv['cm'][0]}-{equiv['cm'][1]} cm)",
+            'regions': f"{equiv['eu']} · {equiv['us']} · {equiv['uk']}",
+        }
+    return None
 
 
 # --- deterministic keyword inference (fallback when catalog lacks the tag) ---

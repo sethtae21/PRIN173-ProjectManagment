@@ -238,7 +238,8 @@ function CatalogPage({ isGuest = false }) {
           storeName: product.store_name,
           imageUrl: product.imageUrl,
           quantity: 1,
-          selectedSize: "M",
+          // FIX: carry the listing's real size instead of hardcoding "M"
+          selectedSize: product.size || "M",
           selectedColor: product.color || "Default",
           selected: true,
         });

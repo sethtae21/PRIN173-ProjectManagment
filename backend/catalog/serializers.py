@@ -14,6 +14,9 @@ class CatalogItemSerializer(serializers.ModelSerializer):
     # Computed at serialization time - NOT stored in MongoDB.
     # Gives the UI the cm bracket representation: "(96-102 cm)".
     size_cm = serializers.SerializerMethodField()
+    # Footwear only: the triple regional display string, e.g.
+    # "EU 40 · US 9 · UK 7". None for clothing sizes.
+    size_regions = serializers.SerializerMethodField()
 
     class Meta:
         model = CatalogItem
@@ -25,9 +28,13 @@ class CatalogItemSerializer(serializers.ModelSerializer):
         ranges = get_size_ranges(obj.size)
         return ranges['cm'] if ranges else None
 
+    def get_size_regions(self, obj):
+        ranges = get_size_ranges(obj.size)
+        return ranges['regions'] if ranges else None
+
     def validate_size(self, value):
-        """Sellers may only store categorical labels (footwear: regional codes).
-        Inch/cm entries are rejected on PUT/PATCH exactly as on CSV upload."""
+        """Sellers may only store S/M/L labels (footwear: prefixed regional
+        codes). Inch/cm entries are rejected on PUT/PATCH exactly as on CSV upload."""
         category = ''
         if isinstance(getattr(self, 'initial_data', None), dict):
             category = str(self.initial_data.get('category') or '').strip().lower()

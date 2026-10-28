@@ -79,7 +79,13 @@ function ProductDetailsPage({ isGuest = false }) {
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
             sellerName: data.store_name || "FitFusion Store",
             availableSize: data.size || "M",
-            sizeDisplay: `${data.size || "M"} ${data.size_cm ? data.size_cm : ""}`,
+            // SIZE POLICY: clothing shows "M (96-102 cm)"; footwear shows the
+            // triple regional string from size_regions, e.g.
+            // "EU 40 · US 9 · UK 7 (24.5-25.0 cm)" (cm always EU-based).
+            sizeDisplay: [
+              data.size_regions || data.size || "M",
+              data.size_cm || "",
+            ].filter(Boolean).join(" ").trim(),
           });
         }
       } catch (err) {
@@ -424,7 +430,7 @@ function ProductDetailsPage({ isGuest = false }) {
       {showRegistrationModal && (
         <div className="guest-product-modal-backdrop" onMouseDown={() => setShowRegistrationModal(false)}>
           <section className="guest-product-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
-            <button type="button" className="guest-product-close" onClick={() => setShowRegistrationModal(false)}>×</button>
+            <button className="guest-product-close" onClick={() => setShowRegistrationModal(false)}>×</button>
             <p>REGISTRATION REQUIRED</p>
             <h2>Create an account to continue</h2>
             <span>You need a registered shopper account to {restrictedFeature}.</span>
@@ -432,7 +438,7 @@ function ProductDetailsPage({ isGuest = false }) {
               <button type="button" onClick={() => navigate("/signup")}>Create Account</button>
               <button type="button" onClick={() => navigate("/login")}>Log In</button>
             </div>
-            <button type="button" className="guest-product-cancel" onClick={() => setShowRegistrationModal(false)}>Continue Browsing</button>
+            <button className="guest-product-cancel" onClick={() => setShowRegistrationModal(false)}>Continue Browsing</button>
           </section>
         </div>
       )}
