@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { API_URL, catalogAPI } from "../../services/api";
+import { API_URL, catalogAPI, validateSizeLabel } from "../../services/api";
 import "../css/SellerItemDetailsPage.css";
 
 function normalizeStatus(status) {

@@ -201,6 +201,9 @@ class CatalogValidator:
             category = 'dresses'
         if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
+        # SIZE RULE (S/M/L policy + prefixed footwear regional codes):
+        # CSV path enforcement point. The edit path enforces the SAME rule via
+        # CatalogItemSerializer.validate_size -> validate_size_label.
         size_valid, size_error = validate_size_label(row.get('size', ''), category)
         if not size_valid:
             errors.append(f"Row {row_number}: {size_error}")
@@ -384,8 +387,14 @@ class CatalogValidator:
         if not declared_colors:
             return True, 'Color alignment OK'
         try:
+            # FIX: dominant_hex arrives as '#rrggbb' — strip '#' before slicing,
+            # otherwise int('#f', 16) raises and every aligned color is rejected
+            # with "Invalid dominant color value".
+            digits = str(dominant_hex or '').lstrip('#')
+            if len(digits) < 6:
+                raise ValueError(f"short hex: {dominant_hex}")
             red, green, blue = (
-                int(dominant_hex[index:index + 2], 16) / 255
+                int(digits[index:index + 2], 16) / 255
                 for index in (0, 2, 4)
             )
             hsv = colorsys.rgb_to_hsv(red, green, blue)
@@ -557,7 +566,7 @@ def process_batch_background(batch_id):
         batch.completed_at = timezone.now()
         batch.save()
         print(f"🏁 BATCH {batch_id} PROCESSING COMPLETE")
-        print(f"️  Total Time: {total_time:.2f} seconds")
+        print(f"⏱️  Total Time: {total_time:.2f} seconds")
         print(f"📊 Accepted: {accepted_count} | Rejected: {rejected_count}")
         print(f"⚡ Average per item: {total_time/max(total_items,1):.2f} seconds")
         print(f"{'='*60}\n")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { catalogAPI } from "../../services/api";
+import { catalogAPI, validateSizeLabel } from "../../services/api";
 import "../css/EditSellerListingPage.css";
 
 // FIX: category option values must match the backend choices exactly

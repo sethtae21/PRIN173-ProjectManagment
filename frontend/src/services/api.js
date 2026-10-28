@@ -499,6 +499,45 @@ export const changePassword = (o, n, c) => authApi.changePassword(o, n, c);
 export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
 
 // ----------------------------------------------------------------------------
+// Size-label validation — client-side MIRROR of backend
+// recommendations/knowledge_table.py validate_size_label().
+// S/M/L-only clothing policy; footwear accepts prefixed regional codes
+// (EU/US/UK) within supported whole-size ranges. The backend remains the
+// authoritative gate (FR-4.7 report, FR-4.8 display); this gives sellers
+// instant feedback before the PATCH round-trip.
+// Traceability: SRS FR-4.1, FR-4.7, FR-4.8 | Scope WBS 1.3.5 | OBJ-09.
+// ----------------------------------------------------------------------------
+const _CLOTHING_SIZE_OPTIONS = ['S', 'M', 'L'];
+const _FOOTWEAR_REGIONAL_RE = /^(?:US|EU|UK)\s?(\d{1,3}(?:\.\d+)?)$/i;
+const _FOOTWEAR_RANGES = { EU: [35, 46], US: [4, 15], UK: [2, 13] };
+const _MEASURED_RE = /\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)/i;
+
+export function validateSizeLabel(sizeText, category = '') {
+  const raw = String(sizeText || '').trim();
+  const isFootwear = String(category).toLowerCase() === 'footwear';
+  if (!raw) return 'Size is required.';
+  if (_MEASURED_RE.test(raw)) {
+    return `Measured values like "${raw}" are not accepted. Use S, M, or L${
+      isFootwear ? ' or a regional shoe size (e.g., EU 40).' : '.'
+    }`;
+  }
+  const key = raw.toUpperCase();
+  if (_CLOTHING_SIZE_OPTIONS.includes(key)) return null;
+  if (isFootwear) {
+    const m = key.match(_FOOTWEAR_REGIONAL_RE);
+    if (m) {
+      const prefix = key.slice(0, 2);
+      const n = Number(m[1]);
+      const [lo, hi] = _FOOTWEAR_RANGES[prefix];
+      if (Number.isInteger(n) && n >= lo && n <= hi) return null;
+      return 'Regional shoe sizes must be whole sizes in the supported range: EU 35-46, US 4-15, or UK 2-13.';
+    }
+    return `Invalid size "${raw}". Footwear sizes need a region prefix (EU 40, US 9, UK 7) or S/M/L.`;
+  }
+  return `Invalid size "${raw}". Use standard clothing sizes only: S, M, L.`;
+}
+
+// ----------------------------------------------------------------------------
 // Catalog / Seller API — mirrors Backend/catalog/urls.py
 // ----------------------------------------------------------------------------
 export const catalogApi = {
@@ -665,6 +704,7 @@ export default {
   getCachedStoreItems, getCachedMyListings, getCachedListing, getCachedBatchReport,
   getCachedPresets, getCachedPreset, getCachedOutfits, getCachedOutfit,
   getCachedRecommendations, getCachedRatingSummary, getCachedMyRatings,
+  validateSizeLabel,
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,
   outfitsApi, outfitsAPI, cartApi, cartAPI, checkoutApi, checkoutAPI,
   ordersApi, ordersAPI, recommendationsApi, recommendationsAPI,
