@@ -26,7 +26,10 @@ class Cart(models.Model):
         db_table = 'accounts_cart'
 
     def __str__(self):
-        return f"Cart of {self.user.username}"
+        # KAN-FIX: the custom User model has NO username field (USERNAME_FIELD
+        # is email); str(cart) previously raised AttributeError anywhere Django
+        # stringified a Cart (admin, logs, debug pages).
+        return f"Cart of {self.user}"
 
 
 class CartItem(models.Model):
@@ -47,8 +50,6 @@ class Order(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
     # Human-readable order number, stored NOT NULL and unique.
-    # FIX: callable default stops `makemigrations` from prompting for a
-    # one-off value when this field is added to pre-existing rows.
     order_number = models.CharField(max_length=32, unique=True, editable=False, default=generate_order_number)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     recipient_name = models.CharField(max_length=255, blank=True)
@@ -73,7 +74,8 @@ class Order(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Order {self.order_number} - {self.user.username}"
+        # KAN-FIX: User has no username field; use the model's own __str__.
+        return f"Order {self.order_number} - {self.user}"
 
 
 class OrderItem(models.Model):

@@ -1,50 +1,82 @@
 """Serializers for shopping carts, checkout, and order history."""
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from rest_framework import serializers
 
 from catalog.models import CatalogItem
 from commerce.models import Cart, CartItem, Order, OrderItem
 
 
+def _safe_decimal(value, default=Decimal("0.00")):
+    """KAN-FIX: a catalog row with a missing/invalid price must never 500 the
+    cart (None * quantity previously raised TypeError in get_total_amount)."""
+    if value is None:
+        return default
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return default
+
+
+def _safe_quantity(value):
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _image_url(image_field):
+    """Best-effort image URL: NEVER let a storage quirk 500 the cart."""
     if not image_field:
         return None
     try:
         return image_field.url
-    except (ValueError, OSError):
+    except Exception:  # noqa: BLE001 - GridFS/storage errors must not crash carts
+        try:
+            name = getattr(image_field, "name", "") or ""
+            if name:
+                return f"{settings.MEDIA_URL}{str(name).lstrip('/')}"
+        except Exception:  # noqa: BLE001
+            return None
         return None
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    """Current catalog details for a cart entry."""
+    """Current catalog details for a cart entry.
+
+    KAN-FIX: the Side view was permanently removed, so CatalogItem has NO
+    side_image field. The old side_image_url attribute read raised
+    AttributeError on every cart render ("The cart was updated but could not
+    be rendered"). Side image is fully removed; remaining images are read via
+    getattr so a missing column degrades to null instead of crashing.
+    """
     id = serializers.CharField(read_only=True)
     catalog_item = serializers.CharField(source='item_id', read_only=True)
     name = serializers.CharField(source='item.name', read_only=True)
     store_name = serializers.CharField(source='item.store_name', read_only=True)
-    price = serializers.DecimalField(
-        source='item.price', max_digits=10, decimal_places=2, read_only=True
-    )
+    price = serializers.SerializerMethodField()
     front_image_url = serializers.SerializerMethodField()
-    side_image_url = serializers.SerializerMethodField()
     rear_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
         fields = (
             'id', 'catalog_item', 'name', 'store_name', 'price', 'quantity',
-            'front_image_url', 'side_image_url', 'rear_image_url',
+            'front_image_url', 'rear_image_url',
         )
         read_only_fields = fields
 
-    def get_front_image_url(self, obj):
-        return _image_url(obj.item.front_image)
+    def get_price(self, obj):
+        return str(_safe_decimal(getattr(obj.item, "price", None)))
 
-    def get_side_image_url(self, obj):
-        return _image_url(obj.item.side_image)
+    def get_front_image_url(self, obj):
+        return _image_url(getattr(obj.item, "front_image", None))
 
     def get_rear_image_url(self, obj):
-        return _image_url(obj.item.rear_image)
+        return _image_url(getattr(obj.item, "rear_image", None))
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -60,14 +92,19 @@ class CartSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_total_amount(self, obj):
+        # KAN-FIX: defensive arithmetic; None prices/quantities no longer raise.
         total = sum(
-            (entry.item.price * entry.quantity for entry in obj.items.all()),
-            Decimal('0.00'),
+            (
+                _safe_decimal(getattr(entry.item, "price", None))
+                * _safe_quantity(entry.quantity)
+                for entry in obj.items.all()
+            ),
+            Decimal("0.00"),
         )
         return total
 
     def get_item_count(self, obj):
-        return sum(entry.quantity for entry in obj.items.all())
+        return sum(_safe_quantity(entry.quantity) for entry in obj.items.all())
 
 
 class AddToCartSerializer(serializers.Serializer):
@@ -94,7 +131,7 @@ class RemoveSelectedCartItemsSerializer(serializers.Serializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    """Immutable item details captured when an order was placed."""
+    """Immutable item details captured at purchase time."""
     id = serializers.CharField(read_only=True)
     catalog_item = serializers.CharField(source='catalog_item_id', read_only=True, allow_null=True)
 
@@ -117,7 +154,6 @@ class CheckoutItemSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     """Read-only order representation, including purchase-time item snapshots."""
     id = serializers.CharField(read_only=True)
-    # NEW: expose the stored order number to the frontend
     order_number = serializers.CharField(read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
 

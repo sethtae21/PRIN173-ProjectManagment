@@ -271,11 +271,16 @@ export async function performJsonRequest(method, path, body, options = {}) {
     );
   }
 
+  // KAN-FIX: an expired access token is NOT a reportable error — it is the
+  // normal silent-refresh path. Refresh + retry FIRST, and only log/sign-out
+  // when recovery genuinely fails. Previously the browser's default 401 log
+  // made healthy requests look broken in the console.
   if (auth && response.status === 401 && !options._retry) {
     const refreshed = await tryRefreshAccessToken();
     if (refreshed) {
       return performJsonRequest(method, path, body, { ...options, _retry: true });
     }
+    console.warn(`${method} ${url} -> 401 and session refresh failed; signing out.`);
     clearSession();
     redirectToLogin();
   }

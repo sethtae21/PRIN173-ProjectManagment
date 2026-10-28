@@ -6,6 +6,7 @@ import "./css/AvatarPresetPage.css";
 
 // ======================================================
 // FITFUSION AI — AVATAR PRESETS (DB INTEGRATED)
+// UI-ONLY: Weight readouts replaced by derived Body Build.
 // ======================================================
 
 const ACTIVE_KEY = "fitfusion-avatar-preset";
@@ -31,12 +32,19 @@ const BUILT_IN_PRESET = {
   builtIn: true,
 };
 
-// FIX: Side view removed
 const VIEWS = ["front", "rear"];
 
-// ======================================================
-// STORAGE HELPERS (For active session cache only)
-// ======================================================
+// UI-ONLY body build derivation (matches Fitting Studio + Edit page).
+function calculateBodyType(height, weight) {
+  const meters = Number(height) / 100;
+  const mass = Number(weight);
+  if (!Number.isFinite(meters) || !Number.isFinite(mass) || meters <= 0 || mass <= 0) return "Balanced";
+  const index = mass / (meters * meters);
+  if (index < 18.5) return "Slim";
+  if (index < 25) return "Balanced";
+  if (index < 30) return "Full";
+  return "Curve";
+}
 
 function readJSON(storage, key, fallback = null) {
   try {
@@ -50,9 +58,13 @@ function readJSON(storage, key, fallback = null) {
 }
 
 function normalizeGender(value) {
-  return String(value || "").toLowerCase() === "male"
-    ? "Male"
-    : "Female";
+  return String(value || "").toLowerCase() === "male" ? "Male" : "Female";
+}
+
+function capitalizeChoice(value, fallback) {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function normalizePreset(preset, index = 0) {
@@ -65,13 +77,13 @@ function normalizePreset(preset, index = 0) {
     gender,
     height: Number(preset?.height) || 165,
     weight: Number(preset?.weight) || (gender === "Male" ? 70 : 58),
-    skinTone: preset?.skinTone || preset?.skinColor || "#d9aa82",
-    undertone: preset?.undertone || "Neutral",
-    shoulder: preset?.shoulder || preset?.shoulderWidth || "Average",
-    waist: preset?.waist || preset?.waistSize || "Average",
-    hip: preset?.hip || preset?.hipSize || "Average",
-    thigh: preset?.thigh || preset?.thighSize || "Average",
-    cupSize: gender === "Female" ? (preset?.cupSize || "B") : null,
+    skinTone: preset?.skinTone || preset?.skin_tone || preset?.skinColor || "#d9aa82",
+    undertone: capitalizeChoice(preset?.undertone, "Neutral"),
+    shoulder: capitalizeChoice(preset?.shoulder || preset?.shoulderWidth, "Average"),
+    waist: capitalizeChoice(preset?.waist || preset?.waistSize, "Average"),
+    hip: capitalizeChoice(preset?.hip || preset?.hipSize, "Average"),
+    thigh: capitalizeChoice(preset?.thigh || preset?.thighSize, "Average"),
+    cupSize: gender === "Female" ? capitalizeChoice(preset?.cupSize || preset?.cup_size, "B") : null,
     builtIn: false,
   };
 }
@@ -82,10 +94,6 @@ function getActivePresetId(isGuest) {
   const active = readJSON(storage, key);
   return active?.id ? String(active.id) : BUILT_IN_PRESET.id;
 }
-
-// ======================================================
-// AVATAR FIGURE
-// ======================================================
 
 function AvatarFigure({ preset, view = "front", small = false }) {
   return (
@@ -107,10 +115,6 @@ function Measurement({ label, value }) {
   );
 }
 
-// ======================================================
-// MAIN COMPONENT
-// ======================================================
-
 export default function AvatarPresetPage({ isGuest = false }) {
   const navigate = useNavigate();
   const basePath = isGuest ? "/guest" : "/shopper";
@@ -122,9 +126,6 @@ export default function AvatarPresetPage({ isGuest = false }) {
   const [toastMessage, setToastMessage] = useState("");
   const [loading, setLoading] = useState(!isGuest);
 
-  // ====================================================
-  // FETCH PRESETS FROM DATABASE
-  // ====================================================
   useEffect(() => {
     async function fetchPresets() {
       if (isGuest) {
@@ -134,7 +135,7 @@ export default function AvatarPresetPage({ isGuest = false }) {
       }
       try {
         const data = await presetsApi.list();
-        const list = Array.isArray(data) ? data : (data.results || []);
+        const list = Array.isArray(data) ? data : data.results || [];
         setCustomPresets(list.map(normalizePreset));
       } catch (err) {
         console.error("Failed to fetch presets from DB:", err);
@@ -145,8 +146,7 @@ export default function AvatarPresetPage({ isGuest = false }) {
     }
 
     fetchPresets();
-    
-    // Refresh when focusing back to tab
+
     window.addEventListener("focus", fetchPresets);
     return () => window.removeEventListener("focus", fetchPresets);
   }, [isGuest]);
@@ -157,10 +157,7 @@ export default function AvatarPresetPage({ isGuest = false }) {
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  const allPresets = useMemo(
-    () => [BUILT_IN_PRESET, ...customPresets],
-    [customPresets]
-  );
+  const allPresets = useMemo(() => [BUILT_IN_PRESET, ...customPresets], [customPresets]);
 
   const selectedPreset = useMemo(
     () => allPresets.find((preset) => String(preset.id) === String(selectedPresetId)) || BUILT_IN_PRESET,
@@ -179,7 +176,7 @@ export default function AvatarPresetPage({ isGuest = false }) {
     const activePreset = {
       ...preset,
       gender,
-      cupSize: gender === "Female" ? (preset.cupSize || "B") : null,
+      cupSize: gender === "Female" ? preset.cupSize || "B" : null,
     };
 
     if (isGuest) {
@@ -232,15 +229,12 @@ export default function AvatarPresetPage({ isGuest = false }) {
     setDeleteTarget(preset);
   }
 
-  // ====================================================
-  // DELETE PRESET FROM DATABASE
-  // ====================================================
   async function confirmDelete() {
     if (!deleteTarget || isGuest || deleteTarget.builtIn) return;
 
     try {
       await presetsApi.remove(deleteTarget.id);
-      
+
       setCustomPresets((prev) => prev.filter((p) => String(p.id) !== String(deleteTarget.id)));
 
       const active = readJSON(localStorage, ACTIVE_KEY);
@@ -300,41 +294,50 @@ export default function AvatarPresetPage({ isGuest = false }) {
 
             <div className="avatar-presets-grid">
               {loading && <p>Loading avatars...</p>}
-              {!loading && allPresets.map((preset) => {
-                const isSelected = String(selectedPreset.id) === String(preset.id);
-                const isActive = String(activePresetId) === String(preset.id);
+              {!loading &&
+                allPresets.map((preset) => {
+                  const isSelected = String(selectedPreset.id) === String(preset.id);
+                  const isActive = String(activePresetId) === String(preset.id);
+                  const build = calculateBodyType(preset.height, preset.weight);
 
-                return (
-                  <article key={preset.id} className={`avatar-preset-card ${isSelected ? "selected" : ""}`}>
-                    <button
-                      type="button"
-                      className="avatar-preset-select-area"
-                      aria-pressed={isSelected}
-                      onClick={() => selectPreset(preset)}
-                    >
-                      <div className="avatar-preset-card-image">
-                        <AvatarFigure preset={preset} view="front" small />
+                  return (
+                    <article key={preset.id} className={`avatar-preset-card ${isSelected ? "selected" : ""}`}>
+                      <button
+                        type="button"
+                        className="avatar-preset-select-area"
+                        aria-pressed={isSelected}
+                        onClick={() => selectPreset(preset)}
+                      >
+                        <div className="avatar-preset-card-image">
+                          <AvatarFigure preset={preset} view="front" small />
+                        </div>
+
+                        <div className="avatar-preset-card-badges">
+                          <span className="avatar-preset-type">{preset.builtIn ? "PREMADE" : "CUSTOM"}</span>
+                          {isActive && <span className="avatar-preset-active-tag">In Use</span>}
+                        </div>
+
+                        <strong>{preset.name}</strong>
+                        {/* UI-ONLY: weight replaced by Body Build */}
+                        <small>{preset.gender} • {preset.height} cm • {build}</small>
+                      </button>
+
+                      <div className="avatar-preset-card-actions">
+                        <button type="button" className="avatar-preset-card-use" onClick={() => usePreset(preset)}>
+                          Use
+                        </button>
+                        <button type="button" onClick={() => editPreset(preset)}>
+                          {preset.builtIn ? "Customize" : "Edit"}
+                        </button>
+                        {!preset.builtIn && !isGuest && (
+                          <button type="button" className="avatar-preset-delete" onClick={() => requestDelete(preset)}>
+                            Delete
+                          </button>
+                        )}
                       </div>
-
-                      <div className="avatar-preset-card-badges">
-                        <span className="avatar-preset-type">{preset.builtIn ? "PREMADE" : "CUSTOM"}</span>
-                        {isActive && <span className="avatar-preset-active-tag">In Use</span>}
-                      </div>
-
-                      <strong>{preset.name}</strong>
-                      <small>{preset.gender} • {preset.height} cm • {preset.weight} kg</small>
-                    </button>
-
-                    <div className="avatar-preset-card-actions">
-                      <button type="button" className="avatar-preset-card-use" onClick={() => usePreset(preset)}>Use</button>
-                      <button type="button" onClick={() => editPreset(preset)}>{preset.builtIn ? "Customize" : "Edit"}</button>
-                      {!preset.builtIn && !isGuest && (
-                        <button type="button" className="avatar-preset-delete" onClick={() => requestDelete(preset)}>Delete</button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                })}
             </div>
           </section>
 
@@ -369,7 +372,8 @@ export default function AvatarPresetPage({ isGuest = false }) {
             <div className="avatar-preset-measurements">
               <Measurement label="Gender" value={selectedPreset.gender} />
               <Measurement label="Height" value={`${selectedPreset.height} cm`} />
-              <Measurement label="Weight" value={`${selectedPreset.weight} kg`} />
+              {/* UI-ONLY: Weight row replaced by Body Build */}
+              <Measurement label="Body Build" value={calculateBodyType(selectedPreset.height, selectedPreset.weight)} />
               <Measurement label="Shoulders" value={selectedPreset.shoulder} />
               <Measurement label="Waist" value={selectedPreset.waist} />
               <Measurement label="Hips" value={selectedPreset.hip} />
@@ -388,12 +392,16 @@ export default function AvatarPresetPage({ isGuest = false }) {
             </div>
 
             <div className="avatar-preset-preview-actions">
-              <button type="button" className="avatar-preset-use-button" onClick={() => usePreset(selectedPreset)}>Use This Avatar</button>
+              <button type="button" className="avatar-preset-use-button" onClick={() => usePreset(selectedPreset)}>
+                Use This Avatar
+              </button>
               <button type="button" className="avatar-preset-edit-button" onClick={() => editPreset(selectedPreset)}>
                 {selectedPreset.builtIn ? "Customize Avatar" : "Edit Preset"}
               </button>
               {!selectedPreset.builtIn && !isGuest && (
-                <button type="button" className="avatar-preset-preview-delete" onClick={() => requestDelete(selectedPreset)}>Delete Preset</button>
+                <button type="button" className="avatar-preset-preview-delete" onClick={() => requestDelete(selectedPreset)}>
+                  Delete Preset
+                </button>
               )}
             </div>
           </aside>
@@ -401,7 +409,12 @@ export default function AvatarPresetPage({ isGuest = false }) {
       </div>
 
       {deleteTarget && !isGuest && (
-        <div className="avatar-preset-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteTarget(null); }}>
+        <div
+          className="avatar-preset-modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDeleteTarget(null);
+          }}
+        >
           <section className="avatar-preset-modal" role="dialog" aria-modal="true" aria-labelledby="delete-preset-title">
             <div className="avatar-preset-modal-icon">!</div>
             <p>DELETE AVATAR PRESET</p>

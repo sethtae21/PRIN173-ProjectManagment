@@ -27,13 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class MongoRetryMixin:
-    """Retry the whole dispatch once on transient MongoDB connection errors.
-
-    Atlas free-tier sockets can be reset after idle periods (WinError 10054 /
-    ServerSelectionTimeoutError), which otherwise surfaces as a 500 on the
-    FIRST request after idle. One immediate retry lets the driver reconnect
-    and serve the request normally.
-    """
+    """Retry once on transient MongoDB errors AND always answer in JSON."""
 
     def dispatch(self, request, *args, **kwargs):
         try:
@@ -46,6 +40,20 @@ class MongoRetryMixin:
             )
             return super().dispatch(request, *args, **kwargs)
 
+    def handle_exception(self, exc):
+        try:
+            return super().handle_exception(exc)
+        except Exception as inner:  # noqa: BLE001 - non-DRF exception
+            logger.exception(
+                "Unhandled server error on %s %s",
+                getattr(self.request, "method", "?"),
+                getattr(self.request, "path", "?"),
+            )
+            return Response(
+                {"detail": f"{type(inner).__name__}: {inner}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
     """Manage the authenticated user's one shopping cart."""
@@ -57,10 +65,27 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return Cart.objects.prefetch_related('items__item').get(pk=cart.pk)
 
+    def cart_response(self, status_code=status.HTTP_200_OK):
+        """Serialize the cart defensively; KAN-FIX: include the REAL exception
+        type/message in the JSON so the browser console names the cause."""
+        try:
+            return Response(self.get_serializer(self.get_cart()).data, status=status_code)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Cart mutated but serialization failed")
+            return Response(
+                {
+                    "detail": (
+                        "The cart was updated but could not be rendered "
+                        f"({type(exc).__name__}: {exc}). Please reload the cart page."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @extend_schema(responses=CartSerializer)
     def list(self, request):
         """Return the current user's cart, creating it when necessary."""
-        return Response(self.get_serializer(self.get_cart()).data)
+        return self.cart_response()
 
     @extend_schema(request=AddToCartSerializer, responses=CartSerializer)
     @action(detail=False, methods=('post',), url_path='add_item')
@@ -77,7 +102,7 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         if not created:
             cart_item.quantity += quantity
             cart_item.save(update_fields=('quantity',))
-        return Response(self.get_serializer(self.get_cart()).data, status=status.HTTP_200_OK)
+        return self.cart_response()
 
     @extend_schema(request=UpdateCartItemSerializer, responses=CartSerializer)
     @action(detail=False, methods=('patch', 'put'), url_path='update_quantity')
@@ -90,7 +115,7 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         cart_item = get_object_or_404(CartItem, cart=cart, item=item)
         cart_item.quantity = input_serializer.validated_data['quantity']
         cart_item.save(update_fields=('quantity',))
-        return Response(self.get_serializer(self.get_cart()).data)
+        return self.cart_response()
 
     @extend_schema(request=AddToCartSerializer, responses=CartSerializer)
     @action(detail=False, methods=('delete', 'post'), url_path='remove_item')
@@ -104,7 +129,7 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         CartItem.objects.filter(
             cart=cart, item=input_serializer.validated_data['catalog_item']
         ).delete()
-        return Response(self.get_serializer(self.get_cart()).data)
+        return self.cart_response()
 
     @extend_schema(request=RemoveSelectedCartItemsSerializer, responses=CartSerializer)
     @action(detail=False, methods=('post',), url_path='remove_selected')
@@ -117,7 +142,7 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
             cart=cart,
             item_id__in=input_serializer.validated_data['catalog_items'],
         ).delete()
-        return Response(self.get_serializer(self.get_cart()).data)
+        return self.cart_response()
 
     @extend_schema(request=None, responses=CartSerializer)
     @action(detail=False, methods=('delete', 'post'), url_path='clear')
@@ -125,7 +150,7 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         """Remove every item from the current user's cart."""
         cart = self.get_cart()
         cart.items.all().delete()
-        return Response(self.get_serializer(self.get_cart()).data)
+        return self.cart_response()
 
 
 class CheckoutView(MongoRetryMixin, APIView):
@@ -174,7 +199,10 @@ class CheckoutView(MongoRetryMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         total_amount = sum(
-            (entry.item.price * entry.quantity for entry in cart_items),
+            (
+                Decimal(str(entry.item.price or 0)) * int(entry.quantity or 0)
+                for entry in cart_items
+            ),
             Decimal('0.00'),
         )
         shipping_fee = Decimal('0.00') if total_amount >= Decimal('1500.00') else Decimal('80.00')

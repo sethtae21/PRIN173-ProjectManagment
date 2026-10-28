@@ -14,13 +14,11 @@ const categories = [
 ];
 
 // Size filter entries rendered inside the "Filter By" dropdown.
+// KAN-FIX: the store only stocks S, M, L — XS / XL / XXL removed.
 const SIZE_FILTERS = [
-  { value: "XS", label: "Size: Extra Small" },
   { value: "S", label: "Size: Small" },
   { value: "M", label: "Size: Medium" },
   { value: "L", label: "Size: Large" },
-  { value: "XL", label: "Size: Extra Large" },
-  { value: "XXL", label: "Size: XXL" },
 ];
 
 // Helper to construct image URLs exactly like the Seller page does
@@ -251,7 +249,13 @@ function CatalogPage({ isGuest = false }) {
       window.dispatchEvent(new Event("fitfusion-cart-updated"));
     } catch (error) {
       console.error("Failed to save cart item:", error);
-      setCartError("We couldn't add this item to your cart. Please try again.");
+      // ✅ FIX: Show the real server error reason instead of generic message.
+      const reason = error?.fieldMessages?.()?.[0] || error?.message || "";
+      setCartError(
+        reason
+          ? `We couldn't add this item to your cart. (${reason})`
+          : "We couldn't add this item to your cart. Please try again."
+      );
     } finally {
       setAddingToCart(false);
     }
