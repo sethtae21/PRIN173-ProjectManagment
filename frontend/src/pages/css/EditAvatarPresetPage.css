@@ -1,4 +1,3 @@
-
 /* =====================================================
    FITFUSION AI — EDIT AVATAR PRESET
    Complete Updated CSS
@@ -555,6 +554,7 @@
 
 .edit-avatar-range-heading span {
   color: #746b60;
+
   font-size: 10px;
 }
 
@@ -893,6 +893,7 @@
 }
 
 /* ===================== VIEW BUTTONS ===================== */
+/* FIX: Side view removed — 2 columns (Front / Rear) */
 
 .edit-avatar-view-buttons {
   display: grid;
@@ -900,7 +901,7 @@
   width: 100%;
 
   grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+    repeat(2, minmax(0, 1fr));
 
   gap: 8px;
   margin-bottom: 15px;

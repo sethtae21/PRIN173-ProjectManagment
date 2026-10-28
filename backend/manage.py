@@ -21,7 +21,9 @@ def main():
             "forget to activate a virtual environment?"
         ) from exc
     
-    # Execute command (Startup sweep is now safely handled in apps.py)
+    # Step 4: Run startup sweep before executing command
+    # Mark stale batches as failed
+  
     execute_from_command_line(sys.argv)
 
 

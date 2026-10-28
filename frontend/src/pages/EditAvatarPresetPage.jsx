@@ -1,16 +1,14 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
+import { presetsApi } from "../services/api";
 import "./css/EditAvatarPresetPage.css";
 
 // =====================================================
-// FITFUSION AI — EDIT AVATAR PRESET
+// FITFUSION AI — EDIT AVATAR PRESET (DB INTEGRATED)
 // Uses the existing shared ShopperLayout.
-// No separate sidebar or page header.
 // =====================================================
 
-const PRESETS_KEY = "fitfusion-avatar-presets";
 const ACTIVE_KEY = "fitfusion-avatar-preset";
 const GENDER_KEY = "fitfusion-avatar-gender";
 const EDITING_KEY = "fitfusion-editing-avatar-preset";
@@ -41,23 +39,12 @@ const SKIN_TONES = [
   "#603a28",
 ];
 
-const VIEWS = ["front", "side", "rear"];
+// FIX: Side view removed
+const VIEWS = ["front", "rear"];
 
 // =====================================================
-// STORAGE HELPERS
+// STORAGE HELPERS (session cache / handoff only)
 // =====================================================
-
-function readStorageArray(key) {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
-
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
 
 function readStorageObject(key) {
   try {
@@ -348,9 +335,7 @@ function Modal({
     <div
       className="edit-avatar-modal-backdrop"
       onMouseDown={(event) => {
-        if (
-          event.target === event.currentTarget
-        ) {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -374,10 +359,6 @@ function Modal({
 export default function EditAvatarPresetPage() {
   const navigate = useNavigate();
   const { presetId } = useParams();
-
-  // ---------------------------------------------------
-  // STATES
-  // ---------------------------------------------------
 
   const [formData, setFormData] = useState({
     ...DEFAULT_PRESET,
@@ -414,52 +395,66 @@ export default function EditAvatarPresetPage() {
   ] = useState(false);
 
   // ---------------------------------------------------
-  // LOAD SAVED AVATAR
+  // LOAD SAVED AVATAR FROM DATABASE
   // ---------------------------------------------------
 
   useEffect(() => {
+    let active = true;
+
     window.scrollTo(0, 0);
 
-    setLoading(true);
-    setNotFound(false);
+    async function loadPreset() {
+      setLoading(true);
+      setNotFound(false);
 
-    const presets = readStorageArray(
-      PRESETS_KEY
-    ).map(normalizePreset);
+      let selected = null;
 
-    let selected = presets.find(
-      (preset) =>
-        String(preset.id) === String(presetId)
-    );
+      try {
+        const record = await presetsApi.get(
+          presetId
+        );
 
-    if (!selected) {
-      const editing = readStorageObject(
-        EDITING_KEY
-      );
+        selected = record
+          ? normalizePreset(record)
+          : null;
+      } catch {
+        // Fallback: transient editing handoff cache
+        const editing = readStorageObject(
+          EDITING_KEY
+        );
 
-      if (
-        editing &&
-        String(
-          editing.id || editing.presetId
-        ) === String(presetId)
-      ) {
-        selected = normalizePreset(editing);
+        if (
+          editing &&
+          String(
+            editing.id || editing.presetId
+          ) === String(presetId)
+        ) {
+          selected = normalizePreset(editing);
+        }
       }
-    }
 
-    if (!selected || selected.builtIn) {
-      setNotFound(true);
+      if (!active) return;
+
+      if (!selected || selected.builtIn) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      setFormData(selected);
+      setOriginalPreset(selected);
+
+      setErrors({});
+      setPreviewView("front");
+
       setLoading(false);
-      return;
     }
 
-    setFormData(selected);
-    setOriginalPreset(selected);
+    loadPreset();
 
-    setErrors({});
-    setPreviewView("front");
-
-    setLoading(false);
+    return () => {
+      active = false;
+    };
   }, [presetId]);
 
   // ---------------------------------------------------
@@ -562,7 +557,8 @@ export default function EditAvatarPresetPage() {
   }
 
   // ---------------------------------------------------
-  // VALIDATION
+  // VALIDATION (format checks; duplicates checked
+  // against the database inside savePreset)
   // ---------------------------------------------------
 
   function validateForm() {
@@ -581,33 +577,12 @@ export default function EditAvatarPresetPage() {
     } else if (name.length > 50) {
       nextErrors.name =
         "Avatar name must not exceed 50 characters.";
-    } else {
-      const duplicate = readStorageArray(
-        PRESETS_KEY
-      ).some(
-        (preset) =>
-          String(preset.id) !==
-            String(formData.id) &&
-          String(
-            preset.name ||
-              preset.presetName ||
-              ""
-          )
-            .trim()
-            .toLowerCase() ===
-            name.toLowerCase()
-      );
-
-      if (
-        name.toLowerCase() ===
-        "fitfusion standard"
-      ) {
-        nextErrors.name =
-          "This name is reserved for the built-in avatar. Please choose another name.";
-      } else if (duplicate) {
-        nextErrors.name =
-          "Another saved avatar already uses this name. Please choose a unique name.";
-      }
+    } else if (
+      name.toLowerCase() ===
+      "fitfusion standard"
+    ) {
+      nextErrors.name =
+        "This name is reserved for the built-in avatar. Please choose another name.";
     }
 
     const height = Number(formData.height);
@@ -670,74 +645,14 @@ export default function EditAvatarPresetPage() {
 
       bodyType,
       builtIn: false,
-
-      updatedAt: new Date().toISOString(),
     };
   }
 
   // ---------------------------------------------------
-  // SAVE TO LOCAL STORAGE
+  // SAVE CHANGES TO DATABASE
   // ---------------------------------------------------
 
-  function persistPreset(updatedPreset) {
-    const presets = readStorageArray(
-      PRESETS_KEY
-    );
-
-    const existingIndex = presets.findIndex(
-      (preset) =>
-        String(preset.id) ===
-        String(updatedPreset.id)
-    );
-
-    const nextPresets = [...presets];
-
-    if (existingIndex >= 0) {
-      nextPresets[existingIndex] =
-        updatedPreset;
-    } else {
-      nextPresets.push(updatedPreset);
-    }
-
-    localStorage.setItem(
-      PRESETS_KEY,
-      JSON.stringify(nextPresets)
-    );
-
-    localStorage.setItem(
-      EDITING_KEY,
-      JSON.stringify(updatedPreset)
-    );
-
-    const activePreset = readStorageObject(
-      ACTIVE_KEY
-    );
-
-    if (
-      activePreset &&
-      String(activePreset.id) ===
-        String(updatedPreset.id)
-    ) {
-      localStorage.setItem(
-        ACTIVE_KEY,
-        JSON.stringify(updatedPreset)
-      );
-
-      localStorage.setItem(
-        GENDER_KEY,
-        updatedPreset.gender
-      );
-    }
-
-    setFormData(updatedPreset);
-    setOriginalPreset(updatedPreset);
-  }
-
-  // ---------------------------------------------------
-  // SAVE CHANGES
-  // ---------------------------------------------------
-
-  function savePreset(event) {
+  async function savePreset(event) {
     event?.preventDefault();
 
     if (!validateForm()) {
@@ -747,11 +662,76 @@ export default function EditAvatarPresetPage() {
       return;
     }
 
-    try {
-      const updatedPreset =
-        buildUpdatedPreset();
+    const name = formData.name.trim();
 
-      persistPreset(updatedPreset);
+    try {
+      // Duplicate-name check against the database
+      const existing = await presetsApi.list();
+
+      const list = Array.isArray(existing)
+        ? existing
+        : existing.results || [];
+
+      const duplicate = list.some(
+        (preset) =>
+          String(preset.id) !==
+            String(formData.id) &&
+          String(
+            preset.name || ""
+          )
+            .trim()
+            .toLowerCase() ===
+            name.toLowerCase()
+      );
+
+      if (duplicate) {
+        setErrors((current) => ({
+          ...current,
+          name:
+            "Another saved avatar already uses this name. Please choose a unique name.",
+        }));
+
+        setToastMessage(
+          "Please correct the highlighted fields before saving."
+        );
+        return;
+      }
+
+      const updatedPreset = buildUpdatedPreset();
+
+      await presetsApi.update(
+        updatedPreset.id,
+        updatedPreset
+      );
+
+      // Keep the local active-preset cache in sync
+      const activePreset = readStorageObject(
+        ACTIVE_KEY
+      );
+
+      if (
+        activePreset &&
+        String(activePreset.id) ===
+          String(updatedPreset.id)
+      ) {
+        localStorage.setItem(
+          ACTIVE_KEY,
+          JSON.stringify(updatedPreset)
+        );
+
+        localStorage.setItem(
+          GENDER_KEY,
+          updatedPreset.gender
+        );
+      }
+
+      localStorage.setItem(
+        EDITING_KEY,
+        JSON.stringify(updatedPreset)
+      );
+
+      setFormData(updatedPreset);
+      setOriginalPreset(updatedPreset);
 
       navigate("/shopper/avatar-presets");
     } catch (error) {
@@ -815,23 +795,12 @@ export default function EditAvatarPresetPage() {
   }
 
   // ---------------------------------------------------
-  // DELETE PRESET
+  // DELETE PRESET FROM DATABASE
   // ---------------------------------------------------
 
-  function confirmDelete() {
+  async function confirmDelete() {
     try {
-      const remaining = readStorageArray(
-        PRESETS_KEY
-      ).filter(
-        (preset) =>
-          String(preset.id) !==
-          String(formData.id)
-      );
-
-      localStorage.setItem(
-        PRESETS_KEY,
-        JSON.stringify(remaining)
-      );
+      await presetsApi.remove(formData.id);
 
       const activePreset = readStorageObject(
         ACTIVE_KEY
@@ -938,16 +907,9 @@ export default function EditAvatarPresetPage() {
   return (
     <main className="edit-avatar-page">
 
-      {/*
-        NO EXTRA HEADER.
-        ShopperLayout handles shared navigation.
-      */}
-
       <div className="edit-avatar-body">
 
-        {/* =========================================
-            PAGE TITLE
-        ========================================= */}
+        {/* PAGE TITLE */}
 
         <section className="edit-avatar-title-row">
           <div className="edit-avatar-title-copy">
@@ -964,8 +926,8 @@ export default function EditAvatarPresetPage() {
 
             <p>
               Customize your saved avatar and
-              review the changes using the Front,
-              Side, and Rear views.
+              review the changes using the Front
+              and Rear views.
             </p>
           </div>
 
@@ -983,15 +945,11 @@ export default function EditAvatarPresetPage() {
           </div>
         </section>
 
-        {/* =========================================
-            TWO-COLUMN WORKSPACE
-        ========================================= */}
+        {/* TWO-COLUMN WORKSPACE */}
 
         <section className="edit-avatar-workspace">
 
-          {/* =====================================
-              LEFT: AVATAR CUSTOMIZATION
-          ===================================== */}
+          {/* LEFT: AVATAR CUSTOMIZATION */}
 
           <form
             className="edit-avatar-form"
@@ -1341,9 +1299,7 @@ export default function EditAvatarPresetPage() {
             </div>
           </form>
 
-          {/* =====================================
-              RIGHT: LIVE AVATAR PREVIEW
-          ===================================== */}
+          {/* RIGHT: LIVE AVATAR PREVIEW */}
 
           <aside className="edit-avatar-preview-panel">
 
@@ -1360,7 +1316,7 @@ export default function EditAvatarPresetPage() {
               <span>{bodyType}</span>
             </div>
 
-            {/* FRONT / SIDE / REAR */}
+            {/* FRONT / REAR (Side removed) */}
 
             <div
               className="edit-avatar-view-buttons"
@@ -1487,9 +1443,7 @@ export default function EditAvatarPresetPage() {
         </section>
       </div>
 
-      {/* =========================================
-          DELETE CONFIRMATION
-      ========================================= */}
+      {/* DELETE CONFIRMATION */}
 
       {showDeleteModal && (
         <Modal
@@ -1512,9 +1466,9 @@ export default function EditAvatarPresetPage() {
 
           <span>
             This avatar preset will be
-            permanently removed. Your saved
-            outfits and previous orders will
-            not be deleted.
+            permanently removed from your account.
+            Your saved outfits and previous orders
+            will not be deleted.
           </span>
 
           <div className="edit-avatar-modal-actions">
@@ -1538,9 +1492,7 @@ export default function EditAvatarPresetPage() {
         </Modal>
       )}
 
-      {/* =========================================
-          DISCARD CONFIRMATION
-      ========================================= */}
+      {/* DISCARD CONFIRMATION */}
 
       {showDiscardModal && (
         <Modal
@@ -1592,9 +1544,7 @@ export default function EditAvatarPresetPage() {
         </Modal>
       )}
 
-      {/* =========================================
-          NOTIFICATION
-      ========================================= */}
+      {/* NOTIFICATION */}
 
       {toastMessage && (
         <div

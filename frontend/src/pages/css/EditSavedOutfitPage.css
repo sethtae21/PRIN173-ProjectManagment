@@ -1,4 +1,3 @@
-
 /* ==========================================
    FITFUSION AI — EDIT SAVED OUTFIT
    Gold / White / Black Theme
@@ -354,14 +353,15 @@
 }
 
 /* ==========================================
-   FRONT / SIDE / REAR BUTTONS
+   FRONT / REAR BUTTONS
+   (FIX: Side view removed — 2 columns)
    ========================================== */
 
 .edit-outfit-view-buttons {
   display: grid;
 
   grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+    repeat(2, minmax(0, 1fr));
 
   gap: 9px;
   margin-top: 16px;

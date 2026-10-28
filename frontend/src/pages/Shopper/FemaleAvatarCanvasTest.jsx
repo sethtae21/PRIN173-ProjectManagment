@@ -115,7 +115,10 @@ const catalogProducts = [
 
 const ROOT = "/Avatars/Female_avatar";
 const avatarPath = (letter, view) => `${ROOT}/Female_${letter}/female_${letter}_${view}.png`;
-const PRODUCT_VIEWS = ["front", "side", "rear"];
+
+// FIX: Side view removed — only Front and Rear remain
+const PRODUCT_VIEWS = ["front", "rear"];
+
 const DEFAULT_SHAPE = {
   shoulders: "Average", waist: "Average", hips: "Average", thighs: "Average", cup: "B",
 };
@@ -178,7 +181,7 @@ export default function FemaleAvatarCanvasTest() {
   const [quality, setQuality] = useState(512);
   const [showGrid, setShowGrid] = useState(false);
   const [compare, setCompare] = useState(false);
-  const [sideFacing, setSideFacing] = useState("left");
+  // FIX: sideFacing state removed together with the Side view
   const [loaded, setLoaded] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -249,8 +252,9 @@ export default function FemaleAvatarCanvasTest() {
       ctx.clearRect(0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
+      // FIX: sideFacing no longer passed to the lattice
       const mesh = makeLattice(W, H, bounds, {
-        view, heightCm, sideFacing,
+        view, heightCm,
         ...(compare ? DEFAULT_SHAPE : shape),
         strength: compare ? 0 : strength,
       });
@@ -260,12 +264,12 @@ export default function FemaleAvatarCanvasTest() {
       setDrawMs(performance.now() - start);
     });
     return () => cancelAnimationFrame(id);
-  }, [skin, bounds, cloth, W, H, heightCm, view, sideFacing, shape, strength, showGrid, compare]);
+  }, [skin, bounds, cloth, W, H, heightCm, view, shape, strength, showGrid, compare]);
 
   function resetAvatar() {
     setHeightCm(164); setWeightKg(85); setShape(DEFAULT_SHAPE);
     setTone("Original"); setUndertone("Neutral"); setStrength(1);
-    setSideFacing("left"); setShowGrid(false); setCompare(false);
+    setShowGrid(false); setCompare(false);
     selectProduct(null);
   }
 
@@ -318,7 +322,7 @@ export default function FemaleAvatarCanvasTest() {
           <SegmentControl label="Hips" options={BODY_OPTIONS.hips} value={shape.hips} onChange={(v) => changeShape("hips", v)} />
           <SegmentControl label="Thighs" options={BODY_OPTIONS.thighs} value={shape.thighs} onChange={(v) => changeShape("thighs", v)} />
           <SegmentControl label="Cup (prototype only)" options={BODY_OPTIONS.cup} value={shape.cup} onChange={(v) => changeShape("cup", v)} />
-          <p className="fc-tiny">Change just one region at a time. The head stays the same width when shoulders change. Side-view cups remain experimental; rendered variants may be needed.</p>
+          <p className="fc-tiny">Change just one region at a time. The head stays the same width when shoulders change. Cup deformation is prototype-only; rendered variants may be needed.</p>
 
           <h2>Skin color</h2>
           <div className="fc-selects">
@@ -339,13 +343,13 @@ export default function FemaleAvatarCanvasTest() {
             <button type="button" className="fc-gold-button" onClick={() => setCatalogOpen(true)}>Browse Catalog</button>
             {product && <button type="button" className="fc-outline" onClick={() => selectProduct(null)}>Remove outfit item</button>}
           </div>
-          {product && <p className="fc-warning">Catalog item selected: the test currently draws an illustrative {product.category.toLowerCase()} shape, because this catalog record has no registered Front/Side/Rear transparent garment PNGs. The shared lattice warps this placeholder with the avatar; real seller-photo alignment is still unverified.</p>}
+          {product && <p className="fc-warning">Catalog item selected: the test currently draws an illustrative {product.category.toLowerCase()} shape, because this catalog record has no registered Front/Rear transparent garment PNGs. The shared lattice warps this placeholder with the avatar; real seller-photo alignment is still unverified.</p>}
 
           <h2>Warp inspector</h2>
           <RangeControl label="Strength" min={0} max={1.5} step={0.05} value={strength} onChange={setStrength} unit="×" />
           <label className="fc-check"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Show {GRID_COLS}×{GRID_ROWS} deformation grid and labels</label>
           <label className="fc-check"><input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Pause body-part warp for comparison (height unchanged)</label>
-          {view === "side" && <label className="fc-select-block">Side camera orientation<select value={sideFacing} onChange={(e) => setSideFacing(e.target.value)}><option value="left">Facing left</option><option value="right">Facing right</option></select></label>}
+          {/* FIX: "Side camera orientation" select removed with the Side view */}
           <label className="fc-select-block">Preview resolution<select value={quality} onChange={(e) => setQuality(Number(e.target.value))}><option value={512}>512 × 1024 (fast)</option><option value={1024}>1024 × 2048 (full)</option></select></label>
           <p className="fc-tiny">Draw time excludes image downloads and interaction latency; target complete updates under one second on a mid-range laptop.</p>
         </section>

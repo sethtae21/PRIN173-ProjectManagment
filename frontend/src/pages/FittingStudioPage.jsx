@@ -1,7 +1,6 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../services/api";
+import { API_URL, presetsApi, outfitsApi } from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/FittingStudioPage.css";
@@ -43,8 +42,10 @@ const RECOMMENDED_ITEMS = [
   },
 ];
 
+// FIX: Side view removed — only Front and Rear remain.
+const STUDIO_VIEWS = ["Front", "Rear"];
+
 // Session data is temporary, including for registered shoppers.
-// Saved avatar presets remain independent from clothing previews.
 const STUDIO_SESSION_PREFIX =
   "fitfusion-fitting-studio-session-";
 
@@ -125,9 +126,9 @@ function normalizeStudioItem(item) {
     category: normalizeCategory(item.category),
     size: String(
       item.selectedSize ||
-      item.availableSize ||
-      item.size ||
-      "M"
+        item.availableSize ||
+        item.size ||
+        "M"
     ).toUpperCase(),
     color:
       item.selectedColor ||
@@ -143,7 +144,6 @@ function normalizeStudioItem(item) {
 }
 
 // Only use explicit fitting limits supplied by a seller.
-// A size label such as "S" is not a reliable weight limit.
 function sizeRecordFor(item) {
   const source =
     item.fit_limits ||
@@ -364,18 +364,6 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
-function readStoredArray(key) {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
-
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
 function readAuthState() {
   if (!localStorage.getItem("access_token")) {
     return null;
@@ -487,11 +475,16 @@ function FittingStudioPage({
   const [
     currentView,
     setCurrentView,
-  ] = useState(
-    () =>
+  ] = useState(() => {
+    const stored =
       readStudioSession(isGuest)?.currentView ||
-      "Front"
-  );
+      "Front";
+
+    // FIX: legacy "Side" sessions fall back to Front
+    return STUDIO_VIEWS.includes(stored)
+      ? stored
+      : "Front";
+  });
 
   const [
     activePanel,
@@ -845,7 +838,7 @@ function FittingStudioPage({
   }
 
   // =====================================
-  // SAVE AVATAR PRESET
+  // SAVE AVATAR PRESET (DATABASE)
   // =====================================
 
   function handleSavePreset() {
@@ -865,7 +858,7 @@ function FittingStudioPage({
     setAvatarPresetNameError("");
   }
 
-  function confirmSaveAvatarPreset(event) {
+  async function confirmSaveAvatarPreset(event) {
     event.preventDefault();
 
     if (isGuest) {
@@ -892,62 +885,61 @@ function FittingStudioPage({
       return;
     }
 
-    const savedPresets = readStoredArray(
-      "fitfusion-avatar-presets"
-    );
-
-    const isDuplicate =
-      name.toLowerCase() ===
-        "fitfusion standard" ||
-      savedPresets.some(
-        (preset) =>
-          String(preset.name || "")
-            .trim()
-            .toLowerCase() ===
-          name.toLowerCase()
-      );
-
-    if (isDuplicate) {
-      setAvatarPresetNameError(
-        "This preset name already exists. Please choose another name."
-      );
-      return;
-    }
-
-    const newPreset = {
-      ...avatar,
-      id: `avatar-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 7)}`,
-      name,
-      gender: normalizeGender(
-        avatar.gender
-      ),
-      cupSize: isFemale
-        ? avatar.cupSize
-        : null,
-      builtIn: false,
-      updatedAt:
-        new Date().toISOString(),
-    };
-
     try {
+      // Duplicate check against the database
+      const existing = await presetsApi.list();
+      const savedPresets = Array.isArray(existing)
+        ? existing
+        : existing.results || [];
+
+      const isDuplicate =
+        name.toLowerCase() ===
+          "fitfusion standard" ||
+        savedPresets.some(
+          (preset) =>
+            String(preset.name || "")
+              .trim()
+              .toLowerCase() ===
+            name.toLowerCase()
+        );
+
+      if (isDuplicate) {
+        setAvatarPresetNameError(
+          "This preset name already exists. Please choose another name."
+        );
+        return;
+      }
+
+      const newPreset = {
+        ...avatar,
+        name,
+        gender: normalizeGender(
+          avatar.gender
+        ),
+        cupSize: isFemale
+          ? avatar.cupSize
+          : null,
+        builtIn: false,
+      };
+
+      const created = await presetsApi.create(
+        newPreset
+      );
+
+      // Keep the local "active preset" cache in sync
       localStorage.setItem(
         "fitfusion-avatar-presets",
-        JSON.stringify([
-          newPreset,
-          ...savedPresets,
-        ])
+        JSON.stringify([created])
       );
 
       localStorage.setItem(
         "fitfusion-avatar-preset",
-        JSON.stringify(newPreset)
+        JSON.stringify(created)
       );
 
       localStorage.setItem(
         "fitfusion-avatar-gender",
-        newPreset.gender
+        created.gender
       );
 
       closeSaveAvatarModal();
@@ -1057,7 +1049,7 @@ function FittingStudioPage({
   }
 
   // =====================================
-  // SAVE OUTFIT
+  // SAVE OUTFIT (DATABASE)
   // =====================================
 
   function saveOutfit() {
@@ -1086,7 +1078,7 @@ function FittingStudioPage({
     setOutfitNameError("");
   }
 
-  function confirmSaveOutfit(event) {
+  async function confirmSaveOutfit(event) {
     event.preventDefault();
 
     const trimmedName =
@@ -1106,11 +1098,6 @@ function FittingStudioPage({
       return;
     }
 
-    const savedOutfits =
-      readStoredArray(
-        "fitfusion-saved-outfits"
-      );
-
     const savedProducts =
       equippedItemsArray.map((item) => ({
         id: item.id,
@@ -1125,7 +1112,6 @@ function FittingStudioPage({
       }));
 
     const newOutfit = {
-      id: `outfit-${Date.now()}`,
       name: trimmedName,
       occasion: "Casual",
       description: "",
@@ -1140,20 +1126,18 @@ function FittingStudioPage({
       },
       products: savedProducts,
       items: equippedItemsArray,
-      createdAt:
-        new Date().toISOString(),
     };
 
     try {
-      localStorage.setItem(
-        "fitfusion-saved-outfits",
-        JSON.stringify([
-          newOutfit,
-          ...savedOutfits,
-        ])
-      );
+      await outfitsApi.create(newOutfit);
 
       closeSaveOutfitModal();
+
+      window.dispatchEvent(
+        new Event(
+          "fitfusion-outfits-updated"
+        )
+      );
 
       displayNotification(
         `"${trimmedName}" was saved successfully!`
@@ -1220,8 +1204,8 @@ function FittingStudioPage({
 
             <span>
               Customize your avatar and
-              switch between Front, Side,
-              and Rear views.
+              switch between Front and Rear
+              views.
 
               {isGuest &&
                 " Your changes are temporary and will be removed when the guest session ends."}
@@ -1305,7 +1289,7 @@ function FittingStudioPage({
                   </strong>
                 </div>
 
-                {/* EXISTING HEIGHT AND WEIGHT SLIDERS */}
+                {/* HEIGHT AND WEIGHT SLIDERS */}
 
                 <div className="studio-measurement-grid">
                   <div className="studio-slider-field">
@@ -1430,8 +1414,7 @@ function FittingStudioPage({
                       padding: "12px",
                       borderRadius: "10px",
                       background: "#fff9e9",
-                      border:
-                        "1px solid #e6d8ac",
+                      border: "1px solid #e6d8ac",
                       color: "#675328",
                       fontSize: "12px",
                       lineHeight: 1.5,
@@ -1757,12 +1740,9 @@ function FittingStudioPage({
           {/* AVATAR PREVIEW — CANVAS 2D */}
 
           <section className="studio-avatar-card">
+            {/* FIX: Side view removed */}
             <div className="studio-view-buttons">
-              {[
-                "Front",
-                "Side",
-                "Rear",
-              ].map((view) => (
+              {STUDIO_VIEWS.map((view) => (
                 <button
                   key={view}
                   type="button"
@@ -1910,8 +1890,6 @@ function FittingStudioPage({
                                     "3px",
                                   cursor:
                                     "pointer",
-                                  font:
-                                    "inherit",
                                   fontWeight:
                                     "inherit",
                                   textAlign:

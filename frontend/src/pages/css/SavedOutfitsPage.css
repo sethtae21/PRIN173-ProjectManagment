@@ -1,4 +1,3 @@
-
 /* FITFUSION AI — SAVED OUTFITS */
 /* GOLD / WHITE / BLACK */
 
@@ -326,7 +325,7 @@
   object-fit: contain;
 }
 
-/* FRONT / SIDE / REAR */
+/* FRONT / REAR (FIX: Side view removed) */
 
 .saved-outfit-view-buttons {
   position: absolute;

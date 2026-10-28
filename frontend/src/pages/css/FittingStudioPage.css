@@ -519,9 +519,10 @@
   padding: 24px;
 }
 
+/* FIX: Side view removed — 2 columns (Front / Rear) */
 .studio-view-buttons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 9px;
 }
 
@@ -599,6 +600,7 @@
 /* ==========================================
    EXISTING AVATAR BODY
    Preserved for integration compatibility
+   (FIX: dead .studio-avatar.side rules removed)
 ========================================== */
 
 .studio-avatar {
@@ -610,10 +612,6 @@
   width: 210px;
   height: 445px;
   transition: transform 0.2s ease;
-}
-
-.studio-avatar.side {
-  transform: scaleX(0.72);
 }
 
 .studio-avatar-head {
@@ -1413,12 +1411,9 @@
   overflow: hidden;
 }
 
-/* The PNG already contains its Side view.
-   Do not squash it a second time. */
-
-.studio-avatar.side {
-  transform: none;
-}
+/* FIX: The legacy ".studio-avatar.side" override
+   (and its "do not squash" comment) was removed
+   together with the Side view. */
 
 .studio-avatar-image,
 .studio-avatar-color {

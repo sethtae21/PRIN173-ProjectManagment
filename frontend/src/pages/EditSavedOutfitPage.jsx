@@ -1,14 +1,13 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
+import { outfitsApi, cartApi } from "../services/api";
 import "./css/EditSavedOutfitPage.css";
 
-const OUTFITS_KEY = "fitfusion-saved-outfits";
-const CART_KEY = "fitfusion-cart";
 const EDITING_KEY = "fitfusion-editing-outfit";
 
-const VIEWS = ["front", "side", "rear"];
+// FIX: Side view removed. Legacy "side" values normalize to "front".
+const VIEWS = ["front", "rear"];
 
 const OCCASIONS = [
   "Casual",
@@ -43,18 +42,6 @@ const DEFAULT_AVATAR = {
   thigh: "Average",
   cupSize: "B",
 };
-
-function readArray(key) {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
-
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
 
 function normalizeProduct(item, index) {
   if (!item || typeof item !== "object") {
@@ -166,6 +153,7 @@ function normalizeOutfit(raw) {
         ""
     ),
 
+    // Legacy "side" outfits safely fall back to "front"
     avatarView: VIEWS.includes(requestedView)
       ? requestedView
       : "front",
@@ -189,18 +177,6 @@ function normalizeOutfit(raw) {
       .map(normalizeProduct)
       .filter(Boolean),
   };
-}
-
-function getCartCount() {
-  return readArray(CART_KEY).reduce(
-    (sum, item) =>
-      sum +
-      Math.max(
-        1,
-        Number(item.quantity) || 1
-      ),
-    0
-  );
 }
 
 function getSlot(item) {
@@ -296,85 +272,118 @@ export default function EditSavedOutfitPage() {
     useState("front");
 
   const [cartCount, setCartCount] =
-    useState(getCartCount);
+    useState(0);
 
-  const [errors, setErrors] =
-    useState({});
+  const [errors, setErrors] = useState({});
 
   const [modal, setModal] =
     useState(null);
 
-  const [notice, setNotice] =
-    useState("");
+  const [notice, setNotice] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
   // ============================================
-  // LOAD SAVED OUTFIT
+  // LOAD SAVED OUTFIT FROM DATABASE
   // ============================================
 
   useEffect(() => {
-    const stored = readArray(OUTFITS_KEY);
+    let active = true;
 
-    const found = stored.find(
-      (item) =>
-        String(
-          item.id || item.outfitId
-        ) === String(outfitId)
-    );
+    async function loadOutfit() {
+      setLoading(true);
 
-    const resolved = found
-      ? normalizeOutfit(found)
-      : null;
+      try {
+        const found = await outfitsApi.get(
+          outfitId
+        );
 
-    setOutfit(resolved);
+        const resolved = found
+          ? normalizeOutfit(found)
+          : null;
 
-    setOriginal(
-      resolved
-        ? structuredClone(resolved)
-        : null
-    );
+        if (!active) return;
 
-    setView(
-      resolved?.avatarView || "front"
-    );
+        setOutfit(resolved);
 
-    setErrors({});
-    setNotice("");
-    setLoading(false);
+        setOriginal(
+          resolved
+            ? structuredClone(resolved)
+            : null
+        );
 
-    window.scrollTo(0, 0);
+        setView(
+          resolved?.avatarView || "front"
+        );
+      } catch (error) {
+        console.error(
+          "Unable to load outfit:",
+          error
+        );
+
+        if (active) {
+          setOutfit(null);
+          setOriginal(null);
+        }
+      } finally {
+        if (active) {
+          setErrors({});
+          setNotice("");
+          setLoading(false);
+          window.scrollTo(0, 0);
+        }
+      }
+    }
+
+    loadOutfit();
+
+    return () => {
+      active = false;
+    };
   }, [outfitId]);
 
   // ============================================
-  // CART COUNT
+  // CART COUNT FROM DATABASE
   // ============================================
 
   useEffect(() => {
-    const update = () => {
-      setCartCount(getCartCount());
-    };
+    let active = true;
 
-    window.addEventListener(
-      "storage",
-      update
-    );
+    async function refreshCartCount() {
+      try {
+        const cart = await cartApi.get();
+
+        const items = cart?.items || [];
+
+        const count = items.reduce(
+          (sum, item) =>
+            sum +
+            Math.max(
+              1,
+              Number(item.quantity) || 1
+            ),
+          0
+        );
+
+        if (active) setCartCount(count);
+      } catch {
+        if (active) setCartCount(0);
+      }
+    }
+
+    refreshCartCount();
 
     window.addEventListener(
       "fitfusion-cart-updated",
-      update
+      refreshCartCount
     );
 
     return () => {
-      window.removeEventListener(
-        "storage",
-        update
-      );
+      active = false;
 
       window.removeEventListener(
         "fitfusion-cart-updated",
-        update
+        refreshCartCount
       );
     };
   }, []);
@@ -532,28 +541,6 @@ export default function EditSavedOutfitPage() {
         "Add at least one garment before saving.";
     }
 
-    const duplicate = readArray(
-      OUTFITS_KEY
-    ).some(
-      (item) =>
-        String(
-          item.id || item.outfitId
-        ) !== outfit.id &&
-        String(
-          item.name ||
-            item.outfitName ||
-            ""
-        )
-          .trim()
-          .toLowerCase() ===
-          trimmedName.toLowerCase()
-    );
-
-    if (duplicate) {
-      next.name =
-        "An outfit with this name already exists.";
-    }
-
     setErrors(next);
 
     return (
@@ -562,10 +549,10 @@ export default function EditSavedOutfitPage() {
   }
 
   // ============================================
-  // SAVE CHANGES
+  // SAVE CHANGES TO DATABASE
   // ============================================
 
-  function saveOutfit() {
+  async function saveOutfit() {
     if (!outfit || !validate()) {
       setNotice(
         "Please correct the highlighted fields."
@@ -574,57 +561,67 @@ export default function EditSavedOutfitPage() {
       return;
     }
 
-    const updatedProducts =
-      outfit.products.map((item) => ({
-        ...item,
-        selectedSize: item.size,
-      }));
-
-    const nextOutfit = {
-      ...outfit,
-
-      name: outfit.name.trim(),
-
-      description:
-        outfit.description.trim(),
-
-      avatarView: view,
-
-      products: updatedProducts,
-
-      items: updatedProducts.map(
-        (item) => ({ ...item })
-      ),
-
-      updatedAt:
-        new Date().toISOString(),
-    };
+    const trimmedName = outfit.name.trim();
 
     try {
-      const all = readArray(
-        OUTFITS_KEY
-      );
+      // Duplicate name check against database
+      const all = await outfitsApi.list();
 
-      const index = all.findIndex(
+      const list = Array.isArray(all)
+        ? all
+        : all.results || [];
+
+      const duplicate = list.some(
         (item) =>
+          String(item.id) !== outfit.id &&
           String(
-            item.id || item.outfitId
-          ) === outfit.id
+            item.name || ""
+          )
+            .trim()
+            .toLowerCase() ===
+            trimmedName.toLowerCase()
       );
 
-      if (index === -1) {
+      if (duplicate) {
+        setErrors((current) => ({
+          ...current,
+          name:
+            "An outfit with this name already exists.",
+        }));
+
         setNotice(
-          "This outfit no longer exists in your saved collection."
+          "Please correct the highlighted fields."
         );
 
         return;
       }
 
-      all[index] = nextOutfit;
+      const updatedProducts =
+        outfit.products.map((item) => ({
+          ...item,
+          selectedSize: item.size,
+        }));
 
-      localStorage.setItem(
-        OUTFITS_KEY,
-        JSON.stringify(all)
+      const nextOutfit = {
+        ...outfit,
+
+        name: trimmedName,
+
+        description:
+          outfit.description.trim(),
+
+        avatarView: view,
+
+        products: updatedProducts,
+
+        items: updatedProducts.map(
+          (item) => ({ ...item })
+        ),
+      };
+
+      await outfitsApi.update(
+        outfit.id,
+        nextOutfit
       );
 
       localStorage.removeItem(
@@ -648,28 +645,16 @@ export default function EditSavedOutfitPage() {
   }
 
   // ============================================
-  // DELETE OUTFIT
+  // DELETE OUTFIT FROM DATABASE
   // ============================================
 
-  function deleteOutfit() {
+  async function deleteOutfit() {
     if (!outfit) {
       return;
     }
 
     try {
-      const remaining = readArray(
-        OUTFITS_KEY
-      ).filter(
-        (item) =>
-          String(
-            item.id || item.outfitId
-          ) !== outfit.id
-      );
-
-      localStorage.setItem(
-        OUTFITS_KEY,
-        JSON.stringify(remaining)
-      );
+      await outfitsApi.remove(outfit.id);
 
       localStorage.removeItem(
         EDITING_KEY
@@ -905,7 +890,7 @@ export default function EditSavedOutfitPage() {
               />
             </div>
 
-            {/* FRONT / SIDE / REAR */}
+            {/* FRONT / REAR (Side removed) */}
 
             <div
               className="edit-outfit-view-buttons"

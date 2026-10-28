@@ -1,4 +1,3 @@
-
 import {
   useEffect,
   useMemo,
@@ -123,8 +122,6 @@ function prepareAvatar(image) {
       HEIGHT
   );
 
-  // Leave enough space for a heavier
-  // avatar to expand horizontally.
   const targetHeight =
     HEIGHT * 0.72;
 
@@ -242,10 +239,6 @@ export default function AvatarCanvas({
     setError,
   ] = useState("");
 
-  // ========================================
-  // GENDER
-  // ========================================
-
   const gender =
     String(
       avatar?.gender
@@ -253,17 +246,13 @@ export default function AvatarCanvas({
       ? "male"
       : "female";
 
-  // ========================================
-  // VIEW
-  // ========================================
-
   const requestedView = String(
     view
   ).toLowerCase();
 
+  // FIX: Removed "side" from accepted views
   const angle = [
     "front",
-    "side",
     "rear",
   ].includes(requestedView)
     ? requestedView
@@ -273,10 +262,6 @@ export default function AvatarCanvas({
     gender,
     angle
   );
-
-  // ========================================
-  // LOAD AVATAR IMAGE
-  // ========================================
 
   useEffect(() => {
     let active = true;
@@ -311,10 +296,6 @@ export default function AvatarCanvas({
     };
   }, [path]);
 
-  // ========================================
-  // PREPARE BLENDER IMAGE
-  // ========================================
-
   const source = useMemo(() => {
     if (!imageState?.image) {
       return null;
@@ -325,19 +306,11 @@ export default function AvatarCanvas({
     );
   }, [imageState]);
 
-  // ========================================
-  // DETECT BODY BOUNDS
-  // ========================================
-
   const bounds = useMemo(() => {
     return detectBodyBounds(
       source
     );
   }, [source]);
-
-  // ========================================
-  // APPLY SKIN TONE
-  // ========================================
 
   const skin = useMemo(() => {
     if (!source) {
@@ -356,10 +329,6 @@ export default function AvatarCanvas({
     avatar?.skinTone,
     avatar?.undertone,
   ]);
-
-  // ========================================
-  // PREPARE CLOTHING
-  // ========================================
 
   const garments = useMemo(() => {
     if (!bounds) {
@@ -399,10 +368,6 @@ export default function AvatarCanvas({
     angle,
   ]);
 
-  // ========================================
-  // CANVAS RENDERING
-  // ========================================
-
   useEffect(() => {
     const canvas =
       canvasRef.current;
@@ -439,10 +404,6 @@ export default function AvatarCanvas({
         if (!active) return;
 
         try {
-          // ================================
-          // AVATAR CONFIGURATION
-          // ================================
-
           const config = {
             gender,
 
@@ -485,13 +446,8 @@ export default function AvatarCanvas({
                   "B"
                 : "B",
 
-            // Full weight response.
             strength: 1,
           };
-
-          // ================================
-          // CREATE CONTINUOUS BODY MESH
-          // ================================
 
           const mesh = makeLattice(
             WIDTH,
@@ -510,32 +466,11 @@ export default function AvatarCanvas({
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
 
-          // ================================
-          // RENDER COMPLETE BLENDER BODY
-          // ================================
-
-          // One connected mesh for:
-          // - Head
-          // - Shoulders
-          // - Upper arms
-          // - Forearms
-          // - Hands
-          // - Chest
-          // - Belly
-          // - Hips
-          // - Thighs
-          // - Calves
-          // - Feet
-
           renderLayer(
             ctx,
             skin,
             mesh
           );
-
-          // ================================
-          // RENDER CLOTHING
-          // ================================
 
           garments.forEach(
             (garment) => {
@@ -587,10 +522,6 @@ export default function AvatarCanvas({
     avatar?.thigh,
     avatar?.cupSize,
   ]);
-
-  // ========================================
-  // DISPLAY
-  // ========================================
 
   return (
     <div

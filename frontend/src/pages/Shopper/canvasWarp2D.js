@@ -1,11 +1,10 @@
-
 /**
  * FitFusion AI
  * Weight-responsive 2D Avatar Engine
  *
  * Supports:
  * - Female and Male Standard avatars
- * - Front, Side, Rear
+ * - Front, Rear (Side view removed)
  * - Height and weight
  * - Shoulders, waist, hips, thighs
  * - Female cup size
@@ -258,12 +257,6 @@ export function makeLattice(
       ? "male"
       : "female";
 
-  const view = String(
-    config.view || "front"
-  ).toLowerCase();
-
-  const sideView = view === "side";
-
   const heightCm = clamp(
     Number(config.heightCm) || 164,
     120,
@@ -280,8 +273,6 @@ export function makeLattice(
   const baseline =
     gender === "male" ? 70 : 58;
 
-  // Height-aware weight index.
-  // Used only for visual avatar proportions.
   const referenceWeight =
     weightKg * (164 / heightCm) ** 2;
 
@@ -302,10 +293,6 @@ export function makeLattice(
     0,
     weightChange
   );
-
-  // ========================================
-  // MANUAL BODY CONTROLS
-  // ========================================
 
   const shoulder = option(
     config.shoulders,
@@ -351,10 +338,6 @@ export function makeLattice(
     1
   );
 
-  // ========================================
-  // HEIGHT ADJUSTMENT
-  // ========================================
-
   const desiredHeightShift =
     bounds.height *
     (heightCm / 164 - 1) *
@@ -365,10 +348,6 @@ export function makeLattice(
     -bounds.height * 0.16,
     Math.max(0, bounds.top - 12)
   );
-
-  // ========================================
-  // CANVAS SAFETY
-  // ========================================
 
   const halfWidth = Math.max(
     1,
@@ -391,10 +370,6 @@ export function makeLattice(
 
   const lattice = [];
 
-  // ========================================
-  // BUILD DEFORMATION ROWS
-  // ========================================
-
   for (
     let row = 0;
     row < GRID_ROWS;
@@ -408,8 +383,6 @@ export function makeLattice(
       (sy - bounds.top) /
       Math.max(1, bounds.height);
 
-    // Smooth overlapping body regions.
-    // No abrupt separation at shoulders.
     const shoulderBand = gaussian(
       t,
       0.245,
@@ -446,17 +419,12 @@ export function makeLattice(
       0.075
     );
 
-    // Protect head and feet.
     const bodyFade =
       smoothstep(0.12, 0.23, t) *
       (
         1 -
         smoothstep(0.90, 1.01, t)
       );
-
-    // ======================================
-    // AUTOMATIC WEIGHT PROPORTIONS
-    // ======================================
 
     const weightGrowth =
       positive *
@@ -478,18 +446,13 @@ export function makeLattice(
           0.08 * calfBand
         );
 
-    // ======================================
-    // MANUAL PROPORTION REFINEMENTS
-    // ======================================
-
+    // FIX: Removed side-view multipliers
     const manualGrowth =
       shoulder * 0.055 * shoulderBand +
       waist * 0.07 * bellyBand +
       hips * 0.075 * hipBand +
       thighs * 0.065 * thighBand +
-      cup *
-        (sideView ? 0.065 : 0.025) *
-        chestBand;
+      cup * 0.025 * chestBand;
 
     const requestedGrowth = clamp(
       (
@@ -502,8 +465,6 @@ export function makeLattice(
       0.72
     );
 
-    // Expand the entire body continuously.
-    // Arms move outward with the torso.
     const growth = Math.min(
       requestedGrowth,
       Math.max(
@@ -512,7 +473,6 @@ export function makeLattice(
       )
     );
 
-    // Keep feet anchored.
     const dy =
       -heightShift *
       (
@@ -521,10 +481,6 @@ export function makeLattice(
       );
 
     const rowPoints = [];
-
-    // ======================================
-    // BUILD HORIZONTAL CONTROL POINTS
-    // ======================================
 
     for (
       let col = 0;
@@ -541,81 +497,41 @@ export function makeLattice(
 
       const absX = Math.abs(nx);
 
-      // Whole-body scaling keeps shoulder
-      // and upper-arm pixels connected.
-      const scale =
-        1 +
-        growth *
-          (sideView ? 0.82 : 1);
+      // FIX: Removed side-view scaling
+      const scale = 1 + growth;
 
       let dx =
         (sx - bounds.cx) *
         (scale - 1);
 
-      // ====================================
       // FRONT / REAR BELLY AND HIP SHAPE
-      // ====================================
+      const localBelly =
+        positive *
+          0.17 *
+          bellyBand +
+        Math.max(0, waist) *
+          0.025 *
+          bellyBand;
 
-      if (!sideView) {
-        const localBelly =
-          positive *
-            0.17 *
-            bellyBand +
-          Math.max(0, waist) *
-            0.025 *
-            bellyBand;
+      const localHips =
+        positive *
+        0.09 *
+        hipBand;
 
-        const localHips =
-          positive *
-          0.09 *
-          hipBand;
-
-        dx +=
-          Math.tanh(nx * 5) *
-          halfWidth *
-          (
-            localBelly +
-            localHips
-          ) *
-          gaussian(
-            absX,
-            0.38,
-            0.32
-          ) *
-          bodyFade *
-          strength;
-      } else {
-        // ==================================
-        // SIDE-VIEW BODY PROJECTION
-        // ==================================
-
-        const facing =
-          config.sideFacing === "right"
-            ? 1
-            : -1;
-
-        dx +=
-          facing *
-          halfWidth *
-          (
-            positive *
-              0.12 *
-              bellyBand +
-            positive *
-              0.045 *
-              chestBand +
-            Math.max(0, waist) *
-              0.035 *
-              bellyBand
-          ) *
-          gaussian(
-            nx,
-            0,
-            0.62
-          ) *
-          bodyFade *
-          strength;
-      }
+      dx +=
+        Math.tanh(nx * 5) *
+        halfWidth *
+        (
+          localBelly +
+          localHips
+        ) *
+        gaussian(
+          absX,
+          0.38,
+          0.32
+        ) *
+        bodyFade *
+        strength;
 
       rowPoints.push({
         src: {
@@ -629,10 +545,6 @@ export function makeLattice(
         },
       });
     }
-
-    // ======================================
-    // PREVENT FOLDED MESH / BROKEN ARMS
-    // ======================================
 
     for (
       let col = 1;
@@ -714,10 +626,6 @@ export function renderLayer(
   const dst = out.data;
   const points = mesh.lattice;
 
-  // ========================================
-  // INVERSE PIXEL MAPPING
-  // ========================================
-
   for (
     let y = 0;
     y < height;
@@ -792,10 +700,6 @@ export function renderLayer(
       );
     }
 
-    // ======================================
-    // SAMPLE HORIZONTAL PIXELS
-    // ======================================
-
     for (
       let x = 0;
       x < width;
@@ -848,10 +752,6 @@ export function renderLayer(
       ) {
         continue;
       }
-
-      // ====================================
-      // BILINEAR PIXEL SAMPLING
-      // ====================================
 
       const u = clamp(
         sx - 0.5,
@@ -947,8 +847,6 @@ export function renderLayer(
     }
   }
 
-  // Use an offscreen canvas so transparent
-  // clothing layers composite correctly.
   const layer = newCanvas(
     width,
     height
@@ -1286,146 +1184,82 @@ export function catalogIllustration(
     product.name || ""
   ).toLowerCase();
 
-  const side =
-    String(view).toLowerCase() ===
-    "side";
-
+  // FIX: Removed all Side-view branches. Only Front/Rear polygons remain.
   if (
     category.includes("top") ||
     category.includes("outer")
   ) {
-    poly(
-      side
-        ? [
-            [-0.19, 0.22],
-            [0.15, 0.21],
-            [0.21, 0.30],
-            [0.17, 0.47],
-            [-0.14, 0.47],
-            [-0.20, 0.34],
-          ]
-        : [
-            [-0.21, 0.21],
-            [-0.34, 0.24],
-            [-0.36, 0.32],
-            [-0.24, 0.33],
-            [-0.18, 0.46],
-            [0.18, 0.46],
-            [0.24, 0.33],
-            [0.36, 0.32],
-            [0.34, 0.24],
-            [0.21, 0.21],
-            [0.12, 0.20],
-            [-0.12, 0.20],
-          ]
-    );
+    poly([
+      [-0.21, 0.21],
+      [-0.34, 0.24],
+      [-0.36, 0.32],
+      [-0.24, 0.33],
+      [-0.18, 0.46],
+      [0.18, 0.46],
+      [0.24, 0.33],
+      [0.36, 0.32],
+      [0.34, 0.24],
+      [0.21, 0.21],
+      [0.12, 0.20],
+      [-0.12, 0.20],
+    ]);
   } else if (
     category.includes("bottom")
   ) {
     if (name.includes("skirt")) {
-      poly(
-        side
-          ? [
-              [-0.16, 0.48],
-              [0.17, 0.48],
-              [0.27, 0.70],
-              [-0.23, 0.70],
-            ]
-          : [
-              [-0.18, 0.48],
-              [0.18, 0.48],
-              [0.34, 0.70],
-              [-0.34, 0.70],
-            ]
-      );
+      poly([
+        [-0.18, 0.48],
+        [0.18, 0.48],
+        [0.34, 0.70],
+        [-0.34, 0.70],
+      ]);
     } else {
-      poly(
-        side
-          ? [
-              [-0.18, 0.51],
-              [0.19, 0.51],
-              [0.19, 0.83],
-              [-0.09, 0.83],
-              [-0.07, 0.62],
-              [-0.17, 0.83],
-              [-0.29, 0.83],
-            ]
-          : [
-              [-0.22, 0.51],
-              [0.22, 0.51],
-              [0.22, 0.60],
-              [0.12, 0.84],
-              [0.01, 0.84],
-              [0, 0.64],
-              [-0.02, 0.84],
-              [-0.14, 0.84],
-              [-0.22, 0.60],
-            ]
-      );
+      poly([
+        [-0.22, 0.51],
+        [0.22, 0.51],
+        [0.22, 0.60],
+        [0.12, 0.84],
+        [0.01, 0.84],
+        [0, 0.64],
+        [-0.02, 0.84],
+        [-0.14, 0.84],
+        [-0.22, 0.60],
+      ]);
     }
   } else if (
     category.includes("dress")
   ) {
-    poly(
-      side
-        ? [
-            [-0.17, 0.22],
-            [0.17, 0.22],
-            [0.14, 0.49],
-            [0.31, 0.75],
-            [-0.26, 0.75],
-            [-0.13, 0.48],
-          ]
-        : [
-            [-0.20, 0.21],
-            [-0.32, 0.24],
-            [-0.35, 0.31],
-            [-0.20, 0.34],
-            [-0.13, 0.47],
-            [-0.34, 0.76],
-            [0.34, 0.76],
-            [0.13, 0.47],
-            [0.20, 0.34],
-            [0.35, 0.31],
-            [0.32, 0.24],
-            [0.20, 0.21],
-          ]
-    );
+    poly([
+      [-0.20, 0.21],
+      [-0.32, 0.24],
+      [-0.35, 0.31],
+      [-0.20, 0.34],
+      [-0.13, 0.47],
+      [-0.34, 0.76],
+      [0.34, 0.76],
+      [0.13, 0.47],
+      [0.20, 0.34],
+      [0.35, 0.31],
+      [0.32, 0.24],
+      [0.20, 0.21],
+    ]);
   } else if (
     category.includes("footwear") ||
     category.includes("shoe")
   ) {
-    if (side) {
-      poly([
-        [-0.18, 0.955],
-        [-0.03, 0.955],
-        [0.10, 0.972],
-        [0.12, 0.995],
-        [-0.20, 0.995],
-      ]);
+    poly([
+      [-0.20, 0.955],
+      [-0.04, 0.955],
+      [-0.03, 0.995],
+      [-0.24, 0.995],
+    ]);
 
-      poly([
-        [0.03, 0.955],
-        [0.18, 0.955],
-        [0.28, 0.975],
-        [0.28, 0.995],
-        [0, 0.995],
-      ]);
-    } else {
-      poly([
-        [-0.20, 0.955],
-        [-0.04, 0.955],
-        [-0.03, 0.995],
-        [-0.24, 0.995],
-      ]);
-
-      poly([
-        [0.04, 0.955],
-        [0.20, 0.955],
-        [0.24, 0.995],
-        [0.03, 0.995],
-      ]);
-    }
+    poly([
+      [0.04, 0.955],
+      [0.20, 0.955],
+      [0.24, 0.995],
+      [0.03, 0.995],
+    ]);
   } else {
     return null;
   }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import logo from "../assets/fitfusion-logo.svg";
+import { cartAPI, API_URL } from "../services/api";
 import "./css/CartSelectedItems.css";
 
 const DEFAULT_ITEMS = [
@@ -89,24 +90,18 @@ function readEquippedItems() {
   }
 }
 
-function readCartItems() {
-  try {
-    const parsedCart = JSON.parse(
-      localStorage.getItem("fitfusion-cart-items") || "[]",
-    );
-
-    return Array.isArray(parsedCart) ? parsedCart : [];
-  } catch {
-    return [];
-  }
-}
-
 function formatPrice(price) {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
     maximumFractionDigits: 0,
   }).format(Number(price) || 0);
+}
+
+function mediaUrl(path) {
+  if (!path) return null;
+  if (String(path).startsWith("http")) return path;
+  return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
 }
 
 function CartSelectedItems() {
@@ -127,13 +122,24 @@ function CartSelectedItems() {
   const [notification, setNotification] = useState("");
   const [pageError, setPageError] = useState("");
   const [itemsAdded, setItemsAdded] = useState(false);
-  const [cartCount, setCartCount] = useState(() =>
-    readCartItems().reduce(
-      (total, item) =>
-        total + (Number(item.quantity) || 0),
-      0,
-    ),
-  );
+  const [cartCount, setCartCount] = useState(0);
+  const [isLoadingCart, setIsLoadingCart] = useState(true);
+
+  // Fetch cart count from database on mount
+  useEffect(() => {
+    async function fetchCartCount() {
+      try {
+        const data = await cartAPI.getCart();
+        const count = data.item_count || 0;
+        setCartCount(count);
+      } catch (error) {
+        console.error("Failed to load cart count:", error);
+      } finally {
+        setIsLoadingCart(false);
+      }
+    }
+    fetchCartCount();
+  }, []);
 
   useEffect(() => {
     if (!notification) return undefined;
@@ -251,7 +257,7 @@ function CartSelectedItems() {
     );
   }
 
-  function addSelectedItemsToCart() {
+  async function addSelectedItemsToCart() {
     setPageError("");
 
     if (selectedItems.length === 0) {
@@ -283,60 +289,29 @@ function CartSelectedItems() {
       return;
     }
 
-    const existingCart = readCartItems();
-    const updatedCart = [...existingCart];
-
-    selectedItems.forEach((selectedItem) => {
-      const existingIndex = updatedCart.findIndex(
-        (cartItem) =>
-          cartItem.id === selectedItem.id &&
-          cartItem.selectedSize ===
-            selectedItem.selectedSize,
+    try {
+      // Add each selected item to the database cart using catalog_item ID
+      const addPromises = selectedItems.map((selectedItem) =>
+        cartAPI.addToCart(selectedItem.id, selectedItem.quantity)
       );
 
-      if (existingIndex >= 0) {
-        updatedCart[existingIndex] = {
-          ...updatedCart[existingIndex],
-          quantity:
-            Number(
-              updatedCart[existingIndex].quantity,
-            ) + selectedItem.quantity,
-        };
-      } else {
-        updatedCart.push({
-          id: selectedItem.id,
-          name: selectedItem.name,
-          category: selectedItem.category,
-          seller: selectedItem.seller,
-          color: selectedItem.color,
-          colorCode: selectedItem.colorCode,
-          selectedSize: selectedItem.selectedSize,
-          quantity: selectedItem.quantity,
-          price: selectedItem.price,
-          addedAt: new Date().toISOString(),
-        });
-      }
-    });
+      await Promise.all(addPromises);
 
-    localStorage.setItem(
-      "fitfusion-cart-items",
-      JSON.stringify(updatedCart),
-    );
+      // Update cart count from database
+      const cartData = await cartAPI.getCart();
+      setCartCount(cartData.item_count || 0);
 
-    const updatedCount = updatedCart.reduce(
-      (total, item) =>
-        total + (Number(item.quantity) || 0),
-      0,
-    );
+      setItemsAdded(true);
 
-    setCartCount(updatedCount);
-    setItemsAdded(true);
-
-    setNotification(
-      `${totalQuantity} ${
-        totalQuantity === 1 ? "item was" : "items were"
-      } added to your cart.`,
-    );
+      setNotification(
+        `${totalQuantity} ${
+          totalQuantity === 1 ? "item was" : "items were"
+        } added to your cart.`,
+      );
+    } catch (error) {
+      console.error("Failed to add items to cart:", error);
+      setPageError("Failed to add items to cart. Please try again.");
+    }
   }
 
   function openCart() {
@@ -407,6 +382,7 @@ function CartSelectedItems() {
               className="select-header-cart"
               type="button"
               onClick={openCart}
+              disabled={isLoadingCart}
             >
               <span aria-hidden="true">🛒</span>
               Cart
