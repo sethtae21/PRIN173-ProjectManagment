@@ -1,14 +1,11 @@
-
 const avatarAssets = {
   female: {
     front: "/Avatars/Female_Standard/Female_Standard_front.png",
-    side: "/Avatars/Female_Standard/Female_Standard_side.png",
     rear: "/Avatars/Female_Standard/Female_Standard_rear.png",
   },
 
   male: {
     front: "/Avatars/Male_Standard/Male_Standard_front.png",
-    side: "/Avatars/Male_Standard/Male_Standard_side.png",
     rear: "/Avatars/Male_Standard/Male_Standard_rear.png",
   },
 };

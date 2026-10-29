@@ -7,7 +7,14 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for reading/updating the authenticated user's profile."""
+    """Serializer for reading/updating the authenticated user's profile.
+
+    NOTE (avatar refactor): skin_tone / height / weight / body_proportions are
+    NO LONGER exposed here. Body & skin data live exclusively on the avatar
+    preset (outfits.AvatarPreset, served by /presets/). Any client still
+    sending them in a PATCH /profile/ payload will have them silently ignored
+    by DRF, so old frontend builds degrade gracefully.
+    """
     
     # ⭐ CRITICAL FIX: MongoDB ObjectId PK must serialize as a STRING, not int.
     # Without this, DRF auto-maps the PK to IntegerField and crashes with:
@@ -19,7 +26,6 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'email', 'full_name', 'role', 'store_name',
             'mobile', 'street', 'barangay', 'city', 'province', 'postal_code',
-            'skin_tone', 'height', 'weight', 'body_proportions',
             'is_active', 'date_joined',
         )
         read_only_fields = ('email', 'role', 'is_active', 'date_joined')

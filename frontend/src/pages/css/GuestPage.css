@@ -1,4 +1,3 @@
-
 /* ==========================================
    FITFUSION AI - GUEST DASHBOARD
 ========================================== */
@@ -344,14 +343,15 @@
 }
 
 /* ==========================================
-   FRONT / SIDE / REAR GRID
+   FRONT / REAR GRID
+   FIX: Side view removed — 2 columns (Front / Rear)
 ========================================== */
 
 .guest-view-grid {
   display: grid;
 
   grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+    repeat(2, minmax(0, 1fr));
 
   gap: 10px;
 
@@ -387,7 +387,11 @@
   border-radius: 14px;
 }
 
-/* ACTUAL BLENDER PNG */
+/* ACTUAL BLENDER PNG
+   NOTE: sizing (female == male) is handled in JSX by the
+   GuestAvatarImage alpha-crop wrapper, NOT here. Do not add
+   width/height tweaks to this rule — object-fit: contain on a
+   tightly-cropped source is what equalizes the two bodies. */
 
 .guest-avatar-preview-image {
   display: block;
@@ -433,6 +437,9 @@
 
 /* ==========================================
    PREVIEW STATISTICS
+   NOTE: this stays repeat(3) on purpose — it is the 3 STAT
+   cells (1 / 2 / 2D), not the avatar views. Only the middle
+   cell's VALUE changed 3 -> 2 in GuestPage.jsx.
 ========================================== */
 
 .guest-preview-statistics {
@@ -785,6 +792,8 @@ p:not(.guest-section-label) {
     flex: 1;
   }
 
+  /* 2 view cards stack to 1 column on phones (matches the
+     original 3->1 stacking behaviour). */
   .guest-view-grid {
     grid-template-columns: 1fr;
     gap: 20px;

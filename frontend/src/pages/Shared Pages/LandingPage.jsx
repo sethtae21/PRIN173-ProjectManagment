@@ -1,8 +1,11 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
 import "../css/LandingPage.css";
+
+// ⚠️ If your hook lives in pages/Shopper/ use "./Shopper/useAlphaCrop";
+//    if it lives in components/ use "../components/useAlphaCrop".
+import useAlphaCrop from "../../hooks/useAlphaCrop";
 
 // Images inside the public folder are accessed from the URL root.
 // Do not include "public" in these paths.
@@ -10,22 +13,27 @@ import "../css/LandingPage.css";
 const AVATAR_ASSETS = {
   Female: {
     front: "/Avatars/Female_Standard/Female_Standard_front.png",
-    side: "/Avatars/Female_Standard/Female_Standard_side.png",
     rear: "/Avatars/Female_Standard/Female_Standard_rear.png",
   },
   Male: {
     front: "/Avatars/Male_Standard/Male_Standard_front.png",
-    side: "/Avatars/Male_Standard/Male_Standard_side.png",
     rear: "/Avatars/Male_Standard/Male_Standard_rear.png",
   },
 };
 
-
 const AVATAR_VIEWS = [
   { key: "front", label: "Front", description: "Front View" },
-  { key: "side", label: "Side", description: "Side View" },
   { key: "rear", label: "Rear", description: "Rear View" },
 ];
+
+/* Alpha-cropped avatar image so the Female and Male standard mannequins
+   render at the SAME size inside the container (trims transparent padding).
+   Defined at module scope so the hook obeys the Rules of Hooks (it is used
+   once per tile via this child component, never inside .map() directly). */
+function LandingAvatarImage({ src, alt, className }) {
+  const cropped = useAlphaCrop(src);
+  return <img className={className} src={cropped || src} alt={alt} />;
+}
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -78,8 +86,8 @@ function LandingPage() {
 
           <p className="landing-description">
             Build your personal 2D avatar, explore clothing from trusted
-            sellers, and preview recommended outfits from the front, side,
-            and rear views.
+            sellers, and preview recommended outfits from the front and rear
+            views.
           </p>
 
           <div className="landing-actions">
@@ -122,7 +130,7 @@ function LandingPage() {
             <div className="landing-avatar-selector-text">
               <p>PREMADE AVATAR</p>
               <span>
-                Explore the 2D avatar from three viewing angles.
+                Explore the 2D avatar from two viewing angles.
               </span>
             </div>
 
@@ -151,7 +159,7 @@ function LandingPage() {
             {AVATAR_VIEWS.map((view) => (
               <article className="landing-view-card" key={view.key}>
                 <div className="landing-avatar">
-                  <img
+                  <LandingAvatarImage
                     className="landing-avatar-image"
                     src={currentAvatar[view.key]}
                     alt={`${selectedGender} standard avatar - ${view.description}`}
@@ -172,7 +180,7 @@ function LandingPage() {
             </div>
 
             <div>
-              <strong>3</strong>
+              <strong>2</strong>
               <span>Viewing angles</span>
             </div>
 
@@ -207,7 +215,7 @@ function LandingPage() {
           <span>03</span>
           <h2>Try recommended clothing</h2>
           <p>
-            Preview recommended garments from the front, side, and rear
+            Preview recommended garments from the front and rear
             before adding them to your cart.
           </p>
         </article>

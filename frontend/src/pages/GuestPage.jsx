@@ -1,22 +1,23 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./css/GuestPage.css";
 
+// ⚠️ Adjust this import path if your hook lives in ./Shopper/ or ../components/.
+import useAlphaCrop from "../hooks/useAlphaCrop";
+
 /* ==========================================
    STANDARD AVATAR ASSETS
    Same PNGs used by LandingPage.jsx
+   (Side view removed — only front + rear exist as assets)
 ========================================== */
 
 const AVATAR_ASSETS = {
   Female: {
     front: "/Avatars/Female_Standard/Female_Standard_front.png",
-    side: "/Avatars/Female_Standard/Female_Standard_side.png",
     rear: "/Avatars/Female_Standard/Female_Standard_rear.png",
   },
   Male: {
     front: "/Avatars/Male_Standard/Male_Standard_front.png",
-    side: "/Avatars/Male_Standard/Male_Standard_side.png",
     rear: "/Avatars/Male_Standard/Male_Standard_rear.png",
   },
 };
@@ -28,16 +29,25 @@ const AVATAR_VIEWS = [
     description: "Front View",
   },
   {
-    key: "side",
-    label: "Side",
-    description: "Side View",
-  },
-  {
     key: "rear",
     label: "Rear",
     description: "Rear View",
   },
 ];
+
+/* Alpha-cropped avatar image so Female and Male render at the same size.
+   Module-scope child component keeps the hook legal (one call per tile). */
+function GuestAvatarImage({ src, alt, className }) {
+  const cropped = useAlphaCrop(src);
+  return (
+    <img
+      className={className}
+      src={cropped || src}
+      alt={alt}
+      loading="lazy"
+    />
+  );
+}
 
 /* ==========================================
    GUEST FEATURES
@@ -105,7 +115,7 @@ function GuestAvatarPreview() {
           <p>PREMADE AVATAR</p>
 
           <span>
-            Explore the 2D avatar from three viewing
+            Explore the 2D avatar from two viewing
             angles.
           </span>
         </div>
@@ -135,7 +145,7 @@ function GuestAvatarPreview() {
         </div>
       </div>
 
-      {/* FRONT / SIDE / REAR */}
+      {/* FRONT / REAR */}
 
       <div className="guest-view-grid">
         {AVATAR_VIEWS.map((view) => (
@@ -144,11 +154,10 @@ function GuestAvatarPreview() {
             key={view.key}
           >
             <div className="guest-avatar-preview-stage">
-              <img
+              <GuestAvatarImage
                 className="guest-avatar-preview-image"
                 src={currentAvatar[view.key]}
                 alt={`${selectedGender} Standard Avatar - ${view.description}`}
-                loading="lazy"
               />
 
               <span>
@@ -170,7 +179,7 @@ function GuestAvatarPreview() {
         </div>
 
         <div>
-          <strong>3</strong>
+          <strong>2</strong>
           <span>Viewing angles</span>
         </div>
 
