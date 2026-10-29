@@ -50,11 +50,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     province = models.CharField(max_length=255, blank=True, null=True)
     postal_code = models.CharField(max_length=10, blank=True, null=True)
     
-    # Avatar/Profile Fields
-    skin_tone = models.CharField(max_length=7, blank=True, null=True)
-    height = models.IntegerField(blank=True, null=True)
-    weight = models.IntegerField(blank=True, null=True)
-    body_proportions = models.JSONField(blank=True, null=True, default=dict)
+    # NOTE (avatar refactor): the legacy body attributes
+    #   skin_tone / height / weight / body_proportions
+    # were REMOVED from this model. They are owned exclusively by
+    # outfits.AvatarPreset (SRS FR-2.3, FR-2.4, FR-2.7, FR-2.9), which is now
+    # the single source of truth for body/skin data. See migration
+    # accounts/0002_remove_user_body_fields.py.
     
     # Django required fields (simplified - no username)
     is_active = models.BooleanField(default=True)

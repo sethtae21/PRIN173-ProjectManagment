@@ -10,9 +10,11 @@ class CustomUserAdmin(BaseUserAdmin):
     list_filter = ('role', 'is_staff', 'is_active')
     
     # Fields to show when editing an existing user
+    # NOTE (avatar refactor): skin_tone / height / weight / body_proportions
+    # removed from 'Personal Info' — they now live only on outfits.AvatarPreset.
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Personal Info', {'fields': ('full_name', 'mobile', 'skin_tone', 'height', 'weight', 'body_proportions')}),
+        ('Personal Info', {'fields': ('full_name', 'mobile')}),
         ('Address', {'fields': ('street', 'barangay', 'city', 'province', 'postal_code')}),
         ('Role Information', {'fields': ('role', 'store_name')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),

@@ -12,19 +12,21 @@ class AvatarPresetCRUDTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        # FIX: User model is email-based (no username field) and roles are
+        # 'shopper'/'seller'; the old username=/role='user' kwargs raised TypeError.
         self.user = User.objects.create_user(
-            username='presetuser', email='preset@test.com',
-            password='Test123!@#', role='user')
+            email='preset@test.com', full_name='Preset User',
+            password='Test123!@#', role='shopper')
         self.other = User.objects.create_user(
-            username='otheruser', email='other@test.com',
-            password='Test123!@#', role='user')
+            email='other@test.com', full_name='Other User',
+            password='Test123!@#', role='shopper')
         self.client.force_authenticate(self.user)
         self.payload = {
             'name': 'My Daily Preset',
             'gender': 'female',
             'height': 165.0,
             'weight': 55.0,
-            'skin_tone': 'medium',
+            'skin_tone': '#d9aa82',
             'shoulder': 'average',
             'waist': 'slim',
             'hip': 'average',
@@ -71,9 +73,10 @@ class AccountManagementTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        # FIX: email-based user creation (see note in AvatarPresetCRUDTests).
         self.user = User.objects.create_user(
-            username='acctuser', email='acct@test.com',
-            password='OldPass123!@#', role='user')
+            email='acct@test.com', full_name='Acct User',
+            password='OldPass123!@#', role='shopper')
         self.client.force_authenticate(self.user)
 
     def test_guest_cannot_view_profile(self):
@@ -83,13 +86,41 @@ class AccountManagementTests(TestCase):
     def test_view_profile(self):
         res = self.client.get('/profile/')
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['user']['username'], 'acctuser')
+        # FIX: serializer exposes email, not username.
+        self.assertEqual(res.data['user']['email'], 'acct@test.com')
+
+    def test_profile_payload_excludes_body_fields(self):
+        """Avatar refactor regression: body/skin data must NOT leak from /profile/.
+        They are owned exclusively by outfits.AvatarPreset now."""
+        res = self.client.get('/profile/')
+        self.assertEqual(res.status_code, 200)
+        user_payload = res.data['user']
+        for field in ('skin_tone', 'height', 'weight', 'body_proportions'):
+            self.assertNotIn(field, user_payload)
 
     def test_update_profile(self):
-        res = self.client.patch('/profile/', {'skin_tone': 'deep', 'height': 170.0}, format='json')
+        # FIX: skin_tone/height no longer exist on User; profile updates now
+        # cover contact/address fields only (body data lives on presets).
+        res = self.client.patch(
+            '/profile/',
+            {'mobile': '09123456789', 'city': 'Makati City'},
+            format='json')
         self.assertEqual(res.status_code, 200)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.skin_tone, 'deep')
+        self.assertEqual(self.user.mobile, '09123456789')
+        self.assertEqual(self.user.city, 'Makati City')
+
+    def test_update_profile_ignores_legacy_body_fields(self):
+        """Legacy clients sending body fields get them silently ignored (no crash)."""
+        res = self.client.patch(
+            '/profile/',
+            {'city': 'Taguig City', 'height': 180, 'skin_tone': '#ffffff'},
+            format='json')
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.city, 'Taguig City')
+        self.assertFalse(hasattr(self.user, 'skin_tone'))
+        self.assertFalse(hasattr(self.user, 'height'))
 
     def test_password_change_wrong_current_rejected(self):
         res = self.client.post('/profile/password/',
@@ -105,15 +136,16 @@ class AccountManagementTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewPass123!@#'))
         self.client.force_authenticate(None)
+        # FIX: login is email-based.
         login = self.client.post('/auth/login/',
-                                 {'username': 'acctuser', 'password': 'NewPass123!@#'}, format='json')
+                                 {'email': 'acct@test.com', 'password': 'NewPass123!@#'}, format='json')
         self.assertEqual(login.status_code, 200)
 
     def test_delete_account_cascades_and_blocks_login(self):
         # Create related data to verify CASCADE deletion
         AvatarPreset.objects.create(
             user=self.user, name='P', gender='female',
-            height=165, weight=55, skin_tone='medium'
+            height=165, weight=55, skin_tone='#d9aa82'
         )
 
         # Delete account
@@ -121,7 +153,7 @@ class AccountManagementTests(TestCase):
         self.assertEqual(res.status_code, 204)
 
         # Verify user is gone
-        self.assertFalse(User.objects.filter(username='acctuser').exists())
+        self.assertFalse(User.objects.filter(email='acct@test.com').exists())
 
         # Verify cascaded data is also gone (RA 10173 erasure proof)
         self.assertFalse(AvatarPreset.objects.filter(name='P').exists())
@@ -129,7 +161,7 @@ class AccountManagementTests(TestCase):
         # Verify login now fails
         self.client.force_authenticate(None)
         login = self.client.post('/auth/login/',
-                                 {'username': 'acctuser', 'password': 'OldPass123!@#'}, format='json')
+                                 {'email': 'acct@test.com', 'password': 'OldPass123!@#'}, format='json')
         self.assertEqual(login.status_code, 400)
 
 
@@ -205,7 +237,7 @@ class GridFSStorageDeletionTests(SimpleTestCase):
 
         storage.delete('legacy-name.png')
 
-        gridfs.find_one.assert_called_once_with({'filename': 'legacy-name.png'})
+        gridfs.find_one.assert_called_once_with({'filename': 'legacy-name'})
         gridfs.delete.assert_called_once_with('legacy-id')
 
 
