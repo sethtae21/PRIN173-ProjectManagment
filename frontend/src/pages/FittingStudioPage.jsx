@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_URL, presetsApi, outfitsApi } from "../services/api";
 import RatingControl from "../components/RatingControl";
@@ -13,23 +13,68 @@ const SKIN_TONES = [
 ];
 
 const RECOMMENDED_ITEMS = [
-  { id: "linen-shirt", name: "Linen Shirt", store: "Aurelia Studio", category: "top", color: "Beige", size: "M", price: 750 },
-  { id: "straight-pants", name: "Straight Pants", store: "Noir & Thread", category: "bottom", color: "Charcoal", size: "M", price: 1100 },
-  { id: "everyday-shoes", name: "Everyday Shoes", store: "Maison Sol", category: "shoes", color: "White", size: "7", price: 1500 },
+  {
+    id: "linen-shirt",
+    name: "Linen Shirt",
+    store: "Aurelia Studio",
+    category: "top",
+    color: "Beige",
+    size: "M",
+    price: 750,
+  },
+  {
+    id: "straight-pants",
+    name: "Straight Pants",
+    store: "Noir & Thread",
+    category: "bottom",
+    color: "Charcoal",
+    size: "M",
+    price: 1100,
+  },
+  {
+    id: "everyday-shoes",
+    name: "Everyday Shoes",
+    store: "Maison Sol",
+    category: "shoes",
+    color: "White",
+    size: "7",
+    price: 1500,
+  },
 ];
 
-// FIX: Side view removed — only Front and Rear remain.
 const STUDIO_VIEWS = ["Front", "Rear"];
-
 const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 const STUDIO_PENDING_PREFIX = "fitfusion-fitting-studio-pending-item-";
 
 const HEIGHT_RANGE = { min: 120, max: 218 };
 const WEIGHT_RANGE = { min: 30, max: 200 };
 
-// UI-ONLY BODY BUILD (weight number is derived, backend untouched for now).
 const BODY_BUILDS = ["Slim", "Balanced", "Full", "Curve"];
-const BUILD_BMI = { Slim: 17.5, Balanced: 21.7, Full: 27.5, Curve: 32 };
+const BUILD_BMI = {
+  Slim: 17.5,
+  Balanced: 21.7,
+  Full: 27.5,
+  Curve: 32,
+};
+
+const MATCH_CATEGORIES = [
+  {
+    key: "colorCompatibility",
+    label: "Color compatibility",
+  },
+  {
+    key: "heightContrast",
+    label: "Height contrast",
+  },
+  {
+    key: "proportionShading",
+    label: "Proportion shading",
+  },
+  {
+    key: "styleOccasion",
+    label: "Style / occasion match",
+  },
+];
 
 function sessionKey(isGuest) {
   return `${STUDIO_SESSION_PREFIX}${isGuest ? "guest" : "shopper"}`;
@@ -55,71 +100,128 @@ function readStudioSession(isGuest) {
 function calculateBodyType(height, weight) {
   const meters = Number(height) / 100;
   const mass = Number(weight);
-  if (!Number.isFinite(meters) || !Number.isFinite(mass) || meters <= 0 || mass <= 0) return "Balanced";
+
+  if (
+    !Number.isFinite(meters) ||
+    !Number.isFinite(mass) ||
+    meters <= 0 ||
+    mass <= 0
+  ) {
+    return "Balanced";
+  }
+
   const index = mass / (meters * meters);
+
   if (index < 18.5) return "Slim";
   if (index < 25) return "Balanced";
   if (index < 30) return "Full";
+
   return "Curve";
 }
 
 function weightForBuild(build, height) {
   const meters = Number(height) / 100;
+
   if (!Number.isFinite(meters) || meters <= 0) return 55;
+
   const bmi = BUILD_BMI[build] ?? 21.7;
   const raw = bmi * meters * meters;
-  return Math.min(WEIGHT_RANGE.max, Math.max(WEIGHT_RANGE.min, Math.round(raw * 10) / 10));
+
+  return Math.min(
+    WEIGHT_RANGE.max,
+    Math.max(WEIGHT_RANGE.min, Math.round(raw * 10) / 10)
+  );
 }
 
 function normalizeCategory(category) {
   const label = String(category || "").toLowerCase();
-  if (/shoe|sneaker|footwear|boot|sandal/.test(label)) return "shoes";
-  if (/pant|trouser|jean|short|skirt|bottom/.test(label)) return "bottom";
+
+  if (/shoe|sneaker|footwear|boot|sandal/.test(label)) {
+    return "shoes";
+  }
+
+  if (/pant|trouser|jean|short|skirt|bottom/.test(label)) {
+    return "bottom";
+  }
+
   return "top";
 }
 
 function normalizeStudioItem(item) {
   if (!item || typeof item !== "object") return null;
+
   const id = item.id ?? item.product_id;
+
   if (id === undefined || id === null) return null;
+
   return {
     ...item,
     id,
     name: item.name || item.product_name || "Clothing item",
-    store: item.store || item.store_name || item.sellerName || "FitFusion Store",
+    store:
+      item.store ||
+      item.store_name ||
+      item.sellerName ||
+      "FitFusion Store",
     category: normalizeCategory(item.category),
-    size: String(item.selectedSize || item.availableSize || item.size || "M").toUpperCase(),
+    size: String(
+      item.selectedSize || item.availableSize || item.size || "M"
+    ).toUpperCase(),
     color: item.selectedColor || item.color || "Unspecified",
     price: Number(item.price || 0),
-    image: item.image || item.frontImageUrl || item.front_image || "",
+    image:
+      item.image ||
+      item.frontImageUrl ||
+      item.front_image ||
+      "",
   };
 }
 
-// Only use explicit fitting limits supplied by a seller.
 function sizeRecordFor(item) {
-  const source = item.fit_limits || item.size_chart || item.sizeChart || item.size_measurements;
-  const size = String(item.size || item.selectedSize || "").toUpperCase();
+  const source =
+    item.fit_limits ||
+    item.size_chart ||
+    item.sizeChart ||
+    item.size_measurements;
+
+  const size = String(
+    item.size || item.selectedSize || ""
+  ).toUpperCase();
+
   if (Array.isArray(source)) {
-    return source.find((entry) => String(entry?.size || entry?.label || "").toUpperCase() === size) || null;
+    return (
+      source.find(
+        (entry) =>
+          String(entry?.size || entry?.label || "").toUpperCase() ===
+          size
+      ) || null
+    );
   }
+
   if (source && typeof source === "object") {
     return source[size] || source[size.toLowerCase()] || source;
   }
+
   return item;
 }
 
 function finiteNumber(value) {
-  if (value === undefined || value === null || value === "") return null;
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
 function readRange(record, type, globalRange) {
-  // NOTE: unit strings build SELLER DATA KEY ALIASES only (not displayed).
   const unit = type === "height" ? "cm" : "kg";
   const unitCapitalized = type === "height" ? "Cm" : "Kg";
 
-  const nested = record?.[type] && typeof record[type] === "object" ? record[type] : {};
+  const nested =
+    record?.[type] && typeof record[type] === "object"
+      ? record[type]
+      : {};
 
   const minimum = finiteNumber(
     record?.[`min_${type}`] ??
@@ -139,17 +241,30 @@ function readRange(record, type, globalRange) {
 
   if (minimum === null && maximum === null) return null;
 
-  const low = Math.max(globalRange.min, minimum ?? globalRange.min);
-  const high = Math.min(globalRange.max, maximum ?? globalRange.max);
+  const low = Math.max(
+    globalRange.min,
+    minimum ?? globalRange.min
+  );
+
+  const high = Math.min(
+    globalRange.max,
+    maximum ?? globalRange.max
+  );
 
   if (low > high) return { invalid: true };
 
-  return { min: low, max: high, hasMaximum: maximum !== null };
+  return {
+    min: low,
+    max: high,
+    hasMaximum: maximum !== null,
+  };
 }
 
 function limitsForItem(item) {
   const record = sizeRecordFor(item);
+
   if (!record) return { height: null, weight: null };
+
   return {
     height: readRange(record, "height", HEIGHT_RANGE),
     weight: readRange(record, "weight", WEIGHT_RANGE),
@@ -169,26 +284,47 @@ function combinedFitLimits(items) {
 
   for (const item of Object.values(items).filter(Boolean)) {
     const ranges = limitsForItem(item);
+
     for (const type of ["height", "weight"]) {
       const range = ranges[type];
+
       if (!range) continue;
+
       if (range.invalid) {
         limits.incompatible = true;
         continue;
       }
-      limits[type].min = Math.max(limits[type].min, range.min);
-      limits[type].max = Math.min(limits[type].max, range.max);
+
+      limits[type].min = Math.max(
+        limits[type].min,
+        range.min
+      );
+
+      limits[type].max = Math.min(
+        limits[type].max,
+        range.max
+      );
+
       if (type === "height") {
         limits.hasHeight = true;
-        if (range.hasMaximum) limits.hasHeightMaximum = true;
+
+        if (range.hasMaximum) {
+          limits.hasHeightMaximum = true;
+        }
       } else {
         limits.hasWeight = true;
-        if (range.hasMaximum) limits.hasWeightMaximum = true;
+
+        if (range.hasMaximum) {
+          limits.hasWeightMaximum = true;
+        }
       }
     }
   }
 
-  if (limits.height.min > limits.height.max || limits.weight.min > limits.weight.max) {
+  if (
+    limits.height.min > limits.height.max ||
+    limits.weight.min > limits.weight.max
+  ) {
     limits.incompatible = true;
   }
 
@@ -196,7 +332,10 @@ function combinedFitLimits(items) {
 }
 
 function clamp(value, range) {
-  return Math.min(range.max, Math.max(range.min, Number(value) || range.min));
+  return Math.min(
+    range.max,
+    Math.max(range.min, Number(value) || range.min)
+  );
 }
 
 function applyFitLimits(avatar, limits) {
@@ -217,8 +356,12 @@ function formatCurrency(amount) {
 
 function readAuthState() {
   if (!localStorage.getItem("access_token")) return null;
+
   try {
-    const user = JSON.parse(localStorage.getItem("fitfusion-current-user") || "null");
+    const user = JSON.parse(
+      localStorage.getItem("fitfusion-current-user") || "null"
+    );
+
     return user || {};
   } catch {
     return {};
@@ -226,7 +369,9 @@ function readAuthState() {
 }
 
 function normalizeGender(value) {
-  return String(value).toLowerCase() === "male" ? "Male" : "Female";
+  return String(value).toLowerCase() === "male"
+    ? "Male"
+    : "Female";
 }
 
 function choiceValue(value) {
@@ -235,17 +380,20 @@ function choiceValue(value) {
 
 function capitalizeChoice(value, fallback) {
   const text = String(value || "").trim();
+
   if (!text) return fallback;
+
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function round2(value) {
   const number = Number(value);
+
   if (!Number.isFinite(number)) return null;
+
   return Math.round(number * 100) / 100;
 }
 
-/** UI avatar state -> exact payload the Django serializer/model expects. */
 function toServerPreset(avatar, name, isFemale) {
   return {
     name,
@@ -262,40 +410,54 @@ function toServerPreset(avatar, name, isFemale) {
   };
 }
 
-/** DB record -> UI avatar shape. */
 function fromServerPreset(record) {
   const gender = normalizeGender(record?.gender);
+
   return {
     id: String(record?.id || record?.presetId || ""),
     name: String(record?.name || "Custom Avatar"),
     gender,
     height: String(record?.height ?? "160"),
     weight: String(record?.weight ?? "55"),
-    skinTone: record?.skin_tone || record?.skinTone || "#dca77d",
+    skinTone:
+      record?.skin_tone ||
+      record?.skinTone ||
+      "#dca77d",
     undertone: capitalizeChoice(record?.undertone, "Neutral"),
     shoulder: capitalizeChoice(record?.shoulder, "Average"),
     waist: capitalizeChoice(record?.waist, "Average"),
     hip: capitalizeChoice(record?.hip, "Average"),
     thigh: capitalizeChoice(record?.thigh, "Average"),
-    cupSize: gender === "Female" ? capitalizeChoice(record?.cup_size || record?.cupSize, "B") : null,
+    cupSize:
+      gender === "Female"
+        ? capitalizeChoice(
+            record?.cup_size || record?.cupSize,
+            "B"
+          )
+        : null,
     builtIn: false,
   };
 }
 
 function loadAvatar(isGuest) {
   const storage = isGuest ? sessionStorage : localStorage;
-  const genderKey = isGuest ? "fitfusion-guest-avatar-gender" : "fitfusion-avatar-gender";
-  const presetKey = isGuest ? "fitfusion-guest-avatar-preset" : "fitfusion-avatar-preset";
 
-  let savedPreset = null;
-  try {
-    savedPreset = JSON.parse(storage.getItem(presetKey) || "null");
-  } catch {
-    savedPreset = null;
-  }
+  const genderKey = isGuest
+    ? "fitfusion-guest-avatar-gender"
+    : "fitfusion-avatar-gender";
+
+  const presetKey = isGuest
+    ? "fitfusion-guest-avatar-preset"
+    : "fitfusion-avatar-preset";
+
+  const savedPreset = readJson(storage, presetKey);
 
   return {
-    gender: normalizeGender(storage.getItem(genderKey) || savedPreset?.gender || "Female"),
+    gender: normalizeGender(
+      storage.getItem(genderKey) ||
+        savedPreset?.gender ||
+        "Female"
+    ),
     height: savedPreset?.height || "160",
     weight: savedPreset?.weight || "55",
     shoulder: capitalizeChoice(savedPreset?.shoulder, "Average"),
@@ -303,15 +465,73 @@ function loadAvatar(isGuest) {
     hip: capitalizeChoice(savedPreset?.hip, "Average"),
     cupSize: savedPreset?.cupSize || "B",
     thigh: capitalizeChoice(savedPreset?.thigh, "Average"),
-    skinTone: savedPreset?.skinTone || savedPreset?.skin_tone || "#dca77d",
+    skinTone:
+      savedPreset?.skinTone ||
+      savedPreset?.skin_tone ||
+      "#dca77d",
     undertone: capitalizeChoice(savedPreset?.undertone, "Neutral"),
   };
+}
+
+/*
+  Match-service adapter contract:
+
+  loadMatchReasons({ item, avatar, isGuest, signal })
+
+  Return:
+  {
+    colorCompatibility: { score, maxScore, reason },
+    heightContrast: { score, maxScore, reason },
+    proportionShading: { score, maxScore, reason },
+    styleOccasion: { score, maxScore, reason }
+  }
+
+  Each score must be a finite number between 0 and maxScore.
+  Each maxScore must be a positive finite number.
+  Each reason must be a non-empty string.
+
+  This is the frontend contract, not an assumed existing API.
+  No scores are generated or guessed here.
+*/
+
+function validateMatchDetails(details) {
+  if (!details || typeof details !== "object") {
+    throw new Error("Match details unavailable");
+  }
+
+  return MATCH_CATEGORIES.map(({ key, label }) => {
+    const entry = details[key];
+
+    if (
+      !entry ||
+      typeof entry.score !== "number" ||
+      typeof entry.maxScore !== "number" ||
+      !Number.isFinite(entry.score) ||
+      !Number.isFinite(entry.maxScore) ||
+      entry.maxScore <= 0 ||
+      entry.score < 0 ||
+      entry.score > entry.maxScore ||
+      typeof entry.reason !== "string" ||
+      !entry.reason.trim()
+    ) {
+      throw new Error(`Missing or invalid match detail: ${key}`);
+    }
+
+    return {
+      key,
+      label,
+      score: entry.score,
+      maxScore: entry.maxScore,
+      reason: entry.reason.trim(),
+    };
+  });
 }
 
 function ControlGroup({ label, value, options, onChange }) {
   return (
     <div className="studio-control-group">
       <span>{label}</span>
+
       <div>
         {options.map((option) => (
           <button
@@ -329,50 +549,384 @@ function ControlGroup({ label, value, options, onChange }) {
   );
 }
 
-function FittingStudioPage({ isGuest = false }) {
-  const navigate = useNavigate();
+/*
+  Kept inside FittingStudioPage.jsx.
+  No additional JSX file is needed.
+*/
+function MatchReasonsCard({
+  item,
+  avatar,
+  isGuest,
+  requestVersion,
+  loadMatchReasons,
+  onBrowse,
+  onTryItem,
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [requestCount, setRequestCount] = useState(0);
+  const [result, setResult] = useState({
+    status: "idle",
+    rows: [],
+    context: "",
+  });
 
-  const [avatar, setAvatar] = useState(() => readStudioSession(isGuest)?.avatar || loadAvatar(isGuest));
+  // A changed avatar or selected item invalidates previous scores.
+  const context = JSON.stringify({
+    item,
+    avatar,
+    isGuest,
+  });
+
+  const previousContext = useRef(context);
+  const previousRequestVersion = useRef(requestVersion);
+
+  useEffect(() => {
+    const requestedFromRecommendation =
+      previousRequestVersion.current !== requestVersion;
+
+    const contextChanged =
+      previousContext.current !== context;
+
+    previousRequestVersion.current = requestVersion;
+    previousContext.current = context;
+
+    if (requestedFromRecommendation) {
+      setExpanded(true);
+      setRequestCount((count) => count + 1);
+    } else if (contextChanged) {
+      setExpanded(false);
+      setResult({
+        status: "idle",
+        rows: [],
+        context: "",
+      });
+    }
+  }, [context, requestVersion]);
+
+  useEffect(() => {
+    if (!expanded || !item) return;
+
+    const controller = new AbortController();
+    let active = true;
+
+    setResult({
+      status: "loading",
+      rows: [],
+      context,
+    });
+
+    async function fetchMatchDetails() {
+      try {
+        if (typeof loadMatchReasons !== "function") {
+          throw new Error("Match service has not been connected");
+        }
+
+        const details = await loadMatchReasons({
+          item,
+          avatar: { ...avatar },
+          isGuest,
+          signal: controller.signal,
+        });
+
+        const rows = validateMatchDetails(details);
+
+        if (active) {
+          setResult({
+            status: "success",
+            rows,
+            context,
+          });
+        }
+      } catch (error) {
+        if (!active || controller.signal.aborted) return;
+
+        console.warn("Unable to load match reasons:", error);
+
+        setResult({
+          status: "error",
+          rows: [],
+          context,
+        });
+      }
+    }
+
+    fetchMatchDetails();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [
+    expanded,
+    requestCount,
+    context,
+    item,
+    avatar,
+    isGuest,
+    loadMatchReasons,
+  ]);
+
+  const currentResult =
+    result.context === context
+      ? result
+      : { status: "idle", rows: [] };
+
+  const loading =
+    expanded &&
+    (currentResult.status === "loading" ||
+      currentResult.status === "idle");
+
+  return (
+    <section
+      className="studio-match-card"
+      aria-labelledby="studio-match-heading"
+    >
+      <div className="studio-match-heading">
+        <span className="studio-match-icon" aria-hidden="true">
+          ✧
+        </span>
+
+        <div>
+          <p>RECOMMENDATION DETAILS</p>
+          <h2 id="studio-match-heading">View Match Reasons</h2>
+        </div>
+      </div>
+
+      {!item ? (
+        <div className="studio-match-empty">
+          <p>
+            Select View Match Reasons on a recommended item to
+            review its scores and explanation.
+          </p>
+
+          <button
+            type="button"
+            className="studio-match-outline-button"
+            onClick={onBrowse}
+          >
+            Browse Recommendations
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="studio-match-selected-item">
+            <span>SELECTED ITEM</span>
+            <h3>{item.name}</h3>
+
+            <p>
+              {item.store}
+              {item.sampleOnly && " · Sample"}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="studio-match-primary-button"
+            aria-expanded={expanded}
+            aria-controls="studio-match-breakdown"
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? "Hide Match Reasons" : "View Match Reasons"}
+            <span aria-hidden="true">{expanded ? "−" : "+"}</span>
+          </button>
+
+          {expanded && (
+            <div
+              id="studio-match-breakdown"
+              className="studio-match-breakdown"
+              aria-busy={loading}
+            >
+              {loading && (
+                <p className="studio-match-status" role="status">
+                  Loading match details...
+                </p>
+              )}
+
+              {currentResult.status === "error" && (
+                <div className="studio-match-error">
+                  <p role="alert">
+                    Match details unavailable. Please retry.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="studio-match-outline-button"
+                    onClick={() =>
+                      setRequestCount((count) => count + 1)
+                    }
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {currentResult.status === "success" && (
+                <div className="studio-match-score-list">
+                  {currentResult.rows.map((row) => (
+                    <article
+                      key={row.key}
+                      className="studio-match-score"
+                    >
+                      <div className="studio-match-score-heading">
+                        <h3>{row.label}</h3>
+
+                        <strong>
+                          {row.score}/{row.maxScore}
+                        </strong>
+                      </div>
+
+                      <meter
+                        min={0}
+                        max={row.maxScore}
+                        value={row.score}
+                        aria-label={`${row.label} score`}
+                      >
+                        {row.score} out of {row.maxScore}
+                      </meter>
+
+                      <p>{row.reason}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              <div className="studio-match-actions">
+                <button
+                  type="button"
+                  className="studio-match-outline-button"
+                  onClick={() => {
+                    setExpanded(false);
+                    onBrowse();
+                  }}
+                >
+                  Back to Recommendations
+                </button>
+
+                <button
+                  type="button"
+                  className="studio-match-primary-button"
+                  onClick={() => onTryItem(item)}
+                >
+                  Try Item
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function FittingStudioPage({
+  isGuest = false,
+  loadMatchReasons,
+}) {
+  const navigate = useNavigate();
+  const recommendationsRef = useRef(null);
+  const matchPanelRef = useRef(null);
+
+  const [avatar, setAvatar] = useState(
+    () => readStudioSession(isGuest)?.avatar || loadAvatar(isGuest)
+  );
+
   const [currentView, setCurrentView] = useState(() => {
-    const stored = readStudioSession(isGuest)?.currentView || "Front";
+    const stored =
+      readStudioSession(isGuest)?.currentView || "Front";
+
     return STUDIO_VIEWS.includes(stored) ? stored : "Front";
   });
+
   const [activePanel, setActivePanel] = useState("customize");
+
   const [equippedItems, setEquippedItems] = useState(
-    () => readStudioSession(isGuest)?.equippedItems || { top: null, bottom: null, shoes: null }
+    () =>
+      readStudioSession(isGuest)?.equippedItems || {
+        top: null,
+        bottom: null,
+        shoes: null,
+      }
   );
+
   const [originalDimensions, setOriginalDimensions] = useState(
     () => readStudioSession(isGuest)?.originalDimensions || null
   );
-  const [catalogRecommendations, setCatalogRecommendations] = useState([]);
+
+  const [catalogRecommendations, setCatalogRecommendations] =
+    useState([]);
+
   const [catalogLoading, setCatalogLoading] = useState(true);
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
-  const [showSaveOutfitModal, setShowSaveOutfitModal] = useState(false);
-  const [showSaveAvatarModal, setShowSaveAvatarModal] = useState(false);
+
+  const [selectedMatchItem, setSelectedMatchItem] = useState(null);
+  const [matchRequestVersion, setMatchRequestVersion] = useState(0);
+
+  const [showRegistrationModal, setShowRegistrationModal] =
+    useState(false);
+
+  const [showSaveOutfitModal, setShowSaveOutfitModal] =
+    useState(false);
+
+  const [showSaveAvatarModal, setShowSaveAvatarModal] =
+    useState(false);
+
   const [avatarPresetName, setAvatarPresetName] = useState("");
-  const [avatarPresetNameError, setAvatarPresetNameError] = useState("");
+  const [avatarPresetNameError, setAvatarPresetNameError] =
+    useState("");
+
   const [outfitName, setOutfitName] = useState("");
   const [outfitNameError, setOutfitNameError] = useState("");
   const [notification, setNotification] = useState("");
 
   const basePath = isGuest ? "/guest" : "/shopper";
   const isFemale = avatar.gender.toLowerCase() === "female";
-
-  // UI-ONLY: Body Build replaces the Weight control (weight stays internal).
   const bodyBuild = calculateBodyType(avatar.height, avatar.weight);
 
-  const equippedItemsArray = useMemo(() => Object.values(equippedItems).filter(Boolean), [equippedItems]);
-  const fitLimits = useMemo(() => combinedFitLimits(equippedItems), [equippedItems]);
+  const equippedItemsArray = useMemo(
+    () => Object.values(equippedItems).filter(Boolean),
+    [equippedItems]
+  );
 
-  const atHeightMax = fitLimits.hasHeightMaximum && Number(avatar.height) >= fitLimits.height.max;
-  const atWeightMax = fitLimits.hasWeightMaximum && Number(avatar.weight) >= fitLimits.weight.max;
+  const fitLimits = useMemo(
+    () => combinedFitLimits(equippedItems),
+    [equippedItems]
+  );
+
+  const recommendationItems = useMemo(
+    () =>
+      catalogRecommendations.length
+        ? catalogRecommendations
+        : RECOMMENDED_ITEMS.map((item) => ({
+            ...item,
+            sampleOnly: true,
+          })),
+    [catalogRecommendations]
+  );
+
+  const atHeightMax =
+    fitLimits.hasHeightMaximum &&
+    Number(avatar.height) >= fitLimits.height.max;
+
+  const atWeightMax =
+    fitLimits.hasWeightMaximum &&
+    Number(avatar.weight) >= fitLimits.weight.max;
 
   useEffect(() => {
     sessionStorage.setItem(
       sessionKey(isGuest),
-      JSON.stringify({ avatar, currentView, equippedItems, originalDimensions })
+      JSON.stringify({
+        avatar,
+        currentView,
+        equippedItems,
+        originalDimensions,
+      })
     );
-  }, [avatar, currentView, equippedItems, originalDimensions, isGuest]);
+  }, [
+    avatar,
+    currentView,
+    equippedItems,
+    originalDimensions,
+    isGuest,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -380,20 +934,37 @@ function FittingStudioPage({ isGuest = false }) {
     async function loadRecommendations() {
       try {
         const response = await fetch(`${API_URL}/catalog/`);
-        if (!response.ok) throw new Error("Catalog unavailable");
+
+        if (!response.ok) {
+          throw new Error("Catalog unavailable");
+        }
+
         const data = await response.json();
-        const records = Array.isArray(data) ? data : data.results || data.products || [];
+
+        const records = Array.isArray(data)
+          ? data
+          : data.results || data.products || [];
+
         if (active) {
-          setCatalogRecommendations(records.map(normalizeStudioItem).filter(Boolean).slice(0, 12));
+          setCatalogRecommendations(
+            records
+              .map(normalizeStudioItem)
+              .filter(Boolean)
+              .slice(0, 12)
+          );
         }
       } catch (error) {
-        console.warn("Unable to load catalog recommendations:", error);
+        console.warn(
+          "Unable to load catalog recommendations:",
+          error
+        );
       } finally {
         if (active) setCatalogLoading(false);
       }
     }
 
     loadRecommendations();
+
     return () => {
       active = false;
     };
@@ -402,57 +973,85 @@ function FittingStudioPage({ isGuest = false }) {
   useEffect(() => {
     const key = pendingKey(isGuest);
     const pending = readJson(sessionStorage, key);
+
     if (!pending) return;
+
     sessionStorage.removeItem(key);
 
     const item = normalizeStudioItem(pending);
+
     if (!item) return;
 
-    const next = { ...equippedItems, [item.category]: item };
+    const next = {
+      ...equippedItems,
+      [item.category]: item,
+    };
+
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
-      displayNotification("These garment sizes have conflicting fitting limits. Try another size.");
+      displayNotification(
+        "These garment sizes have conflicting fitting limits. Try another size."
+      );
       return;
     }
 
     if (!Object.values(equippedItems).some(Boolean)) {
-      setOriginalDimensions({ height: avatar.height, weight: avatar.weight });
+      setOriginalDimensions({
+        height: avatar.height,
+        weight: avatar.weight,
+      });
     }
 
     setEquippedItems(next);
+    setSelectedMatchItem(item);
     setAvatar((current) => applyFitLimits(current, nextLimits));
 
-    if (!nextLimits.hasHeight && !nextLimits.hasWeight) {
-      displayNotification(`${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`);
-    } else {
-      displayNotification(`${item.name} equipped. Preview adjusted to its available fitting limits.`);
-    }
+    displayNotification(
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
+        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
+    );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function openProductDetails(item) {
-    if (item.sampleOnly) {
-      displayNotification("This is a sample preview, not a catalog listing. Open Catalog to view real product details.");
-      return;
-    }
-    sessionStorage.setItem(
-      sessionKey(isGuest),
-      JSON.stringify({ avatar, currentView, equippedItems, originalDimensions })
-    );
-    navigate(`${basePath}/products/${encodeURIComponent(item.id)}`, { state: { fromFittingStudio: true } });
-  }
-
   useEffect(() => {
     if (isGuest) {
-      sessionStorage.setItem("fitfusion-guest-avatar-preset", JSON.stringify(avatar));
+      sessionStorage.setItem(
+        "fitfusion-guest-avatar-preset",
+        JSON.stringify(avatar)
+      );
     }
   }, [avatar, isGuest]);
 
   function displayNotification(message) {
     setNotification(message);
     window.setTimeout(() => setNotification(""), 2500);
+  }
+
+  function openProductDetails(item) {
+    if (item.sampleOnly) {
+      displayNotification(
+        "This is a sample preview, not a catalog listing. Open Catalog to view real product details."
+      );
+      return;
+    }
+
+    sessionStorage.setItem(
+      sessionKey(isGuest),
+      JSON.stringify({
+        avatar,
+        currentView,
+        equippedItems,
+        originalDimensions,
+      })
+    );
+
+    navigate(
+      `${basePath}/products/${encodeURIComponent(item.id)}`,
+      { state: { fromFittingStudio: true } }
+    );
   }
 
   function updateAvatar(field, value) {
@@ -462,25 +1061,53 @@ function FittingStudioPage({ isGuest = false }) {
       const adjusted = clamp(requested, range);
 
       if (requested > range.max) {
-        displayNotification(`Maximum ${field === "weight" ? "body build" : field} preview reached for the selected garment size.`);
+        displayNotification(
+          `Maximum ${
+            field === "weight" ? "body build" : field
+          } preview reached for the selected garment size.`
+        );
       } else if (requested < range.min) {
-        displayNotification(`Minimum ${field === "weight" ? "body build" : field} preview reached for the selected garment size.`);
+        displayNotification(
+          `Minimum ${
+            field === "weight" ? "body build" : field
+          } preview reached for the selected garment size.`
+        );
       }
 
-      setAvatar((current) => ({ ...current, [field]: String(adjusted) }));
+      setAvatar((current) => ({
+        ...current,
+        [field]: String(adjusted),
+      }));
+
       return;
     }
-    setAvatar((current) => ({ ...current, [field]: value }));
+
+    setAvatar((current) => ({
+      ...current,
+      [field]: value,
+    }));
   }
 
   function selectBodyBuild(build) {
-    setAvatar((current) => ({ ...current, weight: String(weightForBuild(build, current.height)) }));
+    setAvatar((current) => ({
+      ...current,
+      weight: String(weightForBuild(build, current.height)),
+    }));
   }
 
   function notifyAtLimit(field) {
-    const flag = `has${field[0].toUpperCase()}${field.slice(1)}Maximum`;
-    if (fitLimits[flag] && Number(avatar[field]) >= fitLimits[field].max) {
-      displayNotification(`Maximum ${field === "weight" ? "body build" : field} preview reached for this clothing size. Move the slider backward or choose another size.`);
+    const flag =
+      `has${field[0].toUpperCase()}${field.slice(1)}Maximum`;
+
+    if (
+      fitLimits[flag] &&
+      Number(avatar[field]) >= fitLimits[field].max
+    ) {
+      displayNotification(
+        `Maximum ${
+          field === "weight" ? "body build" : field
+        } preview reached for this clothing size. Move the slider backward or choose another size.`
+      );
     }
   }
 
@@ -488,15 +1115,12 @@ function FittingStudioPage({ isGuest = false }) {
     setShowRegistrationModal(true);
   }
 
-  // =====================================
-  // SAVE AVATAR PRESET (DATABASE)
-  // =====================================
-
   function handleSavePreset() {
     if (isGuest) {
       openRegistrationPopup();
       return;
     }
+
     setAvatarPresetName("");
     setAvatarPresetNameError("");
     setShowSaveAvatarModal(true);
@@ -520,25 +1144,38 @@ function FittingStudioPage({ isGuest = false }) {
     const name = avatarPresetName.trim().replace(/\s+/g, " ");
 
     if (!name) {
-      setAvatarPresetNameError("Please enter a preset name before saving.");
+      setAvatarPresetNameError(
+        "Please enter a preset name before saving."
+      );
       return;
     }
 
     if (name.length > 50) {
-      setAvatarPresetNameError("Preset name must not exceed 50 characters.");
+      setAvatarPresetNameError(
+        "Preset name must not exceed 50 characters."
+      );
       return;
     }
 
     try {
       const existing = await presetsApi.list();
-      const savedPresets = Array.isArray(existing) ? existing : existing.results || [];
+
+      const savedPresets = Array.isArray(existing)
+        ? existing
+        : existing.results || [];
 
       const isDuplicate =
         name.toLowerCase() === "fitfusion standard" ||
-        savedPresets.some((preset) => String(preset.name || "").trim().toLowerCase() === name.toLowerCase());
+        savedPresets.some(
+          (preset) =>
+            String(preset.name || "").trim().toLowerCase() ===
+            name.toLowerCase()
+        );
 
       if (isDuplicate) {
-        setAvatarPresetNameError("This preset name already exists. Please choose another name.");
+        setAvatarPresetNameError(
+          "This preset name already exists. Please choose another name."
+        );
         return;
       }
 
@@ -546,81 +1183,143 @@ function FittingStudioPage({ isGuest = false }) {
       const created = await presetsApi.create(newPreset);
       const savedPreset = fromServerPreset(created);
 
-      localStorage.setItem("fitfusion-avatar-presets", JSON.stringify([savedPreset]));
-      localStorage.setItem("fitfusion-avatar-preset", JSON.stringify(savedPreset));
-      localStorage.setItem("fitfusion-avatar-gender", savedPreset.gender);
+      localStorage.setItem(
+        "fitfusion-avatar-presets",
+        JSON.stringify([savedPreset])
+      );
+
+      localStorage.setItem(
+        "fitfusion-avatar-preset",
+        JSON.stringify(savedPreset)
+      );
+
+      localStorage.setItem(
+        "fitfusion-avatar-gender",
+        savedPreset.gender
+      );
 
       closeSaveAvatarModal();
       displayNotification(`“${name}” was saved to Avatar Presets.`);
     } catch (error) {
       console.error("Unable to save avatar preset:", error);
-      setAvatarPresetNameError("Unable to save your avatar preset. Please try again.");
+
+      setAvatarPresetNameError(
+        "Unable to save your avatar preset. Please try again."
+      );
     }
   }
 
-  // =====================================
-  // EQUIP / REMOVE CLOTHING
-  // =====================================
-
   function tryRecommendedItem(rawItem) {
     const item = normalizeStudioItem(rawItem);
+
     if (!item) return;
 
-    const next = { ...equippedItems, [item.category]: item };
+    const next = {
+      ...equippedItems,
+      [item.category]: item,
+    };
+
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
-      displayNotification("Selected garment sizes have incompatible fitting limits. Choose a different size.");
+      displayNotification(
+        "Selected garment sizes have incompatible fitting limits. Choose a different size."
+      );
       return;
     }
 
     if (!equippedItemsArray.length) {
-      setOriginalDimensions({ height: avatar.height, weight: avatar.weight });
+      setOriginalDimensions({
+        height: avatar.height,
+        weight: avatar.weight,
+      });
     }
 
+    setSelectedMatchItem(item);
     setEquippedItems(next);
     setAvatar((current) => applyFitLimits(current, nextLimits));
 
-    if (!nextLimits.hasHeight && !nextLimits.hasWeight) {
-      displayNotification(`${item.name} equipped. No verified height/weight limits were supplied for this size.`);
-    } else {
-      displayNotification(`${item.name} equipped. Avatar preview adjusted within the garment limits.`);
-    }
+    displayNotification(
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. No verified height/weight limits were supplied for this size.`
+        : `${item.name} equipped. Avatar preview adjusted within the garment limits.`
+    );
   }
 
   function removeEquippedItem(category) {
-    const next = { ...equippedItems, [category]: null };
+    const next = {
+      ...equippedItems,
+      [category]: null,
+    };
+
     const hasRemaining = Object.values(next).some(Boolean);
 
     setEquippedItems(next);
 
     if (!hasRemaining) {
       if (originalDimensions) {
-        setAvatar((current) => ({ ...current, ...originalDimensions }));
+        setAvatar((current) => ({
+          ...current,
+          ...originalDimensions,
+        }));
       }
+
       setOriginalDimensions(null);
     } else {
-      setAvatar((current) => applyFitLimits(current, combinedFitLimits(next)));
+      setAvatar((current) =>
+        applyFitLimits(current, combinedFitLimits(next))
+      );
     }
   }
 
   function handleRecommendations() {
     setActivePanel("recommendations");
+
+    window.requestAnimationFrame(() => {
+      recommendationsRef.current?.focus({
+        preventScroll: true,
+      });
+
+      recommendationsRef.current?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    });
   }
 
-  // =====================================
-  // SAVE OUTFIT (DATABASE)
-  // =====================================
+  function handleViewMatchReasons(rawItem) {
+    const item = normalizeStudioItem(rawItem);
+
+    if (!item) return;
+
+    setSelectedMatchItem(item);
+    setMatchRequestVersion((version) => version + 1);
+
+    window.requestAnimationFrame(() => {
+      matchPanelRef.current?.focus({
+        preventScroll: true,
+      });
+
+      matchPanelRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "auto",
+      });
+    });
+  }
 
   function saveOutfit() {
     if (isGuest) {
       openRegistrationPopup();
       return;
     }
+
     if (equippedItemsArray.length === 0) {
-      displayNotification("Try at least one clothing item before saving.");
+      displayNotification(
+        "Try at least one clothing item before saving."
+      );
       return;
     }
+
     setOutfitName("");
     setOutfitNameError("");
     setShowSaveOutfitModal(true);
@@ -638,12 +1337,16 @@ function FittingStudioPage({ isGuest = false }) {
     const trimmedName = outfitName.trim();
 
     if (!trimmedName) {
-      setOutfitNameError("Please enter an outfit name before saving.");
+      setOutfitNameError(
+        "Please enter an outfit name before saving."
+      );
       return;
     }
 
     if (trimmedName.length > 50) {
-      setOutfitNameError("Outfit name must not exceed 50 characters.");
+      setOutfitNameError(
+        "Outfit name must not exceed 50 characters."
+      );
       return;
     }
 
@@ -676,22 +1379,27 @@ function FittingStudioPage({ isGuest = false }) {
     try {
       await outfitsApi.create(newOutfit);
       closeSaveOutfitModal();
-      window.dispatchEvent(new Event("fitfusion-outfits-updated"));
-      displayNotification(`"${trimmedName}" was saved successfully!`);
+
+      window.dispatchEvent(
+        new Event("fitfusion-outfits-updated")
+      );
+
+      displayNotification(
+        `"${trimmedName}" was saved successfully!`
+      );
     } catch {
-      setOutfitNameError("Unable to save your outfit. Please try again.");
+      setOutfitNameError(
+        "Unable to save your outfit. Please try again."
+      );
     }
   }
-
-  // =====================================
-  // CART
-  // =====================================
 
   function continueToCart() {
     if (isGuest) {
       openRegistrationPopup();
       return;
     }
+
     if (equippedItemsArray.length === 0) {
       displayNotification("Try at least one clothing item first.");
       return;
@@ -699,24 +1407,37 @@ function FittingStudioPage({ isGuest = false }) {
 
     localStorage.setItem(
       "fitfusion-selected-items",
-      JSON.stringify(equippedItemsArray.map((item) => ({ ...item, quantity: 1 })))
+      JSON.stringify(
+        equippedItemsArray.map((item) => ({
+          ...item,
+          quantity: 1,
+        }))
+      )
     );
+
     navigate("/shopper/fitting-studio/select-items");
   }
 
   return (
-    <main className={`fitting-studio-page ${isGuest ? "guest-studio" : ""}`}>
+    <main
+      className={`fitting-studio-page ${
+        isGuest ? "guest-studio" : ""
+      }`}
+    >
       <div className="studio-body">
-        {/* INTRODUCTION */}
         <section className="studio-introduction">
           <div>
             <p>VIRTUAL FITTING</p>
             <h1>Customize and try clothing</h1>
+
             <span>
-              Customize your avatar and switch between Front and Rear views.
-              {isGuest && " Your changes are temporary and will be removed when the guest session ends."}
+              Customize your avatar and switch between Front and
+              Rear views.
+              {isGuest &&
+                " Your changes are temporary and will be removed when the guest session ends."}
             </span>
           </div>
+
           <button
             type="button"
             className="studio-change-gender"
@@ -729,22 +1450,32 @@ function FittingStudioPage({ isGuest = false }) {
           </button>
         </section>
 
-        {/* MAIN WORKSPACE */}
         <div className="studio-workspace">
-          {/* CUSTOMIZATION PANEL */}
-          <section className="studio-controls-card">
+          <section
+            className="studio-controls-card"
+            ref={recommendationsRef}
+            tabIndex={-1}
+            aria-label="Avatar customization and recommendations"
+          >
             <div className="studio-panel-tabs">
               <button
                 type="button"
-                className={activePanel === "customize" ? "active" : ""}
+                className={
+                  activePanel === "customize" ? "active" : ""
+                }
                 aria-pressed={activePanel === "customize"}
                 onClick={() => setActivePanel("customize")}
               >
                 Customize
               </button>
+
               <button
                 type="button"
-                className={activePanel === "recommendations" ? "active" : ""}
+                className={
+                  activePanel === "recommendations"
+                    ? "active"
+                    : ""
+                }
                 aria-pressed={activePanel === "recommendations"}
                 onClick={() => setActivePanel("recommendations")}
               >
@@ -759,13 +1490,13 @@ function FittingStudioPage({ isGuest = false }) {
                   <strong>{avatar.gender}</strong>
                 </div>
 
-                {/* HEIGHT SLIDER + BODY BUILD (Weight control removed from UI) */}
                 <div className="studio-measurement-grid">
                   <div className="studio-slider-field">
                     <div className="studio-slider-header">
                       <label htmlFor="studio-height">Height</label>
                       <strong>{avatar.height} cm</strong>
                     </div>
+
                     <input
                       id="studio-height"
                       className="studio-slider"
@@ -776,8 +1507,11 @@ function FittingStudioPage({ isGuest = false }) {
                       value={clamp(avatar.height, fitLimits.height)}
                       onPointerUp={() => notifyAtLimit("height")}
                       onKeyUp={() => notifyAtLimit("height")}
-                      onChange={(event) => updateAvatar("height", event.target.value)}
+                      onChange={(event) =>
+                        updateAvatar("height", event.target.value)
+                      }
                     />
+
                     <div className="studio-slider-limits">
                       <span>{fitLimits.height.min} cm</span>
                       <span>{fitLimits.height.max} cm</span>
@@ -785,9 +1519,13 @@ function FittingStudioPage({ isGuest = false }) {
                   </div>
                 </div>
 
-                <ControlGroup label="Body Build" value={bodyBuild} options={BODY_BUILDS} onChange={selectBodyBuild} />
+                <ControlGroup
+                  label="Body Build"
+                  value={bodyBuild}
+                  options={BODY_BUILDS}
+                  onChange={selectBodyBuild}
+                />
 
-                {/* CLOTHING SIZE VALIDATION */}
                 {equippedItemsArray.length > 0 && (
                   <div
                     className="studio-fit-validation"
@@ -806,67 +1544,104 @@ function FittingStudioPage({ isGuest = false }) {
                     {atHeightMax || atWeightMax ? (
                       <strong>
                         Maximum{" "}
-                        {atHeightMax && atWeightMax ? "height and body build" : atHeightMax ? "height" : "body build"}{" "}
-                        preview reached for the selected garment size. You can move the slider backward, but not
-                        beyond its maximum.
+                        {atHeightMax && atWeightMax
+                          ? "height and body build"
+                          : atHeightMax
+                            ? "height"
+                            : "body build"}{" "}
+                        preview reached for the selected garment
+                        size. You can move the slider backward,
+                        but not beyond its maximum.
                       </strong>
-                    ) : fitLimits.hasHeight || fitLimits.hasWeight ? (
-                      <span>Garment size limits are active on the existing Height and Body Build controls where seller data is available.</span>
+                    ) : fitLimits.hasHeight ||
+                      fitLimits.hasWeight ? (
+                      <span>
+                        Garment size limits are active on the
+                        existing Height and Body Build controls
+                        where seller data is available.
+                      </span>
                     ) : (
                       <span>
-                        No verified height or weight limits were provided for these garments. Your normal slider
-                        limits remain available; clothing size alone cannot determine body build or height.
+                        No verified height or weight limits were
+                        provided for these garments. Your normal
+                        slider limits remain available; clothing
+                        size alone cannot determine body build
+                        or height.
                       </span>
                     )}
                   </div>
                 )}
 
-                {/* BODY PROPORTIONS */}
                 <ControlGroup
                   label="Shoulder Width"
                   value={avatar.shoulder}
                   options={["Narrow", "Average", "Broad"]}
-                  onChange={(value) => updateAvatar("shoulder", value)}
+                  onChange={(value) =>
+                    updateAvatar("shoulder", value)
+                  }
                 />
+
                 <ControlGroup
                   label="Waist"
                   value={avatar.waist}
                   options={["Slim", "Average", "Curvy"]}
-                  onChange={(value) => updateAvatar("waist", value)}
+                  onChange={(value) =>
+                    updateAvatar("waist", value)
+                  }
                 />
+
                 <ControlGroup
                   label="Hip"
                   value={avatar.hip}
                   options={["Slim", "Average", "Wide"]}
                   onChange={(value) => updateAvatar("hip", value)}
                 />
+
                 {isFemale && (
                   <ControlGroup
                     label="Cup Size"
                     value={avatar.cupSize}
                     options={["A", "B", "C", "D"]}
-                    onChange={(value) => updateAvatar("cupSize", value)}
+                    onChange={(value) =>
+                      updateAvatar("cupSize", value)
+                    }
                   />
                 )}
+
                 <ControlGroup
                   label="Thigh"
                   value={avatar.thigh}
                   options={["Slim", "Average", "Thick"]}
-                  onChange={(value) => updateAvatar("thigh", value)}
+                  onChange={(value) =>
+                    updateAvatar("thigh", value)
+                  }
                 />
 
-                {/* SKIN TONE */}
                 <div className="studio-skin-section">
                   <span>Skin Tone</span>
+
                   <div className="studio-skin-options">
                     {SKIN_TONES.map((skinTone) => (
                       <button
                         key={skinTone.name}
                         type="button"
-                        className={avatar.skinTone === skinTone.value ? "selected" : ""}
-                        style={{ backgroundColor: skinTone.value }}
-                        onClick={() => updateAvatar("skinTone", skinTone.value)}
-                        aria-pressed={avatar.skinTone === skinTone.value}
+                        className={
+                          avatar.skinTone === skinTone.value
+                            ? "selected"
+                            : ""
+                        }
+                        style={{
+                          backgroundColor: skinTone.value,
+                        }}
+                        onClick={() =>
+                          updateAvatar(
+                            "skinTone",
+                            skinTone.value
+                          )
+                        }
+                        aria-pressed={
+                          avatar.skinTone === skinTone.value
+                        }
                         aria-label={skinTone.name}
                         title={skinTone.name}
                       />
@@ -878,68 +1653,97 @@ function FittingStudioPage({ isGuest = false }) {
                   label="Undertone"
                   value={avatar.undertone}
                   options={["Warm", "Cool", "Neutral"]}
-                  onChange={(value) => updateAvatar("undertone", value)}
+                  onChange={(value) =>
+                    updateAvatar("undertone", value)
+                  }
                 />
 
                 <button
                   type="button"
-                  className={isGuest ? "studio-registration-button" : "studio-save-preset"}
+                  className={
+                    isGuest
+                      ? "studio-registration-button"
+                      : "studio-save-preset"
+                  }
                   onClick={handleSavePreset}
                 >
-                  {isGuest ? "Registration Required to Save" : "Save Avatar Preset"}
+                  {isGuest
+                    ? "Registration Required to Save"
+                    : "Save Avatar Preset"}
                 </button>
               </div>
             ) : (
-              /* RECOMMENDATIONS */
               <div className="studio-recommendations-panel">
                 <p className="studio-recommendation-note">
-                  Select Try Item to preview clothing on your avatar. Click a catalog product name to view its
-                  details. Sample-only picks are not linked to real listings.
+                  Select Try Item to preview clothing on your
+                  avatar. Select View Match Reasons to review
+                  its recommendation details. Click a catalog
+                  product name to view its listing. Sample-only
+                  picks are not linked to real listings.
                 </p>
 
-                {catalogLoading && <p>Loading catalog clothing...</p>}
+                {catalogLoading && (
+                  <p role="status">Loading catalog clothing...</p>
+                )}
 
-                {(catalogRecommendations.length
-                  ? catalogRecommendations
-                  : RECOMMENDED_ITEMS.map((item) => ({ ...item, sampleOnly: true }))
-                ).map((item) => (
-                  <article key={item.id} className="studio-recommendation-item">
-                    <div className={`studio-clothing-thumbnail ${item.category}`} aria-hidden="true">
+                {recommendationItems.map((item) => (
+                  <article
+                    key={item.id}
+                    className={`studio-recommendation-item ${
+                      selectedMatchItem &&
+                      String(selectedMatchItem.id) ===
+                        String(item.id)
+                        ? "match-selected"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      className={`studio-clothing-thumbnail ${item.category}`}
+                      aria-hidden="true"
+                    >
                       <span />
                     </div>
 
                     <div className="studio-recommendation-information">
                       <h3>
                         {item.sampleOnly ? (
-                          <span title="Sample preview — not linked to a real catalog listing">{item.name} (Sample)</span>
+                          <span title="Sample preview — not linked to a real catalog listing">
+                            {item.name} (Sample)
+                          </span>
                         ) : (
                           <button
                             type="button"
                             className="studio-product-link"
-                            onClick={() => openProductDetails(item)}
-                            style={{
-                              border: 0,
-                              padding: 0,
-                              background: "none",
-                              color: "inherit",
-                              textDecoration: "underline",
-                              textUnderlineOffset: "3px",
-                              cursor: "pointer",
-                              font: "inherit",
-                              textAlign: "left",
-                            }}
+                            onClick={() =>
+                              openProductDetails(item)
+                            }
                             title="View product details"
                           >
                             {item.name}
                           </button>
                         )}
                       </h3>
+
                       <p>{item.store}</p>
-                      <strong>{formatCurrency(item.price)}</strong>
+                      <strong>
+                        {formatCurrency(item.price)}
+                      </strong>
                     </div>
 
-                    <button type="button" onClick={() => tryRecommendedItem(item)}>
+                    <button
+                      type="button"
+                      onClick={() => tryRecommendedItem(item)}
+                    >
                       Try Item
+                    </button>
+
+                    <button
+                      type="button"
+                      className="studio-recommendation-match-button"
+                      onClick={() => handleViewMatchReasons(item)}
+                      aria-label={`View match reasons for ${item.name}`}
+                    >
+                      View Match Reasons
                     </button>
                   </article>
                 ))}
@@ -947,14 +1751,15 @@ function FittingStudioPage({ isGuest = false }) {
             )}
           </section>
 
-          {/* AVATAR PREVIEW — CANVAS 2D */}
           <section className="studio-avatar-card">
             <div className="studio-view-buttons">
               {STUDIO_VIEWS.map((view) => (
                 <button
                   key={view}
                   type="button"
-                  className={currentView === view ? "active" : ""}
+                  className={
+                    currentView === view ? "active" : ""
+                  }
                   aria-pressed={currentView === view}
                   onClick={() => setCurrentView(view)}
                 >
@@ -969,17 +1774,23 @@ function FittingStudioPage({ isGuest = false }) {
             </div>
 
             <div className="studio-avatar-stage">
-              <AvatarCanvas avatar={avatar} view={currentView} equippedItems={equippedItems} />
+              <AvatarCanvas
+                avatar={avatar}
+                view={currentView}
+                equippedItems={equippedItems}
+              />
 
               <div className="studio-avatar-summary">
                 <div>
                   <span>Gender</span>
                   <strong>{avatar.gender}</strong>
                 </div>
+
                 <div>
                   <span>Height</span>
                   <strong>{avatar.height} cm</strong>
                 </div>
+
                 <div>
                   <span>Body Build</span>
                   <strong>{bodyBuild}</strong>
@@ -988,125 +1799,198 @@ function FittingStudioPage({ isGuest = false }) {
             </div>
           </section>
 
-          {/* EQUIPPED ITEMS */}
-          <aside className="studio-equipped-card">
-            <h2>EQUIPPED ITEMS</h2>
+          <aside className="studio-right-column">
+            <div
+              ref={matchPanelRef}
+              className="studio-match-panel-container"
+              tabIndex={-1}
+              aria-label="Match reasons for the selected recommendation"
+            >
+              <MatchReasonsCard
+                item={selectedMatchItem}
+                avatar={avatar}
+                isGuest={isGuest}
+                requestVersion={matchRequestVersion}
+                loadMatchReasons={loadMatchReasons}
+                onBrowse={handleRecommendations}
+                onTryItem={tryRecommendedItem}
+              />
+            </div>
 
-            {equippedItemsArray.length === 0 ? (
-              <div className="studio-empty-equipped">
-                <span aria-hidden="true">◇</span>
-                <h3>No clothing equipped</h3>
-                <p>
-                  {isGuest
-                    ? "Open Recommendations to try a sample clothing item on your avatar."
-                    : "Open Recommendations and select Try Item."}
-                </p>
-              </div>
-            ) : (
-              <div className="studio-equipped-list">
-                {Object.entries(equippedItems).map(
-                  ([category, item]) =>
-                    item && (
-                      <article key={category} className="studio-equipped-item">
-                        <div>
-                          <span>{category}</span>
-                          <strong>
-                            {item.sampleOnly ? (
-                              item.name
-                            ) : (
-                              <button
-                                type="button"
-                                className="studio-product-link"
-                                onClick={() => openProductDetails(item)}
-                                style={{
-                                  border: 0,
-                                  padding: 0,
-                                  background: "none",
-                                  color: "inherit",
-                                  textDecoration: "underline",
-                                  textUnderlineOffset: "3px",
-                                  cursor: "pointer",
-                                  fontWeight: "inherit",
-                                  textAlign: "left",
-                                }}
-                                title="View product details"
-                              >
-                                {item.name}
-                              </button>
-                            )}
-                          </strong>
-                          <small>
-                            Size {item.size}
-                            {" • "}
-                            {item.color}
-                          </small>
-                          <RatingControl
-                            key={`${category}-${item.id}`}
-                            itemId={item.id}
-                            isEquipped={Boolean(item)}
-                            authState={isGuest ? null : readAuthState()}
-                            onGuestRate={openRegistrationPopup}
-                          />
-                        </div>
+            <section className="studio-equipped-card">
+              <h2>EQUIPPED ITEMS</h2>
 
-                        <button type="button" onClick={() => removeEquippedItem(category)}>
-                          Remove
-                        </button>
-                      </article>
-                    )
-                )}
-              </div>
-            )}
+              {equippedItemsArray.length === 0 ? (
+                <div className="studio-empty-equipped">
+                  <span aria-hidden="true">◇</span>
+                  <h3>No clothing equipped</h3>
 
-            <button type="button" className={isGuest ? "studio-restricted-action" : "studio-open-recommendations"} onClick={handleRecommendations}>
-              {isGuest ? "Browse Sample Picks" : "Open Recommendations"}
-            </button>
+                  <p>
+                    {isGuest
+                      ? "Open Recommendations to try a sample clothing item on your avatar."
+                      : "Open Recommendations and select Try Item."}
+                  </p>
+                </div>
+              ) : (
+                <div className="studio-equipped-list">
+                  {Object.entries(equippedItems).map(
+                    ([category, item]) =>
+                      item && (
+                        <article
+                          key={category}
+                          className="studio-equipped-item"
+                        >
+                          <div>
+                            <span>{category}</span>
 
-            <button type="button" className={isGuest ? "studio-restricted-action" : "studio-save-outfit"} onClick={saveOutfit}>
-              {isGuest ? "Registration Required to Save Outfit" : "Save Outfit"}
-            </button>
+                            <strong>
+                              {item.sampleOnly ? (
+                                item.name
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="studio-product-link"
+                                  onClick={() =>
+                                    openProductDetails(item)
+                                  }
+                                  title="View product details"
+                                >
+                                  {item.name}
+                                </button>
+                              )}
+                            </strong>
 
-            <button type="button" className={isGuest ? "studio-restricted-action" : "studio-select-cart-items"} onClick={continueToCart}>
-              {isGuest ? "Registration Required to Add to Cart" : "Select Items for Cart"}
-            </button>
+                            <small>
+                              Size {item.size} • {item.color}
+                            </small>
+
+                            <RatingControl
+                              key={`${category}-${item.id}`}
+                              itemId={item.id}
+                              isEquipped={Boolean(item)}
+                              authState={
+                                isGuest ? null : readAuthState()
+                              }
+                              onGuestRate={openRegistrationPopup}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeEquippedItem(category)
+                            }
+                          >
+                            Remove
+                          </button>
+                        </article>
+                      )
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={
+                  isGuest
+                    ? "studio-restricted-action"
+                    : "studio-open-recommendations"
+                }
+                onClick={handleRecommendations}
+              >
+                {isGuest
+                  ? "Browse Sample Picks"
+                  : "Open Recommendations"}
+              </button>
+
+              <button
+                type="button"
+                className={
+                  isGuest
+                    ? "studio-restricted-action"
+                    : "studio-save-outfit"
+                }
+                onClick={saveOutfit}
+              >
+                {isGuest
+                  ? "Registration Required to Save Outfit"
+                  : "Save Outfit"}
+              </button>
+
+              <button
+                type="button"
+                className={
+                  isGuest
+                    ? "studio-restricted-action"
+                    : "studio-select-cart-items"
+                }
+                onClick={continueToCart}
+              >
+                {isGuest
+                  ? "Registration Required to Add to Cart"
+                  : "Select Items for Cart"}
+              </button>
+            </section>
           </aside>
         </div>
       </div>
 
-      {/* NOTIFICATION */}
       {notification && (
         <div className="studio-notification" role="status">
           {notification}
         </div>
       )}
 
-      {/* SAVE AVATAR PRESET POPUP */}
       {showSaveAvatarModal && !isGuest && (
         <div
           className="studio-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeSaveAvatarModal();
+            if (event.target === event.currentTarget) {
+              closeSaveAvatarModal();
+            }
           }}
         >
-          <section className="studio-save-outfit-modal" role="dialog" aria-modal="true" aria-labelledby="studio-avatar-preset-title">
-            <button type="button" className="studio-modal-close" onClick={closeSaveAvatarModal} aria-label="Close save avatar preset popup">
+          <section
+            className="studio-save-outfit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-avatar-preset-title"
+          >
+            <button
+              type="button"
+              className="studio-modal-close"
+              onClick={closeSaveAvatarModal}
+              aria-label="Close save avatar preset popup"
+            >
               ×
             </button>
 
             <p className="studio-modal-label">SAVE YOUR AVATAR</p>
-            <h2 id="studio-avatar-preset-title">Save Avatar Preset</h2>
-            <p className="studio-modal-description">Enter a name for your customized avatar before saving it to Avatar Presets.</p>
+
+            <h2 id="studio-avatar-preset-title">
+              Save Avatar Preset
+            </h2>
+
+            <p className="studio-modal-description">
+              Enter a name for your customized avatar before
+              saving it to Avatar Presets.
+            </p>
 
             <form onSubmit={confirmSaveAvatarPreset} noValidate>
-              <label className="studio-save-outfit-field" htmlFor="studio-avatar-preset-name">
+              <label
+                className="studio-save-outfit-field"
+                htmlFor="studio-avatar-preset-name"
+              >
                 Preset Name <span>*</span>
               </label>
 
               <input
                 id="studio-avatar-preset-name"
                 type="text"
-                className={`studio-save-outfit-input ${avatarPresetNameError ? "invalid" : ""}`}
+                className={`studio-save-outfit-input ${
+                  avatarPresetNameError ? "invalid" : ""
+                }`}
                 value={avatarPresetName}
                 onChange={(event) => {
                   setAvatarPresetName(event.target.value);
@@ -1117,25 +2001,42 @@ function FittingStudioPage({ isGuest = false }) {
                 autoFocus
                 required
                 aria-invalid={Boolean(avatarPresetNameError)}
-                aria-describedby={avatarPresetNameError ? "studio-avatar-preset-name-error" : undefined}
+                aria-describedby={
+                  avatarPresetNameError
+                    ? "studio-avatar-preset-name-error"
+                    : undefined
+                }
               />
 
               <div className="studio-save-outfit-hint">
                 {avatarPresetNameError ? (
-                  <span id="studio-avatar-preset-name-error" className="studio-save-outfit-error" role="alert">
+                  <span
+                    id="studio-avatar-preset-name-error"
+                    className="studio-save-outfit-error"
+                    role="alert"
+                  >
                     {avatarPresetNameError}
                   </span>
                 ) : (
                   <span>Required field</span>
                 )}
+
                 <span>{avatarPresetName.length}/50</span>
               </div>
 
               <div className="studio-save-outfit-actions">
-                <button type="button" className="studio-save-cancel-button" onClick={closeSaveAvatarModal}>
+                <button
+                  type="button"
+                  className="studio-save-cancel-button"
+                  onClick={closeSaveAvatarModal}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="studio-save-confirm-button">
+
+                <button
+                  type="submit"
+                  className="studio-save-confirm-button"
+                >
                   Save Preset
                 </button>
               </div>
@@ -1144,33 +2045,53 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       )}
 
-      {/* SAVE OUTFIT POPUP */}
       {showSaveOutfitModal && !isGuest && (
         <div
           className="studio-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeSaveOutfitModal();
+            if (event.target === event.currentTarget) {
+              closeSaveOutfitModal();
+            }
           }}
         >
-          <section className="studio-save-outfit-modal" role="dialog" aria-modal="true" aria-labelledby="studio-save-title">
-            <button type="button" className="studio-modal-close" onClick={closeSaveOutfitModal} aria-label="Close save outfit popup">
+          <section
+            className="studio-save-outfit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-save-title"
+          >
+            <button
+              type="button"
+              className="studio-modal-close"
+              onClick={closeSaveOutfitModal}
+              aria-label="Close save outfit popup"
+            >
               ×
             </button>
 
             <p className="studio-modal-label">SAVE YOUR LOOK</p>
             <h2 id="studio-save-title">Save Outfit</h2>
-            <p className="studio-modal-description">Give your outfit a name so you can easily find it in Saved Outfits.</p>
+
+            <p className="studio-modal-description">
+              Give your outfit a name so you can easily find it
+              in Saved Outfits.
+            </p>
 
             <form onSubmit={confirmSaveOutfit} noValidate>
-              <label className="studio-save-outfit-field" htmlFor="studio-outfit-name">
+              <label
+                className="studio-save-outfit-field"
+                htmlFor="studio-outfit-name"
+              >
                 Outfit Name <span>*</span>
               </label>
 
               <input
                 id="studio-outfit-name"
                 type="text"
-                className={`studio-save-outfit-input ${outfitNameError ? "invalid" : ""}`}
+                className={`studio-save-outfit-input ${
+                  outfitNameError ? "invalid" : ""
+                }`}
                 value={outfitName}
                 onChange={(event) => {
                   setOutfitName(event.target.value);
@@ -1181,25 +2102,42 @@ function FittingStudioPage({ isGuest = false }) {
                 autoFocus
                 required
                 aria-invalid={Boolean(outfitNameError)}
-                aria-describedby={outfitNameError ? "studio-outfit-name-error" : undefined}
+                aria-describedby={
+                  outfitNameError
+                    ? "studio-outfit-name-error"
+                    : undefined
+                }
               />
 
               <div className="studio-save-outfit-hint">
                 {outfitNameError ? (
-                  <span id="studio-outfit-name-error" className="studio-save-outfit-error">
+                  <span
+                    id="studio-outfit-name-error"
+                    className="studio-save-outfit-error"
+                    role="alert"
+                  >
                     {outfitNameError}
                   </span>
                 ) : (
                   <span>Required field</span>
                 )}
+
                 <span>{outfitName.length}/50</span>
               </div>
 
               <div className="studio-save-outfit-actions">
-                <button type="button" className="studio-save-cancel-button" onClick={closeSaveOutfitModal}>
+                <button
+                  type="button"
+                  className="studio-save-cancel-button"
+                  onClick={closeSaveOutfitModal}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="studio-save-confirm-button">
+
+                <button
+                  type="submit"
+                  className="studio-save-confirm-button"
+                >
                   Save Outfit
                 </button>
               </div>
@@ -1208,38 +2146,70 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       )}
 
-      {/* REGISTRATION POPUP */}
       {showRegistrationModal && (
         <div
           className="studio-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setShowRegistrationModal(false);
+            if (event.target === event.currentTarget) {
+              setShowRegistrationModal(false);
+            }
           }}
         >
-          <section className="studio-registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-title">
-            <button type="button" className="studio-modal-close" aria-label="Close registration popup" onClick={() => setShowRegistrationModal(false)}>
+          <section
+            className="studio-registration-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-title"
+          >
+            <button
+              type="button"
+              className="studio-modal-close"
+              aria-label="Close registration popup"
+              onClick={() => setShowRegistrationModal(false)}
+            >
               ×
             </button>
 
             <div className="studio-modal-icon">◇</div>
-            <p className="studio-modal-label">REGISTRATION REQUIRED</p>
-            <h2 id="registration-title">Unlock the complete fitting experience</h2>
+
+            <p className="studio-modal-label">
+              REGISTRATION REQUIRED
+            </p>
+
+            <h2 id="registration-title">
+              Unlock the complete fitting experience
+            </h2>
+
             <p className="studio-modal-description">
-              Create an account or log in to save avatar presets and outfits, and add clothing items to your cart.
+              Create an account or log in to save avatar presets
+              and outfits, and add clothing items to your cart.
               You can continue trying clothing as a Guest.
             </p>
 
             <div className="studio-modal-actions">
-              <button type="button" className="studio-modal-primary" onClick={() => navigate("/signup")}>
+              <button
+                type="button"
+                className="studio-modal-primary"
+                onClick={() => navigate("/signup")}
+              >
                 Create Account
               </button>
-              <button type="button" className="studio-modal-secondary" onClick={() => navigate("/login")}>
+
+              <button
+                type="button"
+                className="studio-modal-secondary"
+                onClick={() => navigate("/login")}
+              >
                 Log In
               </button>
             </div>
 
-            <button type="button" className="studio-modal-continue" onClick={() => setShowRegistrationModal(false)}>
+            <button
+              type="button"
+              className="studio-modal-continue"
+              onClick={() => setShowRegistrationModal(false)}
+            >
               Continue as Guest
             </button>
           </section>

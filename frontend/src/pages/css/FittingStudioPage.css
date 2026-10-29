@@ -1474,3 +1474,421 @@
   width: 210px;
   height: 420px;
 }
+
+/* ==========================================
+   MATCH REASONS + EQUIPPED ITEMS COLUMN
+========================================== */
+
+.studio-right-column {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  min-width: 0;
+}
+
+.studio-right-column > .studio-equipped-card {
+  grid-column: auto;
+}
+
+.studio-match-panel-container {
+  min-width: 0;
+  border-radius: 16px;
+  scroll-margin-top: 24px;
+}
+
+.studio-match-panel-container:focus-visible,
+.studio-controls-card:focus-visible {
+  outline: 2px solid #8e641f;
+  outline-offset: 4px;
+}
+
+.studio-match-card {
+  min-width: 0;
+  padding: 25px;
+  overflow: hidden;
+  border: 1px solid #e2d8c7;
+  border-radius: 16px;
+  background: #fffdf9;
+  box-shadow: 0 12px 30px rgba(70, 52, 26, 0.05);
+}
+
+/* ==========================================
+   MATCH PANEL HEADING
+========================================== */
+
+.studio-match-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2d8c7;
+}
+
+.studio-match-heading > div {
+  min-width: 0;
+}
+
+.studio-match-icon {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #d2be91;
+  border-radius: 50%;
+  color: #9a6a1d;
+  background: #fff8e6;
+  font-size: 25px;
+}
+
+.studio-match-heading p {
+  margin: 0 0 6px;
+  color: #9a6a1d;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+.studio-match-heading h2 {
+  margin: 0;
+  color: #17130f;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+/* ==========================================
+   EMPTY / SELECTED ITEM
+========================================== */
+
+.studio-match-empty {
+  padding-top: 18px;
+}
+
+.studio-match-empty p {
+  margin: 0 0 16px;
+  color: #5c554c;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.studio-match-selected-item {
+  margin: 18px 0 14px;
+  padding: 14px;
+  border: 1px solid #e6d8ba;
+  border-radius: 9px;
+  background: #faf5e9;
+  overflow-wrap: anywhere;
+}
+
+.studio-match-selected-item > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #9a6a1d;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.studio-match-selected-item h3 {
+  margin: 0 0 6px;
+  color: #17130f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.studio-match-selected-item p {
+  margin: 0;
+  color: #6b6154;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ==========================================
+   MATCH BUTTONS
+========================================== */
+
+.studio-match-primary-button,
+.studio-match-outline-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 11px 13px;
+  border: 1px solid #b57e20;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.studio-match-primary-button {
+  color: #fffdf9;
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 60%,
+    #d7af4b
+  );
+}
+
+.studio-match-primary-button > span {
+  margin-left: auto;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.studio-match-outline-button {
+  color: #8e641f;
+  background: #fffdf9;
+}
+
+.studio-match-primary-button:hover {
+  box-shadow: 0 6px 16px rgba(142, 100, 31, 0.2);
+}
+
+.studio-match-outline-button:hover {
+  background: #fff8e6;
+}
+
+.studio-match-primary-button:focus-visible,
+.studio-match-outline-button:focus-visible,
+.studio-recommendation-match-button:focus-visible,
+.studio-product-link:focus-visible {
+  outline: 2px solid #8e641f;
+  outline-offset: 3px;
+}
+
+/* ==========================================
+   MATCH BREAKDOWN
+========================================== */
+
+.studio-match-breakdown {
+  margin-top: 18px;
+}
+
+.studio-match-status {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed #d2be91;
+  border-radius: 8px;
+  color: #675328;
+  background: #fffaf0;
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.studio-match-score-list {
+  display: grid;
+  gap: 12px;
+}
+
+.studio-match-score {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e2d8c7;
+  border-radius: 9px;
+  background: #fcfaf5;
+}
+
+.studio-match-score-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.studio-match-score-heading h3 {
+  margin: 0;
+  color: #29251f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.studio-match-score-heading strong {
+  flex-shrink: 0;
+  color: #8e641f;
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-match-score meter {
+  display: block;
+  width: 100%;
+  height: 12px;
+  margin: 9px 0;
+  border: 0;
+}
+
+.studio-match-score meter::-webkit-meter-bar {
+  border: 0;
+  border-radius: 999px;
+  background: #eadfc9;
+}
+
+.studio-match-score meter::-webkit-meter-optimum-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8e641f, #d7af4b);
+}
+
+.studio-match-score meter::-moz-meter-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8e641f, #d7af4b);
+}
+
+.studio-match-score > p {
+  margin: 0;
+  color: #5c554c;
+  font-size: 10px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.studio-match-actions {
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2d8c7;
+}
+
+/* ==========================================
+   LOAD FAILURE + RETRY
+========================================== */
+
+.studio-match-error {
+  padding: 16px;
+  border: 1px solid #e0bfb2;
+  border-radius: 9px;
+  background: #fff7f1;
+}
+
+.studio-match-error p {
+  margin: 0 0 13px;
+  color: #914a36;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ==========================================
+   RECOMMENDATION ITEM SELECTION
+========================================== */
+
+.studio-recommendation-item.match-selected {
+  border-color: #b57e20;
+  box-shadow: 0 0 0 1px rgba(181, 126, 32, 0.13);
+}
+
+.studio-recommendation-item
+  > .studio-recommendation-match-button {
+  min-height: 36px;
+  margin-top: -5px;
+  color: #8e641f;
+  background: #fffaf0;
+}
+
+.studio-recommendation-item
+  > .studio-recommendation-match-button:hover {
+  background: #f4e8ca;
+}
+
+/* Preserve product-name links after removing inline styles. */
+
+.studio-recommendation-information .studio-product-link,
+.studio-equipped-item .studio-product-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ==========================================
+   RESPONSIVE RIGHT COLUMN
+========================================== */
+
+@media (max-width: 1400px) {
+  .studio-match-card {
+    padding: 20px;
+  }
+
+  .studio-match-heading {
+    gap: 9px;
+  }
+
+  .studio-match-heading h2 {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 1150px) {
+  .studio-right-column {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-right-column {
+    grid-column: auto;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .studio-match-card {
+    padding: 18px;
+  }
+}
+
+/* Scrollable recommendations panel */
+.studio-recommendations-panel {
+  max-height: 650px;
+  max-height: min(650px, 70dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #b57e20 #f2e7d2;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar {
+  width: 7px;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #f2e7d2;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #b57e20;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-thumb:hover {
+  background: #8e641f;
+}
+
+.studio-recommendations-panel:focus-visible {
+  outline: 2px solid #8e641f;
+  outline-offset: -3px;
+}
+
+@media (max-width: 760px) {
+  .studio-recommendations-panel {
+    max-height: 500px;
+    max-height: min(500px, 65dvh);
+  }
+}
