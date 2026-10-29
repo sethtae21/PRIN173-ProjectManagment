@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -25,7 +24,9 @@ const STANDARD_AVATAR = {
   builtIn: true,
 };
 
-const AVATAR_VIEWS = ["front", "side", "rear"];
+/* FIX: Side view removed — the standard side PNG does not exist, so the
+   preview must never request view="side". Front + rear only. */
+const AVATAR_VIEWS = ["front", "rear"];
 
 /* ==========================================
    STORAGE HELPERS
