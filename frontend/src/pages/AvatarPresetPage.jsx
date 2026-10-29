@@ -1,18 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import { presetsApi } from "../services/api";
 import "./css/AvatarPresetPage.css";
 
-// ======================================================
-// FITFUSION AI — AVATAR PRESETS (DB INTEGRATED)
-// UI-ONLY: Weight readouts replaced by derived Body Build.
-// ======================================================
-
 const ACTIVE_KEY = "fitfusion-avatar-preset";
 const GENDER_KEY = "fitfusion-avatar-gender";
 const EDITING_KEY = "fitfusion-editing-avatar-preset";
-
 const GUEST_ACTIVE_KEY = "fitfusion-guest-avatar-preset";
 const GUEST_GENDER_KEY = "fitfusion-guest-avatar-gender";
 
@@ -34,11 +28,19 @@ const BUILT_IN_PRESET = {
 
 const VIEWS = ["front", "rear"];
 
-// UI-ONLY body build derivation (matches Fitting Studio + Edit page).
 function calculateBodyType(height, weight) {
   const meters = Number(height) / 100;
   const mass = Number(weight);
-  if (!Number.isFinite(meters) || !Number.isFinite(mass) || meters <= 0 || mass <= 0) return "Balanced";
+
+  if (
+    !Number.isFinite(meters) ||
+    !Number.isFinite(mass) ||
+    meters <= 0 ||
+    mass <= 0
+  ) {
+    return "Balanced";
+  }
+
   const index = mass / (meters * meters);
   if (index < 18.5) return "Slim";
   if (index < 25) return "Balanced";
@@ -49,22 +51,26 @@ function calculateBodyType(height, weight) {
 function readJSON(storage, key, fallback = null) {
   try {
     const raw = storage.getItem(key);
-    if (!raw) return fallback;
-    const value = JSON.parse(raw);
-    return value ?? fallback;
+    return raw ? JSON.parse(raw) ?? fallback : fallback;
   } catch {
     return fallback;
   }
 }
 
+function getPresetList(data) {
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data?.results) ? data.results : [];
+}
+
 function normalizeGender(value) {
-  return String(value || "").toLowerCase() === "male" ? "Male" : "Female";
+  return String(value || "").trim().toLowerCase() === "male"
+    ? "Male"
+    : "Female";
 }
 
 function capitalizeChoice(value, fallback) {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  const text = String(value || "").trim().toLowerCase();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : fallback;
 }
 
 function normalizePreset(preset, index = 0) {
@@ -73,17 +79,29 @@ function normalizePreset(preset, index = 0) {
   return {
     ...preset,
     id: String(preset?.id || preset?.presetId || `custom-${index}`),
-    name: String(preset?.name || preset?.presetName || `Custom Avatar ${index + 1}`).trim(),
+    name: String(
+      preset?.name || preset?.presetName || `Custom Avatar ${index + 1}`
+    ).trim(),
     gender,
     height: Number(preset?.height) || 165,
     weight: Number(preset?.weight) || (gender === "Male" ? 70 : 58),
-    skinTone: preset?.skinTone || preset?.skin_tone || preset?.skinColor || "#d9aa82",
+    skinTone:
+      preset?.skinTone ||
+      preset?.skin_tone ||
+      preset?.skinColor ||
+      "#d9aa82",
     undertone: capitalizeChoice(preset?.undertone, "Neutral"),
-    shoulder: capitalizeChoice(preset?.shoulder || preset?.shoulderWidth, "Average"),
+    shoulder: capitalizeChoice(
+      preset?.shoulder || preset?.shoulderWidth,
+      "Average"
+    ),
     waist: capitalizeChoice(preset?.waist || preset?.waistSize, "Average"),
     hip: capitalizeChoice(preset?.hip || preset?.hipSize, "Average"),
     thigh: capitalizeChoice(preset?.thigh || preset?.thighSize, "Average"),
-    cupSize: gender === "Female" ? capitalizeChoice(preset?.cupSize || preset?.cup_size, "B") : null,
+    cupSize:
+      gender === "Female"
+        ? String(preset?.cupSize || preset?.cup_size || "B").toUpperCase()
+        : null,
     builtIn: false,
   };
 }
@@ -92,13 +110,53 @@ function getActivePresetId(isGuest) {
   const storage = isGuest ? sessionStorage : localStorage;
   const key = isGuest ? GUEST_ACTIVE_KEY : ACTIVE_KEY;
   const active = readJSON(storage, key);
+
   return active?.id ? String(active.id) : BUILT_IN_PRESET.id;
+}
+
+function syncCachedName(id, name) {
+  for (const key of [ACTIVE_KEY, EDITING_KEY]) {
+    try {
+      const cached = readJSON(localStorage, key);
+
+      if (String(cached?.id || cached?.presetId) !== String(id)) continue;
+
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...cached,
+          name,
+          ...(Object.prototype.hasOwnProperty.call(cached, "presetName")
+            ? { presetName: name }
+            : {}),
+        })
+      );
+    } catch (error) {
+      console.error("Unable to update cached preset name:", error);
+    }
+  }
+}
+
+function removeCachedPreset(id) {
+  for (const key of [ACTIVE_KEY, EDITING_KEY]) {
+    try {
+      const cached = readJSON(localStorage, key);
+
+      if (String(cached?.id || cached?.presetId) === String(id)) {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.error("Unable to clear cached preset:", error);
+    }
+  }
 }
 
 function AvatarFigure({ preset, view = "front", small = false }) {
   return (
     <div
-      className={`avatar-preset-figure ${small ? "avatar-preset-figure--small" : ""}`}
+      className={`avatar-preset-figure ${
+        small ? "avatar-preset-figure--small" : ""
+      }`}
       aria-label={`${preset.name}, ${view} view`}
     >
       <AvatarCanvas avatar={preset} view={view} equippedItems={{}} />
@@ -115,52 +173,142 @@ function Measurement({ label, value }) {
   );
 }
 
+function PresetModal({ children, titleId, busy, onClose }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement;
+
+    if (dialog && !dialog.open) dialog.showModal();
+
+    return () => {
+      if (dialog?.open) dialog.close();
+
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus();
+      }
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="avatar-preset-modal"
+      aria-labelledby={titleId}
+      aria-busy={busy}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onClose();
+      }}
+      onClick={(event) => {
+        if (busy || event.target !== event.currentTarget) return;
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        const outside =
+          event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom;
+
+        if (outside) onClose();
+      }}
+    >
+      {children}
+    </dialog>
+  );
+}
+
 export default function AvatarPresetPage({ isGuest = false }) {
   const navigate = useNavigate();
   const basePath = isGuest ? "/guest" : "/shopper";
 
   const [customPresets, setCustomPresets] = useState([]);
-  const [selectedPresetId, setSelectedPresetId] = useState(() => getActivePresetId(isGuest));
+  const [selectedPresetId, setSelectedPresetId] = useState(() =>
+    getActivePresetId(isGuest)
+  );
   const [previewView, setPreviewView] = useState("front");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [presetName, setPresetName] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [loading, setLoading] = useState(!isGuest);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  const mutationRef = useRef(false);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
+    let active = true;
+
+    setSelectedPresetId(getActivePresetId(isGuest));
+    setRenameTarget(null);
+    setDeleteTarget(null);
+
     async function fetchPresets() {
+      if (mutationRef.current) return;
+
+      const version = ++requestVersionRef.current;
+
       if (isGuest) {
         setCustomPresets([]);
         setLoading(false);
+        setLoadError("");
         return;
       }
+
+      setLoading(true);
+      setLoadError("");
+
       try {
         const data = await presetsApi.list();
-        const list = Array.isArray(data) ? data : data.results || [];
-        setCustomPresets(list.map(normalizePreset));
-      } catch (err) {
-        console.error("Failed to fetch presets from DB:", err);
-        setToastMessage("Failed to load saved avatars.");
+
+        if (active && version === requestVersionRef.current) {
+          setCustomPresets(getPresetList(data).map(normalizePreset));
+        }
+      } catch (error) {
+        console.error("Unable to load avatar presets:", error);
+
+        if (active && version === requestVersionRef.current) {
+          setLoadError("Unable to load saved avatars. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        if (active && version === requestVersionRef.current) {
+          setLoading(false);
+        }
       }
     }
 
     fetchPresets();
-
     window.addEventListener("focus", fetchPresets);
-    return () => window.removeEventListener("focus", fetchPresets);
-  }, [isGuest]);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", fetchPresets);
+    };
+  }, [isGuest, reloadKey]);
 
   useEffect(() => {
-    if (!toastMessage) return;
-    const timer = window.setTimeout(() => setToastMessage(""), 3000);
+    if (!toastMessage) return undefined;
+
+    const timer = window.setTimeout(() => setToastMessage(""), 3500);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  const allPresets = useMemo(() => [BUILT_IN_PRESET, ...customPresets], [customPresets]);
+  const allPresets = useMemo(
+    () => [BUILT_IN_PRESET, ...customPresets],
+    [customPresets]
+  );
 
   const selectedPreset = useMemo(
-    () => allPresets.find((preset) => String(preset.id) === String(selectedPresetId)) || BUILT_IN_PRESET,
+    () =>
+      allPresets.find(
+        (preset) => String(preset.id) === String(selectedPresetId)
+      ) || BUILT_IN_PRESET,
     [allPresets, selectedPresetId]
   );
 
@@ -171,92 +319,191 @@ export default function AvatarPresetPage({ isGuest = false }) {
     setPreviewView("front");
   }
 
-  function writeActivePreset(preset) {
-    const gender = normalizeGender(preset.gender);
-    const activePreset = {
-      ...preset,
-      gender,
-      cupSize: gender === "Female" ? preset.cupSize || "B" : null,
-    };
-
-    if (isGuest) {
-      sessionStorage.setItem(GUEST_ACTIVE_KEY, JSON.stringify(activePreset));
-      sessionStorage.setItem(GUEST_GENDER_KEY, gender);
-    } else {
-      localStorage.setItem(ACTIVE_KEY, JSON.stringify(activePreset));
-      localStorage.setItem(GENDER_KEY, gender);
-    }
-  }
-
   function usePreset(preset) {
     try {
-      writeActivePreset(preset);
+      const gender = normalizeGender(preset.gender);
+      const activePreset = {
+        ...preset,
+        gender,
+        cupSize: gender === "Female" ? preset.cupSize || "B" : null,
+      };
+
+      const storage = isGuest ? sessionStorage : localStorage;
+
+      storage.setItem(
+        isGuest ? GUEST_ACTIVE_KEY : ACTIVE_KEY,
+        JSON.stringify(activePreset)
+      );
+      storage.setItem(isGuest ? GUEST_GENDER_KEY : GENDER_KEY, gender);
+
       setSelectedPresetId(String(preset.id));
       navigate(`${basePath}/fitting-studio/customize`);
     } catch (error) {
+      console.error("Unable to use avatar preset:", error);
       setToastMessage("Unable to load this avatar. Please try again.");
     }
   }
 
-  function editPreset(preset) {
-    if (isGuest || preset.builtIn) {
-      try {
-        writeActivePreset(preset);
-        navigate(`${basePath}/fitting-studio/customize`);
-      } catch (error) {
-        setToastMessage("Unable to open avatar customization.");
-      }
+  function requestRename(preset) {
+    if (isGuest || preset.builtIn || mutationRef.current) return;
+
+    setRenameTarget(preset);
+    setPresetName(preset.name);
+    setRenameError("");
+  }
+
+  function closeRename() {
+    if (mutationRef.current) return;
+    setRenameTarget(null);
+    setRenameError("");
+  }
+
+  async function confirmRename(event) {
+    event.preventDefault();
+
+    if (
+      !renameTarget ||
+      isGuest ||
+      renameTarget.builtIn ||
+      mutationRef.current
+    ) {
       return;
     }
 
-    try {
-      localStorage.setItem(EDITING_KEY, JSON.stringify(preset));
-      navigate(`/shopper/avatar-presets/${encodeURIComponent(preset.id)}/edit`);
-    } catch (error) {
-      setToastMessage("Unable to open this preset for editing.");
-    }
-  }
+    const name = presetName.trim();
 
-  function createAvatar() {
-    navigate(`${basePath}/fitting-studio/customize`);
+    if (name.length < 3 || name.length > 50) {
+      setRenameError("Enter a preset name containing 3–50 characters.");
+      return;
+    }
+
+    if (name.toLowerCase() === BUILT_IN_PRESET.name.toLowerCase()) {
+      setRenameError("This name is reserved for the premade avatar.");
+      return;
+    }
+
+    if (name === renameTarget.name) {
+      closeRename();
+      return;
+    }
+
+    mutationRef.current = true;
+    requestVersionRef.current += 1;
+    setBusy(true);
+    setLoading(false);
+    setRenameError("");
+
+    const targetId = renameTarget.id;
+
+    try {
+      const data = await presetsApi.list();
+      const duplicate = getPresetList(data).some(
+        (preset) =>
+          String(preset.id || preset.presetId) !== String(targetId) &&
+          String(preset.name || preset.presetName || "")
+            .trim()
+            .toLowerCase() === name.toLowerCase()
+      );
+
+      if (duplicate) {
+        setRenameError(
+          "Another preset already uses this name. Please choose a different name."
+        );
+        return;
+      }
+
+      // Read the current server record so full-update APIs retain
+      // its saved measurements, appearance, and other settings.
+      const currentRecord = await presetsApi.get(targetId);
+
+      if (!currentRecord || typeof currentRecord !== "object") {
+        throw new Error("The saved preset is unavailable.");
+      }
+
+      await presetsApi.update(targetId, {
+        ...currentRecord,
+        name,
+      });
+
+      setCustomPresets((current) =>
+        current.map((preset) =>
+          String(preset.id) === String(targetId)
+            ? {
+                ...preset,
+                name,
+                ...(Object.prototype.hasOwnProperty.call(preset, "presetName")
+                  ? { presetName: name }
+                  : {}),
+              }
+            : preset
+        )
+      );
+
+      syncCachedName(targetId, name);
+      setRenameTarget(null);
+      setToastMessage(`Preset renamed to “${name}”.`);
+    } catch (error) {
+      console.error("Unable to rename avatar preset:", error);
+      setRenameError("Unable to rename this preset. Please try again.");
+    } finally {
+      mutationRef.current = false;
+      setBusy(false);
+    }
   }
 
   function requestDelete(preset) {
-    if (isGuest || preset.builtIn) {
-      setToastMessage("The built-in avatar cannot be deleted.");
-      return;
-    }
+    if (isGuest || preset.builtIn || mutationRef.current) return;
+
     setDeleteTarget(preset);
+    setDeleteError("");
+  }
+
+  function closeDelete() {
+    if (mutationRef.current) return;
+    setDeleteTarget(null);
+    setDeleteError("");
   }
 
   async function confirmDelete() {
-    if (!deleteTarget || isGuest || deleteTarget.builtIn) return;
+    if (
+      !deleteTarget ||
+      isGuest ||
+      deleteTarget.builtIn ||
+      mutationRef.current
+    ) {
+      return;
+    }
+
+    mutationRef.current = true;
+    requestVersionRef.current += 1;
+    setBusy(true);
+    setLoading(false);
+    setDeleteError("");
+
+    const target = deleteTarget;
 
     try {
-      await presetsApi.remove(deleteTarget.id);
+      await presetsApi.remove(target.id);
 
-      setCustomPresets((prev) => prev.filter((p) => String(p.id) !== String(deleteTarget.id)));
+      setCustomPresets((current) =>
+        current.filter((preset) => String(preset.id) !== String(target.id))
+      );
 
-      const active = readJSON(localStorage, ACTIVE_KEY);
-      if (String(active?.id) === String(deleteTarget.id)) {
-        localStorage.removeItem(ACTIVE_KEY);
-      }
+      removeCachedPreset(target.id);
 
-      const editing = readJSON(localStorage, EDITING_KEY);
-      if (String(editing?.id) === String(deleteTarget.id)) {
-        localStorage.removeItem(EDITING_KEY);
-      }
-
-      if (String(selectedPresetId) === String(deleteTarget.id)) {
+      if (String(selectedPresetId) === String(target.id)) {
         setSelectedPresetId(BUILT_IN_PRESET.id);
         setPreviewView("front");
       }
 
-      setToastMessage(`“${deleteTarget.name}” was deleted successfully.`);
       setDeleteTarget(null);
+      setToastMessage(`“${target.name}” was deleted successfully.`);
     } catch (error) {
       console.error("Unable to delete avatar preset:", error);
-      setToastMessage("Unable to delete this avatar. Please try again.");
+      setDeleteError("Unable to delete this preset. Please try again.");
+    } finally {
+      mutationRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -270,12 +517,16 @@ export default function AvatarPresetPage({ isGuest = false }) {
             <span>
               {isGuest
                 ? "Explore our premade 2D avatar. Create an account to save your own customized avatars."
-                : "Choose the premade avatar or select one of your saved custom avatars to continue fitting clothes."}
+                : "Choose an avatar to continue fitting clothes. You can rename or delete your saved custom presets."}
             </span>
           </div>
 
           {!isGuest && (
-            <button type="button" className="avatar-presets-create" onClick={createAvatar}>
+            <button
+              type="button"
+              className="avatar-presets-create"
+              onClick={() => navigate(`${basePath}/fitting-studio/customize`)}
+            >
               <span aria-hidden="true">+</span>
               Create Custom Avatar
             </button>
@@ -287,57 +538,105 @@ export default function AvatarPresetPage({ isGuest = false }) {
             <div className="avatar-presets-panel-heading">
               <div>
                 <p>AVAILABLE PRESETS</p>
-                <h2>{allPresets.length} {allPresets.length === 1 ? "Avatar" : "Avatars"}</h2>
+                <h2>
+                  {allPresets.length}{" "}
+                  {allPresets.length === 1 ? "Avatar" : "Avatars"}
+                </h2>
               </div>
               {!isGuest && <span>{customPresets.length} Custom</span>}
             </div>
 
+            {loading && (
+              <p className="avatar-presets-loading" role="status">
+                Loading saved avatars...
+              </p>
+            )}
+
+            {loadError && (
+              <div className="avatar-presets-load-error" role="alert">
+                <p>{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => setReloadKey((current) => current + 1)}
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+
             <div className="avatar-presets-grid">
-              {loading && <p>Loading avatars...</p>}
-              {!loading &&
-                allPresets.map((preset) => {
-                  const isSelected = String(selectedPreset.id) === String(preset.id);
-                  const isActive = String(activePresetId) === String(preset.id);
-                  const build = calculateBodyType(preset.height, preset.weight);
+              {allPresets.map((preset) => {
+                const isSelected =
+                  String(selectedPreset.id) === String(preset.id);
+                const isActive =
+                  String(activePresetId) === String(preset.id);
+                const canManage = !preset.builtIn && !isGuest;
 
-                  return (
-                    <article key={preset.id} className={`avatar-preset-card ${isSelected ? "selected" : ""}`}>
-                      <button
-                        type="button"
-                        className="avatar-preset-select-area"
-                        aria-pressed={isSelected}
-                        onClick={() => selectPreset(preset)}
-                      >
-                        <div className="avatar-preset-card-image">
-                          <AvatarFigure preset={preset} view="front" small />
-                        </div>
+                return (
+                  <article
+                    key={preset.id}
+                    className={`avatar-preset-card ${
+                      isSelected ? "selected" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="avatar-preset-select-area"
+                      aria-pressed={isSelected}
+                      onClick={() => selectPreset(preset)}
+                    >
+                      <div className="avatar-preset-card-image">
+                        <AvatarFigure preset={preset} view="front" small />
+                      </div>
 
-                        <div className="avatar-preset-card-badges">
-                          <span className="avatar-preset-type">{preset.builtIn ? "PREMADE" : "CUSTOM"}</span>
-                          {isActive && <span className="avatar-preset-active-tag">In Use</span>}
-                        </div>
-
-                        <strong>{preset.name}</strong>
-                        {/* UI-ONLY: weight replaced by Body Build */}
-                        <small>{preset.gender} • {preset.height} cm • {build}</small>
-                      </button>
-
-                      <div className="avatar-preset-card-actions">
-                        <button type="button" className="avatar-preset-card-use" onClick={() => usePreset(preset)}>
-                          Use
-                        </button>
-                        <button type="button" onClick={() => editPreset(preset)}>
-                          {preset.builtIn ? "Customize" : "Edit"}
-                        </button>
-                        {!preset.builtIn && !isGuest && (
-                          <button type="button" className="avatar-preset-delete" onClick={() => requestDelete(preset)}>
-                            Delete
-                          </button>
+                      <div className="avatar-preset-card-badges">
+                        <span className="avatar-preset-type">
+                          {preset.builtIn ? "PREMADE" : "CUSTOM"}
+                        </span>
+                        {isActive && (
+                          <span className="avatar-preset-active-tag">In Use</span>
                         )}
                       </div>
-                    </article>
-                  );
-                })}
+
+                      <strong>{preset.name}</strong>
+                      <small>
+                        {preset.gender} • {preset.height} cm •{" "}
+                        {calculateBodyType(preset.height, preset.weight)}
+                      </small>
+                    </button>
+
+                    <div className="avatar-preset-card-actions">
+                      <button
+                        type="button"
+                        className="avatar-preset-card-use"
+                        onClick={() => usePreset(preset)}
+                      >
+                        Use
+                      </button>
+
+                      {canManage && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => requestRename(preset)}
+                            aria-label={`Rename ${preset.name}`}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="avatar-preset-delete"
+                            onClick={() => requestDelete(preset)}
+                            aria-label={`Delete ${preset.name}`}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
@@ -350,7 +649,11 @@ export default function AvatarPresetPage({ isGuest = false }) {
               <span>{selectedPreset.builtIn ? "Premade" : "Custom"}</span>
             </div>
 
-            <div className="avatar-preset-view-buttons" role="group" aria-label="Avatar preview angle">
+            <div
+              className="avatar-preset-view-buttons"
+              role="group"
+              aria-label="Avatar preview angle"
+            >
               {VIEWS.map((view) => (
                 <button
                   key={view}
@@ -365,71 +668,200 @@ export default function AvatarPresetPage({ isGuest = false }) {
             </div>
 
             <div className="avatar-preset-preview-stage">
-              <AvatarFigure key={`${selectedPreset.id}-${previewView}`} preset={selectedPreset} view={previewView} />
-              <span className="avatar-preset-view-label">{previewView.toUpperCase()} VIEW</span>
+              <AvatarFigure
+                key={`${selectedPreset.id}-${previewView}`}
+                preset={selectedPreset}
+                view={previewView}
+              />
+              <span className="avatar-preset-view-label">
+                {previewView.toUpperCase()} VIEW
+              </span>
             </div>
 
             <div className="avatar-preset-measurements">
               <Measurement label="Gender" value={selectedPreset.gender} />
-              <Measurement label="Height" value={`${selectedPreset.height} cm`} />
-              {/* UI-ONLY: Weight row replaced by Body Build */}
-              <Measurement label="Body Build" value={calculateBodyType(selectedPreset.height, selectedPreset.weight)} />
+              <Measurement
+                label="Height"
+                value={`${selectedPreset.height} cm`}
+              />
+              <Measurement
+                label="Body Build"
+                value={calculateBodyType(
+                  selectedPreset.height,
+                  selectedPreset.weight
+                )}
+              />
               <Measurement label="Shoulders" value={selectedPreset.shoulder} />
               <Measurement label="Waist" value={selectedPreset.waist} />
               <Measurement label="Hips" value={selectedPreset.hip} />
               <Measurement label="Thighs" value={selectedPreset.thigh} />
               <Measurement label="Undertone" value={selectedPreset.undertone} />
+
               {selectedPreset.gender === "Female" && (
-                <Measurement label="Cup Size" value={selectedPreset.cupSize || "B"} />
+                <Measurement
+                  label="Cup Size"
+                  value={selectedPreset.cupSize || "B"}
+                />
               )}
+
               <div className="avatar-preset-measurement">
                 <span>Skin Tone</span>
                 <div className="avatar-preset-skin-row">
-                  <i className="avatar-preset-skin-dot" style={{ backgroundColor: selectedPreset.skinTone }} aria-hidden="true" />
+                  <i
+                    className="avatar-preset-skin-dot"
+                    style={{ backgroundColor: selectedPreset.skinTone }}
+                    aria-hidden="true"
+                  />
                   <strong>{selectedPreset.skinTone}</strong>
                 </div>
               </div>
             </div>
 
             <div className="avatar-preset-preview-actions">
-              <button type="button" className="avatar-preset-use-button" onClick={() => usePreset(selectedPreset)}>
+              <button
+                type="button"
+                className="avatar-preset-use-button"
+                onClick={() => usePreset(selectedPreset)}
+              >
                 Use This Avatar
               </button>
-              <button type="button" className="avatar-preset-edit-button" onClick={() => editPreset(selectedPreset)}>
-                {selectedPreset.builtIn ? "Customize Avatar" : "Edit Preset"}
-              </button>
+
               {!selectedPreset.builtIn && !isGuest && (
-                <button type="button" className="avatar-preset-preview-delete" onClick={() => requestDelete(selectedPreset)}>
-                  Delete Preset
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="avatar-preset-rename-button"
+                    onClick={() => requestRename(selectedPreset)}
+                  >
+                    Rename Preset
+                  </button>
+                  <button
+                    type="button"
+                    className="avatar-preset-preview-delete"
+                    onClick={() => requestDelete(selectedPreset)}
+                  >
+                    Delete Preset
+                  </button>
+                </>
               )}
             </div>
           </aside>
         </div>
       </div>
 
-      {deleteTarget && !isGuest && (
-        <div
-          className="avatar-preset-modal-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDeleteTarget(null);
-          }}
+      {renameTarget && !isGuest && (
+        <PresetModal
+          titleId="rename-preset-title"
+          busy={busy}
+          onClose={closeRename}
         >
-          <section className="avatar-preset-modal" role="dialog" aria-modal="true" aria-labelledby="delete-preset-title">
-            <div className="avatar-preset-modal-icon">!</div>
-            <p>DELETE AVATAR PRESET</p>
-            <h2 id="delete-preset-title">Delete “{deleteTarget.name}”?</h2>
-            <span>This avatar preset will be permanently deleted from your account.</span>
-            <div className="avatar-preset-modal-actions">
-              <button type="button" onClick={() => setDeleteTarget(null)}>Keep Preset</button>
-              <button type="button" className="confirm-delete" onClick={confirmDelete}>Delete Preset</button>
+          <div className="avatar-preset-modal-icon rename" aria-hidden="true">
+            ✎
+          </div>
+          <p className="avatar-preset-modal-eyebrow">RENAME AVATAR PRESET</p>
+          <h2 id="rename-preset-title">Give your preset a name</h2>
+          <span>Your avatar measurements and appearance will stay the same.</span>
+
+          <form onSubmit={confirmRename} noValidate>
+            <div className="avatar-preset-name-field">
+              <label htmlFor="avatar-preset-name">Preset name</label>
+              <input
+                id="avatar-preset-name"
+                type="text"
+                value={presetName}
+                maxLength={50}
+                autoFocus
+                autoComplete="off"
+                disabled={busy}
+                aria-invalid={Boolean(renameError)}
+                aria-describedby={`avatar-preset-name-help${
+                  renameError ? " avatar-preset-name-error" : ""
+                }`}
+                onChange={(event) => {
+                  setPresetName(event.target.value);
+                  setRenameError("");
+                }}
+              />
+              <div className="avatar-preset-name-help">
+                <small id="avatar-preset-name-help">
+                  Use a unique name with 3–50 characters.
+                </small>
+                <small>{presetName.length}/50</small>
+              </div>
+
+              {renameError && (
+                <p
+                  id="avatar-preset-name-error"
+                  className="avatar-preset-form-error"
+                  role="alert"
+                >
+                  {renameError}
+                </p>
+              )}
             </div>
-          </section>
-        </div>
+
+            <div className="avatar-preset-modal-actions">
+              <button type="button" disabled={busy} onClick={closeRename}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="confirm-rename"
+                disabled={busy || presetName.trim() === renameTarget.name}
+              >
+                {busy ? "Saving..." : "Save Name"}
+              </button>
+            </div>
+          </form>
+        </PresetModal>
+      )}
+
+      {deleteTarget && !isGuest && (
+        <PresetModal
+          titleId="delete-preset-title"
+          busy={busy}
+          onClose={closeDelete}
+        >
+          <div className="avatar-preset-modal-icon" aria-hidden="true">!</div>
+          <p className="avatar-preset-modal-eyebrow danger">
+            DELETE AVATAR PRESET
+          </p>
+          <h2 id="delete-preset-title">Delete “{deleteTarget.name}”?</h2>
+          <span>
+            This avatar preset will be permanently deleted from your account.
+          </span>
+
+          {deleteError && (
+            <p className="avatar-preset-form-error" role="alert">
+              {deleteError}
+            </p>
+          )}
+
+          <div className="avatar-preset-modal-actions">
+            <button
+              type="button"
+              autoFocus
+              disabled={busy}
+              onClick={closeDelete}
+            >
+              Keep Preset
+            </button>
+            <button
+              type="button"
+              className="confirm-delete"
+              disabled={busy}
+              onClick={confirmDelete}
+            >
+              {busy ? "Deleting..." : "Delete Preset"}
+            </button>
+          </div>
+        </PresetModal>
       )}
 
       {toastMessage && (
-        <div className="avatar-preset-toast" role="status">{toastMessage}</div>
+        <div className="avatar-preset-toast" role="status">
+          {toastMessage}
+        </div>
       )}
     </main>
   );
