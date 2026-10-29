@@ -2,15 +2,16 @@
 read-only endpoints may be accessed by Guests."""
 import math
 
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from catalog.models import CatalogItem  # adjust model/field names to catalog/models.py
+from catalog.models import CatalogItem
 
 from .knowledge_table import WEIGHTS, WEIGHTS_VERSION
-from .scoring import AvatarProfile, ItemProfile, rank_items
+from .scoring import AvatarProfile, ItemProfile, rank_items, score_item
 
 
 def _as_tuple(value) -> tuple:
@@ -61,14 +62,18 @@ class RecommendationQuerySerializer(serializers.Serializer):
         return self._validate_tags(value, 'occasion')
 
 
-def _item_profile(item) -> ItemProfile:
-    """Single adapter between catalog models and the pure scoring core.
-    If catalog/models.py uses different field names, fix them HERE only.
+def _avatar_profile(values) -> AvatarProfile:
+    return AvatarProfile(
+        undertone=values['undertone'],
+        height_cm=values['height_cm'],
+        body_shape=values['body_shape'],
+        style_tags=values['styles'],
+        occasion_tags=values['occasions'],
+    )
 
-    size_min_cm / size_max_cm are the system-derived wearer-height range
-    stored at upload/edit time (None for footwear / measured sizes); they
-    feed the informational size_height_match note in the FR-7.4 payload.
-    """
+
+def _item_profile(item) -> ItemProfile:
+    """Adapt a catalog item to the pure scoring model."""
     return ItemProfile(
         name=item.name,
         category=(getattr(item, "category", "") or "").lower(),
@@ -76,9 +81,6 @@ def _item_profile(item) -> ItemProfile:
         color_description=getattr(item, "color_description", "") or "",
         style_tags=_as_tuple(getattr(item, "style_tags", ())),
         occasion_tags=_as_tuple(getattr(item, "occasion_tags", ())),
-        size=getattr(item, "size", "") or "",
-        size_min_cm=getattr(item, "size_min_cm", None),
-        size_max_cm=getattr(item, "size_max_cm", None),
     )
 
 
@@ -88,10 +90,8 @@ class RecommendationListView(APIView):
     Query params: undertone (warm|cool|neutral), height_cm, body_shape
     (top-heavy|bottom-heavy|balanced), styles (csv), occasions (csv), limit.
 
-    Response includes, per item: total_score, max_score, the four baselined
-    FR-7.2 rules (fired or not, with reasons), and the score-neutral
-    size_height_match note (FR-7.4 explainability; supports OBJ-06 by
-    surfacing size-appropriateness before purchase).
+    Response includes, per item: total_score, max_score, and the four
+    baselined FR-7.2 rules (fired or not, with reasons).
     """
     permission_classes = [AllowAny]
 
@@ -99,13 +99,7 @@ class RecommendationListView(APIView):
         query = RecommendationQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         values = query.validated_data
-        avatar = AvatarProfile(
-            undertone=values['undertone'],
-            height_cm=values['height_cm'],
-            body_shape=values['body_shape'],
-            style_tags=values['styles'],
-            occasion_tags=values['occasions'],
-        )
+        avatar = _avatar_profile(values)
         items = [_item_profile(i) for i in CatalogItem.objects.filter(status="active")]
         ranked = rank_items(avatar, items, limit=values['limit'])
         return Response({
@@ -119,4 +113,30 @@ class RecommendationListView(APIView):
                 "occasion_tags": list(avatar.occasion_tags),
             },
             "recommendations": [b.as_dict() for b in ranked],
+        })
+
+
+class MatchReasonsView(APIView):
+    """GET /recommendations/<item_id>/match-reasons/ - explain one selected item."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, item_id):
+        query = RecommendationQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        avatar = _avatar_profile(query.validated_data)
+        item = get_object_or_404(CatalogItem, pk=item_id, status="active")
+        breakdown = score_item(avatar, _item_profile(item)).as_dict()
+        return Response({
+            "item_id": item.pk,
+            "item": breakdown["item"],
+            "total_score": breakdown["total_score"],
+            "max_score": breakdown["max_score"],
+            "avatar_profile": {
+                "undertone": avatar.undertone,
+                "height_cm": avatar.height_cm,
+                "body_shape": avatar.body_shape,
+                "style_tags": list(avatar.style_tags),
+                "occasion_tags": list(avatar.occasion_tags),
+            },
+            "match_reasons": breakdown["rules"],
         })

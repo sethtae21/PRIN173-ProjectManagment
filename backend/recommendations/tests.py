@@ -1,5 +1,11 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.http import Http404
 from django.test import TestCase
 from rest_framework.test import APIClient
+
+from catalog.models import CatalogItem
 
 from .knowledge_table import WEIGHTS, height_band, infer_contrast, infer_shade
 from .scoring import AvatarProfile, ItemProfile, rank_items, score_item
@@ -160,3 +166,47 @@ class RecommendationQueryValidationTests(TestCase):
                 self.assertEqual(
                     self.client.get('/api/recommendations/', params).status_code, 400
                 )
+
+
+class MatchReasonsAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    @patch('recommendations.views.get_object_or_404')
+    def test_selected_item_returns_match_reasons(self, get_object):
+        get_object.return_value = SimpleNamespace(
+            pk=42,
+            name='Warm jacket',
+            category='tops',
+            color_family='red',
+            color_description='dark brick red',
+            style_tags=['casual'],
+            occasion_tags=['everyday'],
+        )
+
+        response = self.client.get('/api/recommendations/42/match-reasons/', {
+            'undertone': 'warm',
+            'height_cm': '158',
+            'body_shape': 'bottom-heavy',
+            'styles': 'casual',
+            'occasions': 'everyday',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['item_id'], 42)
+        self.assertEqual(response.data['item'], 'Warm jacket')
+        self.assertEqual(len(response.data['match_reasons']), 4)
+        self.assertEqual(
+            [reason['rule'] for reason in response.data['match_reasons']],
+            ['color_compatibility', 'height_contrast',
+             'proportion_shading', 'style_occasion'],
+        )
+        get_object.assert_called_once_with(
+            CatalogItem, pk=42, status='active'
+        )
+
+    @patch('recommendations.views.get_object_or_404', side_effect=Http404)
+    def test_missing_selected_item_returns_not_found(self, _get_object):
+        response = self.client.get('/api/recommendations/999/match-reasons/')
+
+        self.assertEqual(response.status_code, 404)

@@ -52,4 +52,4 @@ class PasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError({'old_password': 'Current password is incorrect.'})
         user.set_password(self.validated_data['new_password'])
         user.save()
-        return user
+        return user 
