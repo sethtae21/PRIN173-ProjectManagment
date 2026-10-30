@@ -1881,3 +1881,46 @@
     max-height: min(500px, 65dvh);
   }
 }
+
+/* Full-width Height and Body Build sliders */
+.studio-customization-panel .studio-measurement-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.studio-measurement-grid .studio-slider-field {
+  width: 100%;
+  min-width: 0;
+  gap: 12px;
+}
+
+.studio-measurement-grid .studio-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.studio-measurement-grid .studio-slider {
+  display: block;
+  width: 100%;
+  margin: 9px 0;
+}
+
+.studio-build-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  color: #81766a;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.studio-build-slider-labels span.active {
+  color: #8e641f;
+  font-weight: 800;
+}

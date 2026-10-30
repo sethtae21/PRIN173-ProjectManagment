@@ -1054,29 +1054,61 @@ function FittingStudioPage({
     );
   }
 
-  function updateAvatar(field, value) {
-    if (field === "height" || field === "weight") {
-      const range = fitLimits[field];
-      const requested = Number(value);
-      const adjusted = clamp(requested, range);
+ function updateAvatar(field, value) {
+  if (field === "height" || field === "weight") {
+    const range = fitLimits[field];
+    const requested = Number(value);
+    const adjusted = clamp(requested, range);
 
-      if (requested > range.max) {
+    if (requested > range.max) {
+      displayNotification(
+        `Maximum ${
+          field === "weight" ? "body build" : field
+        } preview reached for the selected garment size.`
+      );
+    } else if (requested < range.min) {
+      displayNotification(
+        `Minimum ${
+          field === "weight" ? "body build" : field
+        } preview reached for the selected garment size.`
+      );
+    }
+
+    if (field === "height") {
+      const currentHeight = Number(avatar.height);
+      const currentWeight = Number(avatar.weight);
+      const currentBuild = calculateBodyType(
+        currentHeight,
+        currentWeight
+      );
+
+      // Adjust internal weight to preserve the current body build.
+      const proportionalWeight =
+        currentHeight > 0 && currentWeight > 0
+          ? currentWeight *
+            Math.pow(adjusted / currentHeight, 2)
+          : weightForBuild(currentBuild, adjusted);
+
+      const nextWeight = clamp(
+        proportionalWeight,
+        fitLimits.weight
+      );
+
+      // Keep both controls unchanged if fitting limits prevent
+      // preserving the selected body build.
+      if (
+        calculateBodyType(adjusted, nextWeight) !== currentBuild
+      ) {
         displayNotification(
-          `Maximum ${
-            field === "weight" ? "body build" : field
-          } preview reached for the selected garment size.`
+          "This height cannot keep your selected body build within the current fitting limits."
         );
-      } else if (requested < range.min) {
-        displayNotification(
-          `Minimum ${
-            field === "weight" ? "body build" : field
-          } preview reached for the selected garment size.`
-        );
+        return;
       }
 
       setAvatar((current) => ({
         ...current,
-        [field]: String(adjusted),
+        height: String(adjusted),
+        weight: String(nextWeight),
       }));
 
       return;
@@ -1084,16 +1116,39 @@ function FittingStudioPage({
 
     setAvatar((current) => ({
       ...current,
-      [field]: value,
+      [field]: String(adjusted),
     }));
+
+    return;
   }
 
-  function selectBodyBuild(build) {
-    setAvatar((current) => ({
-      ...current,
-      weight: String(weightForBuild(build, current.height)),
-    }));
+  setAvatar((current) => ({
+    ...current,
+    [field]: value,
+  }));
+}
+
+function selectBodyBuild(build) {
+  if (!BODY_BUILDS.includes(build)) return;
+
+  const nextWeight = clamp(
+    weightForBuild(build, avatar.height),
+    fitLimits.weight
+  );
+
+  if (calculateBodyType(avatar.height, nextWeight) !== build) {
+    displayNotification(
+      "This body build is unavailable at your current height within the current fitting limits."
+    );
+    return;
   }
+
+  // Update internal weight while preserving height.
+  setAvatar((current) => ({
+    ...current,
+    weight: String(nextWeight),
+  }));
+}
 
   function notifyAtLimit(field) {
     const flag =
@@ -1507,40 +1562,68 @@ function FittingStudioPage({
                
 
                 <div className="studio-measurement-grid">
-                  <div className="studio-slider-field">
-                    <div className="studio-slider-header">
-                      <label htmlFor="studio-height">Height</label>
-                      <strong>{avatar.height} cm</strong>
-                    </div>
+  {/* HEIGHT */}
+  <div className="studio-slider-field">
+    <div className="studio-slider-header">
+      <label htmlFor="studio-height">Height</label>
+      <strong>{avatar.height} cm</strong>
+    </div>
 
-                    <input
-                      id="studio-height"
-                      className="studio-slider"
-                      type="range"
-                      min={fitLimits.height.min}
-                      max={fitLimits.height.max}
-                      step="0.1"
-                      value={clamp(avatar.height, fitLimits.height)}
-                      onPointerUp={() => notifyAtLimit("height")}
-                      onKeyUp={() => notifyAtLimit("height")}
-                      onChange={(event) =>
-                        updateAvatar("height", event.target.value)
-                      }
-                    />
+    <input
+      id="studio-height"
+      className="studio-slider"
+      type="range"
+      min={fitLimits.height.min}
+      max={fitLimits.height.max}
+      step="0.1"
+      value={clamp(avatar.height, fitLimits.height)}
+      onPointerUp={() => notifyAtLimit("height")}
+      onKeyUp={() => notifyAtLimit("height")}
+      onChange={(event) =>
+        updateAvatar("height", event.target.value)
+      }
+      aria-valuetext={`${avatar.height} centimeters`}
+    />
 
-                    <div className="studio-slider-limits">
-                      <span>{fitLimits.height.min} cm</span>
-                      <span>{fitLimits.height.max} cm</span>
-                    </div>
-                  </div>
-                </div>
+    <div className="studio-slider-limits">
+      <span>{fitLimits.height.min} cm</span>
+      <span>{fitLimits.height.max} cm</span>
+    </div>
+  </div>
 
-                <ControlGroup
-                  label="Body Build"
-                  value={bodyBuild}
-                  options={BODY_BUILDS}
-                  onChange={selectBodyBuild}
-                />
+  {/* BODY BUILD */}
+  <div className="studio-slider-field">
+    <div className="studio-slider-header">
+      <label htmlFor="studio-body-build">Body Build</label>
+      <strong>{bodyBuild}</strong>
+    </div>
+
+    <input
+      id="studio-body-build"
+      className="studio-slider"
+      type="range"
+      min={0}
+      max={BODY_BUILDS.length - 1}
+      step={1}
+      value={Math.max(0, BODY_BUILDS.indexOf(bodyBuild))}
+      onChange={(event) =>
+        selectBodyBuild(BODY_BUILDS[Number(event.target.value)])
+      }
+      aria-valuetext={bodyBuild}
+    />
+
+    <div className="studio-build-slider-labels" aria-hidden="true">
+      {BODY_BUILDS.map((build) => (
+        <span
+          key={build}
+          className={bodyBuild === build ? "active" : ""}
+        >
+          {build}
+        </span>
+      ))}
+    </div>
+  </div>
+</div>
 
                 {equippedItemsArray.length > 0 && (
                   <div
