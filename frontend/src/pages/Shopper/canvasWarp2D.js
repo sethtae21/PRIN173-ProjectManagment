@@ -611,12 +611,22 @@ export function renderLayer(
 
   if (!sourceCtx) return;
 
-  const src = sourceCtx.getImageData(
-    0,
-    0,
-    width,
-    height
-  ).data;
+  let src;
+
+  try {
+    src = sourceCtx.getImageData(
+      0,
+      0,
+      width,
+      height
+    ).data;
+  } catch {
+    // FIX (SecurityError guard): a tainted layer (legacy cross-origin
+    // media URL) must never abort the whole avatar render. Draw it
+    // unwarped instead of failing.
+    ctx.drawImage(source, 0, 0);
+    return;
+  }
 
   const out = ctx.createImageData(
     width,
@@ -1082,7 +1092,248 @@ export function tintBody(
 }
 
 // ==========================================
-// CLOTHING ILLUSTRATIONS
+// GARMENT IMAGE LAYERS (REAL CATALOG IMAGES)
+//
+// FIX (try-on integration): equipped items now render their actual
+// rembg-processed PNG (transparent background) instead of only the flat
+// color polygons. The image is loaded asynchronously (cached), its
+// transparent margins are auto-cropped via the alpha bounding box, and the
+// cropped garment is stretched onto the anatomical region of its category
+// (torso / legs / feet) in body coordinates, so the existing lattice warp
+// deforms it together with the avatar. catalogIllustration() remains the
+// fallback while the image is loading or when it is missing/unreadable.
+// ==========================================
+
+const garmentImageCache = new Map();
+const garmentCropCache = new Map();
+
+// FIX (SecurityError taint): force SAME-ORIGIN media loads. Items persisted
+// in sessionStorage / saved outfits / pending-item flow may still carry
+// absolute http://127.0.0.1:8000/media/... URLs from before the dev proxy
+// existed; drawing cross-origin images taints the layer canvas and makes
+// renderLayer()'s getImageData throw. Stripping the origin routes every
+// load through the same-origin proxy (Vite dev proxy / staging proxy).
+function sameOriginMedia(src) {
+  const raw = String(src || "");
+
+  if (!raw) return "";
+  if (raw.startsWith("/")) return raw;
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      return url.pathname + url.search;
+    } catch {
+      return raw;
+    }
+  }
+
+  return raw;
+}
+
+// Anatomical regions in bounds-relative coordinates (same system as the
+// polygon illustrations): X(p) = cx + width*p, Y(p) = top + height*p.
+const GARMENT_REGIONS = {
+  tops: { x0: -0.36, x1: 0.36, y0: 0.185, y1: 0.47 },
+  outerwear: { x0: -0.38, x1: 0.38, y0: 0.185, y1: 0.52 },
+  bottoms: { x0: -0.23, x1: 0.23, y0: 0.47, y1: 0.86 },
+  skirt: { x0: -0.34, x1: 0.34, y0: 0.47, y1: 0.72 },
+  dresses: { x0: -0.35, x1: 0.35, y0: 0.185, y1: 0.78 },
+  footwear: { x0: -0.26, x1: 0.26, y0: 0.93, y1: 1.0 },
+};
+
+function cropTransparentCanvas(image) {
+  const w = image.naturalWidth || image.width;
+  const h = image.naturalHeight || image.height;
+
+  if (!w || !h) return null;
+
+  const scale = Math.min(1, 256 / Math.max(w, h));
+  const sw = Math.max(1, Math.round(w * scale));
+  const sh = Math.max(1, Math.round(h * scale));
+
+  const probe = newCanvas(sw, sh);
+  const pctx = probe.getContext("2d", {
+    willReadFrequently: true,
+  });
+
+  if (!pctx) return imageToCanvas(image, w, h);
+
+  pctx.drawImage(image, 0, 0, sw, sh);
+
+  let data;
+
+  try {
+    data = pctx.getImageData(0, 0, sw, sh).data;
+  } catch {
+    // Tainted canvas (cross-origin media): keep the full image.
+    return imageToCanvas(image, w, h);
+  }
+
+  let minX = sw;
+  let minY = sh;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < sh; y += 1) {
+    for (let x = 0; x < sw; x += 1) {
+      if (data[(y * sw + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    return imageToCanvas(image, w, h);
+  }
+
+  const inv = 1 / scale;
+  const pad = Math.round(Math.max(2, (maxX - minX) * 0.04));
+
+  const sx = Math.max(0, Math.floor((minX - pad) * inv));
+  const sy = Math.max(0, Math.floor((minY - pad) * inv));
+  const ex = Math.min(w, Math.ceil((maxX + pad) * inv));
+  const ey = Math.min(h, Math.ceil((maxY + pad) * inv));
+
+  const cw = ex - sx;
+  const ch = ey - sy;
+
+  if (cw <= 0 || ch <= 0) {
+    return imageToCanvas(image, w, h);
+  }
+
+  const out = newCanvas(cw, ch);
+  out
+    .getContext("2d")
+    .drawImage(image, sx, sy, cw, ch, 0, 0, cw, ch);
+
+  return out;
+}
+
+// Start (or reuse) loading + cropping of a garment image.
+export function preloadGarmentImage(src) {
+  if (!src) return Promise.resolve(null);
+
+  if (!garmentImageCache.has(src)) {
+    const sameOrigin = sameOriginMedia(src);
+
+    const promise = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () =>
+        reject(new Error(`Missing garment image: ${sameOrigin}`));
+      image.src = sameOrigin;
+    })
+      .then((image) => {
+        const cropped = cropTransparentCanvas(image);
+        garmentCropCache.set(src, cropped);
+        return cropped;
+      })
+      .catch((error) => {
+        garmentCropCache.set(src, null);
+        throw error;
+      });
+
+    garmentImageCache.set(src, promise);
+
+    promise.catch(() => {
+      garmentImageCache.delete(src);
+    });
+  }
+
+  return garmentImageCache.get(src);
+}
+
+// Synchronous peek: returns the cropped canvas if already loaded.
+export function peekCroppedGarment(src) {
+  if (!src) return null;
+  return garmentCropCache.get(src) || null;
+}
+
+function regionForProduct(product) {
+  const category = String(
+    product.category || "Tops"
+  ).toLowerCase();
+
+  const name = String(product.name || "").toLowerCase();
+
+  if (
+    category.includes("footwear") ||
+    category.includes("shoe")
+  ) {
+    return GARMENT_REGIONS.footwear;
+  }
+
+  if (category.includes("dress")) {
+    return GARMENT_REGIONS.dresses;
+  }
+
+  if (category.includes("outer")) {
+    return GARMENT_REGIONS.outerwear;
+  }
+
+  if (category.includes("bottom")) {
+    return name.includes("skirt")
+      ? GARMENT_REGIONS.skirt
+      : GARMENT_REGIONS.bottoms;
+  }
+
+  return GARMENT_REGIONS.tops;
+}
+
+// Builds a WIDTHxHEIGHT layer canvas with the real garment image stretched
+// onto its anatomical region, ready for renderLayer(). Returns null when
+// the image is not ready yet (caller falls back to catalogIllustration).
+export function garmentImageLayer(
+  product,
+  bounds,
+  view,
+  width,
+  height
+) {
+  if (!product || !bounds) return null;
+
+  const src =
+    product.image ||
+    product.front_image ||
+    "";
+
+  const cropped = peekCroppedGarment(src);
+
+  if (!cropped) return null;
+
+  const region = regionForProduct(product);
+
+  const X = (p) => bounds.cx + bounds.width * p;
+  const Y = (p) => bounds.top + bounds.height * p;
+
+  const rx = X(region.x0);
+  const rw = X(region.x1) - rx;
+  const ry = Y(region.y0);
+  const rh = Y(region.y1) - ry;
+
+  if (rw <= 0 || rh <= 0) return null;
+
+  const canvas = newCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) return null;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Stretch-to-region: the garment conforms to the wearer's body region,
+  // exactly like the polygon fallbacks do.
+  ctx.drawImage(cropped, rx, ry, rw, rh);
+
+  return canvas;
+}
+
+// ==========================================
+// CLOTHING ILLUSTRATIONS (FALLBACK)
 // ==========================================
 
 export function catalogIllustration(

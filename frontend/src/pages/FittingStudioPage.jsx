@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  API_URL,
   presetsApi,
   outfitsApi,
   bodyProportion,
@@ -126,15 +125,16 @@ function normalizeCategory(category) {
   return "top";
 }
 
-// FIX (garment thumbnails): the backend returns media paths relative to
-// Django (e.g. "/media/<gridfs-name>.png"). On the Vite dev server
-// (localhost:5173) a relative src 404s, so prefix the API origin exactly
-// like the Catalog / Product Details pages do.
+// FIX (garment thumbnails + canvas try-on): serve media through the SAME
+// origin as the page. In dev, vite.config.js proxies /media/* to Django; in
+// staging, local_staging_server.mjs already proxies /media/*. Same-origin
+// URLs keep <canvas> pixel reads (transparent-margin crop, try-on warp)
+// untainted and avoid the old Vite 404 on relative media paths.
 function mediaUrl(path) {
   if (!path) return "";
   const raw = String(path);
   if (raw.startsWith("http")) return raw;
-  return `${API_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  return raw.startsWith("/") ? raw : `/${raw}`;
 }
 
 // Normalize backend recommendation payload into the internal item structure
@@ -574,31 +574,125 @@ function ControlGroup({ label, value, options, onChange }) {
   );
 }
 
-// Recommendation thumbnail with real garment image + graceful fallback.
-// FIX: src is the absolute Django media URL (mediaUrl in normalizeStudioItem);
-// if the image still fails (missing file, backend down), fall back to the
-// original gold placeholder span instead of a broken-image icon.
+// FIX (thumbnail "perfect fit"): rembg-processed garment PNGs keep the full
+// source canvas with transparent margins (e.g. jeans occupying only the
+// bottom slice), so objectFit:cover pinned them to one edge. This computes
+// the alpha bounding box on a downscaled probe canvas and returns a cropped
+// data URL, so the garment itself fills and centers in the container.
+function computeCropDataURL(img) {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+
+  if (!w || !h) return null;
+
+  const scale = Math.min(1, 256 / Math.max(w, h));
+  const sw = Math.max(1, Math.round(w * scale));
+  const sh = Math.max(1, Math.round(h * scale));
+
+  const probe = document.createElement("canvas");
+  probe.width = sw;
+  probe.height = sh;
+
+  const pctx = probe.getContext("2d", {
+    willReadFrequently: true,
+  });
+  pctx.drawImage(img, 0, 0, sw, sh);
+
+  const data = pctx.getImageData(0, 0, sw, sh).data;
+
+  let minX = sw;
+  let minY = sh;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < sh; y += 1) {
+    for (let x = 0; x < sw; x += 1) {
+      if (data[(y * sw + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  const inv = 1 / scale;
+  const pad = Math.round(Math.max(2, (maxX - minX) * 0.05));
+
+  const sx = Math.max(0, Math.floor((minX - pad) * inv));
+  const sy = Math.max(0, Math.floor((minY - pad) * inv));
+  const ex = Math.min(w, Math.ceil((maxX + pad) * inv));
+  const ey = Math.min(h, Math.ceil((maxY + pad) * inv));
+
+  const cw = ex - sx;
+  const ch = ey - sy;
+
+  if (cw <= 0 || ch <= 0) return null;
+
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  out
+    .getContext("2d")
+    .drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
+
+  return out.toDataURL("image/png");
+}
+
+// Recommendation thumbnail: real garment image, auto-cropped and centered.
+// Falls back to the raw URL when pixel reads are unavailable (tainted
+// canvas) and to the gold placeholder span when the image cannot load.
 function RecommendationThumb({ item }) {
+  const [displaySrc, setDisplaySrc] = useState(null);
   const [failed, setFailed] = useState(false);
-  const src = item.image;
 
   useEffect(() => {
+    let active = true;
+
+    setDisplaySrc(null);
     setFailed(false);
-  }, [src]);
+
+    if (!item.image) return undefined;
+
+    const img = new Image();
+
+    img.onload = () => {
+      if (!active) return;
+
+      try {
+        const cropped = computeCropDataURL(img);
+        setDisplaySrc(cropped || item.image);
+      } catch {
+        setDisplaySrc(item.image);
+      }
+    };
+
+    img.onerror = () => {
+      if (active) setFailed(true);
+    };
+
+    img.src = item.image;
+
+    return () => {
+      active = false;
+    };
+  }, [item.image]);
 
   return (
     <div
       className={`studio-clothing-thumbnail ${item.category}`}
       aria-hidden="true"
     >
-      {src && !failed ? (
+      {displaySrc && !failed ? (
         <img
-          src={src}
+          src={displaySrc}
           alt={item.name}
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover",
+            objectFit: "contain",
           }}
           onError={() => setFailed(true)}
         />
@@ -1471,6 +1565,7 @@ function FittingStudioPage({
     });
   }
 
+  // FIX: restored the corrupted guard line (was "ifisGuest) {").
   function saveOutfit() {
     if (isGuest) {
       openRegistrationPopup();

@@ -12,6 +12,9 @@ import {
   renderLayer,
   tintBody,
   catalogIllustration,
+  garmentImageLayer,
+  preloadGarmentImage,
+  peekCroppedGarment,
 } from "./canvasWarp2D";
 
 const WIDTH = 320;
@@ -119,7 +122,7 @@ function prepareAvatar(image) {
       bounds.height *
       image.height
     ) /
-      HEIGHT
+    HEIGHT
   );
 
   const targetHeight =
@@ -239,6 +242,14 @@ export default function AvatarCanvas({
     setError,
   ] = useState("");
 
+  // FIX (try-on integration): bump when a real garment image finishes
+  // loading/cropping so the garments memo swaps the polygon fallback for
+  // the actual catalog image layer.
+  const [
+    garmentImageVersion,
+    setGarmentImageVersion,
+  ] = useState(0);
+
   const gender =
     String(
       avatar?.gender
@@ -330,11 +341,8 @@ export default function AvatarCanvas({
     avatar?.undertone,
   ]);
 
-  const garments = useMemo(() => {
-    if (!bounds) {
-      return [];
-    }
-
+  // Equipped items in draw order (bottom under top under outerwear).
+  const garmentItems = useMemo(() => {
     const items =
       equippedItems.dress
         ? [
@@ -352,7 +360,61 @@ export default function AvatarCanvas({
     return items
       .filter(Boolean)
       .map(normalizeItem)
+      .filter(Boolean);
+  }, [equippedItems]);
+
+  // FIX (try-on integration): preload + auto-crop real garment images in
+  // the background; each completion bumps the version so the layers swap
+  // from polygon fallback to the actual image.
+  useEffect(() => {
+    let active = true;
+
+    const sources = garmentItems
+      .map((item) => item.image || item.front_image || "")
+      .filter(Boolean);
+
+    if (!sources.length) {
+      return undefined;
+    }
+
+    sources.forEach((src) => {
+      if (peekCroppedGarment(src)) {
+        return;
+      }
+
+      preloadGarmentImage(src)
+        .then(() => {
+          if (active) {
+            setGarmentImageVersion(
+              (version) => version + 1
+            );
+          }
+        })
+        .catch(() => {
+          // Missing/unreadable image: keep polygon fallback silently.
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [garmentItems]);
+
+  const garments = useMemo(() => {
+    if (!bounds) {
+      return [];
+    }
+
+    return garmentItems
       .map((item) =>
+        // Real catalog image first; polygon illustration as fallback.
+        garmentImageLayer(
+          item,
+          bounds,
+          angle,
+          WIDTH,
+          HEIGHT
+        ) ||
         catalogIllustration(
           item,
           bounds,
@@ -363,9 +425,10 @@ export default function AvatarCanvas({
       )
       .filter(Boolean);
   }, [
-    equippedItems,
+    garmentItems,
     bounds,
     angle,
+    garmentImageVersion,
   ]);
 
   useEffect(() => {
