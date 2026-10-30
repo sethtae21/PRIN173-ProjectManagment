@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/ShopperDashboard.css";
-
-/* ==========================================
-   FITFUSION AI - SHOPPER DASHBOARD
-========================================== */
 
 const STANDARD_AVATAR = {
   id: "fitfusion-standard",
@@ -24,36 +20,37 @@ const STANDARD_AVATAR = {
   builtIn: true,
 };
 
-/* FIX: Side view removed — the standard side PNG does not exist, so the
-   preview must never request view="side". Front + rear only. */
-const AVATAR_VIEWS = ["front", "rear"];
+const STANDARD_IMAGES = {
+  Female: {
+    front: "/Avatars/Female_Standard/Female_Standard_front.png",
+    rear: "/Avatars/Female_Standard/Female_Standard_rear.png",
+  },
+  Male: {
+    front: "/Avatars/Male_Standard/Male_Standard_front.png",
+    rear: "/Avatars/Male_Standard/Male_Standard_rear.png",
+  },
+};
 
-/* ==========================================
-   STORAGE HELPERS
-========================================== */
+const AVATAR_VIEWS = [
+  { key: "front", label: "Front", description: "Front View" },
+  { key: "rear", label: "Rear", description: "Rear View" },
+];
+
+const EMPTY_ITEMS = {};
+
+/* STORAGE HELPERS */
 
 function readStoredArray(...keys) {
   for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
-
       if (!saved) continue;
 
       const parsed = JSON.parse(saved);
 
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-
-      if (parsed && typeof parsed === "object") {
-        if (Array.isArray(parsed.items)) {
-          return parsed.items;
-        }
-
-        if (Array.isArray(parsed.cartItems)) {
-          return parsed.cartItems;
-        }
-      }
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed?.items)) return parsed.items;
+      if (Array.isArray(parsed?.cartItems)) return parsed.cartItems;
     } catch {
       // Try the next storage key.
     }
@@ -66,7 +63,6 @@ function readStoredObject(...keys) {
   for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
-
       if (!saved) continue;
 
       const parsed = JSON.parse(saved);
@@ -88,28 +84,18 @@ function readStoredObject(...keys) {
 
 function getCurrentShopper() {
   const sources = [
-    {
-      storage: localStorage,
-      key: "fitfusion-current-user",
-    },
-    {
-      storage: sessionStorage,
-      key: "registeredAccount",
-    },
+    { storage: localStorage, key: "fitfusion-current-user" },
+    { storage: sessionStorage, key: "registeredAccount" },
   ];
 
   for (const source of sources) {
     try {
       const saved = source.storage.getItem(source.key);
-
       if (!saved) continue;
 
       const parsed = JSON.parse(saved);
 
-      if (
-        parsed &&
-        typeof parsed === "object"
-      ) {
+      if (parsed && typeof parsed === "object") {
         return parsed;
       }
     } catch {
@@ -137,32 +123,38 @@ function getCartCount(items) {
     const quantity = Number(item?.quantity ?? 1);
 
     return total + (
-      Number.isFinite(quantity) && quantity > 0
-        ? quantity
-        : 1
+      Number.isFinite(quantity) && quantity > 0 ? quantity : 1
     );
   }, 0);
 }
 
-/* ==========================================
-   AVATAR HELPERS
-========================================== */
+/* AVATAR HELPERS */
 
 function isValidAvatar(avatar) {
-  if (
-    !avatar ||
-    typeof avatar !== "object" ||
-    Array.isArray(avatar)
-  ) {
-    return false;
-  }
-
   return Boolean(
-    avatar.id ||
-    avatar.presetId ||
-    avatar.gender ||
-    avatar.height ||
-    avatar.weight
+    avatar &&
+    typeof avatar === "object" &&
+    !Array.isArray(avatar) &&
+    (
+      avatar.id ||
+      avatar.presetId ||
+      avatar.gender ||
+      avatar.height ||
+      avatar.weight
+    )
+  );
+}
+
+function isPremadeAvatar(avatar) {
+  if (!isValidAvatar(avatar)) return true;
+
+  const id = String(avatar.id || avatar.presetId || "");
+
+  return (
+    avatar.builtIn === true ||
+    avatar.isPremade === true ||
+    id === "fitfusion-standard" ||
+    id === "premade-default"
   );
 }
 
@@ -171,34 +163,58 @@ function normalizeAvatar(avatar) {
     return { ...STANDARD_AVATAR };
   }
 
+  const gender =
+    String(avatar.gender || "Female").trim().toLowerCase() === "male"
+      ? "Male"
+      : "Female";
+
   return {
     ...STANDARD_AVATAR,
     ...avatar,
-
-    id:
-      avatar.id ||
-      avatar.presetId ||
-      STANDARD_AVATAR.id,
-
-    name:
-      avatar.name ||
-      avatar.presetName ||
-      STANDARD_AVATAR.name,
-
-    gender:
-      avatar.gender ||
-      STANDARD_AVATAR.gender,
-
+    id: avatar.id || avatar.presetId || STANDARD_AVATAR.id,
+    name: avatar.name || avatar.presetName || "Custom Avatar",
+    gender,
     skinTone:
       avatar.skinTone ||
+      avatar.skin_tone ||
       avatar.skinColor ||
       STANDARD_AVATAR.skinTone,
+    shoulder:
+      avatar.shoulder ||
+      avatar.shoulderWidth ||
+      STANDARD_AVATAR.shoulder,
+    waist: avatar.waist || avatar.waistSize || STANDARD_AVATAR.waist,
+    hip: avatar.hip || avatar.hipSize || STANDARD_AVATAR.hip,
+    thigh: avatar.thigh || avatar.thighSize || STANDARD_AVATAR.thigh,
+    cupSize:
+      gender === "Female"
+        ? avatar.cupSize || avatar.cup_size || "B"
+        : null,
+
+    // Do not inherit builtIn: true from the standard defaults.
+    builtIn: isPremadeAvatar(avatar),
   };
 }
 
-/* ==========================================
-   DASHBOARD DATA
-========================================== */
+function getPresetTimestamp(preset) {
+  const values = [
+    preset.updatedAt,
+    preset.updated_at,
+    preset.createdAt,
+    preset.created_at,
+  ];
+
+  for (const value of values) {
+    if (!value) continue;
+
+    const timestamp = new Date(value).getTime();
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+
+  return 0;
+}
+
+/* DASHBOARD DATA */
 
 function getDashboardData() {
   const shopper = getCurrentShopper();
@@ -220,48 +236,57 @@ function getDashboardData() {
     "avatarPresets"
   );
 
-  const activeAvatar = readStoredObject(
-    "fitfusion-avatar-preset"
-  );
+  const activeAvatar = readStoredObject("fitfusion-avatar-preset");
 
-  const customPresets = storedPresets.filter(
-    (preset) =>
-      preset &&
-      typeof preset === "object" &&
-      !preset.builtIn &&
-      !preset.isPremade &&
-      String(preset.id || preset.presetId) !==
-        STANDARD_AVATAR.id
-  );
+  const customPresets = storedPresets
+    .filter(
+      (preset) => isValidAvatar(preset) && !isPremadeAvatar(preset)
+    )
+    .sort((a, b) => getPresetTimestamp(b) - getPresetTimestamp(a));
 
-  const hasActiveAvatar = isValidAvatar(activeAvatar);
+  const activeCustomAvatar =
+    isValidAvatar(activeAvatar) && !isPremadeAvatar(activeAvatar)
+      ? activeAvatar
+      : null;
 
-  const displayAvatar = hasActiveAvatar
-    ? normalizeAvatar(activeAvatar)
-    : { ...STANDARD_AVATAR };
+  // Prefer the selected custom avatar. Otherwise use a saved custom preset.
+  const customAvatar = activeCustomAvatar || customPresets[0] || null;
+
+  const displayAvatar = customAvatar
+    ? normalizeAvatar(customAvatar)
+    : normalizeAvatar(activeAvatar || STANDARD_AVATAR);
+
+  const hasActiveAvatar =
+    Boolean(customAvatar) || isValidAvatar(activeAvatar);
+
+  const activeCustomIsListed =
+    activeCustomAvatar &&
+    customPresets.some(
+      (preset) =>
+        String(preset.id || preset.presetId) ===
+        String(activeCustomAvatar.id || activeCustomAvatar.presetId)
+    );
 
   return {
     username: getShopperName(shopper),
     cartCount: getCartCount(cartItems),
     savedOutfitCount: savedOutfits.length,
-    customPresetCount: customPresets.length,
+    customPresetCount:
+      customPresets.length +
+      (activeCustomAvatar && !activeCustomIsListed ? 1 : 0),
     hasActiveAvatar,
+    hasCustomAvatar: Boolean(customAvatar),
     displayAvatar,
   };
 }
 
-/* ==========================================
-   MAIN DASHBOARD
-========================================== */
+/* MAIN DASHBOARD */
 
 function ShopperDashboard() {
   const navigate = useNavigate();
-
-  const [dashboard, setDashboard] = useState(
-    getDashboardData
-  );
-
-  const [avatarView, setAvatarView] = useState("front");
+  const [dashboard, setDashboard] = useState(getDashboardData);
+  const [standardGender, setStandardGender] = useState("Female");
+  const [actionError, setActionError] = useState("");
 
   const refreshDashboard = useCallback(() => {
     setDashboard(getDashboardData());
@@ -279,17 +304,14 @@ function ShopperDashboard() {
       "fitfusion-cart-updated",
     ];
 
-    events.forEach((event) => {
-      window.addEventListener(event, refreshDashboard);
-    });
+    events.forEach((event) =>
+      window.addEventListener(event, refreshDashboard)
+    );
 
     return () => {
-      events.forEach((event) => {
-        window.removeEventListener(
-          event,
-          refreshDashboard
-        );
-      });
+      events.forEach((event) =>
+        window.removeEventListener(event, refreshDashboard)
+      );
     };
   }, [refreshDashboard]);
 
@@ -299,30 +321,16 @@ function ShopperDashboard() {
     savedOutfitCount,
     customPresetCount,
     hasActiveAvatar,
-    displayAvatar,
+    hasCustomAvatar,
+    displayAvatar: previewAvatar,
   } = dashboard;
 
-  const hasCustomPresets = customPresetCount > 0;
-
-  const hasStartedFitting =
-    hasActiveAvatar || hasCustomPresets;
-
+  const hasStartedFitting = hasActiveAvatar || customPresetCount > 0;
   const isNewShopper = !hasStartedFitting;
 
-  const previewAvatar = useMemo(
-    () => normalizeAvatar(displayAvatar),
-    [displayAvatar]
-  );
-
-  const equippedItems = useMemo(() => ({}), []);
-
-  const isStandardAvatar =
-    !hasActiveAvatar ||
-    Boolean(previewAvatar.builtIn);
-
-  const avatarLabel = isStandardAvatar
-    ? "FitFusion Standard"
-    : previewAvatar.name;
+  const avatarLabel = hasCustomAvatar
+    ? previewAvatar.name
+    : "FitFusion Standard";
 
   function openAvatarPresets() {
     navigate("/shopper/avatar-presets");
@@ -333,8 +341,21 @@ function ShopperDashboard() {
   }
 
   function continueFitting() {
-    if (hasActiveAvatar) {
-      navigate("/shopper/fitting-studio/customize");
+    if (hasCustomAvatar) {
+      try {
+        localStorage.setItem(
+          "fitfusion-avatar-preset",
+          JSON.stringify(previewAvatar)
+        );
+        localStorage.setItem(
+          "fitfusion-avatar-gender",
+          previewAvatar.gender
+        );
+        setActionError("");
+        navigate("/shopper/fitting-studio/customize");
+      } catch {
+        setActionError("Unable to open your avatar. Please try again.");
+      }
       return;
     }
 
@@ -343,11 +364,6 @@ function ShopperDashboard() {
 
   return (
     <main className="shopper-dashboard-page">
-
-      {/* ======================================
-          HEADER
-      ====================================== */}
-
       <header className="shopper-dashboard-header">
         <div className="shopper-dashboard-top-actions">
           <button
@@ -356,32 +372,20 @@ function ShopperDashboard() {
             onClick={() => navigate("/shopper/cart")}
             aria-label={`Open cart with ${cartCount} items`}
           >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />
               <circle cx="10" cy="20" r="1" />
               <circle cx="18" cy="20" r="1" />
             </svg>
-
             <strong>{cartCount}</strong>
           </button>
         </div>
       </header>
 
-      {/* ======================================
-          DASHBOARD CONTENT
-      ====================================== */}
-
       <div className="shopper-dashboard-body">
-
-        {/* WELCOME */}
-
         <section className="shopper-welcome">
           <p>
-            WELCOME{hasStartedFitting ? " BACK" : ""},
-            {" "}
+            WELCOME{hasStartedFitting ? " BACK" : ""},{" "}
             {username.toUpperCase()}
           </p>
 
@@ -398,56 +402,37 @@ function ShopperDashboard() {
           </span>
         </section>
 
-        {/* ======================================
-            MAIN FITTING CARD
-        ====================================== */}
-
         <section className="shopper-start-card">
-
-          {/* LEFT CONTENT */}
-
           <div className="shopper-start-card-content">
             <p className="shopper-card-label">
-              {isNewShopper
-                ? "START YOUR FITTING JOURNEY"
-                : "YOUR FITTING PROFILE"}
+              {hasCustomAvatar
+                ? "YOUR FITTING PROFILE"
+                : "START YOUR FITTING JOURNEY"}
             </p>
 
             <h2>
-              {isNewShopper
-                ? "Meet your Standard Avatar"
-                : hasActiveAvatar
+              {hasCustomAvatar
                 ? "Your avatar is ready to style"
-                : "Choose your fitting avatar"}
+                : "Meet your Standard Avatar"}
             </h2>
 
             <p>
-              {isNewShopper
-                ? "FitFusion includes one premade average-body avatar. You can use it immediately or customize your own avatar using height, weight, skin tone, and body proportions."
-                : hasActiveAvatar
-                ? `Your active fitting profile is ${previewAvatar.name}. Continue your session or manage your avatar presets.`
-                : "You have saved avatar presets. Select one to begin fitting, or use the Standard Avatar."}
+              {hasCustomAvatar
+                ? `Your fitting profile is ${previewAvatar.name}. Continue your session or manage your avatar presets.`
+                : "Explore our Male and Female Standard Avatars. Use a premade avatar or create your own using height, weight, skin tone, and body proportions."}
             </p>
-
-            {/* AVATAR INFORMATION */}
 
             <div className="shopper-active-avatar">
               <span className="shopper-active-dot" />
-
               <div>
-                <strong>
-                  {avatarLabel}
-                </strong>
-
+                <strong>{avatarLabel}</strong>
                 <small>
-                  {hasActiveAvatar
-                    ? "Currently selected fitting avatar"
+                  {hasCustomAvatar
+                    ? "Your saved customized fitting avatar"
                     : "Premade avatar available to select"}
                 </small>
               </div>
             </div>
-
-            {/* ACTIONS */}
 
             <div className="shopper-card-actions">
               <button
@@ -455,13 +440,10 @@ function ShopperDashboard() {
                 className="shopper-primary-button"
                 onClick={continueFitting}
               >
-                {hasActiveAvatar
+                {hasCustomAvatar
                   ? "Continue Fitting Session"
                   : "Use Standard Avatar"}
-
-                <span aria-hidden="true">
-                  →
-                </span>
+                <span aria-hidden="true">→</span>
               </button>
 
               <button
@@ -480,71 +462,128 @@ function ShopperDashboard() {
                   : "Create Custom Avatar"}
               </button>
             </div>
+
+            {actionError && (
+              <p className="shopper-action-error" role="alert">
+                {actionError}
+              </p>
+            )}
           </div>
 
-          {/* ======================================
-              REAL 2D AVATAR PREVIEW
-          ====================================== */}
+          {/* AVATAR PREVIEW — FRONT AND REAR TOGETHER */}
 
           <div className="shopper-avatar-preview-panel">
-            <div className="shopper-avatar-preview-top">
-              <span>2D AVATAR PREVIEW</span>
+            <section
+              className="shopper-fitting-preview"
+              aria-label={
+                hasCustomAvatar
+                  ? "Your customized avatar preview"
+                  : "Standard avatar preview"
+              }
+            >
+              <div className="shopper-preview-header">
+                <div>
+                  <p>FIT PREVIEW</p>
+                  <h2>Your virtual fitting room</h2>
+                </div>
 
-              <strong>
-                {hasActiveAvatar
-                  ? "SELECTED"
-                  : "STANDARD"}
-              </strong>
-            </div>
+                <span className="shopper-preview-badge">2D AVATAR</span>
+              </div>
 
-            <div className="shopper-avatar-preview-stage">
-              <AvatarCanvas
-                avatar={previewAvatar}
-                view={avatarView}
-                equippedItems={equippedItems}
-              />
-            </div>
+              <div className="shopper-avatar-selector">
+                <div className="shopper-avatar-selector-text">
+                  <p>
+                    {hasCustomAvatar
+                      ? "YOUR CUSTOM AVATAR"
+                      : "PREMADE AVATAR"}
+                  </p>
+                  <span>
+                    {hasCustomAvatar
+                      ? `${previewAvatar.name} — your saved body settings and skin tone.`
+                      : "Explore the 2D avatar from two viewing angles."}
+                  </span>
+                </div>
 
-            <div className="shopper-avatar-view-controls">
-              {AVATAR_VIEWS.map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  className={
-                    avatarView === view
-                      ? "active"
-                      : ""
-                  }
-                  aria-pressed={avatarView === view}
-                  onClick={() => setAvatarView(view)}
-                >
-                  {view.charAt(0).toUpperCase() +
-                    view.slice(1)}
-                </button>
-              ))}
-            </div>
+                {hasCustomAvatar ? (
+                  <span className="shopper-custom-avatar-badge">
+                    SAVED PRESET
+                  </span>
+                ) : (
+                  <div
+                    className="shopper-gender-switch"
+                    role="group"
+                    aria-label="Choose standard avatar gender"
+                  >
+                    {["Female", "Male"].map((gender) => (
+                      <button
+                        key={gender}
+                        type="button"
+                        className={
+                          standardGender === gender ? "active" : ""
+                        }
+                        aria-pressed={standardGender === gender}
+                        onClick={() => setStandardGender(gender)}
+                      >
+                        {gender}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            <div className="shopper-avatar-preview-details">
-              <strong>{avatarLabel}</strong>
+              <div className="shopper-view-grid">
+                {AVATAR_VIEWS.map((view) => (
+                  <figure className="shopper-view-card" key={view.key}>
+                    <div className="shopper-avatar-preview-stage">
+                      {hasCustomAvatar ? (
+                        <div className="shopper-custom-avatar-canvas">
+                          <AvatarCanvas
+                            avatar={previewAvatar}
+                            view={view.key}
+                            equippedItems={EMPTY_ITEMS}
+                          />
+                        </div>
+                      ) : (
+                        <img
+                          className="shopper-standard-avatar-image"
+                          src={STANDARD_IMAGES[standardGender][view.key]}
+                          alt={`${standardGender} Standard Avatar - ${view.description}`}
+                        />
+                      )}
 
-              <span>
-                {previewAvatar.gender} ·{" "}
-                {previewAvatar.height} cm ·{" "}
-                {previewAvatar.weight} kg
-              </span>
+                      <span className="shopper-view-badge">
+                        {view.label.toUpperCase()}
+                      </span>
+                    </div>
 
-              <small>
-                {isStandardAvatar
-                  ? "Average / Standard body profile"
-                  : "Custom fitting profile"}
-              </small>
-            </div>
+                    <figcaption>{view.description}</figcaption>
+                  </figure>
+                ))}
+              </div>
+
+              <div className="shopper-preview-statistics">
+                <div>
+                  <strong>{hasCustomAvatar ? "Custom" : "1"}</strong>
+                  <span>
+                    {hasCustomAvatar
+                      ? "Your saved fitting profile"
+                      : "Standard avatar per gender"}
+                  </span>
+                </div>
+
+                <div>
+                  <strong>2</strong>
+                  <span>Viewing angles</span>
+                </div>
+
+                <div>
+                  <strong>2D</strong>
+                  <span>Layered fitting</span>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
-
-        {/* ======================================
-            QUICK ACTIONS
-        ====================================== */}
 
         <section
           className="shopper-quick-actions"
@@ -554,79 +593,51 @@ function ShopperDashboard() {
             number="01"
             title="Browse Catalog"
             description="Discover clothing from different sellers."
-            onClick={() =>
-              navigate("/shopper/catalog")
-            }
+            onClick={() => navigate("/shopper/catalog")}
           />
-
           <DashboardAction
             number="02"
             title="Fitting Studio"
             description="Customize your avatar and try clothing."
             onClick={openFittingStudio}
           />
-
           <DashboardAction
             number="03"
             title="Saved Outfits"
             description={
               savedOutfitCount > 0
                 ? `${savedOutfitCount} saved ${
-                    savedOutfitCount === 1
-                      ? "outfit"
-                      : "outfits"
+                    savedOutfitCount === 1 ? "outfit" : "outfits"
                   }`
                 : "Review your saved clothing combinations."
             }
-            onClick={() =>
-              navigate("/shopper/saved-outfits")
-            }
+            onClick={() => navigate("/shopper/saved-outfits")}
           />
         </section>
 
-        {/* ======================================
-            ACCOUNT OVERVIEW
-        ====================================== */}
-
         <section className="shopper-account-status">
-
           <div className="shopper-status-heading">
             <div>
               <p>ACCOUNT OVERVIEW</p>
-
               <h2>Your FitFusion activity</h2>
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/shopper/account")
-              }
+              onClick={() => navigate("/shopper/account")}
             >
               Manage Account
             </button>
           </div>
-
-          {/* STATISTICS */}
 
           <div className="shopper-stats-grid">
             <StatCard
               number={customPresetCount + 1}
               label="Total Avatar Presets"
             />
-
-            <StatCard
-              number={savedOutfitCount}
-              label="Saved Outfits"
-            />
-
-            <StatCard
-              number={cartCount}
-              label="Cart Items"
-            />
+            <StatCard number={savedOutfitCount} label="Saved Outfits" />
+            <StatCard number={cartCount} label="Cart Items" />
           </div>
-
-          {/* ACCOUNT STATUS */}
 
           <div className="shopper-status-list">
             <StatusRow
@@ -634,61 +645,40 @@ function ShopperDashboard() {
               value={`${customPresetCount} custom · 1 standard`}
               onClick={openAvatarPresets}
             />
-
             <StatusRow
               label="Standard avatar"
               value="FitFusion Standard · Available"
               onClick={openAvatarPresets}
             />
-
             <StatusRow
               label="Active fitting profile"
-              value={
-                hasActiveAvatar
-                  ? previewAvatar.name
-                  : "Not selected yet"
-              }
+              value={hasActiveAvatar ? avatarLabel : "Not selected yet"}
               onClick={openAvatarPresets}
             />
-
             <StatusRow
               label="Saved outfits"
               value={
                 savedOutfitCount > 0
                   ? `${savedOutfitCount} saved ${
-                      savedOutfitCount === 1
-                        ? "outfit"
-                        : "outfits"
+                      savedOutfitCount === 1 ? "outfit" : "outfits"
                     }`
                   : "No saved outfits"
               }
-              onClick={() =>
-                navigate("/shopper/saved-outfits")
-              }
+              onClick={() => navigate("/shopper/saved-outfits")}
             />
-
             <StatusRow
               label="Shopping cart"
               value={
                 cartCount > 0
-                  ? `${cartCount} ${
-                      cartCount === 1
-                        ? "item"
-                        : "items"
-                    }`
+                  ? `${cartCount} ${cartCount === 1 ? "item" : "items"}`
                   : "Your cart is empty"
               }
-              onClick={() =>
-                navigate("/shopper/cart")
-              }
+              onClick={() => navigate("/shopper/cart")}
             />
-
             <StatusRow
               label="Orders"
               value="View your order history"
-              onClick={() =>
-                navigate("/shopper/orders")
-              }
+              onClick={() => navigate("/shopper/orders")}
             />
           </div>
         </section>
@@ -697,44 +687,22 @@ function ShopperDashboard() {
   );
 }
 
-/* ==========================================
-   QUICK ACTION
-========================================== */
-
-function DashboardAction({
-  number,
-  title,
-  description,
-  onClick,
-}) {
+function DashboardAction({ number, title, description, onClick }) {
   return (
     <button
       type="button"
       className="shopper-quick-action"
       onClick={onClick}
     >
-      <span className="shopper-quick-number">
-        {number}
-      </span>
-
+      <span className="shopper-quick-number">{number}</span>
       <div>
         <strong>{title}</strong>
         <small>{description}</small>
       </div>
-
-      <span
-        className="shopper-action-arrow"
-        aria-hidden="true"
-      >
-        →
-      </span>
+      <span className="shopper-action-arrow" aria-hidden="true">→</span>
     </button>
   );
 }
-
-/* ==========================================
-   STAT CARD
-========================================== */
 
 function StatCard({ number, label }) {
   return (
@@ -745,10 +713,6 @@ function StatCard({ number, label }) {
   );
 }
 
-/* ==========================================
-   STATUS ROW
-========================================== */
-
 function StatusRow({ label, value, onClick }) {
   return (
     <button
@@ -758,13 +722,7 @@ function StatusRow({ label, value, onClick }) {
     >
       <strong>{label}</strong>
       <span>{value}</span>
-
-      <span
-        className="shopper-status-arrow"
-        aria-hidden="true"
-      >
-        →
-      </span>
+      <span className="shopper-status-arrow" aria-hidden="true">→</span>
     </button>
   );
 }

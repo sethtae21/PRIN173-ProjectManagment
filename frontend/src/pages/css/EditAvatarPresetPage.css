@@ -1556,3 +1556,70 @@
       minmax(0, 1fr);
   }
 }
+/* ==========================================
+   SCROLLABLE RECOMMENDATIONS
+========================================== */
+
+.studio-controls-card > .studio-recommendations-panel {
+  min-height: 0;
+  max-height: 650px;
+  max-height: min(650px, 70dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #b57e20 #f2e7d2;
+}
+
+/* Hide the accidentally added empty inner panel. */
+.studio-recommendations-panel
+  > .studio-recommendations-panel:empty {
+  display: none;
+}
+
+/* Keep the tabs outside the scrolling area. */
+.studio-panel-tabs {
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling */
+.studio-recommendations-panel::-webkit-scrollbar {
+  width: 7px;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #f2e7d2;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #b57e20;
+}
+
+.studio-recommendations-panel::-webkit-scrollbar-thumb:hover {
+  background: #8e641f;
+}
+
+.studio-recommendations-panel:focus-visible {
+  outline: 2px solid #8e641f;
+  outline-offset: -3px;
+}
+
+.studio-recommendation-information {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.studio-recommendations-panel
+  > .studio-recommendation-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Mobile */
+@media (max-width: 760px) {
+  .studio-controls-card > .studio-recommendations-panel {
+    max-height: 500px;
+    max-height: min(500px, 65dvh);
+  }
+}

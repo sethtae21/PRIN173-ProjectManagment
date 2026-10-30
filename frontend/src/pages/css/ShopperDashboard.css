@@ -1,7 +1,4 @@
-/* ==========================================
-   FITFUSION AI - SHOPPER DASHBOARD
-   GOLD / WHITE / BLACK THEME
-========================================== */
+/* FITFUSION AI - SHOPPER DASHBOARD */
 
 .shopper-dashboard-page,
 .shopper-dashboard-page *,
@@ -16,20 +13,13 @@
   min-width: 0;
   min-height: 100vh;
   padding-bottom: 70px;
-
   background:
     radial-gradient(
       circle at right center,
       rgba(181, 126, 32, 0.17),
       transparent 42%
     ),
-    linear-gradient(
-      135deg,
-      #f2efe8,
-      #fffdf9 52%,
-      #eee8de
-    );
-
+    linear-gradient(135deg, #f2efe8, #fffdf9 52%, #eee8de);
   color: #17130f;
   font-family: inherit;
 }
@@ -39,9 +29,7 @@
   cursor: pointer;
 }
 
-/* ==========================================
-   HEADER
-========================================== */
+/* HEADER */
 
 .shopper-dashboard-header {
   display: flex;
@@ -50,7 +38,6 @@
   align-items: center;
   justify-content: flex-end;
   padding: 20px clamp(25px, 4vw, 58px);
-
   background: rgba(255, 253, 249, 0.97);
   border-bottom: 1px solid #e2d8c7;
 }
@@ -70,15 +57,11 @@
   justify-content: center;
   gap: 18px;
   padding: 0 18px;
-
   background: #fffdf9;
   border: 1px solid #d2be91;
   border-radius: 10px;
   color: #17130f;
-
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .shopper-dashboard-header .shopper-cart-button:hover {
@@ -102,9 +85,7 @@
   font-weight: 700;
 }
 
-/* ==========================================
-   DASHBOARD BODY
-========================================== */
+/* DASHBOARD BODY */
 
 .shopper-dashboard-body {
   width: min(1170px, calc(100% - 60px));
@@ -112,9 +93,7 @@
   padding-top: 36px;
 }
 
-/* ==========================================
-   WELCOME SECTION
-========================================== */
+/* WELCOME */
 
 .shopper-welcome {
   margin-bottom: 31px;
@@ -145,27 +124,19 @@
   line-height: 1.7;
 }
 
-/* ==========================================
-   MAIN FITTING CARD
-========================================== */
+/* MAIN FITTING CARD */
 
 .shopper-start-card {
   position: relative;
   display: grid;
-  grid-template-columns:
-    minmax(0, 1fr)
-    minmax(285px, 0.52fr);
-
+  grid-template-columns: minmax(0, 1fr) minmax(285px, 0.52fr);
   min-height: 390px;
   margin-bottom: 28px;
   overflow: hidden;
-
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 17px;
-
-  box-shadow:
-    0 13px 32px rgba(83, 55, 13, 0.06);
+  box-shadow: 0 13px 32px rgba(83, 55, 13, 0.06);
 }
 
 .shopper-start-card-content {
@@ -184,7 +155,7 @@
   letter-spacing: 0.08em;
 }
 
-.shopper-start-card h2 {
+.shopper-start-card-content h2 {
   margin: 0 0 20px;
   color: #17130f;
   font-size: clamp(25px, 3vw, 34px);
@@ -192,9 +163,7 @@
   line-height: 1.25;
 }
 
-.shopper-start-card-content > p:not(
-  .shopper-card-label
-) {
+.shopper-start-card-content > p:not(.shopper-card-label) {
   max-width: 680px;
   margin: 0;
   color: #5c554c;
@@ -202,9 +171,7 @@
   line-height: 1.7;
 }
 
-/* ==========================================
-   AVATAR STATUS
-========================================== */
+/* AVATAR STATUS */
 
 .shopper-active-avatar {
   display: flex;
@@ -214,7 +181,6 @@
   gap: 12px;
   margin-top: 22px;
   padding: 12px 16px;
-
   background: #fbf5e7;
   border: 1px solid #e9d6aa;
   border-radius: 10px;
@@ -248,9 +214,7 @@
   line-height: 1.5;
 }
 
-/* ==========================================
-   MAIN ACTION BUTTONS
-========================================== */
+/* MAIN ACTIONS */
 
 .shopper-card-actions {
   display: flex;
@@ -271,19 +235,11 @@
   font-size: 11px !important;
   font-weight: 800 !important;
   text-align: center;
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .shopper-primary-button {
-  background: linear-gradient(
-    135deg,
-    #17130f,
-    #8e641f 55%,
-    #d7af4b
-  );
+  background: linear-gradient(135deg, #17130f, #8e641f 55%, #d7af4b);
   border: 1px solid #b57e20;
   color: #fffdf9;
 }
@@ -297,202 +253,288 @@
 .shopper-primary-button:hover,
 .shopper-secondary-button:hover {
   transform: translateY(-2px);
-  box-shadow:
-    0 8px 20px rgba(142, 100, 31, 0.2);
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.2);
 }
 
 .shopper-secondary-button:hover {
   background: #fff8e7;
 }
 
-/* ==========================================
-   ACTUAL 2D AVATAR PREVIEW
-   NOTE: this page renders the avatar through <AvatarCanvas>
-   (canvas-bound-normalized), so there is NO static-PNG size
-   bug here and NO alpha-crop wrapper is needed. The canvas
-   rules below are correct as-is.
-========================================== */
+.shopper-start-card-content > .shopper-action-error {
+  margin-top: 14px;
+  color: #9e3f31;
+  font-size: 12px;
+}
+
+/* AVATAR PREVIEW PANEL */
 
 .shopper-avatar-preview-panel {
   display: flex;
-  flex-direction: column;
   min-width: 0;
-  padding: 20px;
-  background: linear-gradient(
-    155deg,
-    #f8f1e4,
-    #eee0c7 65%,
-    #e5c88e
-  );
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f8f5ef;
   border-left: 1px solid #e0cfac;
 }
 
-.shopper-avatar-preview-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+.shopper-fitting-preview {
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
+  background: rgba(255, 253, 249, 0.97);
+  border: 1px solid #d2be91;
+  border-radius: 22px;
+  box-shadow: 0 16px 35px rgba(72, 50, 20, 0.09);
 }
 
-.shopper-avatar-preview-top > span {
-  color: #8e641f;
+.shopper-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 19px;
+  border-bottom: 1px solid #e2d8c7;
+}
+
+.shopper-preview-header > div {
+  min-width: 0;
+}
+
+.shopper-preview-header p,
+.shopper-avatar-selector-text p {
+  margin: 0 0 8px;
+  color: #b57e20;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
 }
 
-.shopper-avatar-preview-top > strong {
-  padding: 7px 10px;
-  background: #fff9e9;
-  border: 1px solid #e2cb97;
+.shopper-preview-header h2 {
+  margin: 0;
+  color: #17130f;
+  font-size: clamp(17px, 1.6vw, 22px);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.shopper-preview-badge,
+.shopper-custom-avatar-badge {
+  flex-shrink: 0;
+  padding: 9px 11px;
+  color: #6d4914;
+  background: #f6e7b7;
+  border: 1px solid #d7af4b;
   border-radius: 999px;
-  color: #8e641f;
   font-size: 9px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
-/* Canvas 2D preview container */
+/* AVATAR SELECTOR */
+
+.shopper-avatar-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.shopper-avatar-selector-text {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.shopper-avatar-selector-text span {
+  display: block;
+  color: #5c554c;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.shopper-gender-switch {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 4px;
+  background: #f8f5ef;
+  border: 1px solid #d2be91;
+  border-radius: 12px;
+}
+
+.shopper-gender-switch button {
+  min-width: 58px;
+  min-height: 36px;
+  padding: 8px 10px;
+  color: #5c554c;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.shopper-gender-switch button.active {
+  color: #fffdf9;
+  background: linear-gradient(135deg, #17130f, #8e641f 65%, #d7af4b);
+  box-shadow: 0 3px 8px rgba(72, 50, 20, 0.16);
+}
+
+/* FRONT / REAR */
+
+.shopper-view-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 20px 0;
+}
+
+.shopper-view-card {
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+}
 
 .shopper-avatar-preview-stage {
+  position: relative;
   display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  height: 240px;
   min-width: 0;
-  min-height: 285px;
-  height: 340px;
-  max-height: 380px;
-  overflow: hidden;
-  padding: 10px;
-
-  background: radial-gradient(
-    circle at center,
-    #fffdf9,
-    #efe3ce
-  );
-
-  border: 1px solid #ddc89e;
-  border-radius: 13px;
-}
-
-.shopper-avatar-preview-stage
-.studio-canvas-wrapper {
-  display: flex;
   align-items: center;
   justify-content: center;
-  width: min(100%, 215px) !important;
-  height: 100%;
-  max-height: 100%;
+  overflow: hidden;
+  background: linear-gradient(145deg, #f8f5ef, #eee2cc);
+  border: 1px solid #d2be91;
+  border-radius: 14px;
 }
 
-.shopper-avatar-preview-stage canvas {
+.shopper-standard-avatar-image {
   display: block;
+  width: 100%;
+  height: 100%;
+  padding: 8px 4px 32px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.shopper-custom-avatar-canvas {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px 32px;
+}
+
+.shopper-custom-avatar-canvas .studio-canvas-wrapper {
+  display: flex;
+  width: 100% !important;
   max-width: 100% !important;
-  max-height: 350px !important;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.shopper-custom-avatar-canvas canvas {
+  display: block;
   width: auto !important;
   height: auto !important;
+  max-width: 100% !important;
+  max-height: 200px !important;
   margin: 0 auto;
   object-fit: contain;
 }
 
-/* ==========================================
-   FRONT / REAR
-   FIX: Side view removed — 2 columns (Front / Rear).
-   Matches AVATAR_VIEWS = ["front", "rear"] in
-   ShopperDashboard.jsx.
-========================================== */
-
-.shopper-avatar-view-controls {
-  display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 13px;
+.shopper-custom-avatar-canvas small {
+  max-width: 100%;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.shopper-avatar-view-controls button {
-  min-height: 37px;
-  padding: 8px;
-  background: #fffdf9;
-  border: 1px solid #d2be91;
-  border-radius: 7px;
+.shopper-view-badge {
+  position: absolute;
+  z-index: 1;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 9px;
+  color: #8e641f;
+  background: rgba(255, 253, 249, 0.96);
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.shopper-view-card figcaption {
+  margin-top: 10px;
   color: #5c554c;
   font-size: 10px;
   font-weight: 700;
 }
 
-.shopper-avatar-view-controls button.active {
-  background: #17130f;
-  border-color: #17130f;
-  color: #fffdf9;
+/* PREVIEW STATISTICS */
+
+.shopper-preview-statistics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid #e2d8c7;
 }
 
-.shopper-avatar-view-controls button:hover:not(.active) {
-  background: #fff6e3;
-}
-
-/* ==========================================
-   AVATAR PREVIEW DETAILS
-========================================== */
-
-.shopper-avatar-preview-details {
+.shopper-preview-statistics > div {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-top: 17px;
+  gap: 5px;
+  padding: 18px 5px 0;
   text-align: center;
 }
 
-.shopper-avatar-preview-details strong {
-  color: #17130f;
-  font-size: 14px;
+.shopper-preview-statistics > div + div {
+  border-left: 1px solid #e2d8c7;
+}
+
+.shopper-preview-statistics strong {
+  color: #8e641f;
+  font-size: 17px;
   font-weight: 800;
 }
 
-.shopper-avatar-preview-details span {
+.shopper-preview-statistics span {
   color: #5c554c;
-  font-size: 11px;
+  font-size: 9px;
+  line-height: 1.5;
 }
 
-.shopper-avatar-preview-details small {
-  color: #8e641f;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-/* ==========================================
-   QUICK ACTIONS
-   NOTE: stays repeat(3) on purpose — these are the 3 action
-   CARDS (Browse Catalog / Fitting Studio / Saved Outfits),
-   NOT avatar views. Do not change to 2.
-========================================== */
+/* QUICK ACTIONS */
 
 .shopper-quick-actions {
   display: grid;
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   margin-bottom: 28px;
 }
 
 .shopper-quick-action {
   display: grid;
-  grid-template-columns:
-    auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 110px;
   align-items: center;
   gap: 14px;
   padding: 20px;
-
   background: #fffdf9;
   border: 1px solid #e2d8c7;
   border-radius: 13px;
   color: #29251f;
   text-align: left;
-
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
@@ -502,8 +544,7 @@
 .shopper-quick-action:hover {
   transform: translateY(-3px);
   border-color: #d7af4b;
-  box-shadow:
-    0 10px 22px rgba(83, 55, 13, 0.08);
+  box-shadow: 0 10px 22px rgba(83, 55, 13, 0.08);
 }
 
 .shopper-quick-number {
@@ -543,9 +584,7 @@
   font-size: 18px;
 }
 
-/* ==========================================
-   ACCOUNT OVERVIEW
-========================================== */
+/* ACCOUNT OVERVIEW */
 
 .shopper-account-status {
   padding: 29px 30px;
@@ -592,17 +631,9 @@
   background: #fff8e7;
 }
 
-/* ==========================================
-   STATISTICS
-   NOTE: stays repeat(3) on purpose — these are the 3 stat
-   CARDS (Total Presets / Saved Outfits / Cart Items), NOT
-   avatar views. Do not change to 2.
-========================================== */
-
 .shopper-stats-grid {
   display: grid;
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 24px;
 }
@@ -615,13 +646,7 @@
   justify-content: center;
   gap: 8px;
   padding: 20px;
-
-  background: linear-gradient(
-    145deg,
-    #fffaf0,
-    #f7edd8
-  );
-
+  background: linear-gradient(145deg, #fffaf0, #f7edd8);
   border: 1px solid #ead9b7;
   border-radius: 12px;
 }
@@ -639,27 +664,18 @@
   font-weight: 700;
 }
 
-/* ==========================================
-   ACCOUNT STATUS ROWS
-========================================== */
-
 .shopper-status-list {
   width: 100%;
 }
 
 .shopper-status-row {
   display: grid;
-  grid-template-columns:
-    minmax(150px, 0.5fr)
-    minmax(0, 1fr)
-    auto;
-
+  grid-template-columns: minmax(150px, 0.5fr) minmax(0, 1fr) auto;
   width: 100%;
   min-height: 65px;
   align-items: center;
   gap: 20px;
   padding: 14px 7px;
-
   background: transparent;
   border: 0;
   border-top: 1px solid #e2d8c7;
@@ -676,9 +692,7 @@
   font-weight: 700;
 }
 
-.shopper-status-row > span:not(
-  .shopper-status-arrow
-) {
+.shopper-status-row > span:not(.shopper-status-arrow) {
   min-width: 0;
   overflow-wrap: anywhere;
   color: #5c554c;
@@ -691,24 +705,18 @@
   font-size: 17px;
 }
 
-/* ==========================================
-   ACCESSIBILITY
-========================================== */
+/* ACCESSIBILITY */
 
 .shopper-dashboard-page button:focus-visible {
   outline: 3px solid #d7af4b;
   outline-offset: 3px;
 }
 
-/* ==========================================
-   RESPONSIVE - TABLET
-========================================== */
+/* RESPONSIVE */
 
 @media (max-width: 1100px) {
   .shopper-start-card {
-    grid-template-columns:
-      minmax(0, 1fr)
-      minmax(255px, 0.5fr);
+    grid-template-columns: minmax(0, 1fr) minmax(255px, 0.5fr);
   }
 
   .shopper-start-card-content {
@@ -722,6 +730,14 @@
   .shopper-quick-action {
     padding: 16px;
   }
+
+  .shopper-avatar-preview-panel {
+    padding: 12px;
+  }
+
+  .shopper-fitting-preview {
+    padding: 14px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -730,23 +746,28 @@
   }
 
   .shopper-avatar-preview-panel {
+    padding: 22px;
     border-left: 0;
     border-top: 1px solid #e0cfac;
   }
 
+  .shopper-fitting-preview {
+    max-width: 700px;
+    padding: 22px;
+  }
+
   .shopper-avatar-preview-stage {
-    min-height: 320px;
-    height: 360px;
+    height: 280px;
+  }
+
+  .shopper-custom-avatar-canvas canvas {
+    max-height: 240px !important;
   }
 
   .shopper-quick-actions {
     grid-template-columns: 1fr;
   }
 }
-
-/* ==========================================
-   RESPONSIVE - MOBILE
-========================================== */
 
 @media (max-width: 700px) {
   .shopper-dashboard-header {
@@ -790,9 +811,7 @@
     gap: 8px 12px;
   }
 
-  .shopper-status-row > span:not(
-    .shopper-status-arrow
-  ) {
+  .shopper-status-row > span:not(.shopper-status-arrow) {
     grid-column: 1 / -1;
     grid-row: 2;
     text-align: left;
@@ -831,12 +850,27 @@
   }
 
   .shopper-avatar-preview-panel {
-    padding: 15px;
+    padding: 12px;
+  }
+
+  .shopper-fitting-preview {
+    padding: 16px 12px;
   }
 
   .shopper-avatar-preview-stage {
-    height: 330px;
-    min-height: 290px;
+    height: 240px;
+  }
+
+  .shopper-custom-avatar-canvas canvas {
+    max-height: 200px !important;
+  }
+
+  .shopper-gender-switch {
+    width: 100%;
+  }
+
+  .shopper-gender-switch button {
+    flex: 1;
   }
 }
 
