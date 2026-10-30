@@ -126,6 +126,17 @@ function normalizeCategory(category) {
   return "top";
 }
 
+// FIX (garment thumbnails): the backend returns media paths relative to
+// Django (e.g. "/media/<gridfs-name>.png"). On the Vite dev server
+// (localhost:5173) a relative src 404s, so prefix the API origin exactly
+// like the Catalog / Product Details pages do.
+function mediaUrl(path) {
+  if (!path) return "";
+  const raw = String(path);
+  if (raw.startsWith("http")) return raw;
+  return `${API_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
+
 // Normalize backend recommendation payload into the internal item structure
 function normalizeStudioItem(item) {
   if (!item || typeof item !== "object") return null;
@@ -147,20 +158,36 @@ function normalizeStudioItem(item) {
     size: String(
       item.selectedSize || item.availableSize || item.size || "M"
     ).toUpperCase(),
+    // Raw catalog size label (S..4XL or regional footwear code) used by
+    // the avatar-size gate; kept separate from the display fallback.
+    catalogSize: String(item.size || "").toUpperCase(),
     color: item.selectedColor || item.color || "Unspecified",
     price: Number(item.price || 0),
-    image:
-      item.image ||
-      item.front_image ||
-      item.frontImageUrl ||
-      item.front_image ||
-      "",
+    image: mediaUrl(
+      item.image || item.front_image || item.frontImageUrl || ""
+    ),
     // Score metadata from backend
     total_score: item.total_score,
     max_score: item.max_score,
     size_cm: item.size_cm,
     size_regions: item.size_regions,
   };
+}
+
+// SIZE GATE (option a): a clothing recommendation is shown only when its
+// catalog size equals the avatar's computed clothing size (S..4XL derived
+// from Body Build). Footwear keeps regional EU/US/UK codes and is never
+// gated, so it always remains visible.
+function matchesAvatarSize(item, avatarSize) {
+  if (!item) return false;
+  if (item.category === "shoes") return true;
+  const garmentSize = String(
+    item.catalogSize || item.size || ""
+  ).toUpperCase();
+  return (
+    garmentSize !== "" &&
+    garmentSize === String(avatarSize || "").toUpperCase()
+  );
 }
 
 function sizeRecordFor(item) {
@@ -543,6 +570,41 @@ function ControlGroup({ label, value, options, onChange }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Recommendation thumbnail with real garment image + graceful fallback.
+// FIX: src is the absolute Django media URL (mediaUrl in normalizeStudioItem);
+// if the image still fails (missing file, backend down), fall back to the
+// original gold placeholder span instead of a broken-image icon.
+function RecommendationThumb({ item }) {
+  const [failed, setFailed] = useState(false);
+  const src = item.image;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <div
+      className={`studio-clothing-thumbnail ${item.category}`}
+      aria-hidden="true"
+    >
+      {src && !failed ? (
+        <img
+          src={src}
+          alt={item.name}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span />
+      )}
     </div>
   );
 }
@@ -937,10 +999,16 @@ function FittingStudioPage({
     [equippedItems]
   );
 
-  // Real ranked catalog items from the backend
+  // Real ranked catalog items from the backend, filtered by the
+  // avatar-size gate (option a): clothing is listed only when its catalog
+  // size equals the avatar's computed size (proportion.size); footwear
+  // (regional EU/US/UK codes) is exempt and always remains visible.
   const recommendationItems = useMemo(
-    () => catalogRecommendations,
-    [catalogRecommendations]
+    () =>
+      catalogRecommendations.filter((item) =>
+        matchesAvatarSize(item, proportion.size)
+      ),
+    [catalogRecommendations, proportion.size]
   );
 
   const totalPages = Math.ceil(recommendationItems.length / ITEMS_PER_PAGE);
@@ -1020,6 +1088,11 @@ function FittingStudioPage({
       controller.abort();
     };
   }, [avatar]);
+
+  // Reset pagination whenever the avatar size (the gate) changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [proportion.size]);
 
   useEffect(() => {
     const key = pendingKey(isGuest);
@@ -1791,12 +1864,26 @@ function FittingStudioPage({
                   product name to view its listing.
                 </p>
 
+                {/* SIZE GATE NOTICE (option a) */}
+                <p
+                  className="studio-recommendation-note"
+                  style={{ marginTop: "-8px", color: "#857660" }}
+                >
+                  Size gate active: clothing is listed only in
+                  your avatar size ({proportion.size}). Footwear
+                  is shown in all sizes.
+                </p>
+
                 {catalogLoading && (
                   <p role="status">Loading ranked recommendations...</p>
                 )}
 
                 {!catalogLoading && recommendationItems.length === 0 && (
-                  <p role="status">No catalog items available for recommendation.</p>
+                  <p role="status">
+                    {catalogRecommendations.length === 0
+                      ? "No catalog items available for recommendation."
+                      : `No recommendations match your avatar size (${proportion.size}). Move the Body Build slider to change your size, or check back after sellers stock your size.`}
+                  </p>
                 )}
 
                 {/* RANKED CATALOG ITEMS WITH MATCH SCORES */}
@@ -1811,23 +1898,7 @@ function FittingStudioPage({
                         : ""
                     }`}
                   >
-                    <div
-                      className={`studio-clothing-thumbnail ${item.category}`}
-                      aria-hidden="true"
-                    >
-                      {item.image && (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      )}
-                      {!item.image && <span />}
-                    </div>
+                    <RecommendationThumb item={item} />
 
                     <div className="studio-recommendation-information">
                       <h3>
@@ -2190,9 +2261,10 @@ function FittingStudioPage({
               <input
                 id="studio-avatar-preset-name"
                 type="text"
-                className={`studio-save-outfit-input ${
-                  avatarPresetNameError ? "invalid" : ""
-                }`}
+                className={
+                  "studio-save-outfit-input " +
+                  (avatarPresetNameError ? "invalid" : "")
+                }
                 value={avatarPresetName}
                 onChange={(event) => {
                   setAvatarPresetName(event.target.value);
@@ -2291,9 +2363,10 @@ function FittingStudioPage({
               <input
                 id="studio-outfit-name"
                 type="text"
-                className={`studio-save-outfit-input ${
-                  outfitNameError ? "invalid" : ""
-                }`}
+                className={
+                  "studio-save-outfit-input " +
+                  (outfitNameError ? "invalid" : "")
+                }
                 value={outfitName}
                 onChange={(event) => {
                   setOutfitName(event.target.value);
