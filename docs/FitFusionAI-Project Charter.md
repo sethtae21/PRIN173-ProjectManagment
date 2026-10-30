@@ -124,14 +124,6 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 
 ## 
 
-## 
-
-## 
-
-## 
-
-## 
-
 ## **4.4 Requirements Traceability Matrix (RTM)**
 
 ## 
@@ -231,7 +223,7 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 | RSK-05 | Third-party version risk (rembg, django-mongodb-backend) | Medium | Medium | Pinned versions in requirements.txt; standalone architecture; documented Pillow-only validation fallback |
 | RSK-06 | Poor Seller image quality / rembg artifacts on cluttered photos | Medium | High | Automated validation with descriptive rejection reports; Seller instruction sheet advising plain/contrasting backgrounds; filename-mapping checks |
 | RSK-07 | Stakeholder expectation mismatch (panel expects 3D/real payment) | Medium | Medium | SRS \+ Scope Baseline as single source of truth; bi-weekly adviser reviews; dry-run demos before the defense |
-| RSK-08 | Privacy non-compliance (RA 10173\) | High | Low | Argon2id/PBKDF2 password hashing, minimal data collection, account deletion on request, guest-data ephemerality enforced at storage layer |
+| RSK-08 | Privacy non-compliance (RA 10173\) | High | Low | Argon2id/PBKDF2 password hashing, minimal data collection, account deletion on request implemented as deactivation plus restricted archival (pseudonymized direct identifiers, defined retention period, access limited to the retention path), guest-data ephemerality enforced at storage layer |
 
 ## 
 
@@ -246,8 +238,6 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 | M3: Core Implementation & Prototype | Week 8 | Auth/RBAC, avatar management, Seller CSV \+ rembg pipeline, and try-on canvas working; canvas renders \< 1 s (WBS 1.3.1–1.3.4) |
 | M4: Implementation Baseline & Validation | Week 11 | Recommendation engine \+ mock e-commerce complete; outfit management & validation reporting complete; unit/integration tests passing; validation suite 100% pass on defined cases; local staging environment operational (WBS 1.3.5–1.3.8, 1.4.1–1.4.2, 1.5.1) |
 | M5: Final Defense & Delivery | Week 14 — Final Defense: November 18, 2026 | UAT sign-off, MVP operational on local staging (localhost/LAN URL), Seller instruction sheet, panel defense & handover (WBS 1.4.3, 1.5.2, 1.5.3) |
-
-### 
 
 ### 
 
@@ -266,10 +256,6 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 ## **8\. Governance**
 
 **Governance mechanism:** Any addition, deletion, or modification to the baselined scope must be submitted via a formal Change Request Form and logged in the project risk/change register; changes affecting timeline, budget, or architecture require Change Control Board approval (Project Manager \+ academic adviser/panel) before work begins. Approved changes bump the SRS and Scope Baseline version numbers in sync (both currently v1.1). Work performed outside the approved baseline without CCB approval is considered scope creep and will not count toward the MVP. Progress is tracked via weekly sprint reports, Friday lab meetings, and bi-weekly adviser reviews.
-
-## 
-
-## 
 
 ## 
 
