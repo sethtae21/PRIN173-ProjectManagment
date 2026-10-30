@@ -48,7 +48,8 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 * Body tracking, pose detection, and fabric simulation.  
 * Native iOS/Android mobile apps (web application only) and multi-language localization (English only).  
 * Cloud-hosted application hosting (the application runs on the local staging host; only MongoDB Atlas remains cloud-hosted).  
-* Children's and infant clothing categories and pediatric body-proportion modeling; avatar height/Body Build inputs outside the validated ranges of 120–220 cm and 86–112 cm (target users aged 12 years and older).
+* Children's and infant clothing categories and pediatric body-proportion modeling; avatar height/Body Build inputs outside the validated ranges of 120–220 cm and 86–112 cm (target users aged 12 years and older).  
+* Anthropometric or tailoring accuracy of body-proportion category brackets (shoulder width, waist, hip, cup size, thigh, including any cm sub-brackets such as "narrow \= 70–89 cm"). These categories exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category (e.g., "average hip") corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.
 
 ### **1.5 Constraints**
 

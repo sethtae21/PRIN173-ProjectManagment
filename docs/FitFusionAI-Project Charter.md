@@ -107,7 +107,8 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 6. Multi-seller marketplace discovery; external third-party API integrations  
 7. Body tracking, pose detection, fabric simulation  
 8. Cloud-hosted application hosting (application runs on local staging host; only MongoDB Atlas remains cloud-hosted)  
-9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and weight 30–200 kg); inputs outside these ranges are rejected with descriptive validation errors.
+9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and weight 30–200 kg); inputs outside these ranges are rejected with descriptive validation errors.  
+10. Anthropometric or tailoring accuracy of body-proportion category brackets. The avatar proportions exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.
 
 ### 
 
