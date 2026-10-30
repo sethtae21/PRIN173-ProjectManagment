@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_URL, presetsApi, outfitsApi } from "../services/api";
+import {
+  API_URL,
+  presetsApi,
+  outfitsApi,
+  bodyProportion,
+  fetchRankedRecommendations,
+  loadMatchReasons,
+} from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/FittingStudioPage.css";
@@ -10,36 +17,6 @@ const SKIN_TONES = [
   { name: "Warm", value: "#dca77d" },
   { name: "Medium", value: "#bd8058" },
   { name: "Deep", value: "#855338" },
-];
-
-const RECOMMENDED_ITEMS = [
-  {
-    id: "linen-shirt",
-    name: "Linen Shirt",
-    store: "Aurelia Studio",
-    category: "top",
-    color: "Beige",
-    size: "M",
-    price: 750,
-  },
-  {
-    id: "straight-pants",
-    name: "Straight Pants",
-    store: "Noir & Thread",
-    category: "bottom",
-    color: "Charcoal",
-    size: "M",
-    price: 1100,
-  },
-  {
-    id: "everyday-shoes",
-    name: "Everyday Shoes",
-    store: "Maison Sol",
-    category: "shoes",
-    color: "White",
-    size: "7",
-    price: 1500,
-  },
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -149,10 +126,11 @@ function normalizeCategory(category) {
   return "top";
 }
 
+// Normalize backend recommendation payload into the internal item structure
 function normalizeStudioItem(item) {
   if (!item || typeof item !== "object") return null;
 
-  const id = item.id ?? item.product_id;
+  const id = item.id ?? item.item_id ?? item.product_id;
 
   if (id === undefined || id === null) return null;
 
@@ -173,9 +151,15 @@ function normalizeStudioItem(item) {
     price: Number(item.price || 0),
     image:
       item.image ||
+      item.front_image ||
       item.frontImageUrl ||
       item.front_image ||
       "",
+    // Score metadata from backend
+    total_score: item.total_score,
+    max_score: item.max_score,
+    size_cm: item.size_cm,
+    size_regions: item.size_regions,
   };
 }
 
@@ -376,6 +360,39 @@ function normalizeGender(value) {
     : "Female";
 }
 
+function readStoredGender(isGuest) {
+  const storage = isGuest ? sessionStorage : localStorage;
+
+  const genderKey = isGuest
+    ? "fitfusion-guest-avatar-gender"
+    : "fitfusion-avatar-gender";
+
+  const raw = String(
+    storage.getItem(genderKey) || ""
+  ).trim().toLowerCase();
+
+  if (raw === "male") return "Male";
+  if (raw === "female") return "Female";
+  return "";
+}
+
+function reconcileAvatarGender(avatar, isGuest) {
+  const saved = readStoredGender(isGuest);
+
+  if (!saved || !avatar || avatar.gender === saved) {
+    return avatar;
+  }
+
+  return {
+    ...avatar,
+    gender: saved,
+    cupSize:
+      saved === "Female"
+        ? avatar.cupSize || "B"
+        : null,
+  };
+}
+
 function choiceValue(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -535,7 +552,7 @@ function MatchReasonsCard({
   avatar,
   isGuest,
   requestVersion,
-  loadMatchReasons,
+  loadMatchReasonsService,
   onBrowse,
   onTryItem,
 }) {
@@ -593,11 +610,11 @@ function MatchReasonsCard({
 
     async function fetchMatchDetails() {
       try {
-        if (typeof loadMatchReasons !== "function") {
+        if (typeof loadMatchReasonsService !== "function") {
           throw new Error("Match service has not been connected");
         }
 
-        const details = await loadMatchReasons({
+        const details = await loadMatchReasonsService({
           item,
           avatar: { ...avatar },
           isGuest,
@@ -639,7 +656,7 @@ function MatchReasonsCard({
     item,
     avatar,
     isGuest,
-    loadMatchReasons,
+    loadMatchReasonsService,
   ]);
 
   const currentResult =
@@ -691,7 +708,6 @@ function MatchReasonsCard({
 
             <p>
               {item.store}
-              {item.sampleOnly && " · Sample"}
             </p>
           </div>
 
@@ -837,14 +853,17 @@ function weightToVisualBuild(heightCm, weightKg) {
 
 function FittingStudioPage({
   isGuest = false,
-  loadMatchReasons,
 }) {
   const navigate = useNavigate();
   const recommendationsRef = useRef(null);
   const matchPanelRef = useRef(null);
 
   const [avatar, setAvatar] = useState(
-    () => readStudioSession(isGuest)?.avatar || loadAvatar(isGuest)
+    () =>
+      reconcileAvatarGender(
+        readStudioSession(isGuest)?.avatar || loadAvatar(isGuest),
+        isGuest
+      )
   );
 
   const [currentView, setCurrentView] = useState(() => {
@@ -894,7 +913,6 @@ function FittingStudioPage({
   const [outfitNameError, setOutfitNameError] = useState("");
   const [notification, setNotification] = useState("");
   
-  // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
 
   const basePath = isGuest ? "/guest" : "/shopper";
@@ -902,6 +920,11 @@ function FittingStudioPage({
   const bodyBuild = weightToVisualBuild(
     avatar.height,
     avatar.weight
+  );
+
+  const proportion = useMemo(
+    () => bodyProportion(avatar.height, bodyBuild),
+    [avatar.height, bodyBuild]
   );
 
   const equippedItemsArray = useMemo(
@@ -914,18 +937,12 @@ function FittingStudioPage({
     [equippedItems]
   );
 
+  // Real ranked catalog items from the backend
   const recommendationItems = useMemo(
-    () =>
-      catalogRecommendations.length
-        ? catalogRecommendations
-        : RECOMMENDED_ITEMS.map((item) => ({
-            ...item,
-            sampleOnly: true,
-          })),
+    () => catalogRecommendations,
     [catalogRecommendations]
   );
 
-  // PAGINATION LOGIC
   const totalPages = Math.ceil(recommendationItems.length / ITEMS_PER_PAGE);
 
   const paginatedItems = useMemo(
@@ -963,50 +980,46 @@ function FittingStudioPage({
     isGuest,
   ]);
 
+  // Fetch ranked recommendations whenever the avatar changes
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
     async function loadRecommendations() {
       try {
-        const response = await fetch(`${API_URL}/catalog/`);
-
-        if (!response.ok) {
-          throw new Error("Catalog unavailable");
-        }
-
-        const data = await response.json();
-
-        const records = Array.isArray(data)
-          ? data
-          : data.results || data.products || [];
+        const ranked = await fetchRankedRecommendations(
+          avatar,
+          50,
+          controller.signal
+        );
 
         if (active) {
           setCatalogRecommendations(
-            records
-              .map(normalizeStudioItem)
-              .filter(Boolean)
-              .slice(0, 12)
+            ranked.map(normalizeStudioItem).filter(Boolean)
           );
+          setCurrentPage(1);
         }
       } catch (error) {
+        if (error.name === 'AbortError') return;
         console.warn(
-          "Unable to load catalog recommendations:",
+          "Unable to load ranked recommendations:",
           error
         );
       } finally {
         if (active) {
-          setCurrentPage(1); // Reset to page 1 when catalog loads
           setCatalogLoading(false);
         }
       }
     }
 
+    setCatalogLoading(true);
     loadRecommendations();
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, []);
+  }, [avatar]);
 
   useEffect(() => {
     const key = pendingKey(isGuest);
@@ -1069,13 +1082,6 @@ function FittingStudioPage({
   }
 
   function openProductDetails(item) {
-    if (item.sampleOnly) {
-      displayNotification(
-        "This is a sample preview, not a catalog listing. Open Catalog to view real product details."
-      );
-      return;
-    }
-
     sessionStorage.setItem(
       sessionKey(isGuest),
       JSON.stringify({
@@ -1266,7 +1272,7 @@ function FittingStudioPage({
       );
 
       closeSaveAvatarModal();
-      displayNotification(`“${name}” was saved to Avatar Presets.`);
+      displayNotification(`"${name}" was saved to Avatar Presets.`);
     } catch (error) {
       console.error("Unable to save avatar preset:", error);
 
@@ -1782,15 +1788,18 @@ function FittingStudioPage({
                   Select Try Item to preview clothing on your
                   avatar. Select View Match Reasons to review
                   its recommendation details. Click a catalog
-                  product name to view its listing. Sample-only
-                  picks are not linked to real listings.
+                  product name to view its listing.
                 </p>
 
                 {catalogLoading && (
-                  <p role="status">Loading catalog clothing...</p>
+                  <p role="status">Loading ranked recommendations...</p>
                 )}
 
-                {/* PAGINATED ITEMS MAP */}
+                {!catalogLoading && recommendationItems.length === 0 && (
+                  <p role="status">No catalog items available for recommendation.</p>
+                )}
+
+                {/* RANKED CATALOG ITEMS WITH MATCH SCORES */}
                 {paginatedItems.map((item) => (
                   <article
                     key={item.id}
@@ -1806,34 +1815,66 @@ function FittingStudioPage({
                       className={`studio-clothing-thumbnail ${item.category}`}
                       aria-hidden="true"
                     >
-                      <span />
+                      {item.image && (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      )}
+                      {!item.image && <span />}
                     </div>
 
                     <div className="studio-recommendation-information">
                       <h3>
-                        {item.sampleOnly ? (
-                          <span title="Sample preview — not linked to a real catalog listing">
-                            {item.name} (Sample)
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="studio-product-link"
-                            onClick={() =>
-                              openProductDetails(item)
-                            }
-                            title="View product details"
-                          >
-                            {item.name}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="studio-product-link"
+                          onClick={() =>
+                            openProductDetails(item)
+                          }
+                          title="View product details"
+                        >
+                          {item.name}
+                        </button>
                       </h3>
 
                       <p>{item.store}</p>
                       <strong>
                         {formatCurrency(item.price)}
                       </strong>
+                      {item.size_cm && (
+                        <small style={{ display: "block", color: "#857660" }}>
+                          Size {item.size} {item.size_cm}
+                        </small>
+                      )}
                     </div>
+
+                    {/* MATCH SCORE BADGE */}
+                    {item.total_score !== undefined && item.max_score !== undefined && (
+                      <div
+                        className="studio-match-score-badge"
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          background: "#f5f1e8",
+                          border: "1px solid #d4c4a8",
+                          textAlign: "center",
+                          minWidth: "60px",
+                        }}
+                      >
+                        <div style={{ fontSize: "10px", color: "#857660", marginBottom: "2px" }}>
+                          Match
+                        </div>
+                        <strong style={{ fontSize: "16px", color: "#675328" }}>
+                          {item.total_score}/{item.max_score}
+                        </strong>
+                      </div>
+                    )}
 
                     <button
                       type="button"
@@ -1944,6 +1985,7 @@ function FittingStudioPage({
                 equippedItems={equippedItems}
               />
 
+              {/* TOTAL BODY-PROPORTION OUTPUT: SIZE + AVERAGE */}
               <div className="studio-avatar-summary">
                 <div>
                   <span>Gender</span>
@@ -1951,13 +1993,13 @@ function FittingStudioPage({
                 </div>
 
                 <div>
-                  <span>Height</span>
-                  <strong>{avatar.height} cm</strong>
+                  <span>Size</span>
+                  <strong>{proportion.size}</strong>
                 </div>
 
                 <div>
-                  <span>Body Build</span>
-                  <strong>{bodyBuild} cm</strong>
+                  <span>Average</span>
+                  <strong>{proportion.average} cm</strong>
                 </div>
               </div>
             </div>
@@ -1975,7 +2017,7 @@ function FittingStudioPage({
                 avatar={avatar}
                 isGuest={isGuest}
                 requestVersion={matchRequestVersion}
-                loadMatchReasons={loadMatchReasons}
+                loadMatchReasonsService={loadMatchReasons}
                 onBrowse={handleRecommendations}
                 onTryItem={tryRecommendedItem}
               />
@@ -1991,7 +2033,7 @@ function FittingStudioPage({
 
                   <p>
                     {isGuest
-                      ? "Open Recommendations to try a sample clothing item on your avatar."
+                      ? "Open Recommendations to try a clothing item on your avatar."
                       : "Open Recommendations and select Try Item."}
                   </p>
                 </div>
@@ -2008,20 +2050,16 @@ function FittingStudioPage({
                             <span>{category}</span>
 
                             <strong>
-                              {item.sampleOnly ? (
-                                item.name
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="studio-product-link"
-                                  onClick={() =>
-                                    openProductDetails(item)
-                                  }
-                                  title="View product details"
-                                >
-                                  {item.name}
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                className="studio-product-link"
+                                onClick={() =>
+                                  openProductDetails(item)
+                                }
+                                title="View product details"
+                              >
+                                {item.name}
+                              </button>
                             </strong>
 
                             <small>
@@ -2063,7 +2101,7 @@ function FittingStudioPage({
                 onClick={handleRecommendations}
               >
                 {isGuest
-                  ? "Browse Sample Picks"
+                  ? "Browse Recommendations"
                   : "Open Recommendations"}
               </button>
 

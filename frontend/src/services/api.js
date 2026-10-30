@@ -32,6 +32,18 @@
 // getAccessToken, setSession, clearSession, etc. from ./session.js instead
 // of maintaining a parallel local copy. This prevents the frontend from
 // sending stale tokens after login/logout.
+//
+// SIZE-POLICY UPDATE: the client-side size mirror now matches the revised
+// backend knowledge_table.py — clothing sizes S, M, L, XL, 2XL, 3XL, 4XL
+// (pure cm reference table), footwear regional codes (EU/US/UK) restored,
+// and the body-proportion output mirror bodyProportion() returns
+// { size, average } where average = (height_cm + body_build_cm) / 2.
+//
+// RECOMMENDATION SERVICE (FR-7.2/7.3/7.4): fetchRankedRecommendations() and
+// loadMatchReasons() are now exposed via recommendationsApi so the Fitting
+// Studio can fetch real ranked catalog items and per-rule explanations from
+// /api/recommendations/ and /api/recommendations/<id>/match-reasons/.
+// Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | OBJ-05.
 // ============================================================================
 
 import { 
@@ -501,23 +513,40 @@ export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
 // recommendations/knowledge_table.py validate_size_label().
-// S/M/L-only clothing policy; footwear accepts prefixed regional codes
-// (EU/US/UK) within supported whole-size ranges. The backend remains the
-// authoritative gate (FR-4.7 report, FR-4.8 display); this gives sellers
-// instant feedback before the PATCH round-trip.
+// Clothing: S..4XL policy. Footwear additionally accepts prefixed regional
+// codes (EU/US/UK) within supported whole-size ranges (table restored for
+// product-details display). The backend remains the authoritative gate
+// (FR-4.7 report, FR-4.8 display); this gives sellers instant feedback
+// before the PATCH round-trip.
 // Traceability: SRS FR-4.1, FR-4.7, FR-4.8 | Scope WBS 1.3.5 | OBJ-09.
 // ----------------------------------------------------------------------------
-const _CLOTHING_SIZE_OPTIONS = ['S', 'M', 'L'];
+const _CLOTHING_SIZE_OPTIONS = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
 const _FOOTWEAR_REGIONAL_RE = /^(?:US|EU|UK)\s?(\d{1,3}(?:\.\d+)?)$/i;
 const _FOOTWEAR_RANGES = { EU: [35, 46], US: [4, 15], UK: [2, 13] };
 const _MEASURED_RE = /\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)/i;
+
+// Reference-only clothing size table (pure cm), mirror of backend
+// SIZE_RANGE_TABLE. Bands are half-open [lo, hi) except 4XL which includes
+// 112 cm, so every body build in 86-112 cm maps to exactly one size.
+export const SIZE_RANGE_TABLE = {
+  S: [86, 90],
+  M: [90, 94],
+  L: [94, 98],
+  XL: [98, 102],
+  '2XL': [102, 106],
+  '3XL': [106, 110],
+  '4XL': [110, 112],
+};
+export const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+export const HEIGHT_RANGE = { min: 120, max: 218 };
+export const BODY_BUILD_RANGE = { min: 86, max: 112 };
 
 export function validateSizeLabel(sizeText, category = '') {
   const raw = String(sizeText || '').trim();
   const isFootwear = String(category).toLowerCase() === 'footwear';
   if (!raw) return 'Size is required.';
   if (_MEASURED_RE.test(raw)) {
-    return `Measured values like "${raw}" are not accepted. Use S, M, or L${
+    return `Measured values like "${raw}" are not accepted. Use ${_CLOTHING_SIZE_OPTIONS.join(', ')}${
       isFootwear ? ' or a regional shoe size (e.g., EU 40).' : '.'
     }`;
   }
@@ -532,9 +561,151 @@ export function validateSizeLabel(sizeText, category = '') {
       if (Number.isInteger(n) && n >= lo && n <= hi) return null;
       return 'Regional shoe sizes must be whole sizes in the supported range: EU 35-46, US 4-15, or UK 2-13.';
     }
-    return `Invalid size "${raw}". Footwear sizes need a region prefix (EU 40, US 9, UK 7) or S/M/L.`;
+    return `Invalid size "${raw}". Footwear sizes need a region prefix (EU 40, US 9, UK 7) or ${_CLOTHING_SIZE_OPTIONS.join('/')}.`;
   }
-  return `Invalid size "${raw}". Use standard clothing sizes only: S, M, L.`;
+  return `Invalid size "${raw}". Use standard clothing sizes only: ${_CLOTHING_SIZE_OPTIONS.join(', ')}.`;
+}
+
+// ----------------------------------------------------------------------------
+// Body-proportion mirror of backend knowledge_table.body_proportion().
+// TOTAL output = { size, average } where:
+//   size    = SIZE_RANGE_TABLE lookup on body build clamped to 86-112 cm
+//   average = (height_cm + body_build_cm) / 2, one decimal
+// ----------------------------------------------------------------------------
+function _clampRange(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
+export function sizeForBodyBuild(buildCm) {
+  const value = _clampRange(buildCm, BODY_BUILD_RANGE.min, BODY_BUILD_RANGE.max);
+  for (let i = 0; i < SIZE_OPTIONS.length; i += 1) {
+    const label = SIZE_OPTIONS[i];
+    const [lo, hi] = SIZE_RANGE_TABLE[label];
+    const isLast = i === SIZE_OPTIONS.length - 1;
+    if (isLast ? (value >= lo && value <= hi) : (value >= lo && value < hi)) {
+      return label;
+    }
+  }
+  return SIZE_OPTIONS[SIZE_OPTIONS.length - 1];
+}
+
+export function bodyProportion(heightCm, bodyBuildCm) {
+  const height = _clampRange(heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max);
+  const build = _clampRange(bodyBuildCm, BODY_BUILD_RANGE.min, BODY_BUILD_RANGE.max);
+  return {
+    size: sizeForBodyBuild(build),
+    average: Math.round(((height + build) / 2) * 10) / 10,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// RECOMMENDATION SERVICE (FR-7.2/7.3/7.4)
+// Connects the Fitting Studio to the backend rule engine:
+//   GET /api/recommendations/                        -> ranked catalog items
+//   GET /api/recommendations/<id>/match-reasons/     -> 4-rule explanation
+// The avatar is translated into the backend's AvatarProfile query params.
+// Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | OBJ-05.
+// ----------------------------------------------------------------------------
+
+// Backend rule id -> MatchReasonsCard detail key (validateMatchDetails).
+const RULE_TO_KEY = {
+  color_compatibility: 'colorCompatibility',
+  height_contrast: 'heightContrast',
+  proportion_shading: 'proportionShading',
+  style_occasion: 'styleOccasion',
+};
+
+// Mirror of knowledge_table.WEIGHTS (fallback if the payload omits weights).
+const DEFAULT_WEIGHTS = {
+  color_compatibility: 3,
+  height_contrast: 2,
+  proportion_shading: 1,
+  style_occasion: 1,
+};
+
+// Deterministic, auditable body-shape mapping for FR-7.2 rule 3.
+export function bodyShapeForAvatar(avatar) {
+  const shoulder = String(avatar?.shoulder || '').toLowerCase();
+  const waist = String(avatar?.waist || '').toLowerCase();
+  const hip = String(avatar?.hip || '').toLowerCase();
+  const thigh = String(avatar?.thigh || '').toLowerCase();
+
+  const topHeavy = shoulder === 'broad';
+  const bottomHeavy =
+    hip === 'wide' || waist === 'curvy' || thigh === 'thick';
+
+  if (topHeavy && !bottomHeavy) return 'top-heavy';
+  if (bottomHeavy && !topHeavy) return 'bottom-heavy';
+  return 'balanced';
+}
+
+export function avatarQueryParams(avatar) {
+  return {
+    undertone: String(avatar?.undertone || 'neutral').toLowerCase(),
+    height_cm: String(
+      _clampRange(avatar?.height, HEIGHT_RANGE.min, HEIGHT_RANGE.max)
+    ),
+    body_shape: bodyShapeForAvatar(avatar),
+  };
+}
+
+function recommendationQueryString(params) {
+  return new URLSearchParams(params).toString();
+}
+
+// Ranked recommendations (real catalog items only, with score + metadata).
+export async function fetchRankedRecommendations(avatar, limit = 50, signal) {
+  const qs = recommendationQueryString({ ...avatarQueryParams(avatar), limit });
+  const response = await fetch(`${API_BASE}/api/recommendations/?${qs}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Recommendations unavailable (${response.status})`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.recommendations) ? data.recommendations : [];
+}
+
+// Match reasons for one selected item, shaped for MatchReasonsCard:
+// { colorCompatibility: {score, maxScore, reason}, ... } (all four keys).
+export async function loadMatchReasons({ item, avatar, signal } = {}) {
+  const id = item?.id ?? item?.item_id;
+
+  if (id === undefined || id === null || id === '') {
+    throw new Error('Match reasons require a catalog item id');
+  }
+
+  const qs = recommendationQueryString(avatarQueryParams(avatar));
+  const response = await fetch(
+    `${API_BASE}/api/recommendations/${encodeURIComponent(id)}/match-reasons/?${qs}`,
+    { signal, headers: { Accept: 'application/json' } },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Match reasons unavailable (${response.status})`);
+  }
+
+  const data = await response.json();
+  const weights = data.weights || DEFAULT_WEIGHTS;
+  const details = {};
+
+  for (const rule of data.match_reasons || []) {
+    const key = RULE_TO_KEY[rule.rule];
+    if (!key) continue;
+    details[key] = {
+      score: rule.points,
+      maxScore:
+        weights[rule.rule] ?? DEFAULT_WEIGHTS[rule.rule] ?? 1,
+      reason: rule.reason,
+    };
+  }
+
+  return details;
 }
 
 // ----------------------------------------------------------------------------
@@ -670,7 +841,11 @@ export const ordersApi = {
 // ----------------------------------------------------------------------------
 // Recommendations & ratings
 // ----------------------------------------------------------------------------
-export const recommendationsApi = { get: (params = {}) => getCachedRecommendations(params) };
+export const recommendationsApi = {
+  get: (params = {}) => getCachedRecommendations(params),
+  fetchRanked: fetchRankedRecommendations,
+  loadMatchReasons: loadMatchReasons,
+};
 
 export const ratingsApi = {
   submit: (payload) => performJsonRequest('POST', '/ratings/', payload),
@@ -704,7 +879,9 @@ export default {
   getCachedStoreItems, getCachedMyListings, getCachedListing, getCachedBatchReport,
   getCachedPresets, getCachedPreset, getCachedOutfits, getCachedOutfit,
   getCachedRecommendations, getCachedRatingSummary, getCachedMyRatings,
-  validateSizeLabel,
+  validateSizeLabel, SIZE_RANGE_TABLE, SIZE_OPTIONS, HEIGHT_RANGE, BODY_BUILD_RANGE,
+  sizeForBodyBuild, bodyProportion,
+  bodyShapeForAvatar, avatarQueryParams, fetchRankedRecommendations, loadMatchReasons,
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,
   outfitsApi, outfitsAPI, cartApi, cartAPI, checkoutApi, checkoutAPI,
   ordersApi, ordersAPI, recommendationsApi, recommendationsAPI,

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,6 +12,7 @@ import "./css/ChooseAvatarGenderPage.css";
 const PREVIEW_WIDTH = 480;
 const PREVIEW_HEIGHT = 660;
 
+const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 
 const AVATAR_IMAGES = {
   Male: "/Avatars/Male_Standard/Male_Standard_front.png",
@@ -54,6 +54,42 @@ function getSavedGender(isGuest) {
   return normalizeGender(
     storage.getItem(genderKey)
   );
+}
+
+// ==========================================
+// FIX (female -> male redirect bug):
+// keep the cached Fitting Studio session in
+// sync with the gender chosen here, so the
+// customize page never resurrects a stale
+// avatar of the opposite gender.
+// ==========================================
+
+function syncStudioSessionGender(isGuest, gender) {
+  const key = `${STUDIO_SESSION_PREFIX}${isGuest ? "guest" : "shopper"}`;
+
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+
+    const session = JSON.parse(raw);
+
+    if (!session || typeof session !== "object" || !session.avatar) {
+      return;
+    }
+
+    session.avatar.gender = gender;
+    session.avatar.cupSize =
+      gender === "Female"
+        ? session.avatar.cupSize || "B"
+        : null;
+
+    sessionStorage.setItem(key, JSON.stringify(session));
+  } catch (error) {
+    console.warn(
+      "Unable to sync fitting studio session gender:",
+      error
+    );
+  }
 }
 
 // ==========================================
@@ -241,6 +277,13 @@ function ChooseAvatarGenderPage({
 
     storage.setItem(
       genderKey,
+      normalizedGender
+    );
+
+    // FIX: also patch any cached studio session
+    // so the customize page opens with THIS gender.
+    syncStudioSessionGender(
+      isGuest,
       normalizedGender
     );
 

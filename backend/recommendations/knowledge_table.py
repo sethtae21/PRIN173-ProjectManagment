@@ -8,10 +8,27 @@ No machine learning - every rule is human-readable and auditable.
 Weight tuning: before the baseline freeze, bump WEIGHTS_VERSION and record the
 change + rationale in the tuning log (KAN-107). AFTER the freeze, weight changes
 are baselined changes and must go through the CCB (Charter Sec. 8).
+
+Size-policy revision (integration with female/male avatar fix + size update):
+* Petite / average / tall height categories REMOVED. Height is a single
+  range: 120.0-218.0 cm. The FR-7.2 contrast rule now uses a deterministic
+  midpoint split of that range (below / above 169.0 cm) - no named bands.
+* Body build range added: 86.0-112.0 cm.
+* Clothing sizes extended to S, M, L, XL, 2XL, 3XL, 4XL. The clothing size
+  table is REFERENCE-ONLY (displayed on product details in the
+  "AVAILABLE SIZE" block as e.g. "M (90-94 cm)" + "Standard size chart
+  reference."): pure cm, no inches, no regional equivalents.
+  Never scored, never stored.
+* Footwear regional size table (EU/US/UK) RESTORED for product-details
+  display. Backend cm calculation always uses the EU column; the product
+  page shows all three regional equivalents via the 'regions' key
+  (e.g. "EU 40 · US 9 · UK 7").
+* Body-proportion TOTAL OUTPUT = recommended size + average cm, where
+  average = (height_cm + body_build_cm) / 2.
 """
 import re
 
-WEIGHTS_VERSION = "1.1.0"
+WEIGHTS_VERSION = "1.1.0"  # weights untouched by the size-policy revision
 
 # SRS FR-7.2 weighted tag scoring. Keys are the rule ids used in scoring.py.
 WEIGHTS = {
@@ -32,17 +49,40 @@ COLOR_COMPATIBILITY = {
                 "gray", "silver"},
 }
 
+# --- Body ranges (single source of truth) ------------------------------------
+HEIGHT_RANGE = (120.0, 218.0)      # cm, inclusive
+BODY_BUILD_RANGE = (86.0, 112.0)   # cm, inclusive
+HEIGHT_MIDPOINT = (HEIGHT_RANGE[0] + HEIGHT_RANGE[1]) / 2.0  # 169.0 cm
+
 # --- FR-7.2 rule 2: height-appropriate contrast ------------------------------
-HEIGHT_BANDS = (  # (band, min_cm inclusive, max_cm exclusive)
-    ("petite", 0.0, 160.0),
-    ("average", 160.0, 175.0),
-    ("tall", 175.0, 999.0),
-)
-CONTRAST_BY_HEIGHT = {
-    "petite": {"low", "medium"},
-    "average": {"low", "medium", "high"},
-    "tall": {"medium", "high"},
+# No named height bands anymore: a deterministic midpoint split of
+# HEIGHT_RANGE. Shorter stature keeps the silhouette unbroken (low/medium
+# contrast); taller stature can carry silhouette-breaking contrast.
+CONTRAST_BY_HEIGHT_ZONE = {
+    "below-midpoint": {"low", "medium"},
+    "above-midpoint": {"medium", "high"},
 }
+
+
+def clamp_range(value, bounds):
+    """Clamp a numeric value into bounds; invalid input falls back to min."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = bounds[0]
+    return min(bounds[1], max(bounds[0], number))
+
+
+def height_zone(height_cm) -> str:
+    """Deterministic height -> zone mapping (helper for FR-7.2 rule 2)."""
+    height = clamp_range(height_cm, HEIGHT_RANGE)
+    return "below-midpoint" if height < HEIGHT_MIDPOINT else "above-midpoint"
+
+
+def allowed_contrast(height_cm) -> set:
+    """Contrast levels recommended for a height inside 120-218 cm."""
+    return CONTRAST_BY_HEIGHT_ZONE[height_zone(height_cm)]
+
 
 # --- FR-7.2 rule 3: proportion-appropriate shading ---------------------------
 CATEGORY_GROUPS = {
@@ -62,19 +102,27 @@ PROPORTION_SHADING = {
                  "footwear": {"light", "medium", "dark"}},
 }
 
-# --- Size range table (display-only, expert-encoded) -------------------------
-# S/M/L STORE POLICY (KAN-FIX): the store stocks Small, Medium, Large ONLY.
-# Maps categorical sizes to standard unisex adult chest/body girth ranges in
-# CM so the UI can show "M (96-102 cm)". Display-only:
-# never stored, never scored. Sellers input S/M/L labels ONLY (see
-# validate_size_label); cm entries are rejected at upload/edit time.
+# --- Size range table (REFERENCE-ONLY, expert-encoded) -----------------------
+# Clothing sizes: displayed on product details as "M (90-94 cm)".
+# Pure CM - no inches, no regional equivalents. Never scored, never stored.
+# Sellers input size labels ONLY (see validate_size_label); cm entries are
+# rejected at upload/edit time.
+# Bands are half-open [lo, hi) except the last band, which includes 112 cm,
+# so the whole 86-112 cm body-build range maps to exactly one size.
 SIZE_RANGE_TABLE = {
-    'S': {'cm': (86, 91)},
-    'M': {'cm': (96, 102)},
-    'L': {'cm': (107, 112)},
+    'S':   {'cm': (86, 90)},
+    'M':   {'cm': (90, 94)},
+    'L':   {'cm': (94, 98)},
+    'XL':  {'cm': (98, 102)},
+    '2XL': {'cm': (102, 106)},
+    '3XL': {'cm': (106, 110)},
+    '4XL': {'cm': (110, 112)},
 }
 
-# --- Footwear regional size table (display-only, expert-encoded) ------------
+SIZE_OPTIONS = ('S', 'M', 'L', 'XL', '2XL', '3XL', '4XL')
+CLOTHING_SIZE_OPTIONS = SIZE_OPTIONS  # legacy alias (same policy for clothing)
+
+# --- Footwear regional size table (RESTORED, display-only) -------------------
 # One row per EU size with its US/UK equivalents and the EU-based foot-length
 # bracket in CM. BACKEND CM CALCULATION ALWAYS USES THE EU COLUMN: a US or UK
 # input is first resolved to its EU row, then the EU cm bracket is used.
@@ -97,10 +145,10 @@ FOOTWEAR_SIZE_TABLE = (
 )
 
 # --- Size label validation (CSV upload + listing edits) ----------------------
-# S/M/L STORE POLICY: clothing labels are S, M, L only. Footwear additionally
-# accepts regional shoe codes WITH a region prefix (US 9, EU 40, UK 7); a bare
-# number ("40") is rejected because the region would be ambiguous.
-CLOTHING_SIZE_OPTIONS = ('S', 'M', 'L')
+# Clothing (tops/bottoms/dresses/outerwear): label must be one of S..4XL.
+# Footwear: S..4XL or a prefixed regional code in the supported table
+# (EU 35-46, US 4-15, UK 2-13, whole sizes).
+# Any cm/measured entry is rejected for every category.
 _FOOTWEAR_REGIONAL_RE = re.compile(r'^(?:US|EU|UK)\s?\d{1,3}(?:\.\d+)?$', re.IGNORECASE)
 _MEASURED_RE = re.compile(
     r'\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)',
@@ -147,8 +195,8 @@ def validate_size_label(size_text, category=''):
     """
     Deterministic size-format rule. Returns (is_valid, error_message_or_None).
 
-    Clothing (tops/bottoms/dresses/outerwear): label must be S, M, or L.
-    Footwear: S/M/L or a prefixed regional code in the supported table
+    Clothing (tops/bottoms/dresses/outerwear): label must be S..4XL.
+    Footwear: S..4XL or a prefixed regional code in the supported table
     (EU 35-46, US 4-15, UK 2-13, whole sizes).
     Any cm/measured entry is rejected for every category.
     Empty values pass here - presence is enforced by the required-field rule.
@@ -167,11 +215,11 @@ def validate_size_label(size_text, category=''):
         )
         return False, (
             f"Invalid size '{raw}': measured values with units (e.g., cm) are not accepted. "
-            f"Enter a standard size label ({', '.join(CLOTHING_SIZE_OPTIONS)}){suffix}"
+            f"Enter a standard size label ({', '.join(SIZE_OPTIONS)}){suffix}"
         )
 
     if cat == 'footwear':
-        if key in CLOTHING_SIZE_OPTIONS:
+        if key in SIZE_OPTIONS:
             return True, None
         if _FOOTWEAR_REGIONAL_RE.match(key):
             if get_footwear_row(key) is not None:
@@ -183,23 +231,25 @@ def validate_size_label(size_text, category=''):
         return False, (
             f"Invalid size '{raw}'. Footwear sizes must be regional codes with a region "
             f"prefix (e.g., US 9, EU 40, UK 7) or standard labels "
-            f"({', '.join(CLOTHING_SIZE_OPTIONS)}); cm measurements are not accepted."
+            f"({', '.join(SIZE_OPTIONS)}); cm measurements are not accepted."
         )
 
-    if key in CLOTHING_SIZE_OPTIONS:
+    if key in SIZE_OPTIONS:
         return True, None
     return False, (
         f"Invalid size '{raw}'. Use standard clothing sizes only: "
-        f"{', '.join(CLOTHING_SIZE_OPTIONS)}. Do not enter cm measurements; "
+        f"{', '.join(SIZE_OPTIONS)}. Do not enter cm measurements; "
         f"the product page shows the cm range automatically."
     )
 
 
 def get_size_ranges(size_text):
     """
-    Convert a size label to its display ranges.
+    Convert a size label to its display ranges - the exact content of the
+    product-details "AVAILABLE SIZE" block.
 
-    Clothing (S/M/L): {'label', 'cm', 'regions': None}.
+    Clothing (S..4XL): {'label', 'cm', 'regions': None} where 'cm' renders as
+    "(90-94 cm)" so the page shows e.g. "M (90-94 cm)".
     Footwear regional: {'label', 'cm', 'regions'} where 'cm' is the EU-based
     foot-length bracket and 'regions' is the triple display string
     ("EU 40 · US 9 · UK 7").
@@ -227,6 +277,36 @@ def get_size_ranges(size_text):
     return None
 
 
+def size_for_body_build(body_build_cm):
+    """Map a body-build measurement (86-112 cm) to its S..4XL size label."""
+    value = clamp_range(body_build_cm, BODY_BUILD_RANGE)
+    last = SIZE_OPTIONS[-1]
+    for label in SIZE_OPTIONS:
+        lo, hi = SIZE_RANGE_TABLE[label]['cm']
+        if label == last:
+            if lo <= value <= hi:
+                return label
+        elif lo <= value < hi:
+            return label
+    return last
+
+
+def body_proportion(height_cm, body_build_cm):
+    """
+    TOTAL body-proportion output: {'size': <S..4XL>, 'average': <cm>}.
+
+    size    = SIZE_RANGE_TABLE lookup on the clamped body build (86-112 cm).
+    average = (height_cm + body_build_cm) / 2, clamped to 120-218 / 86-112
+              first, rounded to one decimal.
+    """
+    height = clamp_range(height_cm, HEIGHT_RANGE)
+    build = clamp_range(body_build_cm, BODY_BUILD_RANGE)
+    return {
+        'size': size_for_body_build(build),
+        'average': round((height + build) / 2.0, 1),
+    }
+
+
 # --- deterministic keyword inference (fallback when catalog lacks the tag) ---
 CONTRAST_KEYWORDS = {
     "high": ("high contrast", "contrast", "color-block", "colorblock"),
@@ -238,14 +318,6 @@ SHADE_KEYWORDS = {
 }
 DEFAULT_CONTRAST = "medium"
 DEFAULT_SHADE = "medium"
-
-
-def height_band(height_cm: float) -> str:
-    """Deterministic height -> band mapping (helper for FR-7.2 rule 2)."""
-    for name, lo, hi in HEIGHT_BANDS:
-        if lo <= height_cm < hi:
-            return name
-    return "average"
 
 
 def infer_contrast(color_description: str) -> str:

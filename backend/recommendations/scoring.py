@@ -4,12 +4,17 @@ FitFusion AI - deterministic scoring service (rule-based recommendation engine).
 Traceability: SRS FR-7.2 (scoring), FR-7.3/FR-7.4 (explainable output).
 Pure functions: no DB, no network, no randomness -> identical inputs always
 produce identical outputs (auditability, Charter OBJ-05).
+
+Size-policy revision: the height_contrast rule no longer uses petite/average/
+tall bands; it uses the 120-218 cm range midpoint split exposed by
+knowledge_table.height_zone / knowledge_table.allowed_contrast.
 """
 from dataclasses import dataclass
 
 from .knowledge_table import (
-    CATEGORY_GROUPS, COLOR_COMPATIBILITY, CONTRAST_BY_HEIGHT, MAX_SCORE,
-    PROPORTION_SHADING, WEIGHTS, height_band, infer_contrast, infer_shade,
+    CATEGORY_GROUPS, COLOR_COMPATIBILITY, MAX_SCORE,
+    PROPORTION_SHADING, WEIGHTS, allowed_contrast, height_zone,
+    infer_contrast, infer_shade,
 )
 
 RULE_ORDER = ("color_compatibility", "height_contrast",
@@ -82,12 +87,14 @@ def _rule_color(avatar, item, weights):
 
 
 def _rule_contrast(avatar, item, weights):
-    band = height_band(avatar.height_cm)
+    zone = height_zone(avatar.height_cm)
     level = item.contrast_level.lower() or infer_contrast(item.color_description)
-    fired = level in CONTRAST_BY_HEIGHT.get(band, set())
-    reason = (f"{level} contrast suits {band} height band ({avatar.height_cm} cm)"
+    fired = level in allowed_contrast(avatar.height_cm)
+    reason = (f"{level} contrast suits the {zone} height zone "
+              f"({avatar.height_cm} cm within the 120-218 cm range)"
               if fired else
-              f"{level} contrast not recommended for {band} height band")
+              f"{level} contrast not recommended for the {zone} height zone "
+              f"({avatar.height_cm} cm within the 120-218 cm range)")
     return RuleResult("height_contrast", weights["height_contrast"] if fired else 0,
                       fired, reason)
 

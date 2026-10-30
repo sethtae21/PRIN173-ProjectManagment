@@ -10,6 +10,8 @@ import "./css/EditAvatarPresetPage.css";
 // selector (Slim/Balanced/Full/Curve). The numeric weight
 // is derived from build + height and still sent to the API,
 // so models/serializers stay untouched for now.
+// SIZE-POLICY UPDATE: height range aligned with backend
+// knowledge_table HEIGHT_RANGE = 120-218 cm (was 218.4).
 // =====================================================
 
 const ACTIVE_KEY = "fitfusion-avatar-preset";
@@ -34,7 +36,7 @@ const LEGACY_CHOICES = {
   undertone: {},
 };
 
-const HEIGHT_RANGE = { min: 120, max: 218.4 };
+const HEIGHT_RANGE = { min: 120, max: 218 };
 const WEIGHT_RANGE = { min: 30, max: 200 };
 
 const DEFAULT_PRESET = {
@@ -321,7 +323,7 @@ export default function EditAvatarPresetPage() {
     loadPreset();
 
     return () => {
-      active = false;
+      active = true;
     };
   }, [presetId]);
 
@@ -781,7 +783,7 @@ export default function EditAvatarPresetPage() {
             <button type="button" onClick={() => setShowDeleteModal(false)}>
               Keep Preset
             </button>
-            <button type="button" className="danger-button" onClick={confirmDelete}>
+            <button type="button" className="danger-button" onClick={confirmDelete()}>
               Delete Preset
             </button>
           </div>

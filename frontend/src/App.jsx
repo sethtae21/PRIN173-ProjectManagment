@@ -18,7 +18,6 @@ import ChooseRegistrationRolePage from "./pages/Shared Pages/ChooseRegistrationR
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import SellerSignupPage from "./pages/Seller/SellerSignupPage";
-// FIX: Updated path to include /Shopper/
 import FemaleAvatarCanvasTest from "./pages/Shopper/FemaleAvatarCanvasTest";
 
 /* GUEST PAGES */
@@ -46,7 +45,6 @@ import OrderDetailsPage from "./pages/OrderDetailsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
 import EditAccountPage from "./pages/EditAccountPage";
 
-
 /* SELLER PAGES */
 import SellerDashboardPage from "./pages/Seller/SellerDashboardPage";
 import SellerCatalogUploadPage from "./pages/Seller/SellerCatalogUploadPage";
@@ -58,6 +56,9 @@ import SellerStoreProfilePage from "./pages/Seller/SellerStoreProfilePage";
 
 /* NEW SELLER EDIT ACCOUNT PAGE */
 import SellerEditAccountPage from "./pages/Seller/SellerEditAccountPage";
+
+/* RECOMMENDATION SERVICE (FR-7.2/7.3/7.4 wiring) */
+import { loadMatchReasons } from "./services/api";
 
 import "./App.css";
 
@@ -167,7 +168,10 @@ function App() {
           <Route
             path="fitting-studio/customize"
             element={
-              <FittingStudioPage isGuest={true} />
+              <FittingStudioPage
+                isGuest={true}
+                loadMatchReasons={loadMatchReasons}
+              />
             }
           />
 
@@ -211,7 +215,11 @@ function App() {
 
           <Route
             path="fitting-studio/customize"
-            element={<FittingStudioPage />}
+            element={
+              <FittingStudioPage
+                loadMatchReasons={loadMatchReasons}
+              />
+            }
           />
 
           <Route
@@ -353,7 +361,6 @@ function App() {
             element={<SellerProductListingsPage />}
           />
 
-          {/* ✅ FIX: Safety-net redirect for old /seller/product-listings links */}
           <Route
             path="product-listings"
             element={
@@ -426,13 +433,7 @@ function App() {
             }
           />
 
-          {/* =====================================
-              NEW: SELLER EDIT ACCOUNT ROUTE
-
-              /seller/account/edit#profile
-              /seller/account/edit#password
-          ===================================== */}
-
+          {/* SELLER EDIT ACCOUNT ROUTE */}
           <Route
             path="account/edit"
             element={<SellerEditAccountPage />}
@@ -441,9 +442,7 @@ function App() {
           {/* UNKNOWN SELLER ROUTE */}
           <Route
             path="*"
-            element={
-              <Navigate to="/seller/dashboard" replace />
-            }
+            element={<Navigate to="/seller/dashboard" replace />}
           />
         </Route>
 

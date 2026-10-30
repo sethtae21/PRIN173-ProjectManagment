@@ -1,5 +1,15 @@
 """Read-only recommendation API. Guest-accessible because SRS Sec. 4.2 states
-read-only endpoints may be accessed by Guests."""
+read-only endpoints may be accessed by Guests.
+
+Integration update (Fitting Studio recommendations):
+* The list endpoint now returns each ranked catalog item together with its
+  FR-7.2 score breakdown AND the display metadata the UI needs (id, store,
+  category, size + pure-cm reference, regional equivalents for footwear,
+  color, price, front image). No placeholders anywhere.
+* The match-reasons endpoint now includes the rule weights so the UI can
+  render per-rule score/maxScore, and accepts string item ids (ObjectId-safe).
+Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | Charter OBJ-05.
+"""
 import math
 
 from django.shortcuts import get_object_or_404
@@ -10,8 +20,8 @@ from rest_framework.views import APIView
 
 from catalog.models import CatalogItem
 
-from .knowledge_table import WEIGHTS, WEIGHTS_VERSION
-from .scoring import AvatarProfile, ItemProfile, rank_items, score_item
+from .knowledge_table import WEIGHTS, WEIGHTS_VERSION, get_size_ranges
+from .scoring import AvatarProfile, ItemProfile, score_item
 
 
 def _as_tuple(value) -> tuple:
@@ -84,14 +94,61 @@ def _item_profile(item) -> ItemProfile:
     )
 
 
+def _image_url(item) -> str:
+    """Front-image URL for the UI; empty string when the listing has none."""
+    try:
+        return item.front_image.url if item.front_image else ""
+    except Exception:
+        return ""
+
+
+def _item_metadata(item) -> dict:
+    """Display metadata merged into every scored recommendation entry."""
+    ranges = get_size_ranges(item.size)
+    return {
+        "id": str(item.pk),
+        "item_id": str(item.pk),
+        "name": item.name,
+        "store": item.store_name,
+        "store_name": item.store_name,
+        "category": item.category,
+        "size": item.size,
+        "size_cm": ranges["cm"] if ranges else None,
+        "size_regions": ranges["regions"] if ranges else None,
+        "color": item.color,
+        "color_description": item.color_description,
+        "price": float(item.price),
+        "front_image": _image_url(item),
+        "style_tags": list(item.style_tags or []),
+        "occasion_tags": list(item.occasion_tags or []),
+    }
+
+
+def _ranked_recommendations(avatar, queryset, limit: int) -> list:
+    """Score every active item, rank desc (ties by name), attach metadata."""
+    rows = []
+    for item in queryset:
+        breakdown = score_item(avatar, _item_profile(item))
+        rows.append((breakdown.total, item.name, item, breakdown))
+    rows.sort(key=lambda row: (-row[0], row[1]))
+    payload = []
+    for _, _, item, breakdown in rows[:limit]:
+        entry = breakdown.as_dict()
+        entry.update(_item_metadata(item))
+        payload.append(entry)
+    return payload
+
+
 class RecommendationListView(APIView):
-    """GET /recommendations/ - ranked, explainable recommendations.
+    """GET /api/recommendations/ - ranked, explainable recommendations.
 
     Query params: undertone (warm|cool|neutral), height_cm, body_shape
     (top-heavy|bottom-heavy|balanced), styles (csv), occasions (csv), limit.
 
-    Response includes, per item: total_score, max_score, and the four
-    baselined FR-7.2 rules (fired or not, with reasons).
+    Response includes, per item: total_score, max_score, the four baselined
+    FR-7.2 rules (fired or not, with reasons) AND the catalog metadata the
+    Fitting Studio renders (id, store, category, size, cm reference, color,
+    price, front image).
     """
     permission_classes = [AllowAny]
 
@@ -100,8 +157,7 @@ class RecommendationListView(APIView):
         query.is_valid(raise_exception=True)
         values = query.validated_data
         avatar = _avatar_profile(values)
-        items = [_item_profile(i) for i in CatalogItem.objects.filter(status="active")]
-        ranked = rank_items(avatar, items, limit=values['limit'])
+        queryset = CatalogItem.objects.filter(status="active")
         return Response({
             "weights_version": WEIGHTS_VERSION,
             "weights": WEIGHTS,
@@ -112,12 +168,19 @@ class RecommendationListView(APIView):
                 "style_tags": list(avatar.style_tags),
                 "occasion_tags": list(avatar.occasion_tags),
             },
-            "recommendations": [b.as_dict() for b in ranked],
+            "recommendations": _ranked_recommendations(
+                avatar, queryset, values['limit']
+            ),
         })
 
 
 class MatchReasonsView(APIView):
-    """GET /recommendations/<item_id>/match-reasons/ - explain one selected item."""
+    """GET /api/recommendations/<item_id>/match-reasons/ - explain one item.
+
+    Returns the four-rule breakdown plus 'weights' so the UI can show
+    score/maxScore per rule, plus the item metadata for the selected-item
+    header.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, item_id):
@@ -126,11 +189,12 @@ class MatchReasonsView(APIView):
         avatar = _avatar_profile(query.validated_data)
         item = get_object_or_404(CatalogItem, pk=item_id, status="active")
         breakdown = score_item(avatar, _item_profile(item)).as_dict()
-        return Response({
-            "item_id": item.pk,
+        response = {
+            "item_id": str(item.pk),
             "item": breakdown["item"],
             "total_score": breakdown["total_score"],
             "max_score": breakdown["max_score"],
+            "weights": WEIGHTS,
             "avatar_profile": {
                 "undertone": avatar.undertone,
                 "height_cm": avatar.height_cm,
@@ -139,4 +203,6 @@ class MatchReasonsView(APIView):
                 "occasion_tags": list(avatar.occasion_tags),
             },
             "match_reasons": breakdown["rules"],
-        })
+        }
+        response.update(_item_metadata(item))
+        return Response(response)

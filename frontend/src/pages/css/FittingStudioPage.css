@@ -420,14 +420,16 @@
   line-height: 1.6;
 }
 
+/* UPDATED: Added 'auto' column for the match-score badge */
 .studio-recommendation-item {
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 58px 1fr auto;
   gap: 13px;
   margin-bottom: 14px;
   padding: 14px;
   border: 1px solid #e2d8c7;
   border-radius: 9px;
+  align-items: center;
 }
 
 .studio-clothing-thumbnail {
@@ -480,6 +482,31 @@
 .studio-recommendation-information strong {
   color: #8e641f;
   font-size: 11px;
+}
+
+/* NEW: Match-score badge styles (FR-7.3 explainability) */
+.studio-match-score-badge {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f5f1e8;
+  border: 1px solid #d4c4a8;
+  text-align: center;
+  min-width: 60px;
+  align-self: center;
+}
+
+.studio-match-score-badge small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #857660;
+  margin-bottom: 2px;
+}
+
+.studio-match-score-badge strong {
+  font-size: 16px;
+  color: #675328;
 }
 
 .studio-recommendation-item > button {
