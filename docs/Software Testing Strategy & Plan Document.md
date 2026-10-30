@@ -4,7 +4,7 @@
 | :---- | :---- |
 | **Document Version** | 1.0 |
 | **Date** | 2026-10-23 |
-| **Prepared By** | Seth Martin D. Duclayan (Project Manager / Scrum Master), with Karol Dein A. Tamo (Frontend Lead / QA Coordinator) |
+| **Prepared By** | Seth Martin D. Duclayan (Project Manager / Scrum Master), with Karol Dein A. Tamo (Frontend Lead / QA Coordinator) \- Group 1 |
 | **Target Audience** | Development Team (Backend/Frontend), QA/UAT Execution Team, Project Stakeholders, Panel of Evaluators, Course Adviser |
 | **Reference Documents** | SRS v1.1 (2026-09-21); Project Scope Baseline v1.1; Project Charter v1.1; Use Case Specifications UC-01–UC-19; Jira board KAN (Epic 1.4 – Quality Assurance & Testing, KAN-81); WBS 1.4.1–1.4.3 |
 
@@ -21,7 +21,7 @@ This document defines the software testing strategy and execution plan for the F
 * Detect and resolve **100% of Critical/Blocker (P1/P2) defects** prior to the local staging demonstration and the Week 14 final defense (November 21, 2026).  
 * Meet all performance NFRs: 95% of catalog/filtering/recommendation/commerce API requests \<500 ms; canvas overlay, view-angle, and proportion-deformation renders \<1 s; initial load \<3 s; 10-item CSV pipeline \<60 s (Criteria 1–4).  
 * Meet UAT gates: first-time Guest try-on ≤2 minutes (Criterion 6); ≥80% fit/style confidence improvement and fit-visualization "rating" ≥4/5 (Criterion 9); ≥80% recommendation approval (Criterion 10); ≥80% purchase-decision confidence improvement with lower return-intent (Criterion 11); ≥70% cart-to-mock-checkout completion (Criterion 8).  
-* Pass 100% of the Security & Privacy checklist — TLS 1.2+, Argon2id/PBKDF2 hashing, server-side RBAC, ephemeral guests, no user photo upload, RA 10173 account deletion (Criterion 7 / RT-09).  
+* Pass 100% of the Security & Privacy checklist — TLS 1.2+, Argon2id/PBKDF2 hashing, server-side RBAC, ephemeral guests, no user photo upload,RA 10173-compliant account deletion via deactivation and restricted archival (Criterion 7/ RT-09).  
 * Maintain a predictable **Cost of Quality (CoQ)** by shifting defect detection left: weights  regression \+ ±1 sensitivity tests run at commit time (KAN-103), and API input-hardening tests (KAN-117) precede integration testing.
 
 ## **2\. Test Execution Levels & Framework**
@@ -55,7 +55,7 @@ This document defines the software testing strategy and execution plan for the F
 ### **3.2 Key Guidelines & Rules**
 
 1. **Isolation:** Unit tests execute without calling the live Atlas cluster or external network — use seeded test collections/fakes for MongoDB and in-memory image fixtures for Pillow/rembg paths (Mocks/Stubs).  
-2. **Defensive Validation:** Every function handling input must test edge cases (null inputs, invalid types, boundary limits such as 119/120/220/221 cm and 29/30/200/201 kg, unexpected exceptions).  
+2. **Defensive Validation:** Every function handling input must test edge cases (null inputs, invalid types, boundary limits such as 119/120/220/221 cm and 87/88/112/113 cm, unexpected exceptions).  
 3. **Execution Speed:** Full unit suite must execute in under 2 minutes so it remains a per-commit gate.  
 4. **Determinism:** Scoring and validation tests use fixed tag combinations and fixed image fixtures so results are reproducible for panel audit (Charter §6.1.11 explainability).
 
@@ -71,7 +71,7 @@ This document defines the software testing strategy and execution plan for the F
 | UT-06 | catalog/validation rule (d) | CSV filename with no matching uploaded file | Reject with filename-mapping reason | Edge / Defensive | Pass (KAN-64) |
 | UT-07 | catalog/validation rule (e) | Declared color "red" with blue-dominant image | Reject with image–text color mismatch reason | Edge / Defensive | Pass (KAN-64) |
 | UT-08 | catalog palette derivation | color\_family \= "red" on publish | color\_palette\_tags populated from knowledge table | Happy Path | In Progress (KAN-86) |
-| UT-09 | accounts/preset serializer | height=250 cm; weight=20 kg | 400 with descriptive range errors; avatar not updated | Edge / Defensive | Pass (KAN-58) |
+| UT-09 | accounts/preset serializer | height=250 cm; Body Build=200 cm | 400 with descriptive range errors; avatar not updated | Edge / Defensive | Pass (KAN-58) |
 | UT-10 | accounts/preset serializer | cup\_size supplied with gender=male | 400 field error (cup size female-only, FR-2.7) | Defensive Check | Pass (KAN-58) |
 | UT-11 | commerce views (RBAC) | Guest POST /cart; User B GET User A order | 401/403 for Guest; 403/404 cross-user; owner-only reads | Security / RBAC | Pass (KAN-118) |
 | UT-12 | commerce mock gateway | Simulated decline response | Checkout error shown; no order record; cart intact | Edge / Defensive | Pass (KAN-118) |
@@ -115,7 +115,7 @@ This document defines the software testing strategy and execution plan for the F
 | E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; guest rating not persisted (FR-1.9) |
 | E2E-08 | Canvas performance (UC-03, UC-04) | Mid-range laptop; staged catalog | 1\. Switch item. 2\. Toggle view. 3\. Change proportion.4. Equip a Dress/One-Piece → Top and Bottom slots replaced with confirmation (FR-5.2 v1.1). | Each overlay/deformation renders fluidly | Each render ≤1 s (Criterion 2; KAN-84 run) |
 | E2E-09 | API performance sweep | Staging under normal load | 1\. Script calls to catalog, filtering, recommendation, commerce endpoints. 2\. Compute 95th percentile. | Responses within threshold | 95% \<500 ms (Criterion 1\) |
-| E2E-10 | Account deletion / RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm. 3\. Query collections for user data. | Account and associated personal data permanently erased | Post-delete queries return nothing (FR-1.4; Criterion 7 checklist) |
+| E2E-10 | Account deletion (deactivation \+ archival)/ RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm.3. Query active collections for user data; verify the archived record is access-restricted and pseudonymized. | Account deactivated (login and all role access blocked); personal data removed from active collections and retained only in the restricted archive per the retention policy | Post-delete queries on active collections return nothing; the archive is readable only through the restricted retention path and holds no directly identifying fields (FR-1.4; Criterion 7 checklist) |
 | E2E-11 | Saved outfit CRUD (UC-10) | Registered user with equipped items | 1\. Save outfit. 2\. List. 3\. Load. 4\. Edit. 5\. Delete. 6\. Load outfit containing a deleted catalog item. | Outfit persists across sessions; missing item warned and skipped | CRUD round-trip passes; warning shown per UC-10 extension |
 | E2E-12 | Catalog browsing, filters, per-seller Store page (UC-02) | Seeded catalog with ≥2 Sellers; Guest session | 1\. Open Catalog Browser. 2\. Apply category filter, then size filter, then price filter/sort. 3\. Open an item detail. 4\. Click the store name to open the Store page. 5\. Confirm only that Seller's active items are listed. | Filtered subsets match seeded data per FR-3.3; Store page lists only that Seller's active items; read-only for Guests | Filter results exact; Store page count \== Seller's active item count (KAN-104/105) |
 
@@ -144,7 +144,7 @@ This document defines the software testing strategy and execution plan for the F
 | UAT-04 | As a shopper, I want confidence in my purchase decision and lower intent to return (Criterion 11 / OBJ-06) | Pre/post purchase-decision confidence and return-intent ratings around a mock checkout session. | ≥80% of sessions report higher confidence and lower return-intent vs baseline. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
 | UAT-05 | As a Seller, I want to upload my catalog using the template and instruction sheet without help (FR-4.1–4.8; Criterion 5 / OBJ-09) | Seller participant downloads template, uploads 10 items unassisted, reads validation report. | ≥80% of items publish without manual correction; report reasons understood. | \[Carlos – Backend\] \[Participant\] | Planned (Week 12\) |
 | UAT-06 | As a Registered User, I want to complete a mock purchase end-to-end (FR-6.1–6.9; Criterion 8 / OBJ-07) | Build cart, checkout through mock gateway, verify order history entry. | ≥70% of created carts complete the simulated checkout. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
-| UAT-07 | As a user, I want my data protected (FR-1.4–1.9; Criterion 7 / OBJ-04) | Walkthrough: password policy, guest ephemerality check, account deletion request. | Checklist 100% pass; deletion erases personal data. | \[Seth – PM\] \[Carlos – Backend\] | Planned (Week 12\) |
+| UAT-07 | As a user, I want my data protected (FR-1.4–1.9; Criterion 7 / OBJ-04) | Walkthrough: password policy, guest ephemerality check, account deletion (deactivation \+ archival) request. | Checklist 100% pass; deletion deactivates the account and archives personal data under restricted access, with no active access remaining. | \[Seth – PM\] \[Carlos – Backend\] | Planned (Week 12\) |
 
 ## 
 
@@ -189,7 +189,7 @@ All defects are logged in Jira as sub-tasks under Epic 1.4 (KAN-81) with label *
 | UT-09, UT-10; E2E-01, E2E-02, E2E-08 | FR-2.1–2.10, FR-5.1–5.3 | RT-02, RT-05 | KAN-58, KAN-46, KAN-48, KAN-116 |
 | UT-11, UT-12; E2E-05, E2E-06, E2E-10 | FR-1.1–1.9, FR-6.1–6.9 | RT-01, RT-07, RT-09 | KAN-45, KAN-56, KAN-118 |
 | E2E-09; E2E-08 | SRS §4.1 | RT-08 | KAN-90 |
-| UAT-01…UAT-07 | FR-1.4–1.9, FR-2.1–2.10, FR-4.1–4.8, FR-5.1–5.8, FR-6.1–6.9, FR-7.5, §4.4 | RT-01, RT-02, RT-04, RT-05, RT-06, RT-07, RT-09 | KAN-87, KAN-88, KAN-89, KAN-90 |
+| UAT-01…UAT-07 | SRS §4.4, FR-7.5 | RT-01, RT-02, RT-04, RT-05, RT-06, RT-07, RT-09 | FR-1.4–1.9, FR-2.1–2.10, FR-4.1–4.8, FR-5.1–5.8, FR-6.1–6.9, FR-7.5, §4.4 |
 | E2E-12 | FR-3.1–3.4 | RT-03 | KAN-104, KAN-105 |
 
 ## 
@@ -206,9 +206,9 @@ All defects are logged in Jira as sub-tasks under Epic 1.4 (KAN-81) with label *
 | UC-06 View Match Reasons | E2E-07 |
 | UC-07 Register Account | E2E-02 |
 | UC-08 Access Account | E2E-02, E2E-06 |
-| UC-09 Manage Avatar Presets | E2E-02 (partial: no preset-delete test) |
+| UC-09 Manage Avatar Presets | E2E-02 |
 | UC-10 Manage Saved Outfits | E2E-11 |
-| UC-11 Manage Cart | UT-11, E2E-05, E2E-06 (partial: no explicit remove/clear-cart test) |
+| UC-11 Manage Cart | UT-11, E2E-05, E2E-06 |
 | UC-12 Complete Mock Checkout | UT-12, E2E-05 |
 | UC-13 Process Mock Payment | UT-12, E2E-05 |
 | UC-14 View Order History | E2E-05 |
@@ -216,6 +216,7 @@ All defects are logged in Jira as sub-tasks under Epic 1.4 (KAN-81) with label *
 | UC-16 Upload Catalog Items | UT-04–UT-07, E2E-03, E2E-04 |
 | UC-17 Validate Catalog Items | UT-04–UT-08, E2E-04 |
 | UC-18 View Validation Report | E2E-03, E2E-04 |
-| UC-19 Manage Listings | E2E-04, UT-13 (partial: no listing list/details test; UT-13 is planned) |
+| UC-19 Manage Listings | E2E-04, UT-13 |
 
 End of document — FitFusion AI Software Testing & Quality Assurance Plan v1.0 (2026-10-24). Maintained under WBS 1.4 and Epic KAN-81; changes to this plan follow the Scope Baseline Change Management Plan when they affect baselined criteria.
+
