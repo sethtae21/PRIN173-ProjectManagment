@@ -1247,31 +1247,50 @@ function FittingStudioPage({
   }
 
   function removeEquippedItem(category) {
-    const next = {
-      ...equippedItems,
-      [category]: null,
-    };
+  const removedItem = equippedItems[category];
 
-    const hasRemaining = Object.values(next).some(Boolean);
+  if (!removedItem) return;
 
-    setEquippedItems(next);
+  const next = {
+    ...equippedItems,
+    [category]: null,
+  };
 
-    if (!hasRemaining) {
-      if (originalDimensions) {
-        setAvatar((current) => ({
-          ...current,
-          ...originalDimensions,
-        }));
-      }
+  const hasRemaining = Object.values(next).some(Boolean);
 
-      setOriginalDimensions(null);
-    } else {
-      setAvatar((current) =>
-        applyFitLimits(current, combinedFitLimits(next))
-      );
+  setEquippedItems(next);
+
+  // Clear match reasons for the removed item.
+  // Also reset the panel when all equipped items are removed.
+  setSelectedMatchItem((current) => {
+    if (!hasRemaining) return null;
+
+    if (
+      current &&
+      String(current.id) === String(removedItem.id) &&
+      current.category === removedItem.category
+    ) {
+      return null;
     }
-  }
 
+    return current;
+  });
+
+  if (!hasRemaining) {
+    if (originalDimensions) {
+      setAvatar((current) => ({
+        ...current,
+        ...originalDimensions,
+      }));
+    }
+
+    setOriginalDimensions(null);
+  } else {
+    setAvatar((current) =>
+      applyFitLimits(current, combinedFitLimits(next))
+    );
+  }
+}
   function handleRecommendations() {
     setActivePanel("recommendations");
 
@@ -1485,10 +1504,7 @@ function FittingStudioPage({
 
             {activePanel === "customize" ? (
               <div className="studio-customization-panel">
-                <div className="studio-selected-gender">
-                  <span>Selected Gender</span>
-                  <strong>{avatar.gender}</strong>
-                </div>
+               
 
                 <div className="studio-measurement-grid">
                   <div className="studio-slider-field">
@@ -2219,4 +2235,7 @@ function FittingStudioPage({
   );
 }
 
+
+
 export default FittingStudioPage;
+
