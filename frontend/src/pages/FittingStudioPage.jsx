@@ -42,6 +42,8 @@ const RECOMMENDED_ITEMS = [
   },
 ];
 
+const ITEMS_PER_PAGE = 10;
+
 const STUDIO_VIEWS = ["Front", "Rear"];
 const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 const STUDIO_PENDING_PREFIX = "fitfusion-fitting-studio-pending-item-";
@@ -473,27 +475,6 @@ function loadAvatar(isGuest) {
   };
 }
 
-/*
-  Match-service adapter contract:
-
-  loadMatchReasons({ item, avatar, isGuest, signal })
-
-  Return:
-  {
-    colorCompatibility: { score, maxScore, reason },
-    heightContrast: { score, maxScore, reason },
-    proportionShading: { score, maxScore, reason },
-    styleOccasion: { score, maxScore, reason }
-  }
-
-  Each score must be a finite number between 0 and maxScore.
-  Each maxScore must be a positive finite number.
-  Each reason must be a non-empty string.
-
-  This is the frontend contract, not an assumed existing API.
-  No scores are generated or guessed here.
-*/
-
 function validateMatchDetails(details) {
   if (!details || typeof details !== "object") {
     throw new Error("Match details unavailable");
@@ -549,10 +530,6 @@ function ControlGroup({ label, value, options, onChange }) {
   );
 }
 
-/*
-  Kept inside FittingStudioPage.jsx.
-  No additional JSX file is needed.
-*/
 function MatchReasonsCard({
   item,
   avatar,
@@ -570,7 +547,6 @@ function MatchReasonsCard({
     context: "",
   });
 
-  // A changed avatar or selected item invalidates previous scores.
   const context = JSON.stringify({
     item,
     avatar,
@@ -818,6 +794,47 @@ function MatchReasonsCard({
   );
 }
 
+const BODY_BUILD_RANGE = {
+  min: 86,
+  max: 112,
+};
+
+function visualBuildToWeight(buildCm, heightCm) {
+  const build = clamp(buildCm, BODY_BUILD_RANGE);
+  const heightMeters = Number(heightCm) / 100;
+
+  const progress =
+    (build - BODY_BUILD_RANGE.min) /
+    (BODY_BUILD_RANGE.max - BODY_BUILD_RANGE.min);
+
+  const visualRatio = 21 + progress * 11;
+
+  return visualRatio * heightMeters * heightMeters;
+}
+
+function weightToVisualBuild(heightCm, weightKg) {
+  const heightMeters = Number(heightCm) / 100;
+  const weight = Number(weightKg);
+
+  if (
+    !Number.isFinite(heightMeters) ||
+    !Number.isFinite(weight) ||
+    heightMeters <= 0 ||
+    weight <= 0
+  ) {
+    return 99;
+  }
+
+  const visualRatio = weight / (heightMeters * heightMeters);
+
+  const build =
+    BODY_BUILD_RANGE.min +
+    ((visualRatio - 21) / 11) *
+      (BODY_BUILD_RANGE.max - BODY_BUILD_RANGE.min);
+
+  return Math.round(clamp(build, BODY_BUILD_RANGE) * 10) / 10;
+}
+
 function FittingStudioPage({
   isGuest = false,
   loadMatchReasons,
@@ -876,10 +893,16 @@ function FittingStudioPage({
   const [outfitName, setOutfitName] = useState("");
   const [outfitNameError, setOutfitNameError] = useState("");
   const [notification, setNotification] = useState("");
+  
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
 
   const basePath = isGuest ? "/guest" : "/shopper";
   const isFemale = avatar.gender.toLowerCase() === "female";
-  const bodyBuild = calculateBodyType(avatar.height, avatar.weight);
+  const bodyBuild = weightToVisualBuild(
+    avatar.height,
+    avatar.weight
+  );
 
   const equippedItemsArray = useMemo(
     () => Object.values(equippedItems).filter(Boolean),
@@ -900,6 +923,18 @@ function FittingStudioPage({
             sampleOnly: true,
           })),
     [catalogRecommendations]
+  );
+
+  // PAGINATION LOGIC
+  const totalPages = Math.ceil(recommendationItems.length / ITEMS_PER_PAGE);
+
+  const paginatedItems = useMemo(
+    () =>
+      recommendationItems.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+      ),
+    [recommendationItems, currentPage]
   );
 
   const atHeightMax =
@@ -959,7 +994,10 @@ function FittingStudioPage({
           error
         );
       } finally {
-        if (active) setCatalogLoading(false);
+        if (active) {
+          setCurrentPage(1); // Reset to page 1 when catalog loads
+          setCatalogLoading(false);
+        }
       }
     }
 
@@ -1054,50 +1092,21 @@ function FittingStudioPage({
     );
   }
 
- function updateAvatar(field, value) {
-  if (field === "height" || field === "weight") {
-    const range = fitLimits[field];
-    const requested = Number(value);
-    const adjusted = clamp(requested, range);
-
-    if (requested > range.max) {
-      displayNotification(
-        `Maximum ${
-          field === "weight" ? "body build" : field
-        } preview reached for the selected garment size.`
-      );
-    } else if (requested < range.min) {
-      displayNotification(
-        `Minimum ${
-          field === "weight" ? "body build" : field
-        } preview reached for the selected garment size.`
-      );
-    }
-
+  function updateAvatar(field, value) {
     if (field === "height") {
+      const nextHeight = clamp(value, fitLimits.height);
       const currentHeight = Number(avatar.height);
       const currentWeight = Number(avatar.weight);
-      const currentBuild = calculateBodyType(
-        currentHeight,
-        currentWeight
-      );
 
-      // Adjust internal weight to preserve the current body build.
-      const proportionalWeight =
+      const nextWeight =
         currentHeight > 0 && currentWeight > 0
           ? currentWeight *
-            Math.pow(adjusted / currentHeight, 2)
-          : weightForBuild(currentBuild, adjusted);
+            Math.pow(nextHeight / currentHeight, 2)
+          : visualBuildToWeight(bodyBuild, nextHeight);
 
-      const nextWeight = clamp(
-        proportionalWeight,
-        fitLimits.weight
-      );
-
-      // Keep both controls unchanged if fitting limits prevent
-      // preserving the selected body build.
       if (
-        calculateBodyType(adjusted, nextWeight) !== currentBuild
+        nextWeight < fitLimits.weight.min ||
+        nextWeight > fitLimits.weight.max
       ) {
         displayNotification(
           "This height cannot keep your selected body build within the current fitting limits."
@@ -1107,8 +1116,17 @@ function FittingStudioPage({
 
       setAvatar((current) => ({
         ...current,
-        height: String(adjusted),
+        height: String(nextHeight),
         weight: String(nextWeight),
+      }));
+
+      return;
+    }
+
+    if (field === "weight") {
+      setAvatar((current) => ({
+        ...current,
+        weight: String(clamp(value, fitLimits.weight)),
       }));
 
       return;
@@ -1116,39 +1134,33 @@ function FittingStudioPage({
 
     setAvatar((current) => ({
       ...current,
-      [field]: String(adjusted),
+      [field]: value,
     }));
-
-    return;
   }
 
-  setAvatar((current) => ({
-    ...current,
-    [field]: value,
-  }));
-}
+  function selectBodyBuild(value) {
+    const nextBuild = clamp(value, BODY_BUILD_RANGE);
 
-function selectBodyBuild(build) {
-  if (!BODY_BUILDS.includes(build)) return;
-
-  const nextWeight = clamp(
-    weightForBuild(build, avatar.height),
-    fitLimits.weight
-  );
-
-  if (calculateBodyType(avatar.height, nextWeight) !== build) {
-    displayNotification(
-      "This body build is unavailable at your current height within the current fitting limits."
+    const nextWeight = visualBuildToWeight(
+      nextBuild,
+      avatar.height
     );
-    return;
-  }
 
-  // Update internal weight while preserving height.
-  setAvatar((current) => ({
-    ...current,
-    weight: String(nextWeight),
-  }));
-}
+    if (
+      nextWeight < fitLimits.weight.min ||
+      nextWeight > fitLimits.weight.max
+    ) {
+      displayNotification(
+        "This body build is outside the current garment fitting limits."
+      );
+      return;
+    }
+
+    setAvatar((current) => ({
+      ...current,
+      weight: String(nextWeight),
+    }));
+  }
 
   function notifyAtLimit(field) {
     const flag =
@@ -1302,50 +1314,49 @@ function selectBodyBuild(build) {
   }
 
   function removeEquippedItem(category) {
-  const removedItem = equippedItems[category];
+    const removedItem = equippedItems[category];
 
-  if (!removedItem) return;
+    if (!removedItem) return;
 
-  const next = {
-    ...equippedItems,
-    [category]: null,
-  };
+    const next = {
+      ...equippedItems,
+      [category]: null,
+    };
 
-  const hasRemaining = Object.values(next).some(Boolean);
+    const hasRemaining = Object.values(next).some(Boolean);
 
-  setEquippedItems(next);
+    setEquippedItems(next);
 
-  // Clear match reasons for the removed item.
-  // Also reset the panel when all equipped items are removed.
-  setSelectedMatchItem((current) => {
-    if (!hasRemaining) return null;
+    setSelectedMatchItem((current) => {
+      if (!hasRemaining) return null;
 
-    if (
-      current &&
-      String(current.id) === String(removedItem.id) &&
-      current.category === removedItem.category
-    ) {
-      return null;
+      if (
+        current &&
+        String(current.id) === String(removedItem.id) &&
+        current.category === removedItem.category
+      ) {
+        return null;
+      }
+
+      return current;
+    });
+
+    if (!hasRemaining) {
+      if (originalDimensions) {
+        setAvatar((current) => ({
+          ...current,
+          ...originalDimensions,
+        }));
+      }
+
+      setOriginalDimensions(null);
+    } else {
+      setAvatar((current) =>
+        applyFitLimits(current, combinedFitLimits(next))
+      );
     }
-
-    return current;
-  });
-
-  if (!hasRemaining) {
-    if (originalDimensions) {
-      setAvatar((current) => ({
-        ...current,
-        ...originalDimensions,
-      }));
-    }
-
-    setOriginalDimensions(null);
-  } else {
-    setAvatar((current) =>
-      applyFitLimits(current, combinedFitLimits(next))
-    );
   }
-}
+
   function handleRecommendations() {
     setActivePanel("recommendations");
 
@@ -1559,71 +1570,65 @@ function selectBodyBuild(build) {
 
             {activePanel === "customize" ? (
               <div className="studio-customization-panel">
-               
-
                 <div className="studio-measurement-grid">
-  {/* HEIGHT */}
-  <div className="studio-slider-field">
-    <div className="studio-slider-header">
-      <label htmlFor="studio-height">Height</label>
-      <strong>{avatar.height} cm</strong>
-    </div>
+                  {/* HEIGHT */}
+                  <div className="studio-slider-field">
+                    <div className="studio-slider-header">
+                      <label htmlFor="studio-height">Height</label>
+                      <strong>{avatar.height} cm</strong>
+                    </div>
 
-    <input
-      id="studio-height"
-      className="studio-slider"
-      type="range"
-      min={fitLimits.height.min}
-      max={fitLimits.height.max}
-      step="0.1"
-      value={clamp(avatar.height, fitLimits.height)}
-      onPointerUp={() => notifyAtLimit("height")}
-      onKeyUp={() => notifyAtLimit("height")}
-      onChange={(event) =>
-        updateAvatar("height", event.target.value)
-      }
-      aria-valuetext={`${avatar.height} centimeters`}
-    />
+                    <input
+                      id="studio-height"
+                      className="studio-slider"
+                      type="range"
+                      min={fitLimits.height.min}
+                      max={fitLimits.height.max}
+                      step="0.1"
+                      value={clamp(avatar.height, fitLimits.height)}
+                      onPointerUp={() => notifyAtLimit("height")}
+                      onKeyUp={() => notifyAtLimit("height")}
+                      onChange={(event) =>
+                        updateAvatar("height", event.target.value)
+                      }
+                      aria-valuetext={`${avatar.height} centimeters`}
+                    />
 
-    <div className="studio-slider-limits">
-      <span>{fitLimits.height.min} cm</span>
-      <span>{fitLimits.height.max} cm</span>
-    </div>
-  </div>
+                    <div className="studio-slider-limits">
+                      <span>{fitLimits.height.min} cm</span>
+                      <span>{fitLimits.height.max} cm</span>
+                    </div>
+                  </div>
 
-  {/* BODY BUILD */}
-  <div className="studio-slider-field">
-    <div className="studio-slider-header">
-      <label htmlFor="studio-body-build">Body Build</label>
-      <strong>{bodyBuild}</strong>
-    </div>
+                  {/* BODY BUILD */}
+                  <div className="studio-slider-field">
+                    <div className="studio-slider-header">
+                      <label htmlFor="studio-body-build">Body Build</label>
+                      <strong>{bodyBuild} cm</strong>
+                    </div>
 
-    <input
-      id="studio-body-build"
-      className="studio-slider"
-      type="range"
-      min={0}
-      max={BODY_BUILDS.length - 1}
-      step={1}
-      value={Math.max(0, BODY_BUILDS.indexOf(bodyBuild))}
-      onChange={(event) =>
-        selectBodyBuild(BODY_BUILDS[Number(event.target.value)])
-      }
-      aria-valuetext={bodyBuild}
-    />
+                    <input
+                      id="studio-body-build"
+                      className="studio-slider"
+                      type="range"
+                      min={BODY_BUILD_RANGE.min}
+                      max={BODY_BUILD_RANGE.max}
+                      step="0.1"
+                      value={clamp(bodyBuild, BODY_BUILD_RANGE)}
+                      onPointerUp={() => notifyAtLimit("weight")}
+                      onKeyUp={() => notifyAtLimit("weight")}
+                      onChange={(event) =>
+                        selectBodyBuild(Number(event.target.value))
+                      }
+                      aria-valuetext={`${bodyBuild} centimeters`}
+                    />
 
-    <div className="studio-build-slider-labels" aria-hidden="true">
-      {BODY_BUILDS.map((build) => (
-        <span
-          key={build}
-          className={bodyBuild === build ? "active" : ""}
-        >
-          {build}
-        </span>
-      ))}
-    </div>
-  </div>
-</div>
+                    <div className="studio-slider-limits">
+                      <span>{BODY_BUILD_RANGE.min} cm</span>
+                      <span>{BODY_BUILD_RANGE.max} cm</span>
+                    </div>
+                  </div>
+                </div>
 
                 {equippedItemsArray.length > 0 && (
                   <div
@@ -1785,7 +1790,8 @@ function selectBodyBuild(build) {
                   <p role="status">Loading catalog clothing...</p>
                 )}
 
-                {recommendationItems.map((item) => (
+                {/* PAGINATED ITEMS MAP */}
+                {paginatedItems.map((item) => (
                   <article
                     key={item.id}
                     className={`studio-recommendation-item ${
@@ -1846,6 +1852,65 @@ function selectBodyBuild(build) {
                     </button>
                   </article>
                 ))}
+
+                {/* PAGINATION CONTROLS */}
+                {totalPages > 1 && (
+                  <div className="studio-pagination-controls" style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginTop: '24px',
+                    paddingTop: '24px',
+                    borderTop: '1px solid #e8e0d0'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      style={{
+                        padding: '10px 16px',
+                        border: '1px solid #d4c4a8',
+                        borderRadius: '8px',
+                        background: currentPage === 1 ? '#f5f1e8' : '#fff',
+                        color: currentPage === 1 ? '#999' : '#675328',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}
+                      aria-label="Previous page"
+                    >
+                      ← Previous
+                    </button>
+                    
+                    <span style={{
+                      color: '#675328',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      style={{
+                        padding: '10px 16px',
+                        border: '1px solid #d4c4a8',
+                        borderRadius: '8px',
+                        background: currentPage === totalPages ? '#f5f1e8' : '#fff',
+                        color: currentPage === totalPages ? '#999' : '#675328',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}
+                      aria-label="Next page"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -1892,7 +1957,7 @@ function selectBodyBuild(build) {
 
                 <div>
                   <span>Body Build</span>
-                  <strong>{bodyBuild}</strong>
+                  <strong>{bodyBuild} cm</strong>
                 </div>
               </div>
             </div>
@@ -2318,7 +2383,4 @@ function selectBodyBuild(build) {
   );
 }
 
-
-
 export default FittingStudioPage;
-
