@@ -407,13 +407,15 @@ export default function AvatarCanvas({
 
     return garmentItems
       .map((item) =>
-        // Real catalog image first; polygon illustration as fallback.
+        // Real catalog image first (clipped to the body silhouette for a
+        // perfect fit); polygon illustration as fallback.
         garmentImageLayer(
           item,
           bounds,
           angle,
           WIDTH,
-          HEIGHT
+          HEIGHT,
+          source
         ) ||
         catalogIllustration(
           item,
@@ -428,6 +430,7 @@ export default function AvatarCanvas({
     garmentItems,
     bounds,
     angle,
+    source,
     garmentImageVersion,
   ]);
 

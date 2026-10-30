@@ -1094,18 +1094,29 @@ export function tintBody(
 // ==========================================
 // GARMENT IMAGE LAYERS (REAL CATALOG IMAGES)
 //
-// FIX (try-on integration): equipped items now render their actual
-// rembg-processed PNG (transparent background) instead of only the flat
-// color polygons. The image is loaded asynchronously (cached), its
-// transparent margins are auto-cropped via the alpha bounding box, and the
-// cropped garment is stretched onto the anatomical region of its category
-// (torso / legs / feet) in body coordinates, so the existing lattice warp
-// deforms it together with the avatar. catalogIllustration() remains the
-// fallback while the image is loading or when it is missing/unreadable.
+// Pipeline (the MVP's designated "perfect fit" tool per scope FR-5.x /
+// KAN-67/68 — deterministic 2D overlay, no ML try-on):
+//   1. load garment PNG same-origin (proxy) and cache it
+//   2. MULTI-PASS alpha crop: thresholds 128 -> 64 -> 32 -> 12, first
+//      pass that finds a bounding box wins (defeats rembg semi-transparent
+//      veils of any strength, keeps genuinely sheer fabrics)
+//   3. stretch the crop onto the category's anatomical region
+//      (jacket cuffs reach wrist height; waistbands start at the waist)
+//   4. alpha-clip to the dilated body silhouette so cloth hugs arms,
+//      legs and feet instead of floating as rectangles
+//   5. renderLayer() warps the result with the body lattice
+// catalogIllustration() remains the fallback while loading / when missing.
 // ==========================================
 
 const garmentImageCache = new Map();
 const garmentCropCache = new Map();
+
+// FIX (hazy rembg backgrounds): descending alpha thresholds for the garment
+// bounding-box crop. A single low threshold kept strong semi-transparent
+// veils inside the box, shrinking the visible garment to a slice of its
+// body region (denim only on the lower legs). The first pass that finds
+// opaque pixels wins; clean photos crop at 128.
+const CROP_THRESHOLD_STEPS = [128, 64, 32, 12];
 
 // FIX (SecurityError taint): force SAME-ORIGIN media loads. Items persisted
 // in sessionStorage / saved outfits / pending-item flow may still carry
@@ -1133,14 +1144,44 @@ function sameOriginMedia(src) {
 
 // Anatomical regions in bounds-relative coordinates (same system as the
 // polygon illustrations): X(p) = cx + width*p, Y(p) = top + height*p.
+// RETUNED per feedback: collars sit at the neck line (0.135-0.140); the
+// outerwear region now ends at 0.58 = wrist height so jacket/blazer cuffs
+// are visible on the wrists with the hem on the upper thigh; plain tops
+// keep a hip-length hem (0.50); bottoms run waist (0.44) to ankle (0.92).
+// The silhouette clip trims all overscan, so wide x-ranges are safe.
 const GARMENT_REGIONS = {
-  tops: { x0: -0.36, x1: 0.36, y0: 0.185, y1: 0.47 },
-  outerwear: { x0: -0.38, x1: 0.38, y0: 0.185, y1: 0.52 },
-  bottoms: { x0: -0.23, x1: 0.23, y0: 0.47, y1: 0.86 },
-  skirt: { x0: -0.34, x1: 0.34, y0: 0.47, y1: 0.72 },
-  dresses: { x0: -0.35, x1: 0.35, y0: 0.185, y1: 0.78 },
-  footwear: { x0: -0.26, x1: 0.26, y0: 0.93, y1: 1.0 },
+  tops: { x0: -0.50, x1: 0.50, y0: 0.140, y1: 0.50 },
+  outerwear: { x0: -0.52, x1: 0.52, y0: 0.135, y1: 0.58 },
+  bottoms: { x0: -0.35, x1: 0.35, y0: 0.44, y1: 0.92 },
+  skirt: { x0: -0.40, x1: 0.40, y0: 0.44, y1: 0.74 },
+  dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.80 },
+  footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
 };
+
+// Silhouette clip overscan (cloth thickness over the skin outline).
+const MASK_DILATION = 1.04;
+
+function alphaBBox(data, w, h, threshold) {
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (data[(y * w + x) * 4 + 3] > threshold) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  return { minX, minY, maxX, maxY };
+}
 
 function cropTransparentCanvas(image) {
   const w = image.naturalWidth || image.width;
@@ -1170,33 +1211,26 @@ function cropTransparentCanvas(image) {
     return imageToCanvas(image, w, h);
   }
 
-  let minX = sw;
-  let minY = sh;
-  let maxX = -1;
-  let maxY = -1;
+  // MULTI-PASS: strongest threshold first so semi-transparent rembg veils
+  // never inflate the box; fall through for sheer/low-contrast garments.
+  let box = null;
 
-  for (let y = 0; y < sh; y += 1) {
-    for (let x = 0; x < sw; x += 1) {
-      if (data[(y * sw + x) * 4 + 3] > 8) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
+  for (const threshold of CROP_THRESHOLD_STEPS) {
+    box = alphaBBox(data, sw, sh, threshold);
+    if (box) break;
   }
 
-  if (maxX < minX || maxY < minY) {
+  if (!box) {
     return imageToCanvas(image, w, h);
   }
 
   const inv = 1 / scale;
-  const pad = Math.round(Math.max(2, (maxX - minX) * 0.04));
+  const pad = Math.round(Math.max(2, (box.maxX - box.minX) * 0.04));
 
-  const sx = Math.max(0, Math.floor((minX - pad) * inv));
-  const sy = Math.max(0, Math.floor((minY - pad) * inv));
-  const ex = Math.min(w, Math.ceil((maxX + pad) * inv));
-  const ey = Math.min(h, Math.ceil((maxY + pad) * inv));
+  const sx = Math.max(0, Math.floor((box.minX - pad) * inv));
+  const sy = Math.max(0, Math.floor((box.minY - pad) * inv));
+  const ex = Math.min(w, Math.ceil((box.maxX + pad) * inv));
+  const ey = Math.min(h, Math.ceil((box.maxY + pad) * inv));
 
   const cw = ex - sx;
   const ch = ey - sy;
@@ -1271,7 +1305,15 @@ function regionForProduct(product) {
     return GARMENT_REGIONS.dresses;
   }
 
-  if (category.includes("outer")) {
+  // FIX (sleeve-to-wrist): jackets / blazers / coats keep their long sleeves
+  // by using the outerwear region (ends at wrist height 0.58) even when the
+  // catalog files them under tops; plain shirts keep the hip-length region.
+  if (
+    category.includes("outer") ||
+    /blazer|jacket|coat|suit|parka|hoodie|cardigan|windbreaker|trench/.test(
+      name
+    )
+  ) {
     return GARMENT_REGIONS.outerwear;
   }
 
@@ -1285,14 +1327,16 @@ function regionForProduct(product) {
 }
 
 // Builds a WIDTHxHEIGHT layer canvas with the real garment image stretched
-// onto its anatomical region, ready for renderLayer(). Returns null when
-// the image is not ready yet (caller falls back to catalogIllustration).
+// onto its anatomical region and clipped to the dilated body silhouette,
+// ready for renderLayer(). Returns null when the image is not ready yet
+// (caller falls back to catalogIllustration).
 export function garmentImageLayer(
   product,
   bounds,
   view,
   width,
-  height
+  height,
+  bodyMaskSource = null
 ) {
   if (!product || !bounds) return null;
 
@@ -1310,13 +1354,6 @@ export function garmentImageLayer(
   const X = (p) => bounds.cx + bounds.width * p;
   const Y = (p) => bounds.top + bounds.height * p;
 
-  const rx = X(region.x0);
-  const rw = X(region.x1) - rx;
-  const ry = Y(region.y0);
-  const rh = Y(region.y1) - ry;
-
-  if (rw <= 0 || rh <= 0) return null;
-
   const canvas = newCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
@@ -1325,9 +1362,69 @@ export function garmentImageLayer(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // Stretch-to-region: the garment conforms to the wearer's body region,
-  // exactly like the polygon fallbacks do.
-  ctx.drawImage(cropped, rx, ry, rw, rh);
+  const ry = Y(region.y0);
+  const rh = Y(region.y1) - ry;
+
+  if (rh <= 0) return null;
+
+  const isFootwear = region === GARMENT_REGIONS.footwear;
+
+  if (isFootwear) {
+    // FIX (footwear fit): a wide crop is a pair side-by-side -> stretch
+    // once across both feet; a tall crop is a single shoe -> stamp it on
+    // each foot separately. The silhouette clip below then shapes each
+    // stamp to the matching foot.
+    const aspect =
+      cropped.width / Math.max(1, cropped.height);
+
+    if (aspect >= 1.1) {
+      const rx = X(region.x0);
+      const rw = X(region.x1) - rx;
+      ctx.drawImage(cropped, rx, ry, rw, rh);
+    } else {
+      const leftX = X(-0.26);
+      const leftW = X(-0.03) - leftX;
+      const rightX = X(0.03);
+      const rightW = X(0.26) - rightX;
+
+      ctx.drawImage(cropped, leftX, ry, leftW, rh);
+      ctx.drawImage(cropped, rightX, ry, rightW, rh);
+    }
+  } else {
+    const rx = X(region.x0);
+    const rw = X(region.x1) - rx;
+
+    if (rw <= 0) return null;
+
+    // Stretch-to-region: the garment conforms to the wearer's body region,
+    // exactly like the polygon fallbacks do.
+    ctx.drawImage(cropped, rx, ry, rw, rh);
+  }
+
+  // FIX (perfect fit): clip the garment to the dilated body silhouette so
+  // it hugs arms / legs / feet instead of floating as a rectangle.
+  if (bodyMaskSource) {
+    const mask = newCanvas(width, height);
+    const mctx = mask.getContext("2d");
+
+    if (mctx) {
+      const s = MASK_DILATION;
+      const cx = bounds.cx;
+      const cy = bounds.top + bounds.height / 2;
+
+      mctx.drawImage(
+        bodyMaskSource,
+        cx - cx * s,
+        cy - cy * s,
+        width * s,
+        height * s
+      );
+
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(mask, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+    }
+  }
 
   return canvas;
 }

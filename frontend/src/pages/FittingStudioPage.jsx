@@ -574,11 +574,36 @@ function ControlGroup({ label, value, options, onChange }) {
   );
 }
 
-// FIX (thumbnail "perfect fit"): rembg-processed garment PNGs keep the full
-// source canvas with transparent margins (e.g. jeans occupying only the
-// bottom slice), so objectFit:cover pinned them to one edge. This computes
-// the alpha bounding box on a downscaled probe canvas and returns a cropped
-// data URL, so the garment itself fills and centers in the container.
+// FIX (thumbnail "perfect fit"): rembg PNGs keep the source canvas with
+// transparent (or semi-transparent hazy) margins. This computes the alpha
+// bounding box on a downscaled probe with MULTI-PASS thresholds
+// (128 -> 64 -> 32 -> 12, first hit wins) and returns a cropped data URL,
+// so the garment itself fills and centers in the container — matching the
+// canvas try-on crop in canvasWarp2D.js exactly.
+const CROP_THRESHOLD_STEPS = [128, 64, 32, 12];
+
+function alphaBBox(data, w, h, threshold) {
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (data[(y * w + x) * 4 + 3] > threshold) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  return { minX, minY, maxX, maxY };
+}
+
 function computeCropDataURL(img) {
   const w = img.naturalWidth;
   const h = img.naturalHeight;
@@ -600,31 +625,22 @@ function computeCropDataURL(img) {
 
   const data = pctx.getImageData(0, 0, sw, sh).data;
 
-  let minX = sw;
-  let minY = sh;
-  let maxX = -1;
-  let maxY = -1;
+  let box = null;
 
-  for (let y = 0; y < sh; y += 1) {
-    for (let x = 0; x < sw; x += 1) {
-      if (data[(y * sw + x) * 4 + 3] > 8) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
+  for (const threshold of CROP_THRESHOLD_STEPS) {
+    box = alphaBBox(data, sw, sh, threshold);
+    if (box) break;
   }
 
-  if (maxX < minX || maxY < minY) return null;
+  if (!box) return null;
 
   const inv = 1 / scale;
-  const pad = Math.round(Math.max(2, (maxX - minX) * 0.05));
+  const pad = Math.round(Math.max(2, (box.maxX - box.minX) * 0.05));
 
-  const sx = Math.max(0, Math.floor((minX - pad) * inv));
-  const sy = Math.max(0, Math.floor((minY - pad) * inv));
-  const ex = Math.min(w, Math.ceil((maxX + pad) * inv));
-  const ey = Math.min(h, Math.ceil((maxY + pad) * inv));
+  const sx = Math.max(0, Math.floor((box.minX - pad) * inv));
+  const sy = Math.max(0, Math.floor((box.minY - pad) * inv));
+  const ex = Math.min(w, Math.ceil((box.maxX + pad) * inv));
+  const ey = Math.min(h, Math.ceil((box.maxY + pad) * inv));
 
   const cw = ex - sx;
   const ch = ey - sy;
@@ -794,7 +810,7 @@ function MatchReasonsCard({
         setResult({
           status: "error",
           rows: [],
-          context,
+          context: "",
         });
       }
     }
@@ -1124,6 +1140,34 @@ function FittingStudioPage({
     fitLimits.hasWeightMaximum &&
     Number(avatar.weight) >= fitLimits.weight.max;
 
+  // FIX (slider request storm): the ranking endpoint only consumes
+  // undertone + height_cm + body_shape (see avatarQueryParams in api.js).
+  // Key the fetch on exactly those (height rounded to whole cm) so dragging
+  // Height/Body Build/skin/weight no longer fires a request per pixel.
+  const recommendationKey = useMemo(
+    () =>
+      JSON.stringify({
+        undertone: String(avatar.undertone || "").toLowerCase(),
+        heightCm: Math.round(Number(avatar.height) || 0),
+        bodyShape: [
+          avatar.shoulder,
+          avatar.waist,
+          avatar.hip,
+          avatar.thigh,
+        ]
+          .map((value) => String(value || "").toLowerCase())
+          .join("|"),
+      }),
+    [
+      avatar.undertone,
+      avatar.height,
+      avatar.shoulder,
+      avatar.waist,
+      avatar.hip,
+      avatar.thigh,
+    ]
+  );
+
   useEffect(() => {
     sessionStorage.setItem(
       sessionKey(isGuest),
@@ -1142,46 +1186,51 @@ function FittingStudioPage({
     isGuest,
   ]);
 
-  // Fetch ranked recommendations whenever the avatar changes
+  // Fetch ranked recommendations, debounced: one request per drag-pause
+  // (350 ms) instead of one per slider tick; superseded requests abort.
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
 
-    async function loadRecommendations() {
-      try {
-        const ranked = await fetchRankedRecommendations(
-          avatar,
-          50,
-          controller.signal
-        );
-
-        if (active) {
-          setCatalogRecommendations(
-            ranked.map(normalizeStudioItem).filter(Boolean)
+    const timer = window.setTimeout(() => {
+      async function loadRecommendations() {
+        try {
+          const ranked = await fetchRankedRecommendations(
+            avatar,
+            50,
+            controller.signal
           );
-          setCurrentPage(1);
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') return;
-        console.warn(
-          "Unable to load ranked recommendations:",
-          error
-        );
-      } finally {
-        if (active) {
-          setCatalogLoading(false);
+
+          if (active) {
+            setCatalogRecommendations(
+              ranked.map(normalizeStudioItem).filter(Boolean)
+            );
+            setCurrentPage(1);
+          }
+        } catch (error) {
+          if (error.name === "AbortError") return;
+          console.warn(
+            "Unable to load ranked recommendations (is Django running on 127.0.0.1:8000?):",
+            error
+          );
+        } finally {
+          if (active) {
+            setCatalogLoading(false);
+          }
         }
       }
-    }
 
-    setCatalogLoading(true);
-    loadRecommendations();
+      setCatalogLoading(true);
+      loadRecommendations();
+    }, 350);
 
     return () => {
       active = false;
       controller.abort();
+      window.clearTimeout(timer);
     };
-  }, [avatar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendationKey]);
 
   // Reset pagination whenever the avatar size (the gate) changes.
   useEffect(() => {
@@ -1565,7 +1614,6 @@ function FittingStudioPage({
     });
   }
 
-  // FIX: restored the corrupted guard line (was "ifisGuest) {").
   function saveOutfit() {
     if (isGuest) {
       openRegistrationPopup();
