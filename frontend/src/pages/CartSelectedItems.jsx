@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import logo from "../assets/fitfusion-logo.svg";
-import { cartAPI, API_URL } from "../services/api";
+import { cartAPI, getCachedCart, API_URL } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CartSelectedItems.css";
 
+// Visual-only fallback shown when no equipped selection exists in storage. Size is a
+// fixed per-variant attribute (SRS FR-3.2/FR-4.1); there is no availableSizes list
+// because the cart cannot store a different size than the variant's (commerce/views.py:
+// CartItem = cart/item/quantity only). The card renders size read-only, matching the
+// studio equipped card and the catalog's fixed-variant add.
 const DEFAULT_ITEMS = [
   {
     id: "equipped-linen-shirt",
@@ -13,7 +19,6 @@ const DEFAULT_ITEMS = [
     color: "Beige",
     colorCode: "#e5d1aa",
     size: "M",
-    availableSizes: ["S", "M", "L", "XL"],
     price: 750,
   },
   {
@@ -24,7 +29,6 @@ const DEFAULT_ITEMS = [
     color: "Charcoal",
     colorCode: "#c9c0b4",
     size: "M",
-    availableSizes: ["S", "M", "L", "XL"],
     price: 1100,
   },
   {
@@ -35,7 +39,6 @@ const DEFAULT_ITEMS = [
     color: "White",
     colorCode: "#fffdf9",
     size: "7",
-    availableSizes: ["6", "7", "8", "9"],
     price: 1500,
   },
   {
@@ -46,16 +49,18 @@ const DEFAULT_ITEMS = [
     color: "Taupe",
     colorCode: "#8d8173",
     size: "M",
-    availableSizes: ["S", "M", "L", "XL"],
     price: 900,
   },
 ];
 
+// FIX (Defect B): carry the garment image through. The studio's continueToCart spreads
+// the normalized item (which includes `image`, stored root-relative by the studio's own
+// mediaUrl); we also accept the catalog detail aliases so a hydrated record works. The
+// mediaUrl() below re-prefixes a root-relative /media/... to the API origin, exactly as
+// the catalog page does (the proven pattern), so no studio change is required.
 function readEquippedItems() {
   try {
-    const storedValue = localStorage.getItem(
-      "fitfusion-selected-items",
-    );
+    const storedValue = localStorage.getItem("fitfusion-selected-items");
 
     if (!storedValue) {
       return DEFAULT_ITEMS;
@@ -74,16 +79,18 @@ function readEquippedItems() {
       seller:
         item.seller ||
         item.store ||
+        item.store_name ||
         "FitFusion Seller",
-      color: item.color || "Default",
+      color: item.color || item.selectedColor || "Default",
       colorCode: item.colorCode || "#c89a43",
-      size: item.size || "M",
-      availableSizes:
-        item.availableSizes ||
-        (item.category === "Footwear"
-          ? ["6", "7", "8", "9"]
-          : ["S", "M", "L", "XL"]),
+      size: item.size || "",
       price: Number(item.price) || 0,
+      image:
+        item.image ||
+        item.front_image ||
+        item.imageUrl ||
+        item.frontImageUrl ||
+        "",
     }));
   } catch {
     return DEFAULT_ITEMS;
@@ -98,10 +105,93 @@ function formatPrice(price) {
   }).format(Number(price) || 0);
 }
 
+// Prefixes API_URL so a root-relative /media/... stored by the studio resolves against
+// the backend origin (same helper shape as CatalogPage.jsx, which is proven to render).
 function mediaUrl(path) {
   if (!path) return null;
   if (String(path).startsWith("http")) return path;
   return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
+}
+
+// Server cart is the single source of truth (FR-6.1/6.2, KAN-69). The badge is the sum
+// of line quantities -- identical formula to SavedOutfitsPage / EditSavedOutfitPage, and
+// justified by commerce/views.py (CartItem stores cart/item/quantity; quantity is the unit).
+function computeCartCount(cart) {
+  const items = Array.isArray(cart?.items) ? cart.items : [];
+  return items.reduce(
+    (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
+    0,
+  );
+}
+
+// A cart line is keyed by a CatalogItem ObjectId (commerce/views.py add_item ->
+// AddToCartSerializer.PrimaryKeyRelatedField). The select-items ids arrive via
+// /api/recommendations/ -> normalizeStudioItem, which may surface the pk under a
+// different key/shape than /catalog/ does. We validate SYNCHRONOUSLY (24-hex) before
+// any fetch, so a contract mismatch fails with a clear, reload-proof message instead of
+// a silent 400 that a refresh would wipe.
+function isCatalogObjectId(value) {
+  return /^[0-9a-fA-F]{24}$/.test(String(value ?? ""));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+// Read the server cart with a FORCED fresh fetch (bypasses the in-memory GET cache) and
+// up to `attempts` tries. Two reasons this is the badge's correctness backbone:
+//   (1) CACHE: the mount effect memoizes a 'cart' snapshot; a plain cartAPI.get() after
+//       an add can return that stale pre-add value, which is exactly how the badge sticks
+//       BELOW the true total. getCachedCart(true) deletes the key first, so the read is
+//       always post-write truth -- the server number wins, never a cached floor.
+//   (2) TRANSIENCE: the local stack intermittently 503s on GridFS/Atlas hiccups (seen
+//       verbatim in the Django log: "GridFS unreachable while serving ... Service
+//       Unavailable"). Three attempts with backoff absorb those blips; if all fail the
+//       CALLER keeps the add-response floor rather than reverting to a stale 0, so a
+//       transient read can never silently zero-out a confirmed write (FR-6.2 / KAN-69).
+async function fetchCartFresh(attempts = 3) {
+  let lastError = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await getCachedCart(true);
+    } catch (error) {
+      lastError = error;
+      if (i < attempts - 1) await sleep(300 * (i + 1));
+    }
+  }
+  throw lastError;
+}
+
+/* FIX (Defect B): port the catalog's image pipeline (useAlphaCrop hole-repair + union
+   crop, mediaUrl origin-prefix, onError fallback) so each unique garment shows its real,
+   centred, transparent photo. The CSS glyph remains only as a no-image / load-failure
+   fallback -- exactly like CatalogPreview. */
+function EquippedPreview({ src, alt, colorCode }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  if (!src || failed) {
+    return (
+      <div
+        className="equipped-product-image"
+        style={{ "--product-color": colorCode }}
+        aria-hidden="true"
+      >
+        <div className="product-shape" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="equipped-product-image equipped-product-image--photo">
+      <img
+        src={cropped || src}
+        alt={alt}
+        className="equipped-product-photo"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
 }
 
 function CartSelectedItems() {
@@ -112,33 +202,45 @@ function CartSelectedItems() {
       ...item,
       selected: true,
       quantity: 1,
-      selectedSize:
-        item.size ||
-        item.availableSizes?.[0] ||
-        "",
     })),
   );
 
   const [notification, setNotification] = useState("");
   const [pageError, setPageError] = useState("");
   const [itemsAdded, setItemsAdded] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [isLoadingCart, setIsLoadingCart] = useState(true);
 
-  // Fetch cart count from database on mount
+  // Guard async state updates so navigating away mid-request never logs a
+  // set-state-on-unmounted warning (console hygiene).
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
+
+  // FIX (Defect A + the stuck-0/stale-on-load): read the badge from the real endpoint,
+  // FORCED fresh with retry, not the non-existent cartAPI.getCart and not a cached
+  // snapshot. A transient or stale mount read no longer leaves a misleading number on a
+  // non-empty cart. `active` guard prevents a StrictMode double-mount setting state after
+  // unmount.
   useEffect(() => {
+    let active = true;
+
     async function fetchCartCount() {
       try {
-        const data = await cartAPI.getCart();
-        const count = data.item_count || 0;
-        setCartCount(count);
+        const cart = await fetchCartFresh();
+        if (active) setCartCount(computeCartCount(cart));
       } catch (error) {
         console.error("Failed to load cart count:", error);
       } finally {
-        setIsLoadingCart(false);
+        if (active) setIsLoadingCart(false);
       }
     }
+
     fetchCartCount();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -203,22 +305,6 @@ function CartSelectedItems() {
     );
   }
 
-  function updateSize(itemId, selectedSize) {
-    setPageError("");
-    setItemsAdded(false);
-
-    setItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              selectedSize,
-            }
-          : item,
-      ),
-    );
-  }
-
   function decreaseQuantity(itemId) {
     setPageError("");
     setItemsAdded(false);
@@ -257,7 +343,17 @@ function CartSelectedItems() {
     );
   }
 
+  // FIX (the stuck badge): the badge is now driven by (a) the add responses as a
+  // confirmed-write floor and (b) a FORCED-fresh, retried server read that refines
+  // UPWARD. The previous revision's settle read could return a cached pre-add snapshot
+  // (the mount effect memoizes 'cart'), which is how the badge stuck below the true
+  // total; getCachedCart(true) eliminates that. add_item is incremental and
+  // non-transactional across lines, so Promise.allSettled keeps every committed line
+  // reflected even if one line fails, and partial/full failures speak (FR-6.2 / KAN-115 /
+  // SRS 4.4) instead of going silent. The cart line is keyed by the catalog variant
+  // (views.py), so size is NOT sent -- it is intrinsic to the variant and shown read-only.
   async function addSelectedItemsToCart() {
+    if (isAdding) return; // double-submit guard
     setPageError("");
 
     if (selectedItems.length === 0) {
@@ -267,50 +363,100 @@ function CartSelectedItems() {
       return;
     }
 
-    const invalidSizeItem = selectedItems.find(
-      (item) => !item.selectedSize,
-    );
-
-    if (invalidSizeItem) {
+    // Synchronous contract check (see isCatalogObjectId). Runs before any network call,
+    // so its error survives a reload -- unlike an async 400 that a refresh would wipe.
+    const badItems = selectedItems.filter((item) => !isCatalogObjectId(item.id));
+    if (badItems.length > 0) {
+      const detail = badItems
+        .map((item) => `${item.name} (id: ${String(item.id)})`)
+        .join(", ");
       setPageError(
-        `Select a valid size for ${invalidSizeItem.name}.`,
+        `Cannot add to cart: these items don't carry a valid catalog item id yet — ${detail}. ` +
+          `The cart keys each line by the catalog ObjectId, so the recommendation list ` +
+          `isn't returning the catalog id in the expected field.`,
       );
       return;
     }
 
-    const invalidQuantityItem = selectedItems.find(
-      (item) => item.quantity < 1,
-    );
-
-    if (invalidQuantityItem) {
-      setPageError(
-        `${invalidQuantityItem.name} must have a quantity of at least one.`,
-      );
-      return;
-    }
+    setIsAdding(true);
 
     try {
-      // Add each selected item to the database cart using catalog_item ID
-      const addPromises = selectedItems.map((selectedItem) =>
-        cartAPI.addToCart(selectedItem.id, selectedItem.quantity)
+      const results = await Promise.allSettled(
+        selectedItems.map((selectedItem) =>
+          cartAPI.add(selectedItem.id, selectedItem.quantity),
+        ),
       );
 
-      await Promise.all(addPromises);
+      if (!aliveRef.current) return;
 
-      // Update cart count from database
-      const cartData = await cartAPI.getCart();
-      setCartCount(cartData.item_count || 0);
+      const okCarts = results
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => r.value);
+      const failures = results
+        .map((r, i) =>
+          r.status === "rejected"
+            ? { item: selectedItems[i], reason: r.reason }
+            : null,
+        )
+        .filter(Boolean);
 
-      setItemsAdded(true);
-
-      setNotification(
-        `${totalQuantity} ${
-          totalQuantity === 1 ? "item was" : "items were"
-        } added to your cart.`,
+      // Confirmed-write floor from the add responses themselves (no extra GET needed).
+      const fromAdds = okCarts.reduce(
+        (maxCount, cart) => Math.max(maxCount, computeCartCount(cart)),
+        0,
       );
+
+      if (fromAdds > 0) {
+        setCartCount(fromAdds);
+        window.dispatchEvent(new Event("fitfusion-cart-updated"));
+      }
+
+      if (failures.length === 0) {
+        setItemsAdded(true);
+        setNotification(
+          `${totalQuantity} ${
+            totalQuantity === 1 ? "item was" : "items were"
+          } added to your cart.`,
+        );
+      } else {
+        const names = failures.map((f) => f.item.name).join(", ");
+        const reasonMsg = failures[0]?.reason?.message || "the request failed";
+        if (fromAdds > 0) {
+          setPageError(
+            `${fromAdds} of ${selectedItems.length} item(s) added. Could not add: ${names} (${reasonMsg}). Open the cart to confirm what landed.`,
+          );
+        } else {
+          setPageError(
+            `Could not add to cart: ${names} (${reasonMsg}).`,
+          );
+        }
+      }
+
+      // Authoritative refine: FORCED-fresh (never a cached pre-add snapshot), retried to
+      // absorb transient 503s, and applied UPWARD only so a confirmed write is never
+      // under-reported. On total failure we keep fromAdds (the real-response floor), not 0.
+      let settle = null;
+      try {
+        const settledCart = await fetchCartFresh();
+        const n = computeCartCount(settledCart);
+        if (Number.isFinite(n)) settle = n;
+      } catch {
+        settle = null;
+      }
+      if (aliveRef.current && settle !== null) {
+        setCartCount(Math.max(fromAdds, settle));
+      }
     } catch (error) {
+      // Safety net for anything outside the per-line adds (allSettled itself never
+      // rejects, so this is rare); surface it rather than leaving the badge stale.
       console.error("Failed to add items to cart:", error);
-      setPageError("Failed to add items to cart. Please try again.");
+      if (aliveRef.current) {
+        setPageError(
+          `${error?.message || "We couldn't add items to your cart."} Open the cart to confirm before retrying.`,
+        );
+      }
+    } finally {
+      setIsAdding(false);
     }
   }
 
@@ -455,55 +601,32 @@ function CartSelectedItems() {
                     {item.selected ? "✓" : ""}
                   </button>
 
-                  <div
-                    className="equipped-product-image"
-                    style={{
-                      "--product-color":
-                        item.colorCode,
-                    }}
-                    aria-hidden="true"
-                  >
-                    <div className="product-shape" />
-                  </div>
+                  {/* FIX (Defect B): real garment photo via the catalog pipeline,
+                      glyph retained only as the no-image / load-failure fallback. */}
+                  <EquippedPreview
+                    src={mediaUrl(item.image)}
+                    alt={item.name}
+                    colorCode={item.colorCode}
+                  />
 
                   <div className="equipped-product-information">
                     <h3>{item.name}</h3>
 
-                    <p>
-                      {item.seller} • {item.color}
-                    </p>
+                    <p>{item.seller}</p>
+
+                    {/* Read-only size, matching the studio equipped card and the
+                        catalog's fixed-variant add. The cart stores no size column
+                        (views.py), so a dropdown here could only misrepresent what
+                        is purchased. */}
+                    {(item.size || item.color) && (
+                      <small className="equipped-product-size">
+                        {item.size ? `Size ${item.size}` : ""}
+                        {item.size && item.color ? " • " : ""}
+                        {item.color || ""}
+                      </small>
+                    )}
 
                     <div className="product-controls">
-                      <label>
-                        <span>SIZE</span>
-
-                        <select
-                          value={item.selectedSize}
-                          disabled={!item.selected}
-                          onChange={(event) =>
-                            updateSize(
-                              item.id,
-                              event.target.value,
-                            )
-                          }
-                        >
-                          <option value="">
-                            Select
-                          </option>
-
-                          {item.availableSizes.map(
-                            (size) => (
-                              <option
-                                key={size}
-                                value={size}
-                              >
-                                {size}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-
                       <div className="quantity-field">
                         <span>QTY</span>
 
@@ -610,19 +733,24 @@ function CartSelectedItems() {
                   itemsAdded ? "items-added" : ""
                 }`}
                 type="button"
+                disabled={isAdding}
                 onClick={
-                  itemsAdded
-                    ? openCart
-                    : addSelectedItemsToCart
+                  isAdding
+                    ? undefined
+                    : itemsAdded
+                      ? openCart
+                      : addSelectedItemsToCart
                 }
               >
-                {itemsAdded
-                  ? "View Shopping Cart"
-                  : `Add ${totalQuantity} ${
-                      totalQuantity === 1
-                        ? "Item"
-                        : "Items"
-                    } to Cart`}
+                {isAdding
+                  ? "Adding…"
+                  : itemsAdded
+                    ? "View Shopping Cart"
+                    : `Add ${totalQuantity} ${
+                        totalQuantity === 1
+                          ? "Item"
+                          : "Items"
+                      } to Cart`}
               </button>
 
               <button
@@ -643,9 +771,9 @@ function CartSelectedItems() {
             <strong>Before adding your outfit</strong>
 
             <p>
-              Every selected product must have a valid size and a
-              quantity of at least one. Uncheck any garment you do
-              not want to purchase.
+              Every selected product is added at its listed size and the
+              quantity you set. Uncheck any garment you do not want to
+              purchase.
             </p>
           </section>
         </main>

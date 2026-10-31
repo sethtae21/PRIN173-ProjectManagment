@@ -64,6 +64,10 @@ function mediaUrl(path) {
   return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
 }
 
+// Legacy client mirror. RETAINED only for backward compatibility with any page that
+// still reads localStorage 'fitfusion-cart'; the badge itself is now server-derived
+// (KAN-69), so this no longer drives the UI count. A future pass that confirms every
+// reader is server-based can delete this and the mirror write in addToCart.
 function readCart() {
   try {
     const saved = localStorage.getItem("fitfusion-cart");
@@ -74,10 +78,14 @@ function readCart() {
   }
 }
 
-function getCartCount() {
-  return readCart().reduce(
-    (total, item) => total + Number(item.quantity || 1),
-    0
+// Server cart is the source of truth (FR-6.1/6.2). Badge = sum of line quantities, the
+// identical formula used by SavedOutfitsPage / EditSavedOutfitPage and justified by
+// commerce/views.py (CartItem stores cart/item/quantity; quantity is the unit count).
+function computeCartCount(cart) {
+  const items = Array.isArray(cart?.items) ? cart.items : [];
+  return items.reduce(
+    (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
+    0,
   );
 }
 
@@ -132,7 +140,7 @@ function CatalogPage({ isGuest = false }) {
   // Single "Filter By" control: price options sort the grid,
   // size options filter the grid, "all" shows everything unsorted.
   const [filterOption, setFilterOption] = useState("all");
-  const [cartCount, setCartCount] = useState(getCartCount());
+  const [cartCount, setCartCount] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState("");
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
@@ -198,15 +206,40 @@ function CatalogPage({ isGuest = false }) {
     setPickedIds(Array.isArray(queued) ? queued.map(String).filter(Boolean) : []);
   }, []);
 
+  // === badge from the SERVER (KAN-69), guest-guarded =======================
+  // FIX: the previous badge read a localStorage mirror, so it (a) disagreed with the
+  // server-truth pages (Saved Outfits / Edit / Select-Items) and (b) never updated when
+  // another page added to the cart. We now read /cart/ and re-read on the same event the
+  // other pages dispatch. GUEST GUARD is mandatory: /cart/ is IsAuthenticated, and an
+  // unguarded mount fetch by a guest would 401 -> silent-refresh fail -> clearSession +
+  // redirect to /login, bouncing every guest off /guest/catalog. The storage listener is
+  // kept so a cross-tab mirror write still triggers a server re-read (cross-tab sync),
+  // but the VALUE always comes from the server, never from localStorage.
   useEffect(() => {
-    const updateCount = () => setCartCount(getCartCount());
-    window.addEventListener("fitfusion-cart-updated", updateCount);
-    window.addEventListener("storage", updateCount);
+    if (guestMode) return undefined;
+
+    let active = true;
+
+    async function refreshCartCount() {
+      try {
+        const cart = await cartAPI.get();
+        if (active) setCartCount(computeCartCount(cart));
+      } catch {
+        if (active) setCartCount(0);
+      }
+    }
+
+    refreshCartCount();
+
+    window.addEventListener("fitfusion-cart-updated", refreshCartCount);
+    window.addEventListener("storage", refreshCartCount);
+
     return () => {
-      window.removeEventListener("fitfusion-cart-updated", updateCount);
-      window.removeEventListener("storage", updateCount);
+      active = false;
+      window.removeEventListener("fitfusion-cart-updated", refreshCartCount);
+      window.removeEventListener("storage", refreshCartCount);
     };
-  }, []);
+  }, [guestMode]);
 
   const filteredProducts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -304,14 +337,24 @@ function CatalogPage({ isGuest = false }) {
 
     try {
       // ✅ FIX: api.js exposes cartAPI.add(catalog_item, quantity) — there is
-      // no "addItem" method. The old call threw TypeError, so the server-side
-      // cart (POST /cart/add_item/, FR-6.2) was never updated and the badge
-      // stayed at 0.
-      await cartAPI.add(product.id, 1);
+      // no "addItem"/"getCart" method. The add returns the serialized cart, so the
+      // badge is set from server truth with no extra round-trip (single add, no
+      // concurrency here). The catalog is per-variant (FR-3.2/FR-4.1) and the cart
+      // line is keyed by the variant (views.py), so no size is sent -- the listing's
+      // size is intrinsic to product.id.
+      //
+      // NOTE (parse fix): the server response is `cart`; the legacy localStorage
+      // array is `mirror`. They MUST be distinct identifiers -- a prior draft
+      // declared `const cart` twice in this scope, which is a SyntaxError that
+      // broke the whole Vite build (App imports this module), not just the catalog.
+      const cart = await cartAPI.add(product.id, 1);
+      setCartCount(computeCartCount(cart));
 
-      const cart = readCart();
-      const existingIndex = cart.findIndex((item) => item.id === product.id);
-      const nextCart = [...cart];
+      // Legacy mirror retained for backward compatibility only (see readCart note);
+      // it no longer feeds the badge.
+      const mirror = readCart();
+      const existingIndex = mirror.findIndex((item) => item.id === product.id);
+      const nextCart = [...mirror];
 
       if (existingIndex >= 0) {
         nextCart[existingIndex] = {
@@ -334,7 +377,6 @@ function CatalogPage({ isGuest = false }) {
       }
 
       localStorage.setItem("fitfusion-cart", JSON.stringify(nextCart));
-      setCartCount(getCartCount());
       window.dispatchEvent(new Event("fitfusion-cart-updated"));
     } catch (error) {
       console.error("Failed to save cart item:", error);

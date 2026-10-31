@@ -683,3 +683,52 @@ button {
     flex-direction: column;
   }
 }
+
+/* ============================================================
+   GARMENT PHOTO + READ-ONLY SIZE (Defect B / UI-consistency pass)
+   APPENDED BLOCK ONLY -- no rule above is modified. The card now
+   renders the real, alpha-cropped, transparent garment through the
+   same useAlphaCrop + mediaUrl pipeline as CatalogPreview (the CSS
+   glyph .equipped-product-image / .product-shape above stays as the
+   no-image / load-failure fallback), and shows size as read-only
+   text matching the studio equipped card (the cart stores no size
+   column -- views.py -- so a dropdown could only misrepresent the
+   purchase). Placed after the media queries on purpose: the
+   responsive rules target the base .equipped-product-image, which
+   the photo element also carries, so the frame still shrinks
+   (92 -> 78 -> full) at each breakpoint and only the background/crop
+   differ via the higher-specificity --photo modifier. Tokens reuse
+   the gold/cream palette already declared in :root.
+   ============================================================ */
+
+.equipped-product-image--photo {
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(215, 175, 75, 0.18),
+      transparent 60%
+    ),
+    #f2e7d2;
+  overflow: hidden;
+}
+
+.equipped-product-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.1));
+  transition: transform 0.25s ease;
+}
+
+.equipped-product-card:hover .equipped-product-photo {
+  transform: scale(1.05);
+}
+
+.equipped-product-size {
+  display: block;
+  margin: 4px 0 0;
+  color: var(--select-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
