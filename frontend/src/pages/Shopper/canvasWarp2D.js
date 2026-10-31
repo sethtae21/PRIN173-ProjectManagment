@@ -14,6 +14,23 @@
  * IMPORTANT:
  * The whole avatar uses ONE continuous mesh.
  * Arms are never separated from shoulders.
+ *
+ * Try-on pipeline (deterministic 2D overlay — SRS FR-2.6/2.7, FR-5.x /
+ * KAN-67-68; charter: no ML, no cloth physics, no WebGL):
+ *   1. same-origin load + cache
+ *   2. largest-connected-component + hole-fill alpha crop (kills hanger /
+ *      tag / shadow / rembg-haze inflation of the bounding box)
+ *   3. category -> anatomical region (gender-aware; knitwear has its own
+ *      region with the collar at the shoulder line and the hem at the hip)
+ *   4. long-sleeve drape: a flat-lay whose sleeves lie HORIZONTALLY has a
+ *      long horizontal side-wing (>= 0.5 x hem width); such garments are
+ *      composited as torso + two 90-degree-rotated sleeve panels draped
+ *      down each arm from shoulder to wrist. Vertical-sleeve garments
+ *      (the blazer) and short-sleeve tees have narrow wings and keep the
+ *      proven plain stretch, so their fit is unchanged.
+ *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs)
+ *   6. shared lattice warp (garment deforms with the body)
+ * catalogIllustration() remains the fallback while loading / when missing.
  */
 
 export const GRID_COLS = 37;
@@ -446,7 +463,6 @@ export function makeLattice(
           0.08 * calfBand
         );
 
-    // FIX: Removed side-view multipliers
     const manualGrowth =
       shoulder * 0.055 * shoulderBand +
       waist * 0.07 * bellyBand +
@@ -497,14 +513,12 @@ export function makeLattice(
 
       const absX = Math.abs(nx);
 
-      // FIX: Removed side-view scaling
       const scale = 1 + growth;
 
       let dx =
         (sx - bounds.cx) *
         (scale - 1);
 
-      // FRONT / REAR BELLY AND HIP SHAPE
       const localBelly =
         positive *
           0.17 *
@@ -621,9 +635,7 @@ export function renderLayer(
       height
     ).data;
   } catch {
-    // FIX (SecurityError guard): a tainted layer (legacy cross-origin
-    // media URL) must never abort the whole avatar render. Draw it
-    // unwarped instead of failing.
+    // Tainted layer must never abort the whole avatar render.
     ctx.drawImage(source, 0, 0);
     return;
   }
@@ -1093,37 +1105,15 @@ export function tintBody(
 
 // ==========================================
 // GARMENT IMAGE LAYERS (REAL CATALOG IMAGES)
-//
-// Pipeline (the MVP's designated "perfect fit" tool per scope FR-5.x /
-// KAN-67/68 — deterministic 2D overlay, no ML try-on):
-//   1. load garment PNG same-origin (proxy) and cache it
-//   2. MULTI-PASS alpha crop: thresholds 128 -> 64 -> 32 -> 12, first
-//      pass that finds a bounding box wins (defeats rembg semi-transparent
-//      veils of any strength, keeps genuinely sheer fabrics)
-//   3. stretch the crop onto the category's anatomical region
-//      (jacket cuffs reach wrist height; waistbands start at the waist)
-//   4. alpha-clip to the dilated body silhouette so cloth hugs arms,
-//      legs and feet instead of floating as rectangles
-//   5. renderLayer() warps the result with the body lattice
-// catalogIllustration() remains the fallback while loading / when missing.
 // ==========================================
 
 const garmentImageCache = new Map();
 const garmentCropCache = new Map();
 
-// FIX (hazy rembg backgrounds): descending alpha thresholds for the garment
-// bounding-box crop. A single low threshold kept strong semi-transparent
-// veils inside the box, shrinking the visible garment to a slice of its
-// body region (denim only on the lower legs). The first pass that finds
-// opaque pixels wins; clean photos crop at 128.
 const CROP_THRESHOLD_STEPS = [128, 64, 32, 12];
 
-// FIX (SecurityError taint): force SAME-ORIGIN media loads. Items persisted
-// in sessionStorage / saved outfits / pending-item flow may still carry
-// absolute http://127.0.0.1:8000/media/... URLs from before the dev proxy
-// existed; drawing cross-origin images taints the layer canvas and makes
-// renderLayer()'s getImageData throw. Stripping the origin routes every
-// load through the same-origin proxy (Vite dev proxy / staging proxy).
+const MIN_COMPONENT_AREA_RATIO = 0.02;
+
 function sameOriginMedia(src) {
   const raw = String(src || "");
 
@@ -1142,47 +1132,65 @@ function sameOriginMedia(src) {
   return raw;
 }
 
-// Anatomical regions in bounds-relative coordinates (same system as the
-// polygon illustrations): X(p) = cx + width*p, Y(p) = top + height*p.
-// RETUNED per feedback: collars sit at the neck line (0.135-0.140); the
-// outerwear region now ends at 0.58 = wrist height so jacket/blazer cuffs
-// are visible on the wrists with the hem on the upper thigh; plain tops
-// keep a hip-length hem (0.50); bottoms run waist (0.44) to ankle (0.92).
-// The silhouette clip trims all overscan, so wide x-ranges are safe.
+// Gender- + category-aware anatomical regions, in bounds-relative
+// coordinates: X(p) = cx + width*p, Y(p) = top + height*p.
+//
+// FIX (crewneck "up a little bit more"): knit collar/shoulder line raised
+// again (male y0 0.165 -> 0.145, female 0.15 -> 0.135) so the deltoid caps
+// and upper chest are covered; hem held at the hip so the stomach stays
+// covered and tucks under the jeans waistband. Outerwear (blazers/coats)
+// keeps its proven region and is NEVER draped (see DRAPEABLE).
 const GARMENT_REGIONS = {
-  tops: { x0: -0.50, x1: 0.50, y0: 0.140, y1: 0.50 },
-  outerwear: { x0: -0.52, x1: 0.52, y0: 0.135, y1: 0.58 },
-  bottoms: { x0: -0.35, x1: 0.35, y0: 0.44, y1: 0.92 },
-  skirt: { x0: -0.40, x1: 0.40, y0: 0.44, y1: 0.74 },
-  dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.80 },
-  footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
+  male: {
+    tops: { x0: -0.50, x1: 0.50, y0: 0.140, y1: 0.50 },
+    knits: { x0: -0.46, x1: 0.46, y0: 0.145, y1: 0.495 },
+    outerwear: { x0: -0.52, x1: 0.52, y0: 0.135, y1: 0.58 },
+    bottoms: { x0: -0.35, x1: 0.35, y0: 0.44, y1: 0.92 },
+    skirt: { x0: -0.40, x1: 0.40, y0: 0.44, y1: 0.74 },
+    dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.80 },
+    footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
+  },
+  female: {
+    tops: { x0: -0.55, x1: 0.55, y0: 0.125, y1: 0.47 },
+    knits: { x0: -0.50, x1: 0.50, y0: 0.135, y1: 0.475 },
+    outerwear: { x0: -0.57, x1: 0.57, y0: 0.120, y1: 0.55 },
+    bottoms: { x0: -0.35, x1: 0.35, y0: 0.43, y1: 0.91 },
+    skirt: { x0: -0.40, x1: 0.40, y0: 0.43, y1: 0.72 },
+    dresses: { x0: -0.45, x1: 0.45, y0: 0.125, y1: 0.78 },
+    footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
+  },
 };
 
-// Silhouette clip overscan (cloth thickness over the skin outline).
-const MASK_DILATION = 1.04;
+// Only flat-lay knits and tees are eligible for the long-sleeve drape.
+// Outerwear (the blazer) and bottoms always use the proven plain stretch,
+// so the approved blazer/jeans fit cannot regress.
+const DRAPEABLE = new Set(["tops", "knits"]);
 
-function alphaBBox(data, w, h, threshold) {
-  let minX = w;
-  let minY = h;
-  let maxX = -1;
-  let maxY = -1;
+// Per-gender arm drape endpoints (fraction of body height): the shoulder
+// joint (sleeve cap, raised to meet the collar) down to the WRIST, plus the
+// horizontal arm strip the rotated sleeve is mapped to and the torso
+// half-width the torso panel is stretched to. The silhouette clip trims the
+// generous strip down to the real arm taper, so the cuff lands on the wrist.
+const ARM_DRAPE = {
+  male: {
+    top: 0.15,
+    bottom: 0.525,
+    outerX: -0.46,
+    innerX: -0.26,
+    torsoHalf: 0.30,
+  },
+  female: {
+    top: 0.14,
+    bottom: 0.505,
+    outerX: -0.48,
+    innerX: -0.27,
+    torsoHalf: 0.32,
+  },
+};
 
-  for (let y = 0; y < h; y += 1) {
-    for (let x = 0; x < w; x += 1) {
-      if (data[(y * w + x) * 4 + 3] > threshold) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
+const MASK_DILATION = 1.06;
 
-  if (maxX < minX || maxY < minY) return null;
-
-  return { minX, minY, maxX, maxY };
-}
-
+// ---- Largest-connected-component + hole-fill crop -----------------------
 function cropTransparentCanvas(image) {
   const w = image.naturalWidth || image.width;
   const h = image.naturalHeight || image.height;
@@ -1207,30 +1215,134 @@ function cropTransparentCanvas(image) {
   try {
     data = pctx.getImageData(0, 0, sw, sh).data;
   } catch {
-    // Tainted canvas (cross-origin media): keep the full image.
     return imageToCanvas(image, w, h);
   }
 
-  // MULTI-PASS: strongest threshold first so semi-transparent rembg veils
-  // never inflate the box; fall through for sheer/low-contrast garments.
-  let box = null;
+  const total = sw * sh;
+  const opaque = new Uint8Array(total);
+  const ALPHA = 96;
 
-  for (const threshold of CROP_THRESHOLD_STEPS) {
-    box = alphaBBox(data, sw, sh, threshold);
-    if (box) break;
+  for (let i = 0; i < total; i += 1) {
+    opaque[i] = data[i * 4 + 3] > ALPHA ? 1 : 0;
   }
 
-  if (!box) {
-    return imageToCanvas(image, w, h);
+  const outside = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let qHead = 0;
+  let qTail = 0;
+
+  const pushOutside = (idx) => {
+    if (!outside[idx] && !opaque[idx]) {
+      outside[idx] = 1;
+      queue[qTail++] = idx;
+    }
+  };
+
+  for (let x = 0; x < sw; x += 1) {
+    pushOutside(x);
+    pushOutside((sh - 1) * sw + x);
+  }
+  for (let y = 0; y < sh; y += 1) {
+    pushOutside(y * sw);
+    pushOutside(y * sw + sw - 1);
+  }
+
+  while (qHead < qTail) {
+    const idx = queue[qHead++];
+    const x = idx % sw;
+    const y = (idx - x) / sw;
+
+    if (x > 0) pushOutside(idx - 1);
+    if (x < sw - 1) pushOutside(idx + 1);
+    if (y > 0) pushOutside(idx - sw);
+    if (y < sh - 1) pushOutside(idx + sw);
+  }
+
+  const visited = new Uint8Array(total);
+  const stack = new Int32Array(total);
+  let bestArea = 0;
+  let bestBox = null;
+  const minArea = Math.max(16, total * MIN_COMPONENT_AREA_RATIO);
+
+  for (let start = 0; start < total; start += 1) {
+    if (visited[start] || !opaque[start] || outside[start]) continue;
+
+    let sp = 0;
+    stack[sp++] = start;
+    visited[start] = 1;
+
+    let area = 0;
+    let minX = sw;
+    let minY = sh;
+    let maxX = -1;
+    let maxY = -1;
+
+    while (sp > 0) {
+      const idx = stack[--sp];
+      const x = idx % sw;
+      const y = (idx - x) / sw;
+
+      area += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+
+      if (x > 0) {
+        const n = idx - 1;
+        if (!visited[n] && opaque[n] && !outside[n]) {
+          visited[n] = 1;
+          stack[sp++] = n;
+        }
+      }
+      if (x < sw - 1) {
+        const n = idx + 1;
+        if (!visited[n] && opaque[n] && !outside[n]) {
+          visited[n] = 1;
+          stack[sp++] = n;
+        }
+      }
+      if (y > 0) {
+        const n = idx - sw;
+        if (!visited[n] && opaque[n] && !outside[n]) {
+          visited[n] = 1;
+          stack[sp++] = n;
+        }
+      }
+      if (y < sw - 1 + 1 && y < sh - 1) {
+        const n = idx + sw;
+        if (!visited[n] && opaque[n] && !outside[n]) {
+          visited[n] = 1;
+          stack[sp++] = n;
+        }
+      }
+    }
+
+    if (area >= minArea && area > bestArea) {
+      bestArea = area;
+      bestBox = { minX, minY, maxX, maxY };
+    }
+  }
+
+  if (!bestBox) {
+    let box = null;
+    for (const threshold of CROP_THRESHOLD_STEPS) {
+      box = alphaBBox(data, sw, sh, threshold);
+      if (box) break;
+    }
+    if (!box) return imageToCanvas(image, w, h);
+    bestBox = box;
   }
 
   const inv = 1 / scale;
-  const pad = Math.round(Math.max(2, (box.maxX - box.minX) * 0.04));
+  const pad = Math.round(
+    Math.max(2, (bestBox.maxX - bestBox.minX) * 0.03)
+  );
 
-  const sx = Math.max(0, Math.floor((box.minX - pad) * inv));
-  const sy = Math.max(0, Math.floor((box.minY - pad) * inv));
-  const ex = Math.min(w, Math.ceil((box.maxX + pad) * inv));
-  const ey = Math.min(h, Math.ceil((box.maxY + pad) * inv));
+  const sx = Math.max(0, Math.floor((bestBox.minX - pad) * inv));
+  const sy = Math.max(0, Math.floor((bestBox.minY - pad) * inv));
+  const ex = Math.min(w, Math.ceil((bestBox.maxX + pad) * inv));
+  const ey = Math.min(h, Math.ceil((bestBox.maxY + pad) * inv));
 
   const cw = ex - sx;
   const ch = ey - sy;
@@ -1247,7 +1359,28 @@ function cropTransparentCanvas(image) {
   return out;
 }
 
-// Start (or reuse) loading + cropping of a garment image.
+function alphaBBox(data, w, h, threshold) {
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (data[(y * w + x) * 4 + 3] > threshold) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  return { minX, minY, maxX, maxY };
+}
+
 export function preloadGarmentImage(src) {
   if (!src) return Promise.resolve(null);
 
@@ -1281,13 +1414,12 @@ export function preloadGarmentImage(src) {
   return garmentImageCache.get(src);
 }
 
-// Synchronous peek: returns the cropped canvas if already loaded.
 export function peekCroppedGarment(src) {
   if (!src) return null;
   return garmentCropCache.get(src) || null;
 }
 
-function regionForProduct(product) {
+function regionKeyForProduct(product) {
   const category = String(
     product.category || "Tops"
   ).toLowerCase();
@@ -1298,45 +1430,228 @@ function regionForProduct(product) {
     category.includes("footwear") ||
     category.includes("shoe")
   ) {
-    return GARMENT_REGIONS.footwear;
+    return "footwear";
   }
 
   if (category.includes("dress")) {
-    return GARMENT_REGIONS.dresses;
+    return "dresses";
   }
 
-  // FIX (sleeve-to-wrist): jackets / blazers / coats keep their long sleeves
-  // by using the outerwear region (ends at wrist height 0.58) even when the
-  // catalog files them under tops; plain shirts keep the hip-length region.
+  if (
+    /sweater|knit|crewneck|pullover|jumper|turtleneck|mock[\s-]?neck|cardigan/.test(
+      name
+    ) ||
+    category.includes("knit")
+  ) {
+    return "knits";
+  }
+
   if (
     category.includes("outer") ||
-    /blazer|jacket|coat|suit|parka|hoodie|cardigan|windbreaker|trench/.test(
+    /blazer|jacket|coat|suit|parka|hoodie|windbreaker|trench/.test(
       name
     )
   ) {
-    return GARMENT_REGIONS.outerwear;
+    return "outerwear";
   }
 
   if (category.includes("bottom")) {
-    return name.includes("skirt")
-      ? GARMENT_REGIONS.skirt
-      : GARMENT_REGIONS.bottoms;
+    return name.includes("skirt") ? "skirt" : "bottoms";
   }
 
-  return GARMENT_REGIONS.tops;
+  return "tops";
 }
 
-// Builds a WIDTHxHEIGHT layer canvas with the real garment image stretched
-// onto its anatomical region and clipped to the dilated body silhouette,
-// ready for renderLayer(). Returns null when the image is not ready yet
-// (caller falls back to catalogIllustration).
+function regionForProduct(product, gender = "male") {
+  const table =
+    String(gender).toLowerCase() === "female"
+      ? GARMENT_REGIONS.female
+      : GARMENT_REGIONS.male;
+
+  return table[regionKeyForProduct(product)];
+}
+
+// ---- Long-sleeve (horizontal-sleeve) detector --------------------------
+// Orientation-agnostic: the TRUE torso width is the median opaque width of
+// the HEM band (bottom 22%, never touched by sleeves). The centre x is the
+// hem-band median centre. We then scan the upper band for opaque pixels that
+// sit outside the torso column ("side wings"). A sleeve laid HORIZONTALLY
+// produces a wing whose HORIZONTAL extent (sleeve length) is long
+// (>= 0.5 x torso width); a vertical sleeve (the blazer) or a short tee cap
+// produces only a narrow wing (sleeve diameter / cap length). So a long wing
+// uniquely identifies a flat-lay long-sleeve garment that must be draped;
+// anything else returns null and keeps the proven plain stretch.
+function analyzeTShape(cropped) {
+  const cw = cropped.width;
+  const ch = cropped.height;
+
+  if (!cw || !ch) return null;
+
+  const cctx = cropped.getContext("2d", {
+    willReadFrequently: true,
+  });
+
+  if (!cctx) return null;
+
+  let data;
+
+  try {
+    data = cctx.getImageData(0, 0, cw, ch).data;
+  } catch {
+    return null;
+  }
+
+  const ALPHA = 96;
+  const rowMin = new Int32Array(ch).fill(cw);
+  const rowMax = new Int32Array(ch).fill(-1);
+  const rowCnt = new Int32Array(ch);
+
+  for (let y = 0; y < ch; y += 1) {
+    for (let x = 0; x < cw; x += 1) {
+      if (data[(y * cw + x) * 4 + 3] > ALPHA) {
+        if (x < rowMin[y]) rowMin[y] = x;
+        if (x > rowMax[y]) rowMax[y] = x;
+        rowCnt[y] += 1;
+      }
+    }
+  }
+
+  let top = -1;
+  let bottom = -1;
+  for (let y = 0; y < ch; y += 1) {
+    if (rowCnt[y] > 0) {
+      if (top < 0) top = y;
+      bottom = y;
+    }
+  }
+
+  if (top < 0 || bottom <= top) return null;
+
+  const H = bottom - top + 1;
+
+  // Hem band -> true torso width + centre.
+  const hemStart = top + Math.round(H * 0.78);
+  const hemWidths = [];
+  const hemCentres = [];
+  for (let y = hemStart; y <= bottom; y += 1) {
+    if (rowCnt[y] > 0) {
+      hemWidths.push(rowMax[y] - rowMin[y] + 1);
+      hemCentres.push((rowMin[y] + rowMax[y]) / 2);
+    }
+  }
+
+  if (!hemWidths.length) return null;
+
+  hemWidths.sort((a, b) => a - b);
+  hemCentres.sort((a, b) => a - b);
+  const torsoW = hemWidths[Math.floor(hemWidths.length / 2)] || 0;
+  const cx = hemCentres[Math.floor(hemCentres.length / 2)] || cw / 2;
+
+  if (torsoW <= 2) return null;
+
+  const halfTorso = torsoW / 2;
+  const margin = Math.max(2, Math.round(torsoW * 0.06));
+
+  // Upper band -> side wings (pixels outside the torso column).
+  const upperEnd = top + Math.round(H * 0.66);
+  let lMinX = cw;
+  let lMaxX = -1;
+  let rMinX = cw;
+  let rMaxX = -1;
+  let sTop = -1;
+  let sBottom = -1;
+
+  for (let y = top; y <= upperEnd; y += 1) {
+    if (rowCnt[y] <= 0) continue;
+    if (sTop < 0) sTop = y;
+    sBottom = y;
+
+    for (let x = rowMin[y]; x <= rowMax[y]; x += 1) {
+      if (data[(y * cw + x) * 4 + 3] <= ALPHA) continue;
+      if (x < cx - halfTorso - margin) {
+        if (x < lMinX) lMinX = x;
+        if (x > lMaxX) lMaxX = x;
+      } else if (x > cx + halfTorso + margin) {
+        if (x < rMinX) rMinX = x;
+        if (x > rMaxX) rMaxX = x;
+      }
+    }
+  }
+
+  const leftWing =
+    lMaxX >= lMinX
+      ? { x0: lMinX, x1: lMaxX, y0: sTop, y1: sBottom }
+      : null;
+  const rightWing =
+    rMaxX >= rMinX
+      ? { x0: rMinX, x1: rMaxX, y0: sTop, y1: sBottom }
+      : null;
+
+  const wingLenL = leftWing ? leftWing.x1 - leftWing.x0 : 0;
+  const wingLenR = rightWing ? rightWing.x1 - rightWing.x0 : 0;
+  const longest = Math.max(wingLenL, wingLenR);
+
+  // Long horizontal wing => flat-lay long sleeve => drape. Otherwise the
+  // sleeves are vertical (blazer) or short (tee) => plain stretch.
+  const LONG_WING_RATIO = 0.5;
+  if (longest < torsoW * LONG_WING_RATIO || longest < 8) {
+    return null;
+  }
+
+  return {
+    torso: {
+      x0: Math.max(0, Math.round(cx - halfTorso)),
+      x1: Math.min(cw - 1, Math.round(cx + halfTorso)),
+      y0: top,
+      y1: bottom,
+    },
+    leftWing,
+    rightWing,
+  };
+}
+
+// Draw one photo-space rectangle, rotated 90 degrees, into a body-space
+// vertical strip. After rotate(+-PI/2) the LOCAL width becomes the GLOBAL
+// vertical extent and the LOCAL height the GLOBAL horizontal extent, so
+// callers pass (verticalLength = arm span, horizontalThickness = arm width).
+function drawRotatedPanel(
+  ctx,
+  img,
+  rect,
+  centerX,
+  centerY,
+  verticalLength,
+  horizontalThickness,
+  angle
+) {
+  const sw = Math.max(1, rect.x1 - rect.x0);
+  const sh = Math.max(1, rect.y1 - rect.y0);
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(angle);
+  ctx.drawImage(
+    img,
+    rect.x0,
+    rect.y0,
+    sw,
+    sh,
+    -verticalLength / 2,
+    -horizontalThickness / 2,
+    verticalLength,
+    horizontalThickness
+  );
+  ctx.restore();
+}
+
 export function garmentImageLayer(
   product,
   bounds,
   view,
   width,
   height,
-  bodyMaskSource = null
+  bodyMaskSource = null,
+  gender = "male"
 ) {
   if (!product || !bounds) return null;
 
@@ -1349,7 +1664,10 @@ export function garmentImageLayer(
 
   if (!cropped) return null;
 
-  const region = regionForProduct(product);
+  const regionKey = regionKeyForProduct(product);
+  const region = regionForProduct(product, gender);
+
+  if (!region) return null;
 
   const X = (p) => bounds.cx + bounds.width * p;
   const Y = (p) => bounds.top + bounds.height * p;
@@ -1367,42 +1685,119 @@ export function garmentImageLayer(
 
   if (rh <= 0) return null;
 
-  const isFootwear = region === GARMENT_REGIONS.footwear;
+  try {
+    if (regionKey === "footwear") {
+      const aspect =
+        cropped.width / Math.max(1, cropped.height);
 
-  if (isFootwear) {
-    // FIX (footwear fit): a wide crop is a pair side-by-side -> stretch
-    // once across both feet; a tall crop is a single shoe -> stamp it on
-    // each foot separately. The silhouette clip below then shapes each
-    // stamp to the matching foot.
-    const aspect =
-      cropped.width / Math.max(1, cropped.height);
+      if (aspect >= 1.1) {
+        const rx = X(region.x0);
+        const rw = X(region.x1) - rx;
+        ctx.drawImage(cropped, rx, ry, rw, rh);
+      } else {
+        const leftX = X(-0.26);
+        const leftW = X(-0.03) - leftX;
+        const rightX = X(0.03);
+        const rightW = X(0.26) - rightX;
 
-    if (aspect >= 1.1) {
+        ctx.drawImage(cropped, leftX, ry, leftW, rh);
+        ctx.drawImage(cropped, rightX, ry, rightW, rh);
+      }
+    } else if (DRAPEABLE.has(regionKey)) {
+      // Long-sleeve flat-lay knits/tees: torso panel + two rotated sleeve
+      // wings draped shoulder->wrist. Vertical-sleeve / short-sleeve
+      // garments (analyzeTShape -> null) use the plain stretch below.
+      const shape = analyzeTShape(cropped);
+
+      if (shape) {
+        const arm =
+          String(gender).toLowerCase() === "female"
+            ? ARM_DRAPE.female
+            : ARM_DRAPE.male;
+
+        // Torso panel (full garment height, torso column width).
+        const torsoX0 = X(-arm.torsoHalf);
+        const torsoX1 = X(arm.torsoHalf);
+        const torsoY0 = Y(region.y0);
+        const torsoY1 = Y(region.y1);
+
+        ctx.drawImage(
+          cropped,
+          shape.torso.x0,
+          shape.torso.y0,
+          shape.torso.x1 - shape.torso.x0,
+          shape.torso.y1 - shape.torso.y0,
+          torsoX0,
+          torsoY0,
+          torsoX1 - torsoX0,
+          torsoY1 - torsoY0
+        );
+
+        // Arm strips: shoulder joint -> wrist.
+        const armTop = Y(arm.top);
+        const armBottom = Y(arm.bottom);
+        const armLen = armBottom - armTop;
+        const armCentreY = (armTop + armBottom) / 2;
+
+        const lOuter = X(arm.outerX);
+        const lInner = X(arm.innerX);
+        const armW = Math.abs(lInner - lOuter);
+        const lCentreX = (lOuter + lInner) / 2;
+
+        if (shape.leftWing) {
+          drawRotatedPanel(
+            ctx,
+            cropped,
+            shape.leftWing,
+            lCentreX,
+            armCentreY,
+            armLen,
+            armW,
+            Math.PI / 2
+          );
+        }
+
+        const rInner = X(-arm.innerX);
+        const rOuter = X(-arm.outerX);
+        const rCentreX = (rInner + rOuter) / 2;
+
+        if (shape.rightWing) {
+          drawRotatedPanel(
+            ctx,
+            cropped,
+            shape.rightWing,
+            rCentreX,
+            armCentreY,
+            armLen,
+            armW,
+            -Math.PI / 2
+          );
+        }
+      } else {
+        const rx = X(region.x0);
+        const rw = X(region.x1) - rx;
+
+        if (rw <= 0) return null;
+
+        ctx.drawImage(cropped, rx, ry, rw, rh);
+      }
+    } else {
       const rx = X(region.x0);
       const rw = X(region.x1) - rx;
-      ctx.drawImage(cropped, rx, ry, rw, rh);
-    } else {
-      const leftX = X(-0.26);
-      const leftW = X(-0.03) - leftX;
-      const rightX = X(0.03);
-      const rightW = X(0.26) - rightX;
 
-      ctx.drawImage(cropped, leftX, ry, leftW, rh);
-      ctx.drawImage(cropped, rightX, ry, rightW, rh);
+      if (rw <= 0) return null;
+
+      ctx.drawImage(cropped, rx, ry, rw, rh);
     }
-  } else {
+  } catch {
+    // Any drape/analysis failure must not lose the garment: fall back to a
+    // plain stretch of the whole crop into the region.
     const rx = X(region.x0);
     const rw = X(region.x1) - rx;
-
-    if (rw <= 0) return null;
-
-    // Stretch-to-region: the garment conforms to the wearer's body region,
-    // exactly like the polygon fallbacks do.
-    ctx.drawImage(cropped, rx, ry, rw, rh);
+    if (rw > 0) ctx.drawImage(cropped, rx, ry, rw, rh);
   }
 
-  // FIX (perfect fit): clip the garment to the dilated body silhouette so
-  // it hugs arms / legs / feet instead of floating as a rectangle.
+  // Silhouette clip (cloth hugs arms / legs / feet).
   if (bodyMaskSource) {
     const mask = newCanvas(width, height);
     const mctx = mask.getContext("2d");
@@ -1470,6 +1865,8 @@ export function catalogIllustration(
     red: "#ae554e",
     pink: "#d69ca5",
     green: "#788b68",
+    gray: "#9a9a9a",
+    grey: "#9a9a9a",
   };
 
   const color = String(
@@ -1532,10 +1929,10 @@ export function catalogIllustration(
     product.name || ""
   ).toLowerCase();
 
-  // FIX: Removed all Side-view branches. Only Front/Rear polygons remain.
   if (
     category.includes("top") ||
-    category.includes("outer")
+    category.includes("outer") ||
+    /sweater|knit|crewneck/.test(name)
   ) {
     poly([
       [-0.21, 0.21],

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   imageToCanvas,
@@ -22,34 +17,33 @@ const HEIGHT = 640;
 
 const imageCache = new Map();
 
-// ==========================================
-// LOAD BLENDER AVATAR IMAGE
-// ==========================================
+// FIX (dress on male): defensive render-side gate. Even if a dress-class
+// item reaches the canvas through a stale session or a saved outfit, it is
+// never handed to the warp pipeline on a male avatar. This does NOT modify
+// canvasWarp2D.js -- it only chooses which items to render -- so the
+// approved sweater / blazer / jeans fit is byte-for-byte unchanged.
+const FEMALE_ONLY_CATEGORY_PATTERN = /dress|gown|jumpsuit|romper|one-?piece/i;
+
+function isFemaleOnlyAvatarItem(item) {
+  if (!item) return false;
+  if (item.femaleOnlyCut === true) return true;
+  return (
+    FEMALE_ONLY_CATEGORY_PATTERN.test(String(item.rawCategory || "")) ||
+    FEMALE_ONLY_CATEGORY_PATTERN.test(String(item.category || ""))
+  );
+}
 
 function loadImage(path) {
   if (!imageCache.has(path)) {
-    const promise = new Promise(
-      (resolve, reject) => {
-        const image = new Image();
+    const promise = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () =>
+        reject(new Error(`Missing avatar image: ${path}`));
+      image.src = path;
+    });
 
-        image.onload = () =>
-          resolve(image);
-
-        image.onerror = () =>
-          reject(
-            new Error(
-              `Missing avatar image: ${path}`
-            )
-          );
-
-        image.src = path;
-      }
-    );
-
-    imageCache.set(
-      path,
-      promise
-    );
+    imageCache.set(path, promise);
 
     promise.catch(() => {
       imageCache.delete(path);
@@ -59,99 +53,38 @@ function loadImage(path) {
   return imageCache.get(path);
 }
 
-// ==========================================
-// STANDARD AVATAR PATHS
-// ==========================================
-
-function avatarPath(
-  gender,
-  view
-) {
+function avatarPath(gender, view) {
   const folder =
-    gender === "male"
-      ? "Male_Standard"
-      : "Female_Standard";
-
+    gender === "male" ? "Male_Standard" : "Female_Standard";
   return `/Avatars/${folder}/${folder}_${view}.png`;
 }
 
-// ==========================================
-// PREPARE BLENDER AVATAR
-// ==========================================
-
 function prepareAvatar(image) {
-  const preview = imageToCanvas(
-    image,
-    WIDTH,
-    HEIGHT
-  );
-
-  const bounds =
-    detectBodyBounds(preview);
+  const preview = imageToCanvas(image, WIDTH, HEIGHT);
+  const bounds = detectBodyBounds(preview);
 
   if (!bounds) {
     return preview;
   }
 
-  const sx =
-    (
-      bounds.left *
-      image.width
-    ) /
-    WIDTH;
+  const sx = (bounds.left * image.width) / WIDTH;
+  const sy = (bounds.top * image.height) / HEIGHT;
+  const sw = Math.max(1, (bounds.width * image.width) / WIDTH);
+  const sh = Math.max(1, (bounds.height * image.height) / HEIGHT);
 
-  const sy =
-    (
-      bounds.top *
-      image.height
-    ) /
-    HEIGHT;
-
-  const sw = Math.max(
-    1,
-    (
-      bounds.width *
-      image.width
-    ) /
-      WIDTH
-  );
-
-  const sh = Math.max(
-    1,
-    (
-      bounds.height *
-      image.height
-    ) /
-    HEIGHT
-  );
-
-  const targetHeight =
-    HEIGHT * 0.72;
-
+  const targetHeight = HEIGHT * 0.72;
   const targetWidth = Math.min(
-    WIDTH * 0.70,
+    WIDTH * 0.7,
     (sw / sh) * targetHeight
   );
+  const targetLeft = (WIDTH - targetWidth) / 2;
+  const targetTop = HEIGHT * 0.96 - targetHeight;
 
-  const targetLeft =
-    (
-      WIDTH -
-      targetWidth
-    ) /
-    2;
-
-  const targetTop =
-    HEIGHT * 0.96 -
-    targetHeight;
-
-  const canvas =
-    document.createElement("canvas");
-
+  const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
-  const ctx =
-    canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
 
   if (!ctx) {
     return preview;
@@ -175,55 +108,32 @@ function prepareAvatar(image) {
   return canvas;
 }
 
-// ==========================================
-// NORMALIZE CLOTHING CATEGORIES
-// ==========================================
-
 function normalizeItem(item) {
   if (!item) {
     return null;
   }
 
-  const category = String(
-    item.category || ""
-  ).toLowerCase();
+  const category = String(item.category || "").toLowerCase();
 
   const categories = {
     top: "Tops",
     tops: "Tops",
-
     bottom: "Bottoms",
     bottoms: "Bottoms",
-
     shoes: "Footwear",
     shoe: "Footwear",
     footwear: "Footwear",
-
     dress: "Dresses",
     dresses: "Dresses",
-
     outerwear: "Outerwear",
   };
 
   return {
     ...item,
-
-    category:
-      categories[category] ||
-      item.category,
-
-    colors:
-      item.colors ||
-      [
-        item.color ||
-          "Beige",
-      ],
+    category: categories[category] || item.category,
+    colors: item.colors || [item.color || "Beige"],
   };
 }
-
-// ==========================================
-// MAIN AVATAR COMPONENT
-// ==========================================
 
 export default function AvatarCanvas({
   avatar,
@@ -232,47 +142,20 @@ export default function AvatarCanvas({
 }) {
   const canvasRef = useRef(null);
 
-  const [
-    imageState,
-    setImageState,
-  ] = useState(null);
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  // FIX (try-on integration): bump when a real garment image finishes
-  // loading/cropping so the garments memo swaps the polygon fallback for
-  // the actual catalog image layer.
-  const [
-    garmentImageVersion,
-    setGarmentImageVersion,
-  ] = useState(0);
+  const [imageState, setImageState] = useState(null);
+  const [error, setError] = useState("");
+  const [garmentImageVersion, setGarmentImageVersion] = useState(0);
 
   const gender =
-    String(
-      avatar?.gender
-    ).toLowerCase() === "male"
-      ? "male"
-      : "female";
+    String(avatar?.gender).toLowerCase() === "male" ? "male" : "female";
 
-  const requestedView = String(
-    view
-  ).toLowerCase();
+  const requestedView = String(view).toLowerCase();
 
-  // FIX: Removed "side" from accepted views
-  const angle = [
-    "front",
-    "rear",
-  ].includes(requestedView)
+  const angle = ["front", "rear"].includes(requestedView)
     ? requestedView
     : "front";
 
-  const path = avatarPath(
-    gender,
-    angle
-  );
+  const path = avatarPath(gender, angle);
 
   useEffect(() => {
     let active = true;
@@ -283,23 +166,12 @@ export default function AvatarCanvas({
     loadImage(path)
       .then((image) => {
         if (!active) return;
-
-        setImageState({
-          image,
-          path,
-        });
+        setImageState({ image, path });
       })
       .catch((err) => {
         if (!active) return;
-
-        console.error(
-          "Avatar loading error:",
-          err
-        );
-
-        setError(
-          `Could not load avatar. Check public${path}`
-        );
+        console.error("Avatar loading error:", err);
+        setError(`Could not load avatar. Check public${path}`);
       });
 
     return () => {
@@ -308,64 +180,46 @@ export default function AvatarCanvas({
   }, [path]);
 
   const source = useMemo(() => {
-    if (!imageState?.image) {
-      return null;
-    }
-
-    return prepareAvatar(
-      imageState.image
-    );
+    if (!imageState?.image) return null;
+    return prepareAvatar(imageState.image);
   }, [imageState]);
 
   const bounds = useMemo(() => {
-    return detectBodyBounds(
-      source
-    );
+    return detectBodyBounds(source);
   }, [source]);
 
   const skin = useMemo(() => {
-    if (!source) {
-      return null;
-    }
-
+    if (!source) return null;
     return tintBody(
       source,
-      avatar?.skinTone ||
-        "Original",
-      avatar?.undertone ||
-        "Neutral"
+      avatar?.skinTone || "Original",
+      avatar?.undertone || "Neutral"
     );
-  }, [
-    source,
-    avatar?.skinTone,
-    avatar?.undertone,
-  ]);
+  }, [source, avatar?.skinTone, avatar?.undertone]);
 
-  // Equipped items in draw order (bottom under top under outerwear).
   const garmentItems = useMemo(() => {
-    const items =
-      equippedItems.dress
-        ? [
-            equippedItems.dress,
-            equippedItems.outerwear,
-            equippedItems.shoes,
-          ]
-        : [
-            equippedItems.bottom,
-            equippedItems.top,
-            equippedItems.outerwear,
-            equippedItems.shoes,
-          ];
+    const items = equippedItems.dress
+      ? [
+          equippedItems.dress,
+          equippedItems.outerwear,
+          equippedItems.shoes,
+        ]
+      : [
+          equippedItems.bottom,
+          equippedItems.top,
+          equippedItems.outerwear,
+          equippedItems.shoes,
+        ];
 
     return items
       .filter(Boolean)
       .map(normalizeItem)
-      .filter(Boolean);
-  }, [equippedItems]);
+      .filter(Boolean)
+      // FIX (dress on male): drop female-only cuts before they reach the
+      // warp pipeline when the avatar is male.
+      .filter((item) => !(gender === "male" && isFemaleOnlyAvatarItem(item)));
+  }, [equippedItems, gender]);
 
-  // FIX (try-on integration): preload + auto-crop real garment images in
-  // the background; each completion bumps the version so the layers swap
-  // from polygon fallback to the actual image.
   useEffect(() => {
     let active = true;
 
@@ -385,9 +239,7 @@ export default function AvatarCanvas({
       preloadGarmentImage(src)
         .then(() => {
           if (active) {
-            setGarmentImageVersion(
-              (version) => version + 1
-            );
+            setGarmentImageVersion((version) => version + 1);
           }
         })
         .catch(() => {
@@ -401,29 +253,21 @@ export default function AvatarCanvas({
   }, [garmentItems]);
 
   const garments = useMemo(() => {
-    if (!bounds) {
-      return [];
-    }
+    if (!bounds) return [];
 
     return garmentItems
-      .map((item) =>
-        // Real catalog image first (clipped to the body silhouette for a
-        // perfect fit); polygon illustration as fallback.
-        garmentImageLayer(
-          item,
-          bounds,
-          angle,
-          WIDTH,
-          HEIGHT,
-          source
-        ) ||
-        catalogIllustration(
-          item,
-          bounds,
-          angle,
-          WIDTH,
-          HEIGHT
-        )
+      .map(
+        (item) =>
+          garmentImageLayer(
+            item,
+            bounds,
+            angle,
+            WIDTH,
+            HEIGHT,
+            source,
+            gender
+          ) ||
+          catalogIllustration(item, bounds, angle, WIDTH, HEIGHT)
       )
       .filter(Boolean);
   }, [
@@ -431,147 +275,69 @@ export default function AvatarCanvas({
     bounds,
     angle,
     source,
+    gender,
     garmentImageVersion,
   ]);
 
   useEffect(() => {
-    const canvas =
-      canvasRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    if (!canvas) {
-      return;
-    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const ctx =
-      canvas.getContext("2d");
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    if (!ctx) {
-      return;
-    }
-
-    ctx.clearRect(
-      0,
-      0,
-      WIDTH,
-      HEIGHT
-    );
-
-    if (
-      !skin ||
-      !bounds
-    ) {
+    if (!skin || !bounds) {
       return;
     }
 
     let active = true;
 
-    const frame =
-      requestAnimationFrame(() => {
-        if (!active) return;
+    const frame = requestAnimationFrame(() => {
+      if (!active) return;
 
-        try {
-          const config = {
-            gender,
+      try {
+        const config = {
+          gender,
+          view: angle,
+          heightCm: Number(avatar?.height) || 164,
+          weightKg:
+            Number(avatar?.weight) || (gender === "male" ? 70 : 58),
+          shoulders: avatar?.shoulder || "Average",
+          waist: avatar?.waist || "Average",
+          hips: avatar?.hip || "Average",
+          thighs: avatar?.thigh || "Average",
+          cup: gender === "female" ? avatar?.cupSize || "B" : "B",
+          strength: 1,
+        };
 
-            view: angle,
+        const mesh = makeLattice(WIDTH, HEIGHT, bounds, config);
 
-            heightCm:
-              Number(
-                avatar?.height
-              ) || 164,
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
 
-            weightKg:
-              Number(
-                avatar?.weight
-              ) ||
-              (
-                gender === "male"
-                  ? 70
-                  : 58
-              ),
+        renderLayer(ctx, skin, mesh);
 
-            shoulders:
-              avatar?.shoulder ||
-              "Average",
+        garments.forEach((garment) => {
+          renderLayer(ctx, garment, mesh);
+        });
 
-            waist:
-              avatar?.waist ||
-              "Average",
-
-            hips:
-              avatar?.hip ||
-              "Average",
-
-            thighs:
-              avatar?.thigh ||
-              "Average",
-
-            cup:
-              gender === "female"
-                ? avatar?.cupSize ||
-                  "B"
-                : "B",
-
-            strength: 1,
-          };
-
-          const mesh = makeLattice(
-            WIDTH,
-            HEIGHT,
-            bounds,
-            config
-          );
-
-          ctx.clearRect(
-            0,
-            0,
-            WIDTH,
-            HEIGHT
-          );
-
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-
-          renderLayer(
-            ctx,
-            skin,
-            mesh
-          );
-
-          garments.forEach(
-            (garment) => {
-              renderLayer(
-                ctx,
-                garment,
-                mesh
-              );
-            }
-          );
-
-          if (active) {
-            setError("");
-          }
-        } catch (err) {
-          console.error(
-            "Avatar rendering error:",
-            err
-          );
-
-          if (active) {
-            setError(
-              err?.message ||
-                "Unable to render avatar."
-            );
-          }
+        if (active) {
+          setError("");
         }
-      });
+      } catch (err) {
+        console.error("Avatar rendering error:", err);
+        if (active) {
+          setError(err?.message || "Unable to render avatar.");
+        }
+      }
+    });
 
     return () => {
       active = false;
-
-      cancelAnimationFrame(
-        frame
-      );
+      cancelAnimationFrame(frame);
     };
   }, [
     skin,
@@ -579,7 +345,6 @@ export default function AvatarCanvas({
     garments,
     gender,
     angle,
-
     avatar?.height,
     avatar?.weight,
     avatar?.shoulder,
@@ -592,10 +357,7 @@ export default function AvatarCanvas({
   return (
     <div
       className="studio-canvas-wrapper"
-      style={{
-        width: "100%",
-        textAlign: "center",
-      }}
+      style={{ width: "100%", textAlign: "center" }}
     >
       <canvas
         ref={canvasRef}
@@ -606,30 +368,17 @@ export default function AvatarCanvas({
         aria-label={`${gender} avatar, ${angle} view`}
         style={{
           display: "block",
-
-          width:
-            "min(100%, 320px)",
-
+          width: "min(100%, 320px)",
           height: "auto",
-
-          aspectRatio:
-            "1 / 2",
-
-          margin:
-            "0 auto",
-
-          filter:
-            "drop-shadow(0 9px 7px rgba(63,43,30,0.15))",
+          aspectRatio: "1 / 2",
+          margin: "0 auto",
+          filter: "drop-shadow(0 9px 7px rgba(63,43,30,0.15))",
         }}
       />
 
       {!imageState && !error && (
         <small
-          style={{
-            display: "block",
-            color: "#857660",
-            marginTop: 8,
-          }}
+          style={{ display: "block", color: "#857660", marginTop: 8 }}
         >
           Loading avatar...
         </small>
@@ -638,11 +387,7 @@ export default function AvatarCanvas({
       {error && (
         <small
           role="alert"
-          style={{
-            display: "block",
-            color: "#b42318",
-            marginTop: 8,
-          }}
+          style={{ display: "block", color: "#b42318", marginTop: 8 }}
         >
           {error}
         </small>
