@@ -42,14 +42,11 @@ const MATCH_CATEGORIES = [
   { key: "styleOccasion", label: "Style / occasion match" },
 ];
 
-// FIX (dress on male avatar): one-piece DRESS-class cuts are female-only in
-// this catalog (SRS category list: tops/bottoms/dresses/outerwear/footwear).
-// We gate on the RAW CATEGORY token only -- never the product name (a
-// "dress shirt" is menswear) and never the backend gender tag (the approved
-// blazer is mis-tagged "Women" in seed data, so trusting it would hide the
-// very garments the user signed off on). Deterministic, no ML (charter
-// boundary preserved): the male avatar simply is not offered, cannot equip,
-// and never renders a dress-class item.
+// FIX (dress on male): one-piece DRESS-class cuts are female-only in this
+// catalog (SRS FR-3.1 category list: Tops/Bottoms/Dresses/Outerwear/Footwear).
+// Gate on the RAW CATEGORY token only -- never the product NAME (a "dress
+// shirt" is menswear) and never the backend gender tag (seed data mis-tags
+// approved menswear, e.g. the blazer, as "Women"). Deterministic, no ML.
 const FEMALE_ONLY_CATEGORY_PATTERN = /dress|gown|jumpsuit|romper|one-?piece/i;
 
 function isFemaleOnlyItem(item) {
@@ -58,13 +55,17 @@ function isFemaleOnlyItem(item) {
   return FEMALE_ONLY_CATEGORY_PATTERN.test(String(item.rawCategory || ""));
 }
 
+function normalizeGender(value) {
+  return String(value).toLowerCase() === "male" ? "Male" : "Female";
+}
+
 function avatarGenderAllowsItem(avatarGender, item) {
   if (normalizeGender(avatarGender) !== "Male") return true; // female: show all
   return !isFemaleOnlyItem(item);
 }
 
-// Strip any female-only cut already sitting in an equipped slot (e.g. a
-// dress restored from a pre-fix session) so it cannot paint on a male body.
+// Strip any female-only cut already sitting in an equipped slot (e.g. a dress
+// restored from a pre-fix session) so it cannot paint on a male body.
 function sanitizeEquipped(equipped, avatarGender) {
   if (
     !equipped ||
@@ -85,6 +86,34 @@ function sanitizeEquipped(equipped, avatarGender) {
   }
 
   return changed ? next : equipped;
+}
+
+// Surface the REAL server validation message (KAN-115 UAT feedback) instead of
+// a generic string, so a contract mismatch (e.g. a 400 keyed on `items`) is
+// visible to the user and to testers. The API layer throws an ApiError whose
+// .message is already the joined "field: reason | field: reason" form; we also
+// handle a raw .data object defensively.
+function extractApiError(error, fallback) {
+  const data = error?.data ?? error?.response?.data;
+
+  if (data && typeof data === "object") {
+    const parts = [];
+    for (const [field, value] of Object.entries(data)) {
+      if (Array.isArray(value)) {
+        parts.push(`${field}: ${value.join(", ")}`);
+      } else if (typeof value === "string") {
+        parts.push(`${field}: ${value}`);
+      }
+    }
+    if (parts.length) return parts.join(" | ");
+    if (typeof data.detail === "string") return data.detail;
+  }
+
+  if (typeof error?.message === "string" && error.message) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 function sessionKey(isGuest) {
@@ -166,9 +195,8 @@ function mediaUrl(path) {
 }
 
 // Normalize backend recommendation payload into the internal item structure.
-// FIX (dress on male): preserve the RAW category + a femaleOnlyCut flag so
-// the gender gate survives the category collapse (a dress would otherwise be
-// relabelled "top" and slip onto the male torso).
+// Preserve the RAW category + a femaleOnlyCut flag so the gender gate survives
+// the category collapse (a dress would otherwise be relabelled "top").
 function normalizeStudioItem(item) {
   if (!item || typeof item !== "object") return null;
 
@@ -234,8 +262,7 @@ function sizeRecordFor(item) {
     return (
       source.find(
         (entry) =>
-          String(entry?.size || entry?.label || "").toUpperCase() ===
-          size
+          String(entry?.size || entry?.label || "").toUpperCase() === size
       ) || null
     );
   }
@@ -261,9 +288,7 @@ function readRange(record, type, globalRange) {
   const unitCapitalized = type === "height" ? "Cm" : "Kg";
 
   const nested =
-    record?.[type] && typeof record[type] === "object"
-      ? record[type]
-      : {};
+    record?.[type] && typeof record[type] === "object" ? record[type] : {};
 
   const minimum = finiteNumber(
     record?.[`min_${type}`] ??
@@ -382,10 +407,6 @@ function readAuthState() {
   }
 }
 
-function normalizeGender(value) {
-  return String(value).toLowerCase() === "male" ? "Male" : "Female";
-}
-
 function readStoredGender(isGuest) {
   const storage = isGuest ? sessionStorage : localStorage;
   const genderKey = isGuest
@@ -421,18 +442,25 @@ function capitalizeChoice(value, fallback) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function round2(value) {
+// FIX (preset save 400 "A valid integer is required"): the deployed AvatarPreset
+// serializer validates height/weight as integers, while the UI collects decimal
+// cm (step 0.1) and the SRS data dictionary declares float height_cm/weight_kg.
+// Because these values drive a simulation-only 2D silhouette (SRS 3.2) and 0.1 cm
+// is sub-pixel on the canvas, we persist whole centimetres -- visually identical,
+// no migration, no risk to other backend callers. The live slider keeps decimals
+// for the session; only the stored preset snaps to the nearest cm on reload.
+function toWholeCm(value, fallback) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return null;
-  return Math.round(number * 100) / 100;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.round(number);
 }
 
 function toServerPreset(avatar, name, isFemale) {
   return {
     name,
     gender: choiceValue(avatar.gender),
-    height: round2(avatar.height) ?? 160,
-    weight: round2(avatar.weight) ?? 55,
+    height: toWholeCm(avatar.height, 160),
+    weight: toWholeCm(avatar.weight, 55),
     skin_tone: avatar.skinTone || "#dca77d",
     undertone: choiceValue(avatar.undertone),
     shoulder: choiceValue(avatar.shoulder),
@@ -770,10 +798,7 @@ function MatchReasonsCard({
     (currentResult.status === "loading" || currentResult.status === "idle");
 
   return (
-    <section
-      className="studio-match-card"
-      aria-labelledby="studio-match-heading"
-    >
+    <section className="studio-match-card" aria-labelledby="studio-match-heading">
       <div className="studio-match-heading">
         <span className="studio-match-icon" aria-hidden="true">
           ✧
@@ -951,8 +976,6 @@ function FittingStudioPage({ isGuest = false }) {
 
   const [activePanel, setActivePanel] = useState("customize");
 
-  // FIX (dress on male): sanitize the restored session so a dress equipped
-  // before this fix cannot reappear on the male avatar after a reload.
   const [equippedItems, setEquippedItems] = useState(
     () =>
       sanitizeEquipped(
@@ -1007,8 +1030,6 @@ function FittingStudioPage({ isGuest = false }) {
     [equippedItems]
   );
 
-  // FIX (dress on male): gender gate chained after the size gate, so a
-  // dress-class card is never even listed for the male avatar.
   const recommendationItems = useMemo(
     () =>
       catalogRecommendations.filter(
@@ -1036,9 +1057,6 @@ function FittingStudioPage({ isGuest = false }) {
   const atWeightMax =
     fitLimits.hasWeightMaximum && Number(avatar.weight) >= fitLimits.weight.max;
 
-  // FIX (dress on male): the ranking endpoint only consumes undertone +
-  // height_cm + body_shape; key the fetch on exactly those (debounced) so
-  // slider drags no longer fire a request per pixel.
   const recommendationKey = useMemo(
     () =>
       JSON.stringify({
@@ -1111,8 +1129,7 @@ function FittingStudioPage({ isGuest = false }) {
     setCurrentPage(1);
   }, [proportion.size]);
 
-  // FIX (dress on male): if the avatar gender flips to Male while a
-  // dress-class item is equipped, purge it from the slot immediately.
+  // Purge a female-only cut the instant the avatar becomes Male.
   useEffect(() => {
     setEquippedItems((current) => sanitizeEquipped(current, avatar.gender));
   }, [avatar.gender]);
@@ -1129,8 +1146,6 @@ function FittingStudioPage({ isGuest = false }) {
 
     if (!item) return;
 
-    // FIX (dress on male): a pending dress carried from a product page must
-    // not auto-equip on the male avatar.
     if (!avatarGenderAllowsItem(avatar.gender, item)) {
       displayNotification(
         `${item.name} is not available for your current avatar gender.`
@@ -1254,10 +1269,7 @@ function FittingStudioPage({ isGuest = false }) {
   function notifyAtLimit(field) {
     const flag = `has${field[0].toUpperCase()}${field.slice(1)}Maximum`;
 
-    if (
-      fitLimits[flag] &&
-      Number(avatar[field]) >= fitLimits[field].max
-    ) {
+    if (fitLimits[flag] && Number(avatar[field]) >= fitLimits[field].max) {
       displayNotification(
         `Maximum ${
           field === "weight" ? "body build" : field
@@ -1348,7 +1360,7 @@ function FittingStudioPage({ isGuest = false }) {
     } catch (error) {
       console.error("Unable to save avatar preset:", error);
       setAvatarPresetNameError(
-        "Unable to save your avatar preset. Please try again."
+        extractApiError(error, "Unable to save your avatar preset. Please try again.")
       );
     }
   }
@@ -1358,8 +1370,6 @@ function FittingStudioPage({ isGuest = false }) {
 
     if (!item) return;
 
-    // FIX (dress on male): refuse to equip a female-only cut on the male
-    // avatar (the card is already hidden, this guards stale/direct calls).
     if (!avatarGenderAllowsItem(avatar.gender, item)) {
       displayNotification(
         `${item.name} is not available for your current avatar gender.`
@@ -1495,41 +1505,51 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    const savedProducts = equippedItemsArray.map((item) => ({
-      id: item.id,
-      name: item.name,
-      seller: item.store,
-      category: item.category,
-      color: item.color,
-      size: item.size,
-      price: item.price,
-      quantity: 1,
-      image: item.image || "",
-    }));
+    // FIX (save outfit 400 "items"): the deployed OutfitSerializer.items is a
+    // PrimaryKeyRelatedField(many=True) over the catalog M2M (outfits/models.py;
+    // the green test suite posts/reads items as a LIST OF ID STRINGS and
+    // validates item status). The previous payload sent whole item OBJECTS, so
+    // DRF rejected `items` -> 400. We now send exactly the contract the real
+    // API accepts: { name, items: [catalogItemId, ...] }. This persists the
+    // named combination + its catalog links in MongoDB via the backend
+    // (KAN-69: "persist outfits through the backend rather than relying on
+    // client-only demo state"; KAN-115: wire to the real Django APIs).
+    //
+    // NOTE (spec gap, see reply): the deployed model is a PLAIN M2M, so the
+    // server currently has nowhere to store the per-item size/color/category
+    // snapshots nor the avatar/occasion/description that the SRS data
+    // dictionary (SAVED_OUTFITS.avatar_preset_id, OUTFIT_ITEMS.{size,color,
+    // category}) and FR-5.6 (load outfit re-equips everything) require. Those
+    // rich fields are therefore intentionally OMITTED from the write until the
+    // backend through-model exists (optional migration provided in the reply).
+    const itemIds = equippedItemsArray
+      .map((item) => String(item.id))
+      .filter(Boolean);
+
+    if (!itemIds.length) {
+      setOutfitNameError("No valid clothing items to save.");
+      return;
+    }
 
     const newOutfit = {
       name: trimmedName,
-      occasion: "Casual",
-      description: "",
-      avatarView: currentView.toLowerCase(),
-      avatar: {
-        ...avatar,
-        cupSize: isFemale ? avatar.cupSize : null,
-        view: currentView,
-      },
-      products: savedProducts,
-      items: equippedItemsArray,
+      items: itemIds,
     };
 
     try {
       await outfitsApi.create(newOutfit);
       closeSaveOutfitModal();
 
+      // Saved Outfits page re-fetches from the DB on this event, so the list
+      // reflects server truth (not client-only state).
       window.dispatchEvent(new Event("fitfusion-outfits-updated"));
 
       displayNotification(`"${trimmedName}" was saved successfully!`);
-    } catch {
-      setOutfitNameError("Unable to save your outfit. Please try again.");
+    } catch (error) {
+      console.error("Unable to save outfit:", error);
+      setOutfitNameError(
+        extractApiError(error, "Unable to save your outfit. Please try again.")
+      );
     }
   }
 

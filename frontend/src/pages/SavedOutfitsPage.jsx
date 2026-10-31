@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
-import { outfitsApi, cartApi } from "../services/api";
+import { outfitsApi, cartApi, API_URL } from "../services/api";
 import "./css/SavedOutfitsPage.css";
 
 // FIX: Side view removed
@@ -20,6 +20,15 @@ const DEFAULT_AVATAR = {
   cupSize: "B",
 };
 
+// Same-origin media path (keeps <canvas> pixel reads untainted; mirrors the
+// product/seller pages' mediaUrl).
+function mediaUrl(path) {
+  if (!path) return "";
+  const raw = String(path);
+  if (raw.startsWith("http")) return raw;
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
 function normalizeProduct(product, index) {
   if (!product || typeof product !== "object") return null;
 
@@ -31,38 +40,74 @@ function normalizeProduct(product, index) {
     price: Math.max(0, Number(product.price) || 0),
     quantity: Math.max(1, Number(product.quantity) || 1),
     selectedSize: product.selectedSize || product.size || "M",
+    size: product.selectedSize || product.size || "M",
     color: product.color || product.selectedColor || "Beige",
+    image: mediaUrl(product.image || product.front_image || product.frontImageUrl || ""),
   };
 }
 
-function normalizeOutfit(outfit, index) {
-  if (!outfit || typeof outfit !== "object") return null;
+// Resolve the stored CatalogItem IDs into real garments via the guest-readable
+// /catalog/{id}/ endpoint (the serializer's documented design). Id-preserving:
+// a failed fetch yields a placeholder with id:"" so the dead reference is
+// dropped on the next save instead of 400-ing the whole edit.
+async function hydrateProducts(ids) {
+  const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
+  if (!list.length) return [];
 
-  const sourceProducts = Array.isArray(outfit.products)
-    ? outfit.products
-    : Array.isArray(outfit.items)
-      ? outfit.items
-      : [];
+  const settled = await Promise.allSettled(
+    list.map(async (id) => {
+      const res = await fetch(`${API_URL}/catalog/${encodeURIComponent(id)}/`);
+      if (!res.ok) throw new Error(`catalog ${res.status}`);
+      const data = await res.json();
+      return normalizeProduct({ ...data, id: String(id) }, 0);
+    })
+  );
 
-  const products = sourceProducts.map(normalizeProduct).filter(Boolean);
+  return settled.map((result, i) =>
+    result.status === "fulfilled" && result.value
+      ? result.value
+      : {
+          id: "", // dropped on save (self-heals hard-deleted refs)
+          name: "Item unavailable",
+          category: "",
+          price: 0,
+          quantity: 1,
+          selectedSize: "",
+          size: "",
+          color: "",
+          image: "",
+          _requestedId: String(list[i]),
+        }
+  );
+}
 
-  const storedAvatar = outfit.avatar && typeof outfit.avatar === "object" ? outfit.avatar : {};
+// Compose a render-ready outfit from the API row + hydrated products. The API
+// returns items as id-strings and created_at (snake); the nested avatar /
+// occasion / description come from the additive Phase-A serializer.
+function composeOutfit(raw, products, index) {
+  if (!raw || typeof raw !== "object") return null;
 
-  const avatar = {
-    ...DEFAULT_AVATAR,
-    ...storedAvatar,
-    gender: storedAvatar.gender || outfit.gender || DEFAULT_AVATAR.gender,
-    skinTone: storedAvatar.skinTone || outfit.skinTone || DEFAULT_AVATAR.skinTone,
-  };
+  const storedAvatar =
+    raw.avatar && typeof raw.avatar === "object" ? raw.avatar : {};
+
+  const requestedView = String(
+    raw.avatar_view || raw.avatarView || raw.view || "front"
+  ).toLowerCase();
 
   return {
-    ...outfit,
-    id: String(outfit.id ?? `outfit-${index}`),
-    name: String(outfit.name || `Saved Outfit ${index + 1}`),
-    description: String(outfit.description || ""),
-    createdAt: outfit.createdAt || "",
-    avatar,
-    avatarView: String(outfit.avatarView || "front").toLowerCase(),
+    ...raw,
+    id: String(raw.id ?? `outfit-${index}`),
+    name: String(raw.name || `Saved Outfit ${index + 1}`),
+    occasion: String(raw.occasion || "Casual"),
+    description: String(raw.description || ""),
+    createdAt: raw.created_at || raw.createdAt || "",
+    avatarView: VIEWS.includes(requestedView) ? requestedView : "front",
+    avatar: {
+      ...DEFAULT_AVATAR,
+      ...storedAvatar,
+      gender: storedAvatar.gender || raw.gender || DEFAULT_AVATAR.gender,
+      skinTone: storedAvatar.skinTone || raw.skinTone || DEFAULT_AVATAR.skinTone,
+    },
     products,
   };
 }
@@ -121,9 +166,9 @@ function categorySlot(product) {
 }
 
 function outfitLayers(outfit) {
-  const items = Array.isArray(outfit.items) && outfit.items.length ? outfit.items : outfit.products;
+  // Hydrated products carry a real category, so the canvas slots fill correctly.
   const layers = {};
-  items.forEach((item) => {
+  (outfit.products || []).forEach((item) => {
     const slot = categorySlot(item);
     if (slot) layers[slot] = item;
   });
@@ -132,8 +177,11 @@ function outfitLayers(outfit) {
 
 function OutfitCard({ outfit, view, onView, onEdit, onDelete, onCart }) {
   const layers = useMemo(() => outfitLayers(outfit), [outfit]);
-  const total = outfit.products.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const canAddToCart = outfit.products.length > 0;
+  const total = (outfit.products || []).reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+  const canAddToCart = (outfit.products || []).some((p) => p.id);
 
   return (
     <article className="saved-outfit-card">
@@ -168,7 +216,9 @@ function OutfitCard({ outfit, view, onView, onEdit, onDelete, onCart }) {
           <span className="saved-outfit-date">{formatDate(outfit.createdAt)}</span>
         </div>
 
-        <p className="saved-outfit-description">{outfit.description || "Your saved look from the Fitting Studio."}</p>
+        <p className="saved-outfit-description">
+          {outfit.description || "Your saved look from the Fitting Studio."}
+        </p>
 
         <div className="saved-outfit-avatar-info">
           <span>{outfit.avatar.gender}</span>
@@ -177,10 +227,12 @@ function OutfitCard({ outfit, view, onView, onEdit, onDelete, onCart }) {
         </div>
 
         <div className="saved-outfit-products">
-          {outfit.products.length ? (
+          {(outfit.products || []).length ? (
             outfit.products.map((item, index) => (
-              <div className="saved-outfit-product" key={`${item.id}-${index}`}>
-                <span>{item.name} <small>({item.selectedSize})</small></span>
+              <div className="saved-outfit-product" key={`${item.id || item._requestedId}-${index}`}>
+                <span>
+                  {item.name} {item.selectedSize ? <small>({item.selectedSize})</small> : null}
+                </span>
                 <strong>{formatMoney(item.price * item.quantity)}</strong>
               </div>
             ))
@@ -190,7 +242,7 @@ function OutfitCard({ outfit, view, onView, onEdit, onDelete, onCart }) {
         </div>
 
         <div className="saved-outfit-summary">
-          <span>{outfit.products.length} {outfit.products.length === 1 ? "item" : "items"}</span>
+          <span>{(outfit.products || []).length} {(outfit.products || []).length === 1 ? "item" : "items"}</span>
           <strong>{formatMoney(total)}</strong>
         </div>
 
@@ -216,13 +268,22 @@ export default function SavedOutfitsPage() {
   const [message, setMessage] = useState("");
 
   // ====================================================
-  // FETCH OUTFITS FROM DATABASE
+  // FETCH OUTFITS FROM DATABASE + HYDRATE ITEM IDS
   // ====================================================
   const fetchOutfits = useCallback(async () => {
     try {
       const data = await outfitsApi.list();
-      const list = Array.isArray(data) ? data : (data.results || []);
-      setOutfits(list.map(normalizeOutfit).filter(Boolean));
+      const rows = Array.isArray(data) ? data : (data.results || []);
+
+      const hydrated = await Promise.all(
+        rows.map(async (raw, index) => {
+          const ids = Array.isArray(raw.items) ? raw.items : [];
+          const products = await hydrateProducts(ids);
+          return composeOutfit(raw, products, index);
+        })
+      );
+
+      setOutfits(hydrated.filter(Boolean));
     } catch (err) {
       console.error("Failed to load outfits from DB:", err);
       setMessage("Failed to load saved outfits.");
@@ -250,7 +311,7 @@ export default function SavedOutfitsPage() {
   const filteredOutfits = useMemo(() => {
     const search = searchText.trim().toLowerCase();
     const matching = outfits.filter((outfit) => {
-      const searchable = [outfit.name, outfit.description, ...outfit.products.map((item) => item.name)].join(" ").toLowerCase();
+      const searchable = [outfit.name, outfit.description, ...(outfit.products || []).map((item) => item.name)].join(" ").toLowerCase();
       return searchable.includes(search);
     });
 
@@ -287,17 +348,17 @@ export default function SavedOutfitsPage() {
   }
 
   // ====================================================
-  // ADD OUTFIT TO CART (VIA API)
+  // ADD OUTFIT TO CART (VIA API, using hydrated catalog ids)
   // ====================================================
   async function addOutfitToCart(outfit) {
-    if (!outfit.products.length) {
+    const usable = (outfit.products || []).filter((p) => p.id);
+    if (!usable.length) {
       setMessage("This outfit has no clothing items to add.");
       return;
     }
 
     try {
-      for (const product of outfit.products) {
-        // Assuming product.id is the catalog_item ID for the cart API
+      for (const product of usable) {
         await cartApi.add(product.id, product.quantity);
       }
       setMessage(`“${outfit.name}” was added to your cart.`);

@@ -21,6 +21,42 @@ const SIZE_FILTERS = [
   { value: "L", label: "Size: Large" },
 ];
 
+// === ADD-TO-OUTFIT PICKER HANDSHAKE (FR-5.7 edit / KAN-69-115) =============
+// The outfit editor sets EDIT_MODE_KEY immediately before navigating here;
+// we CONSUME it on mount (remove) so a refresh or a later normal visit is
+// never accidentally in picker mode. Picks accumulate in a per-outfit queue
+// key; the editor applies that queue only when arrived-at via router state
+// from our "Back to Outfit" button (leak-proof commit). Mirrors the studio's
+// pending-item discipline, hardened for multi-pick. Class names for the
+// banner / picked states live in CatalogPage.css (appended picker block).
+const EDIT_MODE_KEY = "fitfusion-edit-outfit-mode";
+const RETURN_KEY_PREFIX = "fitfusion-edit-outfit-return-";
+
+function readSessionJSON(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionJSON(key, value) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable: picker degrades to in-memory only */
+  }
+}
+
+function removeSession(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* noop */
+  }
+}
+
 // Helper to construct image URLs exactly like the Seller page does
 function mediaUrl(path) {
   if (!path) return null;
@@ -102,6 +138,11 @@ function CatalogPage({ isGuest = false }) {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
+  // === picker-mode state (only populated when launched from the editor) ====
+  const [editMode, setEditMode] = useState(false);
+  const [editOutfit, setEditOutfit] = useState(null); // {id, name}
+  const [pickedIds, setPickedIds] = useState([]);
+
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -137,6 +178,24 @@ function CatalogPage({ isGuest = false }) {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // === consume the editor's one-shot mode key on mount =====================
+  // Removing it here guarantees a refresh / later normal visit is NOT in
+  // picker mode. Any pre-existing queue for that outfit is restored into
+  // local state so a mid-session reload of the catalog keeps the count.
+  useEffect(() => {
+    const mode = readSessionJSON(EDIT_MODE_KEY);
+    if (!mode || !mode.id) return;
+
+    removeSession(EDIT_MODE_KEY); // consume immediately
+
+    const id = String(mode.id);
+    setEditMode(true);
+    setEditOutfit({ id, name: String(mode.name || "your outfit") });
+
+    const queued = readSessionJSON(RETURN_KEY_PREFIX + id);
+    setPickedIds(Array.isArray(queued) ? queued.map(String).filter(Boolean) : []);
   }, []);
 
   useEffect(() => {
@@ -205,6 +264,35 @@ function CatalogPage({ isGuest = false }) {
     console.log("Viewing store for:", product.store_name);
   }
 
+  // === picker actions (edit mode only) ====================================
+  function pickForOutfit(product) {
+    if (!editMode || !editOutfit) return;
+    const id = String(product.id);
+    if (!id) return;
+
+    setPickedIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      writeSessionJSON(RETURN_KEY_PREFIX + editOutfit.id, next);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setPickedIds([]);
+    if (editOutfit) removeSession(RETURN_KEY_PREFIX + editOutfit.id);
+  }
+
+  function backToOutfit() {
+    if (!editOutfit) return;
+    // Commit gesture: navigate WITH router state so the editor knows to apply
+    // the queue (a normal mount would discard it -> leak-proof).
+    navigate(
+      `/shopper/saved-outfits/${encodeURIComponent(editOutfit.id)}/edit`,
+      { state: { returnedFromCatalog: true, outfitId: editOutfit.id } }
+    );
+  }
+
   async function addToCart(product) {
     if (guestMode) {
       showGuestRestriction("add products to your cart");
@@ -270,7 +358,7 @@ function CatalogPage({ isGuest = false }) {
 
   return (
     <main className="catalog-page">
-      {!guestMode && (
+      {!guestMode && !editMode && (
         <header className="catalog-top-header">
           <button
             type="button"
@@ -285,6 +373,38 @@ function CatalogPage({ isGuest = false }) {
       )}
 
       <div className="catalog-main-content">
+        {/* === picker banner (edit mode only; styled via .catalog-edit-banner) == */}
+        {editMode && editOutfit && (
+          <div className="catalog-edit-banner" role="status">
+            <div className="catalog-edit-banner-text">
+              <strong>Picking garments for “{editOutfit.name}”</strong>
+              <span>
+                <span className="catalog-edit-count">{pickedIds.length}</span>
+                selected · press Back to Outfit to apply, then Save Changes in
+                the editor.
+              </span>
+            </div>
+            <div className="catalog-edit-banner-actions">
+              <button
+                type="button"
+                className="catalog-edit-clear"
+                onClick={clearSelection}
+                disabled={pickedIds.length === 0}
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                className="catalog-edit-commit"
+                onClick={backToOutfit}
+                disabled={pickedIds.length === 0}
+              >
+                Back to Outfit ({pickedIds.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         <section className="catalog-toolbar">
           <label className="catalog-search">
             <SearchIcon />
@@ -343,7 +463,7 @@ function CatalogPage({ isGuest = false }) {
           )}
         </div>
 
-        {cartError && (
+        {cartError && !editMode && (
           <p className="catalog-cart-error" role="alert">
             {cartError}
           </p>
@@ -355,70 +475,123 @@ function CatalogPage({ isGuest = false }) {
           </div>
         ) : filteredProducts.length > 0 ? (
           <section className="catalog-product-grid">
-            {filteredProducts.map((product) => (
-              <article key={product.id} className="catalog-product-card">
-                <button
-                  type="button"
-                  className="catalog-product-preview"
-                  onClick={() => openProductDetails(product)}
-                  aria-label={`View ${product.name}`}
+            {filteredProducts.map((product) => {
+              const isPicked =
+                editMode && pickedIds.includes(String(product.id));
+              const previewMode = editMode
+                ? isPicked
+                  ? "added"
+                  : "add"
+                : "view";
+
+              return (
+                <article
+                  key={product.id}
+                  className={
+                    isPicked
+                      ? "catalog-product-card is-picked"
+                      : "catalog-product-card"
+                  }
                 >
-                  {/* Alpha-cropped, centered garment preview with a clean
-                      placeholder fallback (no DOM sibling hacks). */}
-                  <CatalogPreview
-                    src={product.imageUrl}
-                    alt={product.name}
-                    category={product.displayCategory}
-                  />
-                </button>
-
-                <div className="catalog-product-content">
-                  <div className="catalog-product-tags">
-                    <span>{product.displayCategory}</span>
-                    {product.color_family && <span>{product.color_family}</span>}
-                  </div>
-
-                  <h2>{product.name}</h2>
-
                   <button
                     type="button"
-                    className="catalog-store-link"
-                    onClick={() => openSellerStore(product)}
+                    className="catalog-product-preview"
+                    data-mode={previewMode}
+                    onClick={() =>
+                      editMode
+                        ? pickForOutfit(product)
+                        : openProductDetails(product)
+                    }
+                    aria-label={
+                      editMode
+                        ? `Add ${product.name} to outfit`
+                        : `View ${product.name}`
+                    }
                   >
-                    {product.store_name || "FitFusion Store"}
+                    {/* Alpha-cropped, centered garment preview with a clean
+                        placeholder fallback (no DOM sibling hacks). */}
+                    <CatalogPreview
+                      src={product.imageUrl}
+                      alt={product.name}
+                      category={product.displayCategory}
+                    />
                   </button>
 
-                  <div className="catalog-product-footer">
-                    <div className="catalog-price-group">
-                      <strong className="catalog-price">
-                        {formatCurrency(product.price)}
-                      </strong>
+                  <div className="catalog-product-content">
+                    <div className="catalog-product-tags">
+                      <span>{product.displayCategory}</span>
+                      {product.color_family && <span>{product.color_family}</span>}
                     </div>
 
-                    <button
-                      type="button"
-                      className="catalog-details-button"
-                      onClick={() => openProductDetails(product)}
-                    >
-                      View Details
-                    </button>
-                  </div>
+                    <h2>{product.name}</h2>
 
-                  <button
-                    type="button"
-                    className="catalog-cart-action"
-                    onClick={() => addToCart(product)}
-                    disabled={addingToCart}
-                  >
-                    {guestMode
-                      ? "Register to Add to Cart"
-                      : addingToCart
-                        ? "Adding..."
-                        : "Add to Cart"}
-                  </button>
-                </div>
-              </article>
-            ))}
+                    {!editMode && (
+                      <button
+                        type="button"
+                        className="catalog-store-link"
+                        onClick={() => openSellerStore(product)}
+                      >
+                        {product.store_name || "FitFusion Store"}
+                      </button>
+                    )}
+
+                    {editMode ? (
+                      // === picker footer: compact Add/Added control ==========
+                      <div className="catalog-product-footer">
+                        <div className="catalog-price-group">
+                          <strong className="catalog-price">
+                            {formatCurrency(product.price)}
+                          </strong>
+                        </div>
+                        <button
+                          type="button"
+                          className={
+                            isPicked
+                              ? "catalog-edit-add picked"
+                              : "catalog-edit-add"
+                          }
+                          onClick={() => pickForOutfit(product)}
+                          disabled={isPicked}
+                        >
+                          {isPicked ? "Added ✓" : "Add to Outfit"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="catalog-product-footer">
+                        <div className="catalog-price-group">
+                          <strong className="catalog-price">
+                            {formatCurrency(product.price)}
+                          </strong>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="catalog-details-button"
+                          onClick={() => openProductDetails(product)}
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    )}
+
+                    {!editMode && (
+                      <button
+                        type="button"
+                        className="catalog-cart-action"
+                        onClick={() => addToCart(product)}
+                        disabled={addingToCart}
+                      >
+                        {guestMode
+                          ? "Register to Add to Cart"
+                          : addingToCart
+                            ? "Adding..."
+                            : "Add to Cart"}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </section>
         ) : (
           <section className="catalog-empty-state">
@@ -434,7 +607,7 @@ function CatalogPage({ isGuest = false }) {
         )}
       </div>
 
-      {showRegistrationModal && (
+      {showRegistrationModal && !editMode && (
         <div
           className="catalog-modal-backdrop"
           role="presentation"

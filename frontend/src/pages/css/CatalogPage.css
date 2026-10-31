@@ -739,3 +739,212 @@
     padding: 16px;
   }
 }
+/* ============================================================
+   ADD-TO-OUTFIT PICKER MODE (FR-5.7 edit round-trip / KAN-69-115)
+   APPENDED BLOCK ONLY -- none of the rules above are modified.
+   Styles the catalog when launched from the Saved-Outfit editor's
+   "+ Browse Catalog" button (CatalogPage.jsx consumes the one-shot
+   EDIT_MODE_KEY handshake on mount). Theme-native: reuses the gold/
+   cream tokens already defined above (#8e641f / #b57e20 / #d7af4b /
+   #fffdf9 / #e2d8c7 / #5c554c / #6b5326). The single success-green
+   accent (.picked) mirrors the precedent of the semantic error red
+   (#a32626) already in this sheet, so a "done" affordance is
+   consistent with the sheet's existing use of functional color.
+   ============================================================ */
+
+.catalog-edit-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 20px;
+  margin: 0 0 26px;
+  padding: 20px 26px;
+  background: linear-gradient(135deg, #fff7e6, #fdf3da 60%, #fbeecb);
+  border: 1px solid #e6d2a0;
+  border-left: 5px solid #b57e20;
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(142, 100, 31, 0.12);
+  color: #6b5326;
+}
+
+.catalog-edit-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.catalog-edit-banner-text strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: #4f3c17;
+}
+
+.catalog-edit-banner-text span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8a7343;
+}
+
+.catalog-edit-count {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  padding: 0 6px;
+  place-items: center;
+  background: #8e641f;
+  border-radius: 999px;
+  color: #fffdf9;
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.catalog-edit-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.catalog-edit-clear,
+.catalog-edit-commit {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.catalog-edit-clear {
+  background: #fffdf9;
+  border: 1px solid #d8c79a;
+  color: #6b5326;
+}
+
+.catalog-edit-clear:hover:not(:disabled) {
+  background: #fff9e8;
+}
+
+.catalog-edit-commit {
+  background: linear-gradient(135deg, #17130f, #8e641f 58%, #d7af4b);
+  border: 1px solid #b57e20;
+  color: #fffdf9;
+}
+
+.catalog-edit-commit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 17px rgba(142, 100, 31, 0.24);
+}
+
+.catalog-edit-clear:disabled,
+.catalog-edit-commit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Compact, content-sized picker action for the card footer.
+   (The full-width .catalog-cart-action is reserved for normal
+   shopping; reusing it here forced width:100% inside the flex
+   price row and wrapped awkwardly -- this fixes that.) */
+.catalog-edit-add {
+  min-height: 40px;
+  padding: 9px 16px;
+  background: #fffdf9;
+  border: 1px solid #b57e20;
+  border-radius: 9px;
+  color: #8e641f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.catalog-edit-add:hover:not(:disabled) {
+  background: #fbf3df;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(142, 100, 31, 0.18);
+}
+
+.catalog-edit-add.picked {
+  background: #eef3ea;
+  border-color: #bcd9b4;
+  color: #3f6b3a;
+  cursor: default;
+}
+
+.catalog-edit-add:disabled {
+  cursor: not-allowed;
+}
+
+/* Picked card: gold ring + corner check so selections are scannable. */
+.catalog-product-card.is-picked {
+  border-color: #b57e20;
+  box-shadow:
+    0 0 0 2px rgba(181, 126, 32, 0.35),
+    0 18px 38px rgba(69, 52, 23, 0.15);
+}
+
+.catalog-product-card.is-picked .catalog-product-preview::before {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  background: #3f6b3a;
+  border-radius: 999px;
+  color: #fffdf9;
+  content: "\2713";
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Preview hover hint follows the mode (data-mode set in JSX).
+   Base rule supplies content:"View"; these override only in picker. */
+.catalog-product-preview[data-mode="add"]::after {
+  content: "Add";
+}
+
+.catalog-product-preview[data-mode="added"]::after {
+  content: "Added \2713";
+  background: rgba(63, 107, 58, 0.82);
+}
+
+/* Picker banner stacks on narrow viewports. */
+@media (max-width: 650px) {
+  .catalog-edit-banner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+  }
+
+  .catalog-edit-banner-actions {
+    justify-content: stretch;
+  }
+
+  .catalog-edit-clear,
+  .catalog-edit-commit {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}

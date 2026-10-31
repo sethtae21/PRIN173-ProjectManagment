@@ -26,13 +26,11 @@ class OutfitAPITests(TestCase):
     def setUp(self):
         self.c = APIClient()
         self.alice = User.objects.create_user(
-            username='alice', email='alice@t.com', password='Test123!@#',
-            role='user', store_name=None)
-        self.bob = User.objects.create_user(
-            username='bob', email='bob@t.com', password='Test123!@#',
-            role='user', store_name=None)
-        self.batch = self._make_batch(self.alice)
-
+    email='alice@t.com', full_name='Alice Tester',
+    password='Test123!@#', role='shopper')
+        self.bob = User.objects.create_user(    
+    email='bob@t.com', full_name='Bob Tester',
+    password='Test123!@#', role='shopper')
     # ---- helpers mirroring catalog/views/core.py create() field set ----------
     def _make_batch(self, seller):
         return UploadBatch.objects.create(
