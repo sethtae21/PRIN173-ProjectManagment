@@ -19,6 +19,13 @@
  *    the boot guard works immediately without refactoring every page first.
  *    clearSession() erases the legacy keys too, so a logout can never be revived
  *    by an old key.
+ *  - AVATAR-SCOPE PURGE (cross-account leak fix): per-account avatar UI state
+ *    (active preset, preset cache, gender, editing target) lives in
+ *    localStorage, which is per-BROWSER, not per-USER. Without a purge, the
+ *    next shopper to log in on the same browser inherits the previous
+ *    shopper's avatar (dein's "axa" on karosu's dashboard/studio).
+ *    setSession() and clearSession() therefore erase those keys; guest keys
+ *    live in sessionStorage and are untouched.
  *  - getAccessToken() is safe to call on every request (read per request,
  *    never captured in a module-level constant at import time).
  *  - Cross-tab safety: a 'storage' event refreshes the mirror in other tabs.
@@ -36,6 +43,14 @@ const LEGACY_USER_KEYS = [
   'user',
   'sellerAccount',
   'registeredAccount',
+];
+
+/* NEW: per-account avatar UI state that must NOT survive an account switch. */
+const AVATAR_SCOPE_KEYS = [
+  'fitfusion-avatar-preset',
+  'fitfusion-avatar-presets',
+  'fitfusion-avatar-gender',
+  'fitfusion-editing-avatar-preset',
 ];
 
 let memory = null;          // in-memory mirror of the stored session
@@ -68,6 +83,15 @@ function writeStorage(session) {
     }
   } catch {
     // private-mode / quota errors: the memory mirror still works this load
+  }
+}
+
+/** NEW: erase the previous account's avatar state (dashboard/studio/presets). */
+function purgeAvatarScope() {
+  try {
+    AVATAR_SCOPE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // ignore storage failures during cleanup
   }
 }
 
@@ -130,15 +154,21 @@ export function getRefreshToken() {
   return s && s.refresh ? s.refresh : null;
 }
 
-/** Called by login()/register(): persist FIRST, then navigate. Atomic. */
+/**
+ * Called by login()/register(): persist FIRST, then navigate. Atomic.
+ * CHANGED: a new identity also purges the previous account's avatar-scoped
+ * localStorage keys so no page can resurrect another shopper's avatar.
+ */
 export function setSession({ access, refresh, user }) {
+  purgeAvatarScope();
   memory = normalize({ access, refresh, user });
   writeStorage(memory);
   emit();
   return memory;
 }
 
-/** Called by a 401 auto-refresh path: replace tokens atomically. */
+/** Called by a 401 auto-refresh path: replace tokens atomically.
+ *  NOTE: deliberately does NOT purge avatar scope (same identity). */
 export function updateTokens(access, refresh) {
   const current = getSession();
   if (!current) return null;
@@ -164,6 +194,7 @@ export function clearSession() {
   } catch {
     // ignore storage failures during cleanup
   }
+  purgeAvatarScope();
   emit();
 }
 
