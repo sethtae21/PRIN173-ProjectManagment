@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { getCachedCatalogItem } from "../../services/api";
+
 import {
   imageToCanvas,
   detectBodyBounds,
@@ -136,6 +138,30 @@ function normalizeItem(item) {
   };
 }
 
+// The catalog stores three-view photos, but some payloads (ranked
+// recommendations, saved-outfit snapshots) carry only the front photo on the
+// item object. garmentImageLayer() always reads product.image, so for the
+// rear angle we hand the warp pipeline a proxy whose image is the REAR
+// photo -- either straight from the item or fetched once from the catalog
+// record (rearSources). Falls back to the front photo only when a listing
+// genuinely has no rear asset.
+function rearImageOf(item) {
+  return (
+    item.rear_image ||
+    item.rearImageUrl ||
+    item.rear_image_url ||
+    item.rearImage ||
+    ""
+  );
+}
+
+function toMediaUrl(path) {
+  if (!path) return "";
+  const raw = String(path);
+  if (raw.startsWith("http")) return raw;
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
 export default function AvatarCanvas({
   avatar,
   view = "Front",
@@ -146,6 +172,7 @@ export default function AvatarCanvas({
   const [imageState, setImageState] = useState(null);
   const [error, setError] = useState("");
   const [garmentImageVersion, setGarmentImageVersion] = useState(0);
+  const [rearSources, setRearSources] = useState({});
 
   const gender =
     String(avatar?.gender).toLowerCase() === "male" ? "male" : "female";
@@ -221,11 +248,83 @@ export default function AvatarCanvas({
       .filter((item) => !(gender === "male" && isFemaleOnlyAvatarItem(item)));
   }, [equippedItems, gender]);
 
+  // NEW: fetch the catalog record once per garment that arrived without a
+  // rear photo, so the Rear angle can show the real rear photograph.
   useEffect(() => {
     let active = true;
 
+    const missing = garmentItems.filter((item) => {
+      const id = item?.id ?? item?.item_id ?? item?.product_id;
+      return (
+        id !== undefined &&
+        id !== null &&
+        id !== "" &&
+        !rearImageOf(item) &&
+        !(String(id) in rearSources)
+      );
+    });
+
+    if (!missing.length) {
+      return undefined;
+    }
+
+    missing.forEach((item) => {
+      const id = String(item.id ?? item.item_id ?? item.product_id);
+
+      getCachedCatalogItem(id)
+        .then((record) => {
+          if (!active) return;
+          const rear = toMediaUrl(
+            record?.rear_image ||
+              record?.rearImageUrl ||
+              record?.rear_image_url ||
+              record?.rearImage ||
+              ""
+          );
+          setRearSources((current) => ({ ...current, [id]: rear }));
+        })
+        .catch(() => {
+          if (!active) return;
+          // Unreachable catalog: keep the documented front-photo fallback.
+          setRearSources((current) => ({ ...current, [id]: "" }));
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [garmentItems, rearSources]);
+
+  function rearSourceFor(item) {
+    const own = rearImageOf(item);
+    if (own) return own;
+    const id = item?.id ?? item?.item_id ?? item?.product_id;
+    return (id !== undefined && id !== null && String(id) in rearSources)
+      ? rearSources[String(id)]
+      : "";
+  }
+
+  // View-aware garment list (rear photo on the rear angle).
+  const viewGarmentItems = useMemo(() => {
+    if (angle !== "rear") return garmentItems;
+
+    return garmentItems.map((item) => {
+      const rearSrc = rearSourceFor(item);
+      return rearSrc ? { ...item, image: rearSrc } : item;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [garmentItems, angle, rearSources]);
+
+  useEffect(() => {
+    let active = true;
+
+    // Preload BOTH angles so switching Front/Rear never shows the polygon
+    // fallback while a crop is still loading.
     const sources = garmentItems
-      .map((item) => item.image || item.front_image || "")
+      .flatMap((item) => [
+        item.image || item.front_image || "",
+        rearSourceFor(item),
+      ])
       .filter(Boolean);
 
     if (!sources.length) {
@@ -251,14 +350,13 @@ export default function AvatarCanvas({
     return () => {
       active = false;
     };
-  }, [garmentItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [garmentItems, rearSources]);
 
-  // CHANGED: keep the item next to its rendered layer so the render loop can
-  // build a per-garment size-true mesh (anchor depends on the category).
   const garmentLayers = useMemo(() => {
     if (!bounds) return [];
 
-    return garmentItems
+    return viewGarmentItems
       .map((item) => ({
         item,
         layer:
@@ -274,7 +372,7 @@ export default function AvatarCanvas({
       }))
       .filter((entry) => Boolean(entry.layer));
   }, [
-    garmentItems,
+    viewGarmentItems,
     bounds,
     angle,
     source,
@@ -324,10 +422,10 @@ export default function AvatarCanvas({
 
         renderLayer(ctx, skin, mesh);
 
-        // CHANGED: each garment renders through its OWN size-true mesh:
-        // it follows the body's position (rigid translation at its anchor:
-        // shoulder line / waist / feet) and the FR-2.7 shape controls, but
-        // its dimensions never squeeze or stretch with Height / Body Build.
+        // Each garment renders through its own size-true mesh: it follows
+        // the body's position (rigid translation at its anchor) and the
+        // FR-2.7 shape controls, but never squeezes/stretches with the
+        // Height / Body Build sliders.
         garmentLayers.forEach((entry) => {
           const garmentMesh = makeGarmentMesh(
             WIDTH,

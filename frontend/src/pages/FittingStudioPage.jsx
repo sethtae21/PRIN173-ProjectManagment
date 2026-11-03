@@ -139,14 +139,11 @@ function readStudioSession(isGuest) {
   return session && typeof session === "object" ? session : null;
 }
 
-// NEW (size-band lock, option a): detect a cached studio session whose
-// equipped look belongs to a DIFFERENT avatar gender than the one resolved
-// for this mount. The Choose-Avatar-Gender page patches session.avatar.gender
-// IN PLACE when the shopper picks a new body (syncStudioSessionGender), so
-// comparing stored-vs-session gender alone cannot see that switch -- but the
-// `equippedGender` stamp written by THIS page's session persistence can.
-// Sessions without a stamp (written by other pages, e.g. Saved Outfits ->
-// "Open Fitting Studio", FR-5.6 re-equip) are left untouched on purpose.
+// FIX (stale look after sidebar hops): the studio no longer writes
+// equippedItems into its own session, so the `equippedGender` stamp now also
+// acts as a writer marker. A session WITHOUT the stamp can only come from an
+// external flow writer (Saved Outfits -> "Open Fitting Studio", FR-5.6);
+// those looks are re-equipped. Everything else starts empty.
 function sessionNeedsEquipReset(session, storedGender, avatarGender) {
   if (!session || typeof session !== "object") return false;
 
@@ -1096,11 +1093,24 @@ function FittingStudioPage({ isGuest = false }) {
 
   const [activePanel, setActivePanel] = useState("customize");
 
-  // CHANGED: reset the wardrobe when the cached session was equipped under a
-  // different gender (e.g. sidebar -> Fitting Studio -> pick other gender,
-  // which patches session.avatar.gender in place but keeps equippedItems).
+  // CHANGED (bug: stale look after sidebar hops): the studio no longer
+  // persists equippedItems in its own session writes, so a cached look can
+  // only arrive from an EXTERNAL flow writer (Saved Outfits -> "Open Fitting
+  // Studio", FR-5.6) whose session carries no equippedGender stamp. Every
+  // other re-entry -- sidebar pages, gender page, presets, refresh -- starts
+  // with an empty avatar, exactly as required.
   const [equippedItems, setEquippedItems] = useState(() => {
     const session = readStudioSession(isGuest);
+
+    const externalLook =
+      session &&
+      !("equippedGender" in session) &&
+      session.equippedItems &&
+      typeof session.equippedItems === "object";
+
+    if (!externalLook) {
+      return { top: null, bottom: null, shoes: null };
+    }
 
     if (
       sessionNeedsEquipReset(session, readStoredGender(isGuest), avatar.gender)
@@ -1108,28 +1118,12 @@ function FittingStudioPage({ isGuest = false }) {
       return { top: null, bottom: null, shoes: null };
     }
 
-    return sanitizeEquipped(
-      session?.equippedItems || {
-        top: null,
-        bottom: null,
-        shoes: null,
-      },
-      avatar.gender
-    );
+    return sanitizeEquipped(session.equippedItems, avatar.gender);
   });
 
-  // CHANGED: a stale dimension snapshot must not survive a gender reset.
-  const [originalDimensions, setOriginalDimensions] = useState(() => {
-    const session = readStudioSession(isGuest);
-
-    if (
-      sessionNeedsEquipReset(session, readStoredGender(isGuest), avatar.gender)
-    ) {
-      return null;
-    }
-
-    return session?.originalDimensions || null;
-  });
+  // CHANGED: dimension snapshots are in-memory only now (FR-5.6 sessions
+  // already store null), so a restored look never drags stale dimensions in.
+  const [originalDimensions, setOriginalDimensions] = useState(() => null);
 
   const [catalogRecommendations, setCatalogRecommendations] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -1159,7 +1153,7 @@ function FittingStudioPage({ isGuest = false }) {
     [avatar.height, bodyBuild]
   );
 
-  // NEW: active maximum caps derived from the equipped garment sizes.
+  // Size caps: minimums fixed, maximums snap to the equipped garment size.
   const sizeCaps = useMemo(
     () => sizeCapsForEquipped(equippedItems),
     [equippedItems]
@@ -1180,8 +1174,6 @@ function FittingStudioPage({ isGuest = false }) {
     [equippedItems]
   );
 
-  // NEW: slider ranges. Minimums stay fixed; only maximums snap to the caps
-  // (seller fit-limits still apply on top when present).
   const buildRange = useMemo(
     () => ({
       min: BODY_BUILD_RANGE.min,
@@ -1248,21 +1240,21 @@ function FittingStudioPage({ isGuest = false }) {
     ]
   );
 
-  // CHANGED: stamp the session with the gender the look was equipped under so
-  // a later mount can detect a gender switch even when another page patched
-  // session.avatar.gender in place.
+  // CHANGED: the session now carries ONLY avatar + view + the writer stamp.
+  // Equipped items are deliberately NOT persisted, so leaving the studio
+  // (any sidebar page, gender page, presets, refresh) always comes back to
+  // an empty avatar. FR-5.6 re-equip works because Saved Outfits writes its
+  // own session without the stamp.
   useEffect(() => {
     sessionStorage.setItem(
       sessionKey(isGuest),
       JSON.stringify({
         avatar,
         currentView,
-        equippedItems,
-        originalDimensions,
         equippedGender: avatar.gender,
       })
     );
-  }, [avatar, currentView, equippedItems, originalDimensions, isGuest]);
+  }, [avatar, currentView, isGuest]);
 
   useEffect(() => {
     let active = true;
@@ -1326,9 +1318,8 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }, [avatar.gender]);
 
-  // NEW: keep the avatar inside the equipped garment's caps even when a
-  // restored session (or a pending item equipped from product details) put
-  // the body above them. No-op when already inside the caps.
+  // Keep the avatar inside the equipped garment's caps even when a restored
+  // look (FR-5.6) or a pending item put the body above them.
   useEffect(() => {
     setAvatar((current) => applySizeCaps(current, sizeCaps));
   }, [sizeCaps]);
@@ -1372,7 +1363,10 @@ function FittingStudioPage({ isGuest = false }) {
     setEquippedItems(next);
     setSelectedMatchItem(item);
     setAvatar((current) =>
-      applySizeCaps(applyFitLimits(current, nextLimits), sizeCapsForEquipped(next))
+      applySizeCaps(
+        applyFitLimits(current, nextLimits),
+        sizeCapsForEquipped(next)
+      )
     );
 
     displayNotification(
@@ -1398,15 +1392,15 @@ function FittingStudioPage({ isGuest = false }) {
     window.setTimeout(() => setNotification(""), 2500);
   }
 
-  // CHANGED: snapshot now carries the equippedGender stamp as well.
+  // CHANGED: snapshot no longer carries equippedItems / originalDimensions,
+  // so returning from product details starts from an empty wardrobe and then
+  // applies the pending Try-Item only.
   function openProductDetails(item) {
     sessionStorage.setItem(
       sessionKey(isGuest),
       JSON.stringify({
         avatar,
         currentView,
-        equippedItems,
-        originalDimensions,
         equippedGender: avatar.gender,
       })
     );
@@ -1416,7 +1410,6 @@ function FittingStudioPage({ isGuest = false }) {
     });
   }
 
-  // CHANGED: height now clamps to heightRange (fixed min, capped max).
   function updateAvatar(field, value) {
     if (field === "height") {
       const nextHeight = clamp(value, heightRange);
@@ -1458,7 +1451,6 @@ function FittingStudioPage({ isGuest = false }) {
     setAvatar((current) => ({ ...current, [field]: value }));
   }
 
-  // CHANGED: body build clamps to buildRange (fixed 86 cm min, capped max).
   function selectBodyBuild(value) {
     const nextBuild = clamp(value, buildRange);
     const nextWeight = visualBuildToWeight(nextBuild, avatar.height);
@@ -1570,7 +1562,10 @@ function FittingStudioPage({ isGuest = false }) {
     } catch (error) {
       console.error("Unable to save avatar preset:", error);
       setAvatarPresetNameError(
-        extractApiError(error, "Unable to save your avatar preset. Please try again.")
+        extractApiError(
+          error,
+          "Unable to save your avatar preset. Please try again."
+        )
       );
     }
   }
@@ -1607,7 +1602,10 @@ function FittingStudioPage({ isGuest = false }) {
     setSelectedMatchItem(item);
     setEquippedItems(next);
     setAvatar((current) =>
-      applySizeCaps(applyFitLimits(current, nextLimits), sizeCapsForEquipped(next))
+      applySizeCaps(
+        applyFitLimits(current, nextLimits),
+        sizeCapsForEquipped(next)
+      )
     );
 
     displayNotification(
@@ -1731,14 +1729,6 @@ function FittingStudioPage({ isGuest = false }) {
     // named combination + its catalog links in MongoDB via the backend
     // (KAN-69: "persist outfits through the backend rather than relying on
     // client-only demo state"; KAN-115: wire to the real Django APIs).
-    //
-    // NOTE (spec gap, see reply): the deployed model is a PLAIN M2M, so the
-    // server currently has nowhere to store the per-item size/color/category
-    // snapshots nor the avatar/occasion/description that the SRS data
-    // dictionary (SAVED_OUTFITS.avatar_preset_id, OUTFIT_ITEMS.{size,color,
-    // category}) and FR-5.6 (load outfit re-equips everything) require. Those
-    // rich fields are therefore intentionally OMITTED from the write until the
-    // backend through-model exists (optional migration provided in the reply).
     const itemIds = equippedItemsArray
       .map((item) => String(item.id))
       .filter(Boolean);
@@ -1757,8 +1747,6 @@ function FittingStudioPage({ isGuest = false }) {
       await outfitsApi.create(newOutfit);
       closeSaveOutfitModal();
 
-      // Saved Outfits page re-fetches from the DB on this event, so the list
-      // reflects server truth (not client-only state).
       window.dispatchEvent(new Event("fitfusion-outfits-updated"));
 
       displayNotification(`"${trimmedName}" was saved successfully!`);
@@ -1783,7 +1771,9 @@ function FittingStudioPage({ isGuest = false }) {
 
     localStorage.setItem(
       "fitfusion-selected-items",
-      JSON.stringify(equippedItemsArray.map((item) => ({ ...item, quantity: 1 })))
+      JSON.stringify(
+        equippedItemsArray.map((item) => ({ ...item, quantity: 1 }))
+      )
     );
 
     navigate("/shopper/fitting-studio/select-items");
@@ -2280,10 +2270,7 @@ function FittingStudioPage({ isGuest = false }) {
                 <div className="studio-equipped-list">
                   {Object.entries(equippedItems).map(([category, item]) =>
                     item ? (
-                      <article
-                        key={category}
-                        className="studio-equipped-item"
-                      >
+                      <article key={category} className="studio-equipped-item">
                         <div>
                           <span>{category}</span>
                           <strong>
@@ -2498,8 +2485,7 @@ function FittingStudioPage({ isGuest = false }) {
                 id="studio-outfit-name"
                 type="text"
                 className={
-                  "studio-save-outfit-input " +
-                  (outfitNameError ? "invalid" : "")
+                  "studio-save-outfit-input " + (outfitNameError ? "invalid" : "")
                 }
                 value={outfitName}
                 onChange={(event) => {
