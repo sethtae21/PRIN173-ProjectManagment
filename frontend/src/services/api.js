@@ -953,3 +953,60 @@ export default {
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
   BASE_URL, API_URL,
 };
+
+
+export async function checkRegistrationContact(
+  email,
+  mobile,
+  storeName = "",
+  { signal } = {}
+) {
+  try {
+    const response = await fetch(`${API_BASE}/auth/check-registration/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        mobile,
+        store_name: storeName
+      }),
+      signal
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 400 && data) {
+      return {
+        email: data.email?.[0] ?? null,
+        mobile: data.mobile?.[0] ?? null,
+        store_name: data.store_name?.[0] ?? null
+      };
+    }
+
+    if (response.ok) {
+      return {
+        email: null,
+        mobile: null,
+        store_name: null
+      };
+    }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw error;
+    }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
+  }
+}
