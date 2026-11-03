@@ -1,9 +1,7 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { ratingsApi } from "../services/api";
+import { getAccessToken } from "../services/session";
 import "./ProductReviewSection.css";
 
 function readStoredObject(key, fallback) {
@@ -12,26 +10,15 @@ function readStoredObject(key, fallback) {
       localStorage.getItem(key) ||
       sessionStorage.getItem(key);
 
-    return value
-      ? JSON.parse(value)
-      : fallback;
+    return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
   }
 }
 
 function getCurrentUser() {
-  const registeredAccount =
-    readStoredObject(
-      "registeredAccount",
-      {}
-    );
-
-  const currentUser =
-    readStoredObject(
-      "fitfusion-current-user",
-      {}
-    );
+  const registeredAccount = readStoredObject("registeredAccount", {});
+  const currentUser = readStoredObject("fitfusion-current-user", {});
 
   return {
     ...registeredAccount,
@@ -53,37 +40,24 @@ function formatReviewDate(value) {
   });
 }
 
-export function calculateProductRating(
-  product,
-  storedReviews
-) {
+export function calculateProductRating(product, storedReviews) {
   const productReviews = storedReviews.filter(
-    (review) =>
-      String(review.productId) ===
-      String(product.id)
+    (review) => String(review.productId) === String(product.id)
   );
 
-  const originalRating =
-    Number(product.rating) || 0;
+  const originalRating = Number(product.rating) || 0;
+  const originalCount = Number(product.reviews) || 0;
 
-  const originalCount =
-    Number(product.reviews) || 0;
+  const submittedTotal = productReviews.reduce(
+    (total, review) => total + Number(review.rating || 0),
+    0
+  );
 
-  const submittedTotal =
-    productReviews.reduce(
-      (total, review) =>
-        total + Number(review.rating || 0),
-      0
-    );
-
-  const totalCount =
-    originalCount + productReviews.length;
+  const totalCount = originalCount + productReviews.length;
 
   const average =
     totalCount > 0
-      ? (originalRating * originalCount +
-          submittedTotal) /
-        totalCount
+      ? (originalRating * originalCount + submittedTotal) / totalCount
       : 0;
 
   return {
@@ -101,66 +75,42 @@ function ProductReviewSection({
 }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
-  const isRegisteredUser = Boolean(
-    localStorage.getItem("access_token")
-  );
+  
+  // FIX: Use canonical session manager so registered users never see the popup
+  const isRegisteredUser = Boolean(getAccessToken());
 
   const userKey =
-    currentUser.email ||
-    currentUser.username ||
-    "registered-shopper";
+    currentUser.email || currentUser.username || "registered-shopper";
 
   const reviewerName =
     currentUser.fullName ||
-    [
-      currentUser.firstName,
-      currentUser.lastName,
-    ]
-      .filter(Boolean)
-      .join(" ") ||
+    [currentUser.firstName, currentUser.lastName].filter(Boolean).join(" ") ||
     currentUser.username ||
     "Registered Shopper";
 
-  const productReviews =
-    storedReviews.filter(
-      (review) =>
-        String(review.productId) ===
-        String(product.id)
-    );
-
-  const existingReview =
-    productReviews.find(
-      (review) =>
-        String(review.userKey) ===
-        String(userKey)
-    );
-
-  const [selectedRating, setSelectedRating] =
-    useState(existingReview?.rating || 0);
-
-  const [hoveredRating, setHoveredRating] =
-    useState(0);
-
-  const [comment, setComment] = useState(
-    existingReview?.comment || ""
+  const productReviews = storedReviews.filter(
+    (review) => String(review.productId) === String(product.id)
   );
 
+  const existingReview = productReviews.find(
+    (review) => String(review.userKey) === String(userKey)
+  );
+
+  const [selectedRating, setSelectedRating] = useState(
+    existingReview?.rating || 0
+  );
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [comment, setComment] = useState(existingReview?.comment || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [showRegistrationPrompt, setShowRegistrationPrompt] =
-    useState(false);
+  const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
 
   useEffect(() => {
-    setSelectedRating(
-      existingReview?.rating || 0
-    );
-
-    setComment(
-      existingReview?.comment || ""
-    );
+    setSelectedRating(existingReview?.rating || 0);
+    setComment(existingReview?.comment || "");
   }, [existingReview?.id, product.id]);
 
-  function submitReview(event) {
+  async function submitReview(event) {
     event.preventDefault();
     setMessage("");
     setError("");
@@ -171,46 +121,43 @@ function ProductReviewSection({
     }
 
     if (selectedRating < 1) {
-      setError(
-        "Please select a rating from 1 to 5 stars."
-      );
+      setError("Please select a rating from 1 to 5 stars.");
       return;
     }
 
     if (comment.trim().length < 10) {
-      setError(
-        "Please write at least 10 characters describing your experience."
-      );
+      setError("Please write at least 10 characters describing your experience.");
       return;
     }
 
-    const review = {
-      id:
-        existingReview?.id ||
-        `review-${Date.now()}`,
+    // NEW: Submit the star score to the DB so it reflects in the summary
+    try {
+      await ratingsApi.submit({
+        target_type: 'item',
+        target_id: product.id,
+        score: selectedRating,
+      });
+    } catch (err) {
+      console.warn("Failed to submit score to server:", err);
+    }
 
+    // Keep local storage for the text comment (backend Rating model only tracks score/vote)
+    const review = {
+      id: existingReview?.id || `review-${Date.now()}`,
       productId: String(product.id),
       userKey,
       name: reviewerName,
       rating: selectedRating,
       comment: comment.trim(),
-
       size: product.size || "Default",
-
       verifiedPurchase: false,
-
-      createdAt:
-        existingReview?.createdAt ||
-        new Date().toISOString(),
-
+      createdAt: existingReview?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const updatedReviews = existingReview
       ? storedReviews.map((item) =>
-          item.id === existingReview.id
-            ? review
-            : item
+          item.id === existingReview.id ? review : item
         )
       : [review, ...storedReviews];
 
@@ -228,10 +175,7 @@ function ProductReviewSection({
     );
   }
 
-  const displayedReviews = [
-    ...productReviews,
-    ...sampleReviews,
-  ];
+  const displayedReviews = [...productReviews, ...sampleReviews];
 
   return (
     <section className="product-review-section">
@@ -242,31 +186,15 @@ function ProductReviewSection({
         </div>
 
         <div className="product-review-summary">
-          <strong>
-            {ratingSummary.average.toFixed(1)}
-          </strong>
-
+          <strong>{ratingSummary.average.toFixed(1)}</strong>
           <div>
             <span>
-              {"★".repeat(
-                Math.round(
-                  ratingSummary.average
-                )
-              )}
-
-              {"☆".repeat(
-                5 -
-                  Math.round(
-                    ratingSummary.average
-                  )
-              )}
+              {"★".repeat(Math.round(ratingSummary.average))}
+              {"☆".repeat(5 - Math.round(ratingSummary.average))}
             </span>
-
             <small>
               Based on {ratingSummary.count} review
-              {ratingSummary.count === 1
-                ? ""
-                : "s"}
+              {ratingSummary.count === 1 ? "" : "s"}
             </small>
           </div>
         </div>
@@ -275,63 +203,34 @@ function ProductReviewSection({
       <div className="product-review-layout">
         <div className="product-review-list">
           {displayedReviews.length > 0 ? (
-            displayedReviews.map(
-              (review) => (
-                <article key={review.id}>
-                  <div className="product-review-avatar">
-                    {review.name
-                      ?.charAt(0)
-                      .toUpperCase() || "S"}
-                  </div>
-
-                  <div className="product-review-content">
-                    <div className="product-review-meta">
-                      <div>
-                        <strong>
-                          {review.name}
-                        </strong>
-
-                        {review.verifiedPurchase && (
-                          <small>
-                            Verified purchase
-                          </small>
-                        )}
-                      </div>
-
-                      <span>
-                        {formatReviewDate(
-                          review.updatedAt ||
-                            review.createdAt ||
-                            review.date
-                        )}
-                      </span>
+            displayedReviews.map((review) => (
+              <article key={review.id}>
+                <div className="product-review-avatar">
+                  {review.name?.charAt(0).toUpperCase() || "S"}
+                </div>
+                <div className="product-review-content">
+                  <div className="product-review-meta">
+                    <div>
+                      <strong>{review.name}</strong>
+                      {review.verifiedPurchase && <small>Verified purchase</small>}
                     </div>
-
-                    <p className="product-review-stars">
-                      {"★".repeat(
-                        Number(review.rating)
+                    <span>
+                      {formatReviewDate(
+                        review.updatedAt || review.createdAt || review.date
                       )}
-
-                      {"☆".repeat(
-                        5 -
-                          Number(
-                            review.rating
-                          )
-                      )}
-                    </p>
-
-                    <small className="product-review-size">
-                      Purchased size:{" "}
-                      {review.size || "Default"}
-                    </small>
-
-                    <p className="product-review-comment">
-                      {review.comment}
-                    </p>
+                    </span>
                   </div>
-                </article>
-              )
-            )
+                  <p className="product-review-stars">
+                    {"★".repeat(Number(review.rating))}
+                    {"☆".repeat(5 - Number(review.rating))}
+                  </p>
+                  <small className="product-review-size">
+                    Purchased size: {review.size || "Default"}
+                  </small>
+                  <p className="product-review-comment">{review.comment}</p>
+                </div>
+              </article>
+            ))
           ) : (
             <div className="product-review-empty">
               No reviews have been submitted yet.
@@ -340,107 +239,65 @@ function ProductReviewSection({
         </div>
 
         <aside className="product-review-form-card">
-          <p>
-            {existingReview
-              ? "EDIT YOUR REVIEW"
-              : "RATE THIS PRODUCT"}
-          </p>
-
+          <p>{existingReview ? "EDIT YOUR REVIEW" : "RATE THIS PRODUCT"}</p>
           <h3>
-            {existingReview
-              ? "Update your experience"
-              : "Share your experience"}
+            {existingReview ? "Update your experience" : "Share your experience"}
           </h3>
 
           {isRegisteredUser ? (
             <form onSubmit={submitReview}>
               <label>Your rating</label>
-
               <div className="product-review-star-input">
-                {[1, 2, 3, 4, 5].map(
-                  (star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className={
-                        star <=
-                        (hoveredRating ||
-                          selectedRating)
-                          ? "selected"
-                          : ""
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={
+                      star <= (hoveredRating || selectedRating) ? "selected" : ""
+                    }
+                    onMouseEnter={() => setHoveredRating(star)}
+                    onMouseLeave={() => setHoveredRating(0)}
+                    onClick={() => {
+                      if (!isRegisteredUser) {
+                        setShowRegistrationPrompt(true);
+                        return;
                       }
-                      onMouseEnter={() =>
-                        setHoveredRating(star)
-                      }
-                      onMouseLeave={() =>
-                        setHoveredRating(0)
-                      }
-                      onClick={() => {
-                        if (!isRegisteredUser) {
-                          setShowRegistrationPrompt(true);
-                          return;
-                        }
-                        setSelectedRating(star);
-                        setError("");
-                      }}
-                      aria-label={`${star} star rating`}
-                    >
-                      ★
-                    </button>
-                  )
-                )}
+                      setSelectedRating(star);
+                      setError("");
+                    }}
+                    aria-label={`${star} star rating`}
+                  >
+                    ★
+                  </button>
+                ))}
               </div>
 
-              <label htmlFor="product-review-comment">
-                Your review
-              </label>
-
+              <label htmlFor="product-review-comment">Your review</label>
               <textarea
                 id="product-review-comment"
                 value={comment}
                 onChange={(event) => {
-                  setComment(
-                    event.target.value
-                  );
+                  setComment(event.target.value);
                   setError("");
                 }}
                 maxLength={500}
                 placeholder="Tell other shoppers about the quality, fit, and overall experience."
               />
-
               <div className="product-review-character-count">
                 {comment.length}/500
               </div>
 
-              {error && (
-                <div className="product-review-message error">
-                  {error}
-                </div>
-              )}
+              {error && <div className="product-review-message error">{error}</div>}
+              {message && <div className="product-review-message success">{message}</div>}
 
-              {message && (
-                <div className="product-review-message success">
-                  {message}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="product-review-submit"
-              >
-                {existingReview
-                  ? "Update Review"
-                  : "Submit Review"}
+              <button type="submit" className="product-review-submit">
+                {existingReview ? "Update Review" : "Submit Review"}
               </button>
             </form>
           ) : (
             <div className="product-review-locked">
               <span>★</span>
-
-              <p>
-                Sign in or create an account to submit a rating and review.
-              </p>
-
+              <p>Sign in or create an account to submit a rating and review.</p>
               <div className="product-review-star-input">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -453,17 +310,14 @@ function ProductReviewSection({
                   </button>
                 ))}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowRegistrationPrompt(true)}
-              >
+              <button type="button" onClick={() => setShowRegistrationPrompt(true)}>
                 Rate this product
               </button>
             </div>
           )}
         </aside>
       </div>
+      
       {showRegistrationPrompt && (
         <div
           className="product-review-auth-backdrop"

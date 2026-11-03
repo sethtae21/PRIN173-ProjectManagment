@@ -268,7 +268,12 @@ export async function performJsonRequest(method, path, body, options = {}) {
   if (body instanceof FormData) payload = body;
   else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    payload = JSON.stringify(body);
+    // KAN-FIX (fit rating 400 "Expected a dictionary, but got str"): legacy
+    // callers (RatingControl) hand over an ALREADY-stringified body; the
+    // unconditional JSON.stringify re-encoded it into a JSON *string* root,
+    // which DRF rejects with non_field_errors. Pass strings through untouched
+    // and serialize plain objects exactly once.
+    payload = typeof body === 'string' ? body : JSON.stringify(body);
   }
 
   const url = `${API_BASE}${path}`;
@@ -509,6 +514,62 @@ export const getProfile = () => authApi.getProfile();
 export const updateProfile = (patch) => authApi.updateProfile(patch);
 export const changePassword = (o, n, c) => authApi.changePassword(o, n, c);
 export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
+
+// ----------------------------------------------------------------------------
+// Registration contact probe (PROVISIONAL CONTRACT — unblocks SignupPage.jsx)
+// SignupPage imports checkRegistrationContact; until its exact consumption is
+// confirmed against SignupPage.jsx, this helper behaves conservatively:
+//   200        -> returns the server payload verbatim
+//   400        -> contact rejected / already registered -> truthy flag object
+//   404/405/0  -> endpoint not deployed / backend offline -> false, so a
+//                 missing probe can NEVER block a legitimate signup
+// Replace with the exact contract once SignupPage.jsx + accounts urls/views
+// are reviewed.
+// ----------------------------------------------------------------------------
+export async function checkRegistrationContact(contact, extraPayload) {
+  const payload =
+    typeof contact === 'object' && contact !== null
+      ? { ...contact }
+      : { contact: String(contact ?? ''), ...(extraPayload || {}) };
+
+  const raw = String(
+    payload.contact ||
+    payload.email ||
+    payload.phone ||
+    payload.phone_number ||
+    ''
+  ).trim();
+
+  const email = /\S+@\S+\.\S+/.test(raw)
+    ? raw.toLowerCase()
+    : payload.email
+      ? String(payload.email).trim().toLowerCase()
+      : '';
+  const phone = email ? '' : raw.replace(/[^\d+]/g, '');
+
+  try {
+    return await performJsonRequest(
+      'POST',
+      '/auth/check-contact/',
+      { email, phone },
+      { auth: false },
+    );
+  } catch (err) {
+    const status = err?.status;
+    if (status === 400) {
+      return {
+        exists: true,
+        available: false,
+        registered: true,
+        detail: err.message || 'Contact already registered.',
+      };
+    }
+    if (status === 404 || status === 405 || status === 0) {
+      return false; // probe unavailable: never block signup
+    }
+    throw err;
+  }
+}
 
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
@@ -882,6 +943,7 @@ export default {
   validateSizeLabel, SIZE_RANGE_TABLE, SIZE_OPTIONS, HEIGHT_RANGE, BODY_BUILD_RANGE,
   sizeForBodyBuild, bodyProportion,
   bodyShapeForAvatar, avatarQueryParams, fetchRankedRecommendations, loadMatchReasons,
+  checkRegistrationContact,
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,
   outfitsApi, outfitsAPI, cartApi, cartAPI, checkoutApi, checkoutAPI,
   ordersApi, ordersAPI, recommendationsApi, recommendationsAPI,
@@ -891,50 +953,3 @@ export default {
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
   BASE_URL, API_URL,
 };
-
-export async function checkRegistrationContact(
-  email,
-  mobile,
-  { signal } = {}
-) {
-  const response = await fetch(
-    `${API_BASE}/auth/check-registration/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        mobile: mobile.trim(),
-      }),
-    }
-  );
-
-  const data = await response.json().catch(() => null);
-
-  if (response.status === 400 && data) {
-    const errors = {};
-
-    for (const field of ["email", "mobile"]) {
-      if (data[field]) {
-        errors[field] = Array.isArray(data[field])
-          ? data[field][0]
-          : String(data[field]);
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      return errors;
-    }
-  }
-
-  if (!response.ok || data?.available !== true) {
-    throw new Error(
-      "We couldn't check your email and mobile number. Please try again."
-    );
-  }
-
-  return {};
-}

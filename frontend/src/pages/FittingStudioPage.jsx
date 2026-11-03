@@ -8,6 +8,7 @@ import {
   loadMatchReasons,
   SIZE_RANGE_TABLE,
   sizeForBodyBuild,
+  getAccessToken,
 } from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -423,8 +424,14 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
+// FIX (registration popup shown to logged-in shoppers): the unified session
+// (services/session.js) stores the JWT under fitfusion.session.v1; the legacy
+// localStorage "access_token" key is never written anymore, so the old check
+// always returned null and RatingControl took its GUEST path (FR-7.5 prompt)
+// even for authenticated users. Derive the auth state from the canonical
+// session token instead; guests (isGuest) still receive null from the caller.
 function readAuthState() {
-  if (!localStorage.getItem("access_token")) return null;
+  if (!getAccessToken()) return null;
 
   try {
     const user = JSON.parse(

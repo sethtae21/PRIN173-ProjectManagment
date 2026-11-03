@@ -1,7 +1,7 @@
 import logging
-
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -122,6 +122,12 @@ class RatingSummaryView(APIView):
         score_count = len(scores)
         average = round(sum(scores) / score_count, 2) if score_count else 0.0
 
+        # NEW: per-star histogram for the distribution bars
+        star_counts = {str(i): 0 for i in range(1, 6)}
+        for row in qs.values('score').annotate(count=Count('id')):
+            if row['score'] is not None:
+                star_counts[str(row['score'])] = row['count']
+
         # Reaction dimension
         like_count = qs.filter(vote='like').count()
         dislike_count = qs.filter(vote='dislike').count()
@@ -145,6 +151,7 @@ class RatingSummaryView(APIView):
             'average': average,
             'like_count': like_count,
             'dislike_count': dislike_count,
+            'star_counts': star_counts,
             'guest_session_score_count': g_score_count,
             'guest_session_average': g_avg,
             'guest_session_like_count': g_like,
