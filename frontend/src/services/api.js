@@ -526,50 +526,6 @@ export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
 // Replace with the exact contract once SignupPage.jsx + accounts urls/views
 // are reviewed.
 // ----------------------------------------------------------------------------
-export async function checkRegistrationContact(contact, extraPayload) {
-  const payload =
-    typeof contact === 'object' && contact !== null
-      ? { ...contact }
-      : { contact: String(contact ?? ''), ...(extraPayload || {}) };
-
-  const raw = String(
-    payload.contact ||
-    payload.email ||
-    payload.phone ||
-    payload.phone_number ||
-    ''
-  ).trim();
-
-  const email = /\S+@\S+\.\S+/.test(raw)
-    ? raw.toLowerCase()
-    : payload.email
-      ? String(payload.email).trim().toLowerCase()
-      : '';
-  const phone = email ? '' : raw.replace(/[^\d+]/g, '');
-
-  try {
-    return await performJsonRequest(
-      'POST',
-      '/auth/check-contact/',
-      { email, phone },
-      { auth: false },
-    );
-  } catch (err) {
-    const status = err?.status;
-    if (status === 400) {
-      return {
-        exists: true,
-        available: false,
-        registered: true,
-        detail: err.message || 'Contact already registered.',
-      };
-    }
-    if (status === 404 || status === 405 || status === 0) {
-      return false; // probe unavailable: never block signup
-    }
-    throw err;
-  }
-}
 
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
@@ -953,7 +909,6 @@ export default {
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
   BASE_URL, API_URL,
 };
-
 
 export async function checkRegistrationContact(
   email,
