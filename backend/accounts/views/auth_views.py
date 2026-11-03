@@ -19,6 +19,7 @@ from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSe
 from accounts.serializers.auth_serializers import validate_password_strength 
 from accounts.utils import generate_jwt_tokens, blacklist_refresh_token, is_token_blacklisted
 from accounts.models import User
+from commerce.models import Order
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         })
 
     def destroy(self, request, *args, **kwargs):
-        """Delete account + cascade all owned data + invalidate tokens (RA 10173)."""
+        """Delete account + cascade active data + pseudonymize archived orders (RA 10173)."""
         user = self.get_object()
 
         refresh_raw = request.data.get('refresh')
@@ -152,8 +153,20 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
             except TokenError:
                 pass
 
+        # Preserve order archive while removing all active PII.
+        for order in Order.objects.filter(user=user):
+            order.user = None
+            order.recipient_name = ''
+            order.contact_number = ''
+            order.recipient_email = ''
+            order.shipping_address = ''
+            order.save(update_fields=[
+                'user', 'recipient_name', 'contact_number',
+                'recipient_email', 'shipping_address'
+            ])
+
         try:
-            user.delete()   # CASCADE: presets, outfits, cart, orders, listings
+            user.delete()  # CASCADE: presets, outfits, cart, and remaining active records
         except Exception as e:
             logger.error(f"Account deletion failed for user {request.user.id}: {e}")
             return Response({

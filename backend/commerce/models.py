@@ -48,7 +48,13 @@ class CartItem(models.Model):
 
 class Order(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('cancelled', 'Cancelled')]
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders'
+    )
     # Human-readable order number, stored NOT NULL and unique.
     order_number = models.CharField(max_length=32, unique=True, editable=False, default=generate_order_number)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -75,7 +81,7 @@ class Order(models.Model):
 
     def __str__(self):
         # KAN-FIX: User has no username field; use the model's own __str__.
-        return f"Order {self.order_number} - {self.user}"
+        return f"Order {self.order_number} - {self.user or 'deleted user'}"
 
 
 class OrderItem(models.Model):

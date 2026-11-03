@@ -9,9 +9,13 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import generics
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
 from accounts.serializers import UserSerializer
+from accounts.utils import blacklist_refresh_token
+from commerce.models import Order
 
 
 class ProfileView(generics.RetrieveUpdateDestroyAPIView):
@@ -52,7 +56,25 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         }, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
-        """FR-1.4: Hard-delete the account (RA 10173 right to erasure)."""
+        """FR-1.4: Hard-delete the account while pseudonymizing archived orders (RA 10173)."""
         user = self.get_object()
+        refresh_raw = request.data.get('refresh')
+        if refresh_raw:
+            try:
+                blacklist_refresh_token(RefreshToken(refresh_raw))
+            except TokenError:
+                pass
+
+        for order in Order.objects.filter(user=user):
+            order.user = None
+            order.recipient_name = ''
+            order.contact_number = ''
+            order.recipient_email = ''
+            order.shipping_address = ''
+            order.save(update_fields=[
+                'user', 'recipient_name', 'contact_number',
+                'recipient_email', 'shipping_address'
+            ])
+
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
