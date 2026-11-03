@@ -40,43 +40,43 @@ def validate_email_format(value: str) -> str:
 class RegistrationContactSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     mobile = serializers.CharField(required=True, allow_blank=False)
+    store_name = serializers.CharField(required=False, allow_blank=True)
 
     def validate_email(self, value):
         value = value.strip().lower()
-
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(
-                "This email is already used. "
-                "Please use another email address or log in."
+                "This email is already used. Please use another email address or log in."
             )
-
         return value
 
     def validate_mobile(self, value):
-        digits = "".join(
-            character for character in value
-            if character.isdigit()
-        )
-
-        if digits.startswith("63") and len(digits) == 12:
-            digits = "0" + digits[2:]
-
-        if len(digits) != 11 or not digits.startswith("09"):
+        digits = "".join(character for character in value if character.isdigit())
+        if len(digits) != 11:
+            raise serializers.ValidationError("Mobile number must contain exactly 11 digits.")
+        if not digits.startswith("09"):
+            raise serializers.ValidationError("Mobile number must begin with 09.")
+        if User.objects.filter(mobile=digits).exists():
             raise serializers.ValidationError(
-                "Enter a valid 11-digit mobile number starting with 09."
+                "This mobile number is already registered. Please use another number or log in."
             )
-
-        international = "63" + digits[1:]
-
-        if User.objects.filter(
-            mobile__in=[digits, international, "+" + international]
-        ).exists():
-            raise serializers.ValidationError(
-                "This mobile number is already used. "
-                "Please use another mobile number."
-            )
-
         return digits
+
+    def validate_store_name(self, value):
+        if not value or not value.strip():
+            return value
+
+        value = value.strip()
+
+        if len(value) < 2:
+            raise serializers.ValidationError("Store name must contain at least 2 characters.")
+
+        if User.objects.filter(store_name__iexact=value, role='seller').exists():
+            raise serializers.ValidationError(
+                "This store name is already taken. Please choose a different name."
+            )
+
+        return value
 
 
 class RegistrationSerializer(serializers.ModelSerializer):

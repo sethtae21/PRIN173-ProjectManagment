@@ -68,11 +68,9 @@ class RegistrationContactCheckView(APIView):
 
     def post(self, request):
         serializer = RegistrationContactSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        return Response({
-            "available": True
-        })
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        return Response({"available": True})
 
 
 class RegisterView(generics.CreateAPIView):

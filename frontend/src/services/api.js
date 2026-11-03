@@ -895,46 +895,55 @@ export default {
 export async function checkRegistrationContact(
   email,
   mobile,
+  storeName = "",
   { signal } = {}
 ) {
-  const response = await fetch(
-    `${API_BASE}/auth/check-registration/`,
-    {
+  try {
+    const response = await fetch(`${API_BASE}/auth/check-registration/`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        mobile: mobile.trim(),
+        email,
+        mobile,
+        store_name: storeName
       }),
-    }
-  );
+      signal
+    });
 
-  const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => ({}));
 
-  if (response.status === 400 && data) {
-    const errors = {};
-
-    for (const field of ["email", "mobile"]) {
-      if (data[field]) {
-        errors[field] = Array.isArray(data[field])
-          ? data[field][0]
-          : String(data[field]);
-      }
+    if (response.status === 400 && data) {
+      return {
+        email: data.email?.[0] ?? null,
+        mobile: data.mobile?.[0] ?? null,
+        store_name: data.store_name?.[0] ?? null
+      };
     }
 
-    if (Object.keys(errors).length > 0) {
-      return errors;
+    if (response.ok) {
+      return {
+        email: null,
+        mobile: null,
+        store_name: null
+      };
     }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw error;
+    }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
   }
-
-  if (!response.ok || data?.available !== true) {
-    throw new Error(
-      "We couldn't check your email and mobile number. Please try again."
-    );
-  }
-
-  return {};
 }
