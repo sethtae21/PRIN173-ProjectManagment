@@ -8,7 +8,6 @@
  * - Height and weight
  * - Shoulders, waist, hips, thighs
  * - Female cup size
- * - Skin tone and undertone
  * - Clothing overlays
  *
  * IMPORTANT:
@@ -31,6 +30,15 @@
  *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs)
  *   6. shared lattice warp (garment deforms with the body)
  * catalogIllustration() remains the fallback while loading / when missing.
+ *
+ * SIZE-TRUE GARMENT MESH (makeGarmentMesh): garments follow the body's
+ * POSITION and SHAPE but never squeeze/stretch with the Height / Body Build
+ * sliders. Implemented via two makeLattice config flags:
+ *   freezeWeight:true  -> ignore weight/body-build horizontal growth
+ *   rigidShift:true    -> one rigid vertical translation sampled at anchorT
+ *                         (shoulder line / waist / feet per category)
+ * Manual proportion growth (shoulders/waist/hips/thighs/cup) still applies
+ * so FR-2.7 alignment is preserved.
  */
 
 export const GRID_COLS = 37;
@@ -224,6 +232,8 @@ export function detectBodyBounds(canvas) {
     });
 
     left = Math.min(left, rowLeft);
+    // FIX (ReferenceError: x is not defined): this must aggregate the
+    // per-row scan result (rowRight), never the inner-loop variable x.
     right = Math.max(right, rowRight);
 
     top = Math.min(top, y);
@@ -301,15 +311,21 @@ export function makeLattice(
     1.35
   );
 
-  const positive = Math.max(
-    0,
-    weightChange
-  );
+  // NEW (size-true garment mesh): freezeWeight ignores the weight /
+  // body-build growth so a layer keeps its true width; rigidShift replaces
+  // the tapered per-row vertical shift with ONE rigid translation sampled at
+  // anchorT so a layer follows the body's position without stretching.
+  const freezeWeight = config.freezeWeight === true;
+  const rigidShift = config.rigidShift === true;
+  const anchorT = clamp(Number(config.anchorT ?? 0.245), 0, 1);
 
-  const negative = Math.min(
-    0,
-    weightChange
-  );
+  const positive = freezeWeight
+    ? 0
+    : Math.max(0, weightChange);
+
+  const negative = freezeWeight
+    ? 0
+    : Math.min(0, weightChange);
 
   const shoulder = option(
     config.shoulders,
@@ -365,6 +381,9 @@ export function makeLattice(
     -bounds.height * 0.16,
     Math.max(0, bounds.top - 12)
   );
+
+  // Rigid layers translate by exactly the body's shift at their anchor band.
+  const rigidFactor = 1 - smoothstep(0.13, 1, anchorT);
 
   const halfWidth = Math.max(
     1,
@@ -489,12 +508,13 @@ export function makeLattice(
       )
     );
 
-    const dy =
-      -heightShift *
-      (
-        1 -
-        smoothstep(0.13, 1, t)
-      );
+    const dy = rigidShift
+      ? -heightShift * rigidFactor
+      : -heightShift *
+        (
+          1 -
+          smoothstep(0.13, 1, t)
+        );
 
     const rowPoints = [];
 
@@ -594,6 +614,45 @@ export function makeLattice(
     referenceWeight,
     heightCm,
   };
+}
+
+// ==========================================
+// SIZE-TRUE GARMENT MESH
+// Garments follow the body's position (rigid translation at their anatomical
+// anchor) and the FR-2.7 shape controls, but never squeeze/stretch with the
+// Height / Body Build sliders.
+// ==========================================
+
+const GARMENT_ANCHOR_T = {
+  tops: 0.245, // shoulder line
+  knits: 0.245,
+  outerwear: 0.245,
+  dresses: 0.245,
+  bottoms: 0.52, // waist / hip
+  skirt: 0.52,
+  footwear: 0.95, // planted at the feet
+};
+
+export function garmentAnchorT(product) {
+  return (
+    GARMENT_ANCHOR_T[regionKeyForProduct(product)] ??
+    0.245
+  );
+}
+
+export function makeGarmentMesh(
+  width,
+  height,
+  bounds,
+  baseConfig = {},
+  product
+) {
+  return makeLattice(width, height, bounds, {
+    ...baseConfig,
+    freezeWeight: true,
+    rigidShift: true,
+    anchorT: garmentAnchorT(product),
+  });
 }
 
 // ==========================================
@@ -1036,8 +1095,7 @@ export function tintBody(
         data[i] * 0.21 +
         data[i + 1] * 0.72 +
         data[i + 2] * 0.07
-      ) /
-      255;
+      ) / 255;
 
     count++;
   }
@@ -1046,8 +1104,7 @@ export function tintBody(
     return canvas;
   }
 
-  const average =
-    total / count;
+  const average = total / count;
 
   for (
     let i = 0;
@@ -1063,8 +1120,7 @@ export function tintBody(
         data[i] * 0.21 +
         data[i + 1] * 0.72 +
         data[i + 2] * 0.07
-      ) /
-      255;
+      ) / 255;
 
     const light = clamp(
       1 +
@@ -1309,7 +1365,7 @@ function cropTransparentCanvas(image) {
           stack[sp++] = n;
         }
       }
-      if (y < sw - 1 + 1 && y < sh - 1) {
+      if (y < sh - 1) {
         const n = idx + sw;
         if (!visited[n] && opaque[n] && !outside[n]) {
           visited[n] = 1;
