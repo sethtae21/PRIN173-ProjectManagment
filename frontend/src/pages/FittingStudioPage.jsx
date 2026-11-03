@@ -427,9 +427,9 @@ function formatCurrency(amount) {
 // FIX (registration popup shown to logged-in shoppers): the unified session
 // (services/session.js) stores the JWT under fitfusion.session.v1; the legacy
 // localStorage "access_token" key is never written anymore, so the old check
-// always returned null and RatingControl took its GUEST path (FR-7.5 prompt)
-// even for authenticated users. Derive the auth state from the canonical
-// session token instead; guests (isGuest) still receive null from the caller.
+// always returned null and RatingControl took its guest path (FR-7.5 prompt).
+// Derive the auth state from the canonical session token; guests (isGuest)
+// still receive null from the caller.
 function readAuthState() {
   if (!getAccessToken()) return null;
 
@@ -466,6 +466,22 @@ function reconcileAvatarGender(avatar, isGuest) {
     gender: saved,
     cupSize: saved === "Female" ? avatar.cupSize || "B" : null,
   };
+}
+
+function activePresetKey(isGuest) {
+  return isGuest
+    ? "fitfusion-guest-avatar-preset"
+    : "fitfusion-avatar-preset";
+}
+
+// NEW: id of the preset last activated via "Use" (Avatar Presets, dashboard
+// Continue Fitting Session, preset editor). The studio compares it against
+// the session's avatarPresetId stamp to detect a freshly activated body.
+function readActivePresetId(isGuest) {
+  const storage = isGuest ? sessionStorage : localStorage;
+  const saved = readJson(storage, activePresetKey(isGuest));
+  const id = saved?.id ?? saved?.presetId;
+  return id === undefined || id === null ? null : String(id);
 }
 
 function choiceValue(value) {
@@ -535,10 +551,7 @@ function loadAvatar(isGuest) {
   const genderKey = isGuest
     ? "fitfusion-guest-avatar-gender"
     : "fitfusion-avatar-gender";
-  const presetKey = isGuest
-    ? "fitfusion-guest-avatar-preset"
-    : "fitfusion-avatar-preset";
-  const savedPreset = readJson(storage, presetKey);
+  const savedPreset = readJson(storage, activePresetKey(isGuest));
 
   return {
     gender: normalizeGender(
@@ -1085,13 +1098,35 @@ function FittingStudioPage({ isGuest = false }) {
   const recommendationsRef = useRef(null);
   const matchPanelRef = useRef(null);
 
-  const [avatar, setAvatar] = useState(
-    () =>
-      reconcileAvatarGender(
-        readStudioSession(isGuest)?.avatar || loadAvatar(isGuest),
-        isGuest
-      )
-  );
+  // CHANGED (activated-preset adoption): if the preset activated via "Use"
+  // (Avatar Presets / dashboard / preset editor) differs from the preset the
+  // cached session avatar came from, the studio adopts the activated preset's
+  // body instead of resurrecting the stale session body.
+  const [avatar, setAvatar] = useState(() => {
+    const session = readStudioSession(isGuest);
+    const activeId = readActivePresetId(isGuest);
+    const sessionMatchesActive =
+      !activeId || String(session?.avatarPresetId ?? "") === activeId;
+
+    const base =
+      session?.avatar && sessionMatchesActive
+        ? session.avatar
+        : loadAvatar(isGuest);
+
+    return reconcileAvatarGender(base, isGuest);
+  });
+
+  // NEW: stamp of the preset id the live avatar was loaded from.
+  const [avatarPresetId, setAvatarPresetId] = useState(() => {
+    const session = readStudioSession(isGuest);
+    const activeId = readActivePresetId(isGuest);
+
+    if (activeId && String(session?.avatarPresetId ?? "") !== activeId) {
+      return activeId;
+    }
+
+    return session?.avatarPresetId ?? activeId ?? "";
+  });
 
   const [currentView, setCurrentView] = useState(() => {
     const stored = readStudioSession(isGuest)?.currentView || "Front";
@@ -1247,11 +1282,9 @@ function FittingStudioPage({ isGuest = false }) {
     ]
   );
 
-  // CHANGED: the session now carries ONLY avatar + view + the writer stamp.
-  // Equipped items are deliberately NOT persisted, so leaving the studio
-  // (any sidebar page, gender page, presets, refresh) always comes back to
-  // an empty avatar. FR-5.6 re-equip works because Saved Outfits writes its
-  // own session without the stamp.
+  // CHANGED: the session now carries avatar + view + writer stamp + the
+  // preset-id stamp. Equipped items are deliberately NOT persisted, so
+  // leaving the studio always comes back to an empty avatar.
   useEffect(() => {
     sessionStorage.setItem(
       sessionKey(isGuest),
@@ -1259,9 +1292,10 @@ function FittingStudioPage({ isGuest = false }) {
         avatar,
         currentView,
         equippedGender: avatar.gender,
+        avatarPresetId,
       })
     );
-  }, [avatar, currentView, isGuest]);
+  }, [avatar, currentView, isGuest, avatarPresetId]);
 
   useEffect(() => {
     let active = true;
@@ -1399,9 +1433,7 @@ function FittingStudioPage({ isGuest = false }) {
     window.setTimeout(() => setNotification(""), 2500);
   }
 
-  // CHANGED: snapshot no longer carries equippedItems / originalDimensions,
-  // so returning from product details starts from an empty wardrobe and then
-  // applies the pending Try-Item only.
+  // CHANGED: snapshot carries the preset-id stamp as well.
   function openProductDetails(item) {
     sessionStorage.setItem(
       sessionKey(isGuest),
@@ -1409,6 +1441,7 @@ function FittingStudioPage({ isGuest = false }) {
         avatar,
         currentView,
         equippedGender: avatar.gender,
+        avatarPresetId,
       })
     );
 
@@ -1563,6 +1596,7 @@ function FittingStudioPage({ isGuest = false }) {
         JSON.stringify(savedPreset)
       );
       localStorage.setItem("fitfusion-avatar-gender", savedPreset.gender);
+      setAvatarPresetId(savedPreset.id);
 
       closeSaveAvatarModal();
       displayNotification(`"${name}" was saved to Avatar Presets.`);

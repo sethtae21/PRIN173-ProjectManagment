@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import { presetsApi } from "../services/api";
 import "./css/AvatarPresetPage.css";
@@ -63,9 +63,7 @@ function getPresetList(data) {
 }
 
 function normalizeGender(value) {
-  return String(value || "").trim().toLowerCase() === "male"
-    ? "Male"
-    : "Female";
+  return String(value || "").trim().toLowerCase() === "male" ? "Male" : "Female";
 }
 
 function capitalizeChoice(value, fallback) {
@@ -221,6 +219,7 @@ function PresetModal({ children, titleId, busy, onClose }) {
 
 export default function AvatarPresetPage({ isGuest = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const basePath = isGuest ? "/guest" : "/shopper";
 
   const [customPresets, setCustomPresets] = useState([]);
@@ -241,6 +240,8 @@ export default function AvatarPresetPage({ isGuest = false }) {
 
   const mutationRef = useRef(false);
   const requestVersionRef = useRef(0);
+  // NEW: applies the Product Details modal choice (premade vs custom) once.
+  const kindAppliedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -291,6 +292,28 @@ export default function AvatarPresetPage({ isGuest = false }) {
       window.removeEventListener("focus", fetchPresets);
     };
   }, [isGuest, reloadKey]);
+
+  // NEW: honor the try-on modal choice — preselect FitFusion Standard or the
+  // shopper's first saved custom avatar so they only press Use.
+  useEffect(() => {
+    if (kindAppliedRef.current || loading) return;
+
+    const kind = location.state?.presetKind;
+    if (!kind) return;
+
+    kindAppliedRef.current = true;
+
+    if (kind === "custom") {
+      const first = customPresets[0];
+      if (first) {
+        setSelectedPresetId(String(first.id));
+      }
+    } else {
+      setSelectedPresetId(BUILT_IN_PRESET.id);
+    }
+
+    setPreviewView("front");
+  }, [loading, customPresets, location.state]);
 
   useEffect(() => {
     if (!toastMessage) return undefined;
@@ -412,8 +435,6 @@ export default function AvatarPresetPage({ isGuest = false }) {
         return;
       }
 
-      // Read the current server record so full-update APIs retain
-      // its saved measurements, appearance, and other settings.
       const currentRecord = await presetsApi.get(targetId);
 
       if (!currentRecord || typeof currentRecord !== "object") {

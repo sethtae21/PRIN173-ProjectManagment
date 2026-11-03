@@ -2,9 +2,9 @@
  * FitFusion AI
  * Weight-responsive 2D Avatar Engine
  *
- * BUILD MARKER: DRESS-LENGTH-FIX v2  (grep for DRESS_HEM_MIN_T to confirm
- * this exact file is the one Vite is serving; if the marker is missing you
- * are running a stale/merged copy and dresses will render hip-length.)
+ * BUILD MARKER: DRESS-LENGTH-FIX v2 + SLEEVE-ASPECT v3
+ * (grep for DRESS_HEM_MIN_T and MIN_SLEEVE_ASPECT to confirm this exact file
+ * is the one Vite is serving.)
  *
  * Supports:
  * - Female and Male Standard avatars
@@ -21,32 +21,25 @@
  * Try-on pipeline (deterministic 2D overlay — SRS FR-2.6/2.7, FR-5.x /
  * KAN-67-68; charter: no ML, no cloth physics, no WebGL):
  *   1. same-origin load + cache
- *   2. largest-connected-component + hole-fill alpha crop (kills hanger /
- *      tag / shadow / rembg-haze inflation of the bounding box)
+ *   2. largest-connected-component + hole-fill alpha crop
  *   3. category -> anatomical region (gender-aware; knitwear has its own
  *      region with the collar at the shoulder line and the hem at the hip)
- *   4. long-sleeve drape: a flat-lay whose sleeves lie HORIZONTALLY has a
- *      long horizontal side-wing (>= 0.5 x hem width); such garments are
- *      composited as torso + two 90-degree-rotated sleeve panels draped
- *      down each arm from shoulder to wrist. Vertical-sleeve garments
- *      (the blazer) and short-sleeve tees have narrow wings and keep the
- *      proven plain stretch, so their fit is unchanged.
+ *   4. long-sleeve drape: ONLY flat-lays whose side wings are true horizontal
+ *      sleeves (wing length >= 0.5 x torso width AND wing aspect
+ *      length/thickness >= 2.2) are composited as torso + two 90-degree
+ *      rotated sleeve panels draped shoulder->wrist. Short-sleeve tees and
+ *      vertical-sleeve jackets fail the aspect test and keep the proven plain
+ *      stretch, so they render as ONE connected, fully visible layer.
  *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs)
  *   6. shared lattice warp (garment deforms with the body)
  * catalogIllustration() remains the fallback while loading / when missing.
  *
  * SIZE-TRUE GARMENT MESH (makeGarmentMesh): garments follow the body's
  * POSITION and SHAPE but never squeeze/stretch with the Height / Body Build
- * sliders. Implemented via two makeLattice config flags:
- *   freezeWeight:true  -> ignore weight/body-build horizontal growth
- *   rigidShift:true    -> one rigid vertical translation sampled at anchorT
- *                         (shoulder line / waist / feet per category)
- * Manual proportion growth (shoulders/waist/hips/thighs/cup) still applies
- * so FR-2.7 alignment is preserved.
+ * sliders (freezeWeight + rigidShift flags in makeLattice).
  *
- * DRESS LENGTH FIX: dresses are detected from category / rawCategory / name
- * (the studio collapses categories to top/bottom/shoes when equipping), get
- * their own below-knee..above-ankle region, keep the garment photo's own
+ * DRESS LENGTH FIX: dresses are detected from category / rawCategory / name,
+ * get their own below-knee..above-ankle region, keep the garment photo's own
  * length (aspect-driven hem), and skip the body-silhouette clip so the
  * inter-leg gap cannot punch a hole through the hem.
  */
@@ -319,10 +312,6 @@ export function makeLattice(
     1.35
   );
 
-  // SIZE-TRUE GARMENT MESH: freezeWeight ignores the weight / body-build
-  // growth so a layer keeps its true width; rigidShift replaces the tapered
-  // per-row vertical shift with ONE rigid translation sampled at anchorT so
-  // a layer follows the body's position without stretching.
   const freezeWeight = config.freezeWeight === true;
   const rigidShift = config.rigidShift === true;
   const anchorT = clamp(Number(config.anchorT ?? 0.245), 0, 1);
@@ -390,7 +379,6 @@ export function makeLattice(
     Math.max(0, bounds.top - 12)
   );
 
-  // Rigid layers translate by exactly the body's shift at their anchor band.
   const rigidFactor = 1 - smoothstep(0.13, 1, anchorT);
 
   const halfWidth = Math.max(
@@ -626,19 +614,16 @@ export function makeLattice(
 
 // ==========================================
 // SIZE-TRUE GARMENT MESH
-// Garments follow the body's position (rigid translation at their anatomical
-// anchor) and the FR-2.7 shape controls, but never squeeze/stretch with the
-// Height / Body Build sliders.
 // ==========================================
 
 const GARMENT_ANCHOR_T = {
-  tops: 0.245, // shoulder line
+  tops: 0.245,
   knits: 0.245,
   outerwear: 0.245,
   dresses: 0.245,
-  bottoms: 0.52, // waist / hip
+  bottoms: 0.52,
   skirt: 0.52,
-  footwear: 0.95, // planted at the feet
+  footwear: 0.95,
 };
 
 export function garmentAnchorT(product) {
@@ -702,7 +687,6 @@ export function renderLayer(
       height
     ).data;
   } catch {
-    // Tainted layer must never abort the whole avatar render.
     ctx.drawImage(source, 0, 0);
     return;
   }
@@ -1196,18 +1180,6 @@ function sameOriginMedia(src) {
   return raw;
 }
 
-// Gender- + category-aware anatomical regions, in bounds-relative
-// coordinates: X(p) = cx + width*p, Y(p) = top + height*p.
-//
-// FIX (crewneck "up a little bit more"): knit collar/shoulder line raised
-// again (male y0 0.165 -> 0.145, female 0.15 -> 0.135) so the deltoid caps
-// and upper chest are covered; hem held at the hip so the stomach stays
-// covered and tucks under the jeans waistband. Outerwear (blazers/coats)
-// keeps its proven region and is NEVER draped (see DRAPEABLE).
-//
-// FIX (dress hem at the hip): dresses now span shoulder -> above-ankle
-// (y1 0.90) so the aspect-driven hem branch below can place short dresses
-// below the knee and long dresses at their true midi/maxi length.
 const GARMENT_REGIONS = {
   male: {
     tops: { x0: -0.50, x1: 0.50, y0: 0.140, y1: 0.50 },
@@ -1234,15 +1206,8 @@ const GARMENT_REGIONS = {
 const DRESS_HEM_MIN_T = 0.75;
 
 // Only flat-lay knits and tees are eligible for the long-sleeve drape.
-// Outerwear (the blazer) and bottoms always use the proven plain stretch,
-// so the approved blazer/jeans fit cannot regress.
 const DRAPEABLE = new Set(["tops", "knits"]);
 
-// Per-gender arm drape endpoints (fraction of body height): the shoulder
-// joint (sleeve cap, raised to meet the collar) down to the WRIST, plus the
-// horizontal arm strip the rotated sleeve is mapped to and the torso
-// half-width the torso panel is stretched to. The silhouette clip trims the
-// generous strip down to the real arm taper, so the cuff lands on the wrist.
 const ARM_DRAPE = {
   male: {
     top: 0.15,
@@ -1496,10 +1461,6 @@ function regionKeyForProduct(product) {
     product.category || "Tops"
   ).toLowerCase();
 
-  // FIX (dress rendered as a top): the Fitting Studio collapses categories
-  // to top/bottom/shoes when equipping, so the dress signal survives only on
-  // rawCategory -- and as a last resort on the product NAME. Deliberately
-  // excludes the menswear phrase "dress shirt", which must stay a top.
   const rawCategory = String(
     product.rawCategory || ""
   ).toLowerCase();
@@ -1565,12 +1526,15 @@ function regionForProduct(product, gender = "male") {
 // Orientation-agnostic: the TRUE torso width is the median opaque width of
 // the HEM band (bottom 22%, never touched by sleeves). The centre x is the
 // hem-band median centre. We then scan the upper band for opaque pixels that
-// sit outside the torso column ("side wings"). A sleeve laid HORIZONTALLY
-// produces a wing whose HORIZONTAL extent (sleeve length) is long
-// (>= 0.5 x torso width); a vertical sleeve (the blazer) or a short tee cap
-// produces only a narrow wing (sleeve diameter / cap length). So a long wing
-// uniquely identifies a flat-lay long-sleeve garment that must be draped;
-// anything else returns null and keeps the proven plain stretch.
+// sit outside the torso column ("side wings").
+//
+// FIX (SLEEVE-ASPECT v3): each wing now records its OWN vertical extent, and
+// a wing only counts as a laid-flat LONG sleeve when
+//     length >= 0.5 x torso width  AND  length / thickness >= 2.2.
+// Short-sleeve tees (diagonal caps, aspect ~1-1.5) fail the aspect test and
+// keep the plain stretch, so they render as ONE connected, fully visible
+// layer instead of a tank torso + detached arm tubes. True horizontal sleeves
+// (the sweater) have aspect ~3+ and still drape shoulder->wrist.
 function analyzeTShape(cropped) {
   const cw = cropped.width;
   const ch = cropped.height;
@@ -1642,49 +1606,65 @@ function analyzeTShape(cropped) {
   const halfTorso = torsoW / 2;
   const margin = Math.max(2, Math.round(torsoW * 0.06));
 
-  // Upper band -> side wings (pixels outside the torso column).
+  // Upper band -> side wings with PER-WING vertical extents.
   const upperEnd = top + Math.round(H * 0.66);
   let lMinX = cw;
   let lMaxX = -1;
+  let lMinY = -1;
+  let lMaxY = -1;
   let rMinX = cw;
   let rMaxX = -1;
-  let sTop = -1;
-  let sBottom = -1;
+  let rMinY = -1;
+  let rMaxY = -1;
 
   for (let y = top; y <= upperEnd; y += 1) {
     if (rowCnt[y] <= 0) continue;
-    if (sTop < 0) sTop = y;
-    sBottom = y;
 
     for (let x = rowMin[y]; x <= rowMax[y]; x += 1) {
       if (data[(y * cw + x) * 4 + 3] <= ALPHA) continue;
+
       if (x < cx - halfTorso - margin) {
         if (x < lMinX) lMinX = x;
         if (x > lMaxX) lMaxX = x;
+        if (lMinY < 0) lMinY = y;
+        lMaxY = y;
       } else if (x > cx + halfTorso + margin) {
         if (x < rMinX) rMinX = x;
         if (x > rMaxX) rMaxX = x;
+        if (rMinY < 0) rMinY = y;
+        rMaxY = y;
       }
     }
   }
 
   const leftWing =
-    lMaxX >= lMinX
-      ? { x0: lMinX, x1: lMaxX, y0: sTop, y1: sBottom }
+    lMaxX >= lMinX && lMaxY >= lMinY
+      ? { x0: lMinX, x1: lMaxX, y0: lMinY, y1: lMaxY }
       : null;
   const rightWing =
-    rMaxX >= rMinX
-      ? { x0: rMinX, x1: rMaxX, y0: sTop, y1: sBottom }
+    rMaxX >= rMinX && rMaxY >= rMinY
+      ? { x0: rMinX, x1: rMaxX, y0: rMinY, y1: rMaxY }
       : null;
 
   const wingLenL = leftWing ? leftWing.x1 - leftWing.x0 : 0;
   const wingLenR = rightWing ? rightWing.x1 - rightWing.x0 : 0;
-  const longest = Math.max(wingLenL, wingLenR);
+  const wingThickL = leftWing ? leftWing.y1 - leftWing.y0 : 0;
+  const wingThickR = rightWing ? rightWing.y1 - rightWing.y0 : 0;
 
-  // Long horizontal wing => flat-lay long sleeve => drape. Otherwise the
-  // sleeves are vertical (blazer) or short (tee) => plain stretch.
+  const aspectL = wingLenL / Math.max(4, wingThickL);
+  const aspectR = wingLenR / Math.max(4, wingThickR);
+
+  const longest = Math.max(wingLenL, wingLenR);
+  const bestAspect = Math.max(aspectL, aspectR);
+
   const LONG_WING_RATIO = 0.5;
-  if (longest < torsoW * LONG_WING_RATIO || longest < 8) {
+  const MIN_SLEEVE_ASPECT = 2.2;
+
+  if (
+    longest < torsoW * LONG_WING_RATIO ||
+    longest < 8 ||
+    bestAspect < MIN_SLEEVE_ASPECT
+  ) {
     return null;
   }
 
@@ -1701,9 +1681,7 @@ function analyzeTShape(cropped) {
 }
 
 // Draw one photo-space rectangle, rotated 90 degrees, into a body-space
-// vertical strip. After rotate(+-PI/2) the LOCAL width becomes the GLOBAL
-// vertical extent and the LOCAL height the GLOBAL horizontal extent, so
-// callers pass (verticalLength = arm span, horizontalThickness = arm width).
+// vertical strip.
 function drawRotatedPanel(
   ctx,
   img,
@@ -1794,11 +1772,7 @@ export function garmentImageLayer(
         ctx.drawImage(cropped, rightX, ry, rightW, rh);
       }
     } else if (regionKey === "dresses") {
-      // FIX (dress length): one-piece garments keep their OWN photo length.
-      // The hem is the photo aspect at region width, clamped so it always
-      // falls BELOW the knee (DRESS_HEM_MIN_T) and never past the region max
-      // (above the ankle). Short dresses stop just below the knee; midi/maxi
-      // dresses show their true length.
+      // Dress keeps its OWN photo length; hem clamped below-knee..ankle.
       const rx = X(region.x0);
       const rw = X(region.x1) - rx;
 
@@ -1814,9 +1788,6 @@ export function garmentImageLayer(
 
       ctx.drawImage(cropped, rx, ry, rw, dressH);
     } else if (DRAPEABLE.has(regionKey)) {
-      // Long-sleeve flat-lay knits/tees: torso panel + two rotated sleeve
-      // wings draped shoulder->wrist. Vertical-sleeve / short-sleeve
-      // garments (analyzeTShape -> null) use the plain stretch below.
       const shape = analyzeTShape(cropped);
 
       if (shape) {
@@ -1825,7 +1796,6 @@ export function garmentImageLayer(
             ? ARM_DRAPE.female
             : ARM_DRAPE.male;
 
-        // Torso panel (full garment height, torso column width).
         const torsoX0 = X(-arm.torsoHalf);
         const torsoX1 = X(arm.torsoHalf);
         const torsoY0 = Y(region.y0);
@@ -1843,7 +1813,6 @@ export function garmentImageLayer(
           torsoY1 - torsoY0
         );
 
-        // Arm strips: shoulder joint -> wrist.
         const armTop = Y(arm.top);
         const armBottom = Y(arm.bottom);
         const armLen = armBottom - armTop;
@@ -1900,17 +1869,12 @@ export function garmentImageLayer(
       ctx.drawImage(cropped, rx, ry, rw, rh);
     }
   } catch {
-    // Any drape/analysis failure must not lose the garment: fall back to a
-    // plain stretch of the whole crop into the region.
     const rx = X(region.x0);
     const rw = X(region.x1) - rx;
     if (rw > 0) ctx.drawImage(cropped, rx, ry, rw, rh);
   }
 
-  // Silhouette clip (cloth hugs arms / legs / feet).
-  // FIX: dresses SKIP the clip -- the dilated body mask has a gap between the
-  // legs at knee height, which punched a hole through the hem; a one-piece
-  // garment is intentionally wider than the body below the hip.
+  // Silhouette clip (cloth hugs arms / legs / feet); dresses skip it.
   if (bodyMaskSource && regionKey !== "dresses") {
     const mask = newCanvas(width, height);
     const mctx = mask.getContext("2d");

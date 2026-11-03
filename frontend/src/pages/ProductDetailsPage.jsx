@@ -4,7 +4,6 @@ import { API_URL, cartAPI, ratingsApi, invalidateCache } from "../services/api";
 import { getAccessToken } from "../services/session";
 import "./css/ProductDetailsPage.css";
 
-// Helper to construct image URLs
 function mediaUrl(path) {
   if (!path) return null;
   if (String(path).startsWith("http")) return path;
@@ -36,11 +35,6 @@ function getCartCount() {
   );
 }
 
-// FIX (ratings never reflected): ratingsApi.summary() takes TWO POSITIONAL
-// args (targetType, targetId). The previous object-style call produced
-// target_type=[object Object]&target_id=undefined -> 400 -> zeros on screen.
-// The summary is also an in-memory cache that survives client-side routing,
-// so we bust its key before every fetch to always show database truth.
 function ratingCacheKey(productId) {
   return `ratings:item:${productId}`;
 }
@@ -64,7 +58,6 @@ function ProductDetailsPage({ isGuest = false }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   
-  // UI State
   const [selectedView, setSelectedView] = useState("front");
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState("");
@@ -74,7 +67,8 @@ function ProductDetailsPage({ isGuest = false }) {
   const [cartError, setCartError] = useState("");
   const [cartCount, setCartCount] = useState(getCartCount());
 
-  // Rating state (live DB aggregate)
+  const [showTryOnModal, setShowTryOnModal] = useState(false);
+
   const [ratingSummary, setRatingSummary] = useState({
     average: 0,
     score_count: 0,
@@ -83,7 +77,6 @@ function ProductDetailsPage({ isGuest = false }) {
   const [userRating, setUserRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
 
-  // 1. Fetch Product Data
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -99,16 +92,11 @@ function ProductDetailsPage({ isGuest = false }) {
         if (isMounted) {
           setProduct({
             ...data,
-            // FIX: Side view removed — the backend pipeline only stores
-            // Front and Rear assets, so the Side button was dead UI.
             frontImageUrl: mediaUrl(data.front_image),
             rearImageUrl: mediaUrl(data.rear_image),
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
             sellerName: data.store_name || "FitFusion Store",
             availableSize: data.size || "M",
-            // SIZE POLICY: clothing shows "M (96-102 cm)"; footwear shows the
-            // triple regional string from size_regions, e.g.
-            // "EU 40 · US 9 · UK 7 (24.5-25.0 cm)" (cm always EU-based).
             sizeDisplay: [
               data.size_regions || data.size || "M",
               data.size_cm || "",
@@ -130,9 +118,6 @@ function ProductDetailsPage({ isGuest = false }) {
     return () => { isMounted = false; };
   }, [productId]);
 
-  // 2. Fetch LIVE rating summary from the database (fix: positional args +
-  //    cache bust so a fit rating submitted in the Fitting Studio — or in
-  //    this same SPA session — is always reflected).
   useEffect(() => {
     let active = true;
 
@@ -156,7 +141,6 @@ function ProductDetailsPage({ isGuest = false }) {
     };
   }, [productId]);
 
-  // Update cart count when cart changes
   useEffect(() => {
     const updateCount = () => setCartCount(getCartCount());
     window.addEventListener("fitfusion-cart-updated", updateCount);
@@ -167,25 +151,43 @@ function ProductDetailsPage({ isGuest = false }) {
     };
   }, []);
 
-  // 3. Actions
   function handleSellerNavigation() {
     console.log("Viewing store for:", product?.store_name);
   }
 
   function handleTryOn() {
     if (!product) return;
+    setShowTryOnModal(true);
+  }
+
+  // CHANGED: both choices open Avatar Presets (premade pre-selects the
+  // standard avatar, custom pre-selects your first saved custom avatar).
+  // Pressing Use there continues to the Fitting Studio, which equips the
+  // staged garment via the pending-item handshake.
+  function chooseTryOnPath(mode) {
+    if (!product) return;
+
     const selectedItem = {
       ...product,
       selectedSize: product.availableSize,
       selectedColor: product.color,
       quantity,
     };
-    if (guestMode) {
-      sessionStorage.setItem("fitfusion-selected-items", JSON.stringify([selectedItem]));
-    } else {
-      localStorage.setItem("fitfusion-selected-items", JSON.stringify([selectedItem]));
+
+    try {
+      const pendingKey = `fitfusion-fitting-studio-pending-item-${
+        guestMode ? "guest" : "shopper"
+      }`;
+      sessionStorage.setItem(pendingKey, JSON.stringify(selectedItem));
+    } catch (err) {
+      console.error("Unable to stage try-on item:", err);
     }
-    navigate(`${basePath}/fitting-studio/customize`);
+
+    setShowTryOnModal(false);
+
+    navigate(`${basePath}/avatar-presets`, {
+      state: { presetKind: mode === "premade" ? "premade" : "custom" },
+    });
   }
 
   async function handleAddToCart() {
@@ -201,10 +203,8 @@ function ProductDetailsPage({ isGuest = false }) {
     setMessage("");
     
     try {
-      // Call backend API to add item to cart
       await cartAPI.addItem(product.id, quantity);
       
-      // Update localStorage cart for immediate UI feedback
       const cart = readCart();
       const existingIndex = cart.findIndex((item) => item.id === product.id);
       const nextCart = [...cart];
@@ -241,7 +241,6 @@ function ProductDetailsPage({ isGuest = false }) {
     }
   }
 
-  // Interactive star rating -> POST /ratings/ (DB) then refresh summary
   async function handleStarRate(stars) {
     if (guestMode) {
       setRestrictedFeature("rate products");
@@ -291,7 +290,6 @@ function ProductDetailsPage({ isGuest = false }) {
     );
   }
 
-  // FIX: Side view removed — only Front / Rear assets exist.
   const currentImage =
     selectedView === "front" ? product.frontImageUrl : product.rearImageUrl;
 
@@ -325,7 +323,6 @@ function ProductDetailsPage({ isGuest = false }) {
           <strong>{product.name}</strong>
         </nav>
         <section className="product-details-grid">
-          {/* LEFT: Gallery */}
           <div className="product-details-gallery">
             <div className="product-details-image-container">
               {currentImage ? (
@@ -340,7 +337,6 @@ function ProductDetailsPage({ isGuest = false }) {
                 </div>
               )}
             </div>
-            {/* FIX: Side button removed — only Front / Rear remain */}
             <div className="product-view-buttons">
               {["front", "rear"].map((view) => {
                 const hasImage =
@@ -359,7 +355,6 @@ function ProductDetailsPage({ isGuest = false }) {
               })}
             </div>
           </div>
-          {/* RIGHT: Information */}
           <article className="product-information">
             <p className="product-category">{product.displayCategory}</p>
             <h1>{product.name}</h1>
@@ -367,13 +362,11 @@ function ProductDetailsPage({ isGuest = false }) {
               <strong>{formatCurrency(product.price)}</strong>
             </div>
             <p className="product-description">{product.description}</p>
-            {/* Size Info Card */}
             <div className="product-match-card">
               <span>AVAILABLE SIZE</span>
               <strong>{product.sizeDisplay}</strong>
               <p>Standard size chart reference.</p>
             </div>
-            {/* Color Selection */}
             <section className="product-option-group">
               <div className="product-option-heading">
                 <h2>Color</h2>
@@ -385,7 +378,6 @@ function ProductDetailsPage({ isGuest = false }) {
                 </button>
               </div>
             </section>
-            {/* Size Selection */}
             <section className="product-option-group">
               <div className="product-option-heading">
                 <h2>Size</h2>
@@ -434,7 +426,6 @@ function ProductDetailsPage({ isGuest = false }) {
             )}
           </article>
         </section>
-        {/* Seller Card */}
         <section className="product-seller-card">
           <div>
             <p>SELLER</p>
@@ -445,7 +436,6 @@ function ProductDetailsPage({ isGuest = false }) {
             View Seller Store
           </button>
         </section>
-        {/* Product Information Table */}
         <section className="product-information-card">
           <h2>Product information</h2>
           <div className="product-information-list">
@@ -463,7 +453,6 @@ function ProductDetailsPage({ isGuest = false }) {
             </div>
           </div>
         </section>
-        {/* RATINGS SECTION (LIVE DB INTEGRATED) */}
         <section className="product-ratings-section">
           <div className="product-ratings-header">
             <div>
@@ -482,7 +471,6 @@ function ProductDetailsPage({ isGuest = false }) {
             </div>
           </div>
 
-          {/* Interactive Stars */}
           <div style={{ margin: "16px 0", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "14px", fontWeight: "600", color: "#17130f" }}>Rate this product:</span>
             <div className="product-review-star-input" style={{ display: "flex", gap: "4px" }}>
@@ -541,7 +529,76 @@ function ProductDetailsPage({ isGuest = false }) {
           </p>
         </section>
       </div>
-      {/* Guest Modal */}
+
+      {/* TRY-ON AVATAR CHOICE MODAL */}
+      {showTryOnModal && (
+        <div
+          className="guest-product-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setShowTryOnModal(false)}
+        >
+          <section
+            className="guest-product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tryon-avatar-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="guest-product-close"
+              aria-label="Close avatar choice"
+              onClick={() => setShowTryOnModal(false)}
+            >
+              ×
+            </button>
+            <p>TRY IN FITTING STUDIO</p>
+            <h2 id="tryon-avatar-title">Which avatar will you use?</h2>
+            <span>
+              Choose how you want to preview {product.name}. The garment is
+              staged for your session and will be equipped automatically when
+              the Fitting Studio opens.
+            </span>
+            <div className="guest-product-modal-actions">
+              <button
+                type="button"
+                onClick={() => chooseTryOnPath("premade")}
+              >
+                Premade Avatar
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseTryOnPath("custom")}
+              >
+                Customize Avatar
+              </button>
+            </div>
+            {/* FIX: proper breathing room below the buttons (was glued). */}
+            <p
+              style={{
+                margin: "14px 0 12px",
+                fontSize: "11px",
+                color: "#857660",
+                lineHeight: 1.6,
+              }}
+            >
+              <strong>Premade Avatar</strong> opens Avatar Presets with
+              FitFusion Standard selected. <strong>Customize Avatar</strong>{" "}
+              opens Avatar Presets so you can choose one of your saved custom
+              avatars. Press <strong>Use</strong> to continue to the Fitting
+              Studio with this garment equipped.
+            </p>
+            <button
+              type="button"
+              className="guest-product-cancel"
+              onClick={() => setShowTryOnModal(false)}
+            >
+              Decide Later
+            </button>
+          </section>
+        </div>
+      )}
+
       {showRegistrationModal && (
         <div className="guest-product-modal-backdrop" onMouseDown={() => setShowRegistrationModal(false)}>
           <section className="guest-product-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
@@ -561,7 +618,6 @@ function ProductDetailsPage({ isGuest = false }) {
   );
 }
 
-// Helper component for the rating bars
 function RatingBar({ stars, percentage, count }) {
   return (
     <div className="product-rating-bar-row">
