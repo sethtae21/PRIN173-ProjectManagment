@@ -263,3 +263,43 @@
     display: none;
   }
 }
+
+.role-secondary-button:hover,
+.role-secondary-button:focus-visible {
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
+  border-color: #b57e20;
+  color: #fffdf9;
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.2);
+}
+
+/* Both buttons are white by default. */
+.role-page .role-primary-button,
+.role-page .role-secondary-button {
+  background: #fffdf9;
+  color: #8e641f;
+  border: 1.2px solid #b57e20;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Highlight only the hovered or keyboard-focused button. */
+.role-page .role-primary-button:hover,
+.role-page .role-secondary-button:hover,
+.role-page .role-primary-button:focus-visible,
+.role-page .role-secondary-button:focus-visible {
+  background: linear-gradient(
+    135deg,
+    #17130f,
+    #8e641f 55%,
+    #d7af4b
+  );
+  color: #fffdf9;
+  border-color: #b57e20;
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.2);
+  transform: translateY(-2px);
+}

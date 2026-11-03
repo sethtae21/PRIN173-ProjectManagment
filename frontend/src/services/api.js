@@ -891,3 +891,50 @@ export default {
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
   BASE_URL, API_URL,
 };
+
+export async function checkRegistrationContact(
+  email,
+  mobile,
+  { signal } = {}
+) {
+  const response = await fetch(
+    `${API_BASE}/auth/check-registration/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        mobile: mobile.trim(),
+      }),
+    }
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (response.status === 400 && data) {
+    const errors = {};
+
+    for (const field of ["email", "mobile"]) {
+      if (data[field]) {
+        errors[field] = Array.isArray(data[field])
+          ? data[field][0]
+          : String(data[field]);
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return errors;
+    }
+  }
+
+  if (!response.ok || data?.available !== true) {
+    throw new Error(
+      "We couldn't check your email and mobile number. Please try again."
+    );
+  }
+
+  return {};
+}

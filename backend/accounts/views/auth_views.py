@@ -13,6 +13,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
+from ..serializers.auth_serializers import RegistrationContactSerializer
 from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSerializer, PasswordChangeSerializer
 # ✅ FIXED: Import from auth_serializers instead of validators
 from accounts.serializers.auth_serializers import validate_password_strength 
@@ -62,6 +63,18 @@ def logout_view(request):
 # ==========================================
 # DRF API Views
 # ==========================================
+class RegistrationContactCheckView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        serializer = RegistrationContactSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response({
+            "available": True
+        })
+
+
 class RegisterView(generics.CreateAPIView):
     """API endpoint for user registration"""
     serializer_class = RegistrationSerializer

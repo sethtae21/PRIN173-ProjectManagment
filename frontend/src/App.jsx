@@ -60,6 +60,8 @@ import SellerEditAccountPage from "./pages/Seller/SellerEditAccountPage";
 /* RECOMMENDATION SERVICE (FR-7.2/7.3/7.4 wiring) */
 import { loadMatchReasons } from "./services/api";
 
+import SessionBootGuard from "./components/SessionBootGuard";
+
 import "./App.css";
 
 function ScrollToTop() {
@@ -192,10 +194,14 @@ function App() {
             REGISTERED SHOPPER ROUTES
         ===================================== */}
 
-        <Route
-          path="/shopper"
-          element={<ShopperLayout />}
-        >
+       <Route
+  path="/shopper"
+  element={
+    <SessionBootGuard requireRole="shopper">
+      <ShopperLayout />
+    </SessionBootGuard>
+  }
+>
           <Route
             index
             element={<Navigate to="dashboard" replace />}
@@ -325,9 +331,13 @@ function App() {
         ===================================== */}
 
         <Route
-          path="/seller"
-          element={<SellerLayout />}
-        >
+  path="/seller"
+  element={
+    <SessionBootGuard requireRole="seller">
+      <SellerLayout />
+    </SessionBootGuard>
+  }
+>
           <Route
             index
             element={<Navigate to="dashboard" replace />}

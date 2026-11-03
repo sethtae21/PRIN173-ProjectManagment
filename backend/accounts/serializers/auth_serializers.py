@@ -36,6 +36,49 @@ def validate_email_format(value: str) -> str:
 # ==========================================
 # Registration (FR-1.1 / FR-1.5)
 # ==========================================
+
+class RegistrationContactSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    mobile = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError(
+                "This email is already used. "
+                "Please use another email address or log in."
+            )
+
+        return value
+
+    def validate_mobile(self, value):
+        digits = "".join(
+            character for character in value
+            if character.isdigit()
+        )
+
+        if digits.startswith("63") and len(digits) == 12:
+            digits = "0" + digits[2:]
+
+        if len(digits) != 11 or not digits.startswith("09"):
+            raise serializers.ValidationError(
+                "Enter a valid 11-digit mobile number starting with 09."
+            )
+
+        international = "63" + digits[1:]
+
+        if User.objects.filter(
+            mobile__in=[digits, international, "+" + international]
+        ).exists():
+            raise serializers.ValidationError(
+                "This mobile number is already used. "
+                "Please use another mobile number."
+            )
+
+        return digits
+
+
 class RegistrationSerializer(serializers.ModelSerializer):
     """Serializer for user registration (shopper or seller)."""
     id = serializers.CharField(read_only=True)
@@ -50,7 +93,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(required=False, allow_blank=True)
 
     # Contact & address fields
-    mobile = serializers.CharField(required=False, allow_blank=True)
+    mobile = serializers.CharField(required=True, allow_blank=False)
     street = serializers.CharField(required=False, allow_blank=True)
     barangay = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
@@ -65,12 +108,14 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'city', 'province', 'postal_code',
         )
 
+
+        
+
     def validate_email(self, value):
-        validate_email_format(value)
-        value = value.lower().strip()
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('A user with this email already exists.')
-        return value
+        return RegistrationContactSerializer().validate_email(value)
+
+    def validate_mobile(self, value):
+        return RegistrationContactSerializer().validate_mobile(value)
 
     def validate_full_name(self, value):
         value = value.strip()

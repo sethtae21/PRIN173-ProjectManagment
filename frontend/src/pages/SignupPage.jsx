@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import { authAPI } from "../services/api";
 import { setSession } from "../services/session";
+import { checkRegistrationContact } from "../services/api";
 import "./css/SignupPage.css";
 
 const provinces = [
@@ -123,8 +124,64 @@ export default function SignupPage({ role = "shopper" }) {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [checkingContact, setCheckingContact] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+useEffect(() => {
+  if (step !== 1 || checkingContact) return;
+
+  const email = form.email.trim();
+  const mobile = form.mobile.trim();
+
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validMobile = /^09\d{9}$/.test(mobile);
+
+  // Check whichever field has a complete, valid value.
+  if (!validEmail && !validMobile) return;
+
+  const controller = new AbortController();
+  let active = true;
+
+  const timer = setTimeout(async () => {
+    try {
+      const contactErrors = await checkRegistrationContact(
+        email,
+        mobile,
+        { signal: controller.signal }
+      );
+
+      if (!active) return;
+
+      setErrors((current) => ({
+        ...current,
+        ...(validEmail
+          ? { email: contactErrors.email || "" }
+          : {}),
+        ...(validMobile
+          ? { mobile: contactErrors.mobile || "" }
+          : {}),
+      }));
+    } catch (error) {
+      if (!active || error.name === "AbortError") return;
+
+      const message =
+        "Unable to verify this detail. Please try again.";
+
+      setErrors((current) => ({
+        ...current,
+        ...(validEmail ? { email: message } : {}),
+        ...(validMobile ? { mobile: message } : {}),
+      }));
+    }
+  }, 500);
+
+  return () => {
+    active = false;
+    clearTimeout(timer);
+    controller.abort();
+  };
+}, [form.email, form.mobile, step, checkingContact]);
 
   const stepInformation = {
     1: {
@@ -305,14 +362,42 @@ export default function SignupPage({ role = "shopper" }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleNext() {
-    if (!validateStep(step)) return;
+    async function handleNext() {
+    if (checkingContact || !validateStep(step)) return;
 
-    if (step === 1) formatFullName();
+    setSubmitError("");
+
+    if (step === 1) {
+      setCheckingContact(true);
+
+      try {
+        const contactErrors = await checkRegistrationContact(
+          form.email,
+          form.mobile
+        );
+
+        if (Object.keys(contactErrors).length > 0) {
+          setErrors((current) => ({
+            ...current,
+            ...contactErrors,
+          }));
+          return;
+        }
+
+        formatFullName();
+      } catch (error) {
+        setSubmitError(
+          error.message ||
+          "Unable to verify your details. Please try again."
+        );
+        return;
+      } finally {
+        setCheckingContact(false);
+      }
+    }
 
     setErrors({});
-    setSubmitError("");
-    setStep(current => Math.min(current + 1, 3));
+    setStep((current) => Math.min(current + 1, 3));
     scrollTop();
   }
 
@@ -506,7 +591,8 @@ export default function SignupPage({ role = "shopper" }) {
 
                 <FormField
                   label="Email Address"
-                  name="email"
+                  name="email" 
+                  disabled={checkingContact}
                   type="email"
                   value={form.email}
                   error={errors.email}
@@ -518,6 +604,7 @@ export default function SignupPage({ role = "shopper" }) {
                 <FormField
                   label="Mobile Number"
                   name="mobile"
+                  disabled={checkingContact}
                   type="tel"
                   value={form.mobile}
                   error={errors.mobile}
@@ -768,9 +855,11 @@ export default function SignupPage({ role = "shopper" }) {
                   type="button"
                   className="ff-register-next"
                   onClick={handleNext}
+                  disabled={checkingContact}
                 >
-                  {step === 1 ? "Next: Address" : "Next: Security"}
+                  {checkingContact ? "Checking..." : "Next"}
                 </button>
+              
               ) : (
                 <button
                   type="submit"
@@ -786,4 +875,4 @@ export default function SignupPage({ role = "shopper" }) {
       </section>
     </main>
   );
-}
+  }
