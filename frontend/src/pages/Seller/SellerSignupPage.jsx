@@ -179,6 +179,23 @@ function SellerSignupPage() {
 
   const currentInformation = stepInformation[step];
 
+  const passwordRules = useMemo(
+    () => ({
+      length: form.password.length >= 8,
+      uppercase: /[A-Z]/.test(form.password),
+      lowercase: /[a-z]/.test(form.password),
+      number: /\d/.test(form.password),
+      special: /[^A-Za-z0-9]/.test(form.password)
+    }),
+    [form.password]
+  );
+
+  const passwordIsValid = Object.values(passwordRules).every(Boolean);
+
+  const passwordsMatch =
+    form.confirmPassword.length > 0 &&
+    form.password === form.confirmPassword;
+
   useEffect(() => {
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
     const mobileIsValid = /^\d{11}$/.test(form.mobile) && form.mobile.startsWith("09");
