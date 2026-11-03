@@ -44,6 +44,8 @@ class RatingSummarySerializer(serializers.Serializer):
     # Star dimension (score only)
     score_count = serializers.IntegerField()
     average = serializers.FloatField()
+    # NEW: per-star histogram for distribution bars
+    star_counts = serializers.DictField(child=serializers.IntegerField())
     # Reaction dimension (like/dislike only)
     like_count = serializers.IntegerField()
     dislike_count = serializers.IntegerField()

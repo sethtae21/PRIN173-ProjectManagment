@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
+from .views.auth_views import RegistrationContactCheckView
 
 from .views import (
     RegisterView,
@@ -19,6 +20,8 @@ router.register(r'presets', AvatarPresetViewSet, basename='avatar-presets')
 
 urlpatterns = [
     # FR-1.1 / FR-1.2 / FR-1.4 — authentication
+
+    path('auth/check-registration/', RegistrationContactCheckView.as_view(),name='check-registration',),
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),

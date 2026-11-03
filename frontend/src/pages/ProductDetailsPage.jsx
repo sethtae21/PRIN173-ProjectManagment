@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { API_URL, cartAPI } from "../services/api";
+import { API_URL, cartAPI, ratingsApi, invalidateCache } from "../services/api";
+import { getAccessToken } from "../services/session";
 import "./css/ProductDetailsPage.css";
 
 // Helper to construct image URLs
@@ -35,6 +36,23 @@ function getCartCount() {
   );
 }
 
+// FIX (ratings never reflected): ratingsApi.summary() takes TWO POSITIONAL
+// args (targetType, targetId). The previous object-style call produced
+// target_type=[object Object]&target_id=undefined -> 400 -> zeros on screen.
+// The summary is also an in-memory cache that survives client-side routing,
+// so we bust its key before every fetch to always show database truth.
+function ratingCacheKey(productId) {
+  return `ratings:item:${productId}`;
+}
+
+function normalizeSummary(data) {
+  return {
+    average: Number(data?.average) || 0,
+    score_count: Number(data?.score_count) || 0,
+    star_counts: data?.star_counts || { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+  };
+}
+
 function ProductDetailsPage({ isGuest = false }) {
   const navigate = useNavigate();
   const { productId } = useParams();
@@ -55,6 +73,15 @@ function ProductDetailsPage({ isGuest = false }) {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [cartError, setCartError] = useState("");
   const [cartCount, setCartCount] = useState(getCartCount());
+
+  // Rating state (live DB aggregate)
+  const [ratingSummary, setRatingSummary] = useState({
+    average: 0,
+    score_count: 0,
+    star_counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+  });
+  const [userRating, setUserRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
 
   // 1. Fetch Product Data
   useEffect(() => {
@@ -103,6 +130,32 @@ function ProductDetailsPage({ isGuest = false }) {
     return () => { isMounted = false; };
   }, [productId]);
 
+  // 2. Fetch LIVE rating summary from the database (fix: positional args +
+  //    cache bust so a fit rating submitted in the Fitting Studio — or in
+  //    this same SPA session — is always reflected).
+  useEffect(() => {
+    let active = true;
+
+    async function fetchSummary() {
+      if (!productId) return;
+      try {
+        invalidateCache(ratingCacheKey(productId));
+        const data = await ratingsApi.summary("item", productId);
+        if (active) setRatingSummary(normalizeSummary(data));
+      } catch (err) {
+        console.warn("Failed to load rating summary:", err);
+      }
+    }
+
+    fetchSummary();
+    window.addEventListener("fitfusion-rating-updated", fetchSummary);
+
+    return () => {
+      active = false;
+      window.removeEventListener("fitfusion-rating-updated", fetchSummary);
+    };
+  }, [productId]);
+
   // Update cart count when cart changes
   useEffect(() => {
     const updateCount = () => setCartCount(getCartCount());
@@ -114,7 +167,7 @@ function ProductDetailsPage({ isGuest = false }) {
     };
   }, []);
 
-  // 2. Actions
+  // 3. Actions
   function handleSellerNavigation() {
     console.log("Viewing store for:", product?.store_name);
   }
@@ -185,6 +238,32 @@ function ProductDetailsPage({ isGuest = false }) {
       setCartError("We couldn't add this item to your cart. Please try again.");
     } finally {
       setIsAddingToCart(false);
+    }
+  }
+
+  // Interactive star rating -> POST /ratings/ (DB) then refresh summary
+  async function handleStarRate(stars) {
+    if (guestMode) {
+      setRestrictedFeature("rate products");
+      setShowRegistrationModal(true);
+      return;
+    }
+    try {
+      await ratingsApi.submit({
+        target_type: "item",
+        target_id: productId,
+        score: stars,
+      });
+      setUserRating(stars);
+      invalidateCache(ratingCacheKey(productId));
+      const data = await ratingsApi.summary("item", productId);
+      setRatingSummary(normalizeSummary(data));
+      setMessage(`You rated this product ${stars} star${stars > 1 ? "s" : ""}!`);
+      setTimeout(() => setMessage(""), 3000);
+    } catch (err) {
+      console.error("Failed to submit rating:", err);
+      setMessage("We couldn't save your rating. Please try again.");
+      setTimeout(() => setMessage(""), 3000);
     }
   }
 
@@ -384,7 +463,7 @@ function ProductDetailsPage({ isGuest = false }) {
             </div>
           </div>
         </section>
-        {/* RATINGS SECTION (RESTORED) */}
+        {/* RATINGS SECTION (LIVE DB INTEGRATED) */}
         <section className="product-ratings-section">
           <div className="product-ratings-header">
             <div>
@@ -392,33 +471,69 @@ function ProductDetailsPage({ isGuest = false }) {
               <h2>Product Rating</h2>
             </div>
             <div className="product-average-rating">
-              <strong>4.8</strong>
+              <strong>{ratingSummary.average.toFixed(1)}</strong>
               <div>
-                <span className="product-rating-stars">★★★★★</span>
-                <small>Based on 128 ratings</small>
+                <span className="product-rating-stars">
+                  {"★".repeat(Math.round(ratingSummary.average))}
+                  {"☆".repeat(5 - Math.round(ratingSummary.average))}
+                </span>
+                <small>Based on {ratingSummary.score_count} ratings</small>
               </div>
             </div>
           </div>
+
+          {/* Interactive Stars */}
+          <div style={{ margin: "16px 0", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "14px", fontWeight: "600", color: "#17130f" }}>Rate this product:</span>
+            <div className="product-review-star-input" style={{ display: "flex", gap: "4px" }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  style={{ 
+                    background: "none", 
+                    border: "none", 
+                    fontSize: "24px", 
+                    cursor: "pointer", 
+                    color: star <= (hoverRating || userRating) ? "#d39819" : "#d2be91",
+                    padding: "0 2px"
+                  }}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => handleStarRate(star)}
+                  aria-label={`${star} star rating`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="product-rating-content">
             <div className="product-rating-score">
-              <strong>4.8</strong>
+              <strong>{ratingSummary.average.toFixed(1)}</strong>
               <span>out of 5</span>
-              <div className="product-rating-large-stars">★★★★★</div>
-              <p>128 verified ratings</p>
+              <div className="product-rating-large-stars">
+                {"★".repeat(Math.round(ratingSummary.average))}
+                {"☆".repeat(5 - Math.round(ratingSummary.average))}
+              </div>
+              <p>{ratingSummary.score_count} verified ratings</p>
             </div>
             <div className="product-rating-breakdown">
-              {[5, 4, 3, 2, 1].map((stars) => (
-                <RatingBar
-                  key={stars}
-                  stars={stars}
-                  percentage={
-                    stars === 5 ? 78 :
-                    stars === 4 ? 16 :
-                    stars === 3 ? 4 :
-                    stars === 2 ? 1 : 1
-                  }
-                />
-              ))}
+              {[5, 4, 3, 2, 1].map((stars) => {
+                const count = ratingSummary.star_counts[String(stars)] || 0;
+                const percentage = ratingSummary.score_count > 0 
+                  ? Math.round((count / ratingSummary.score_count) * 100) 
+                  : 0;
+                return (
+                  <RatingBar
+                    key={stars}
+                    stars={stars}
+                    percentage={percentage}
+                    count={count}
+                  />
+                );
+              })}
             </div>
           </div>
           <p className="product-rating-notice">
@@ -447,14 +562,14 @@ function ProductDetailsPage({ isGuest = false }) {
 }
 
 // Helper component for the rating bars
-function RatingBar({ stars, percentage }) {
+function RatingBar({ stars, percentage, count }) {
   return (
     <div className="product-rating-bar-row">
       <span>{stars} {stars === 1 ? "star" : "stars"}</span>
       <div className="product-rating-track">
         <div className="product-rating-fill" style={{ width: `${percentage}%` }} />
       </div>
-      <strong>{percentage}%</strong>
+      <strong>{count}</strong>
     </div>
   );
 }

@@ -2,6 +2,10 @@
  * FitFusion AI
  * Weight-responsive 2D Avatar Engine
  *
+ * BUILD MARKER: DRESS-LENGTH-FIX v2  (grep for DRESS_HEM_MIN_T to confirm
+ * this exact file is the one Vite is serving; if the marker is missing you
+ * are running a stale/merged copy and dresses will render hip-length.)
+ *
  * Supports:
  * - Female and Male Standard avatars
  * - Front, Rear (Side view removed)
@@ -39,6 +43,12 @@
  *                         (shoulder line / waist / feet per category)
  * Manual proportion growth (shoulders/waist/hips/thighs/cup) still applies
  * so FR-2.7 alignment is preserved.
+ *
+ * DRESS LENGTH FIX: dresses are detected from category / rawCategory / name
+ * (the studio collapses categories to top/bottom/shoes when equipping), get
+ * their own below-knee..above-ankle region, keep the garment photo's own
+ * length (aspect-driven hem), and skip the body-silhouette clip so the
+ * inter-leg gap cannot punch a hole through the hem.
  */
 
 export const GRID_COLS = 37;
@@ -232,8 +242,6 @@ export function detectBodyBounds(canvas) {
     });
 
     left = Math.min(left, rowLeft);
-    // FIX (ReferenceError: x is not defined): this must aggregate the
-    // per-row scan result (rowRight), never the inner-loop variable x.
     right = Math.max(right, rowRight);
 
     top = Math.min(top, y);
@@ -311,10 +319,10 @@ export function makeLattice(
     1.35
   );
 
-  // NEW (size-true garment mesh): freezeWeight ignores the weight /
-  // body-build growth so a layer keeps its true width; rigidShift replaces
-  // the tapered per-row vertical shift with ONE rigid translation sampled at
-  // anchorT so a layer follows the body's position without stretching.
+  // SIZE-TRUE GARMENT MESH: freezeWeight ignores the weight / body-build
+  // growth so a layer keeps its true width; rigidShift replaces the tapered
+  // per-row vertical shift with ONE rigid translation sampled at anchorT so
+  // a layer follows the body's position without stretching.
   const freezeWeight = config.freezeWeight === true;
   const rigidShift = config.rigidShift === true;
   const anchorT = clamp(Number(config.anchorT ?? 0.245), 0, 1);
@@ -1196,6 +1204,10 @@ function sameOriginMedia(src) {
 // and upper chest are covered; hem held at the hip so the stomach stays
 // covered and tucks under the jeans waistband. Outerwear (blazers/coats)
 // keeps its proven region and is NEVER draped (see DRAPEABLE).
+//
+// FIX (dress hem at the hip): dresses now span shoulder -> above-ankle
+// (y1 0.90) so the aspect-driven hem branch below can place short dresses
+// below the knee and long dresses at their true midi/maxi length.
 const GARMENT_REGIONS = {
   male: {
     tops: { x0: -0.50, x1: 0.50, y0: 0.140, y1: 0.50 },
@@ -1203,7 +1215,7 @@ const GARMENT_REGIONS = {
     outerwear: { x0: -0.52, x1: 0.52, y0: 0.135, y1: 0.58 },
     bottoms: { x0: -0.35, x1: 0.35, y0: 0.44, y1: 0.92 },
     skirt: { x0: -0.40, x1: 0.40, y0: 0.44, y1: 0.74 },
-    dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.80 },
+    dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.90 },
     footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
   },
   female: {
@@ -1212,10 +1224,14 @@ const GARMENT_REGIONS = {
     outerwear: { x0: -0.57, x1: 0.57, y0: 0.120, y1: 0.55 },
     bottoms: { x0: -0.35, x1: 0.35, y0: 0.43, y1: 0.91 },
     skirt: { x0: -0.40, x1: 0.40, y0: 0.43, y1: 0.72 },
-    dresses: { x0: -0.45, x1: 0.45, y0: 0.125, y1: 0.78 },
+    dresses: { x0: -0.45, x1: 0.45, y0: 0.125, y1: 0.90 },
     footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
   },
 };
+
+// Hem floor for one-piece garments: the dress must always cover past the
+// knee (fraction of body height from the top of the bounds).
+const DRESS_HEM_MIN_T = 0.75;
 
 // Only flat-lay knits and tees are eligible for the long-sleeve drape.
 // Outerwear (the blazer) and bottoms always use the proven plain stretch,
@@ -1480,7 +1496,18 @@ function regionKeyForProduct(product) {
     product.category || "Tops"
   ).toLowerCase();
 
+  // FIX (dress rendered as a top): the Fitting Studio collapses categories
+  // to top/bottom/shoes when equipping, so the dress signal survives only on
+  // rawCategory -- and as a last resort on the product NAME. Deliberately
+  // excludes the menswear phrase "dress shirt", which must stay a top.
+  const rawCategory = String(
+    product.rawCategory || ""
+  ).toLowerCase();
+
   const name = String(product.name || "").toLowerCase();
+
+  const nameIsDress =
+    name.includes("dress") && !name.includes("dress shirt");
 
   if (
     category.includes("footwear") ||
@@ -1489,7 +1516,14 @@ function regionKeyForProduct(product) {
     return "footwear";
   }
 
-  if (category.includes("dress")) {
+  if (
+    category.includes("dress") ||
+    rawCategory.includes("dress") ||
+    rawCategory.includes("gown") ||
+    rawCategory.includes("jumpsuit") ||
+    rawCategory.includes("romper") ||
+    nameIsDress
+  ) {
     return "dresses";
   }
 
@@ -1759,6 +1793,26 @@ export function garmentImageLayer(
         ctx.drawImage(cropped, leftX, ry, leftW, rh);
         ctx.drawImage(cropped, rightX, ry, rightW, rh);
       }
+    } else if (regionKey === "dresses") {
+      // FIX (dress length): one-piece garments keep their OWN photo length.
+      // The hem is the photo aspect at region width, clamped so it always
+      // falls BELOW the knee (DRESS_HEM_MIN_T) and never past the region max
+      // (above the ankle). Short dresses stop just below the knee; midi/maxi
+      // dresses show their true length.
+      const rx = X(region.x0);
+      const rw = X(region.x1) - rx;
+
+      if (rw <= 0) return null;
+
+      const aspect =
+        cropped.width / Math.max(1, cropped.height);
+
+      const naturalH = rw / Math.max(0.2, aspect);
+      const minH = Math.max(1, Y(DRESS_HEM_MIN_T) - ry);
+      const maxH = Math.max(minH, rh);
+      const dressH = Math.min(Math.max(naturalH, minH), maxH);
+
+      ctx.drawImage(cropped, rx, ry, rw, dressH);
     } else if (DRAPEABLE.has(regionKey)) {
       // Long-sleeve flat-lay knits/tees: torso panel + two rotated sleeve
       // wings draped shoulder->wrist. Vertical-sleeve / short-sleeve
@@ -1854,7 +1908,10 @@ export function garmentImageLayer(
   }
 
   // Silhouette clip (cloth hugs arms / legs / feet).
-  if (bodyMaskSource) {
+  // FIX: dresses SKIP the clip -- the dilated body mask has a gap between the
+  // legs at knee height, which punched a hole through the hem; a one-piece
+  // garment is intentionally wider than the body below the hip.
+  if (bodyMaskSource && regionKey !== "dresses") {
     const mask = newCanvas(width, height);
     const mctx = mask.getContext("2d");
 

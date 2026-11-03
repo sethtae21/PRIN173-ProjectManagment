@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
+import { presetsApi } from "../services/api";
 import "./css/ShopperDashboard.css";
 
 const STANDARD_AVATAR = {
@@ -37,6 +38,11 @@ const AVATAR_VIEWS = [
 ];
 
 const EMPTY_ITEMS = {};
+
+// NEW: the only localStorage keys still consulted for presets -- and only to
+// VALIDATE the "In Use" id against the current account's server list.
+const ACTIVE_KEY = "fitfusion-avatar-preset";
+const GENDER_KEY = "fitfusion-avatar-gender";
 
 /* STORAGE HELPERS */
 
@@ -196,27 +202,110 @@ function normalizeAvatar(avatar) {
   };
 }
 
-function getPresetTimestamp(preset) {
-  const values = [
-    preset.updatedAt,
-    preset.updated_at,
-    preset.createdAt,
-    preset.created_at,
-  ];
+/* SERVER PRESET HELPERS (owner-scoped truth, FR-2.8) */
 
-  for (const value of values) {
-    if (!value) continue;
-
-    const timestamp = new Date(value).getTime();
-    if (Number.isFinite(timestamp)) return timestamp;
-  }
-
-  return 0;
+function getPresetList(data) {
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data?.results) ? data.results : [];
 }
 
-/* DASHBOARD DATA */
+function capitalizeChoice(value, fallback) {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
-function getDashboardData() {
+// Mirror of AvatarPresetPage.normalizePreset so the dashboard canvas receives
+// the same valid option labels (Narrow/Average/Broad, Slim/Average/Curvy...).
+function normalizeServerPreset(preset, index = 0) {
+  const gender =
+    String(preset?.gender || "").trim().toLowerCase() === "male"
+      ? "Male"
+      : "Female";
+
+  return {
+    id: String(preset?.id || preset?.presetId || `custom-${index}`),
+    name: String(
+      preset?.name || preset?.presetName || `Custom Avatar ${index + 1}`
+    ).trim(),
+    gender,
+    height: Number(preset?.height) || 165,
+    weight: Number(preset?.weight) || (gender === "Male" ? 70 : 58),
+    skinTone:
+      preset?.skinTone ||
+      preset?.skin_tone ||
+      preset?.skinColor ||
+      STANDARD_AVATAR.skinTone,
+    undertone: capitalizeChoice(preset?.undertone, "Neutral"),
+    shoulder: capitalizeChoice(
+      preset?.shoulder || preset?.shoulderWidth,
+      "Average"
+    ),
+    waist: capitalizeChoice(preset?.waist || preset?.waistSize, "Average"),
+    hip: capitalizeChoice(preset?.hip || preset?.hipSize, "Average"),
+    thigh: capitalizeChoice(preset?.thigh || preset?.thighSize, "Average"),
+    cupSize:
+      gender === "Female"
+        ? String(preset?.cupSize || preset?.cup_size || "B").toUpperCase()
+        : null,
+    is_default: preset?.is_default === true,
+    builtIn: false,
+  };
+}
+
+function readLocalActiveId() {
+  const active = readStoredObject(ACTIVE_KEY);
+
+  return active && (active.id || active.presetId)
+    ? String(active.id || active.presetId)
+    : null;
+}
+
+// OPTION (a): the fitting profile is the locally "In Use" preset ONLY when
+// that id belongs to the CURRENT account's server list; otherwise the
+// server's default preset if any; otherwise the Standard avatar. A stale
+// cross-account cache can never render.
+function resolvePresetView(serverPresets) {
+  const activeId = readLocalActiveId();
+
+  const activeCustom =
+    serverPresets.find((preset) => preset.id === activeId) ||
+    serverPresets.find((preset) => preset.is_default) ||
+    null;
+
+  return {
+    customPresetCount: serverPresets.length,
+    hasActiveAvatar: Boolean(activeCustom),
+    hasCustomAvatar: Boolean(activeCustom),
+    displayAvatar: activeCustom
+      ? normalizeAvatar(activeCustom)
+      : normalizeAvatar(STANDARD_AVATAR),
+  };
+}
+
+const EMPTY_PRESET_VIEW = {
+  customPresetCount: 0,
+  hasActiveAvatar: false,
+  hasCustomAvatar: false,
+  displayAvatar: { ...STANDARD_AVATAR },
+};
+
+async function loadPresetView() {
+  try {
+    const data = await presetsApi.list();
+    const serverPresets = getPresetList(data).map(normalizeServerPreset);
+    return resolvePresetView(serverPresets);
+  } catch (error) {
+    // NEVER fall back to unvalidated local caches: on error the dashboard
+    // shows the Standard avatar rather than another account's preset.
+    console.warn("Unable to load avatar presets from server:", error);
+    return EMPTY_PRESET_VIEW;
+  }
+}
+
+/* DASHBOARD DATA (sync part: identity + commerce counters) */
+
+function getSyncDashboardData() {
   const shopper = getCurrentShopper();
 
   const cartItems = readStoredArray(
@@ -231,52 +320,10 @@ function getDashboardData() {
     "savedOutfits"
   );
 
-  const storedPresets = readStoredArray(
-    "fitfusion-avatar-presets",
-    "avatarPresets"
-  );
-
-  const activeAvatar = readStoredObject("fitfusion-avatar-preset");
-
-  const customPresets = storedPresets
-    .filter(
-      (preset) => isValidAvatar(preset) && !isPremadeAvatar(preset)
-    )
-    .sort((a, b) => getPresetTimestamp(b) - getPresetTimestamp(a));
-
-  const activeCustomAvatar =
-    isValidAvatar(activeAvatar) && !isPremadeAvatar(activeAvatar)
-      ? activeAvatar
-      : null;
-
-  // Prefer the selected custom avatar. Otherwise use a saved custom preset.
-  const customAvatar = activeCustomAvatar || customPresets[0] || null;
-
-  const displayAvatar = customAvatar
-    ? normalizeAvatar(customAvatar)
-    : normalizeAvatar(activeAvatar || STANDARD_AVATAR);
-
-  const hasActiveAvatar =
-    Boolean(customAvatar) || isValidAvatar(activeAvatar);
-
-  const activeCustomIsListed =
-    activeCustomAvatar &&
-    customPresets.some(
-      (preset) =>
-        String(preset.id || preset.presetId) ===
-        String(activeCustomAvatar.id || activeCustomAvatar.presetId)
-    );
-
   return {
     username: getShopperName(shopper),
     cartCount: getCartCount(cartItems),
     savedOutfitCount: savedOutfits.length,
-    customPresetCount:
-      customPresets.length +
-      (activeCustomAvatar && !activeCustomIsListed ? 1 : 0),
-    hasActiveAvatar,
-    hasCustomAvatar: Boolean(customAvatar),
-    displayAvatar,
   };
 }
 
@@ -284,17 +331,35 @@ function getDashboardData() {
 
 function ShopperDashboard() {
   const navigate = useNavigate();
-  const [dashboard, setDashboard] = useState(getDashboardData);
+  const [dashboard, setDashboard] = useState(() => ({
+    ...getSyncDashboardData(),
+    ...EMPTY_PRESET_VIEW,
+  }));
   const [standardGender, setStandardGender] = useState("Female");
   const [actionError, setActionError] = useState("");
+  const [presetReloadKey, setPresetReloadKey] = useState(0);
 
   const refreshDashboard = useCallback(() => {
-    setDashboard(getDashboardData());
+    setDashboard((current) => ({ ...current, ...getSyncDashboardData() }));
+    setPresetReloadKey((key) => key + 1);
   }, []);
 
+  // CHANGED: preset stats/preview now come from the owner-scoped server list.
   useEffect(() => {
-    refreshDashboard();
+    let active = true;
 
+    loadPresetView().then((view) => {
+      if (active) {
+        setDashboard((current) => ({ ...current, ...view }));
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [presetReloadKey]);
+
+  useEffect(() => {
     const events = [
       "focus",
       "storage",
@@ -344,11 +409,11 @@ function ShopperDashboard() {
     if (hasCustomAvatar) {
       try {
         localStorage.setItem(
-          "fitfusion-avatar-preset",
+          ACTIVE_KEY,
           JSON.stringify(previewAvatar)
         );
         localStorage.setItem(
-          "fitfusion-avatar-gender",
+          GENDER_KEY,
           previewAvatar.gender
         );
         setActionError("");

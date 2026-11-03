@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import fitFusionLogo from "../../assets/fitfusion-logo.svg";
-import { authAPI } from "../../services/api";
-import { setSession } from "../../services/session"; // FIX: Import canonical session manager
+import { authAPI, checkRegistrationContact } from "../../services/api";
+import { setSession } from "../../services/session";
 import "../css/SellerSignupPage.css";
 
 const provinces = [
@@ -190,12 +190,53 @@ function SellerSignupPage() {
     [form.password]
   );
 
-  const passwordIsValid =
-    Object.values(passwordRules).every(Boolean);
+  const passwordIsValid = Object.values(passwordRules).every(Boolean);
 
   const passwordsMatch =
     form.confirmPassword.length > 0 &&
     form.password === form.confirmPassword;
+
+  useEffect(() => {
+    const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+    const mobileIsValid = /^\d{11}$/.test(form.mobile) && form.mobile.startsWith("09");
+    const storeNameIsValid = form.storeName.trim().length >= 2;
+
+    if (step !== 1 || !emailIsValid || !mobileIsValid || !storeNameIsValid) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const messages = await checkRegistrationContact(
+          form.email.trim(),
+          form.mobile,
+          form.storeName.trim(),
+          { signal: controller.signal }
+        );
+
+        setErrors((prev) => ({
+          ...prev,
+          email: messages.email || "",
+          mobile: messages.mobile || "",
+          storeName: messages.store_name || ""
+        }));
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        setErrors((prev) => ({
+          ...prev,
+          email: "",
+          mobile: "",
+          storeName: ""
+        }));
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [form.email, form.mobile, form.storeName, step]);
 
   function updateField(event) {
     const { name } = event.target;
@@ -270,6 +311,18 @@ function SellerSignupPage() {
     } else if (!form.mobile.startsWith("09")) {
       nextErrors.mobile =
         "Philippine mobile number must start with 09.";
+    }
+
+    if (errors.email) {
+      nextErrors.email = errors.email;
+    }
+
+    if (errors.mobile) {
+      nextErrors.mobile = errors.mobile;
+    }
+
+    if (errors.storeName) {
+      nextErrors.storeName = errors.storeName;
     }
 
     setForm((current) => ({

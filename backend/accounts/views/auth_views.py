@@ -13,11 +13,13 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
+from ..serializers.auth_serializers import RegistrationContactSerializer
 from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSerializer, PasswordChangeSerializer
 # ✅ FIXED: Import from auth_serializers instead of validators
 from accounts.serializers.auth_serializers import validate_password_strength 
 from accounts.utils import generate_jwt_tokens, blacklist_refresh_token, is_token_blacklisted
 from accounts.models import User
+from commerce.models import Order
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,16 @@ def logout_view(request):
 # ==========================================
 # DRF API Views
 # ==========================================
+class RegistrationContactCheckView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        serializer = RegistrationContactSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        return Response({"available": True})
+
+
 class RegisterView(generics.CreateAPIView):
     """API endpoint for user registration"""
     serializer_class = RegistrationSerializer
@@ -131,7 +143,7 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         })
 
     def destroy(self, request, *args, **kwargs):
-        """Delete account + cascade all owned data + invalidate tokens (RA 10173)."""
+        """Delete account + cascade active data + pseudonymize archived orders (RA 10173)."""
         user = self.get_object()
 
         refresh_raw = request.data.get('refresh')
@@ -141,8 +153,20 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
             except TokenError:
                 pass
 
+        # Preserve order archive while removing all active PII.
+        for order in Order.objects.filter(user=user):
+            order.user = None
+            order.recipient_name = ''
+            order.contact_number = ''
+            order.recipient_email = ''
+            order.shipping_address = ''
+            order.save(update_fields=[
+                'user', 'recipient_name', 'contact_number',
+                'recipient_email', 'shipping_address'
+            ])
+
         try:
-            user.delete()   # CASCADE: presets, outfits, cart, orders, listings
+            user.delete()  # CASCADE: presets, outfits, cart, and remaining active records
         except Exception as e:
             logger.error(f"Account deletion failed for user {request.user.id}: {e}")
             return Response({

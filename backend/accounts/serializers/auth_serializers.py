@@ -36,6 +36,49 @@ def validate_email_format(value: str) -> str:
 # ==========================================
 # Registration (FR-1.1 / FR-1.5)
 # ==========================================
+
+class RegistrationContactSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    mobile = serializers.CharField(required=True, allow_blank=False)
+    store_name = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError(
+                "This email is already used. Please use another email address or log in."
+            )
+        return value
+
+    def validate_mobile(self, value):
+        digits = "".join(character for character in value if character.isdigit())
+        if len(digits) != 11:
+            raise serializers.ValidationError("Mobile number must contain exactly 11 digits.")
+        if not digits.startswith("09"):
+            raise serializers.ValidationError("Mobile number must begin with 09.")
+        if User.objects.filter(mobile=digits).exists():
+            raise serializers.ValidationError(
+                "This mobile number is already registered. Please use another number or log in."
+            )
+        return digits
+
+    def validate_store_name(self, value):
+        if not value or not value.strip():
+            return value
+
+        value = value.strip()
+
+        if len(value) < 2:
+            raise serializers.ValidationError("Store name must contain at least 2 characters.")
+
+        if User.objects.filter(store_name__iexact=value, role='seller').exists():
+            raise serializers.ValidationError(
+                "This store name is already taken. Please choose a different name."
+            )
+
+        return value
+
+
 class RegistrationSerializer(serializers.ModelSerializer):
     """Serializer for user registration (shopper or seller)."""
     id = serializers.CharField(read_only=True)
@@ -50,7 +93,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(required=False, allow_blank=True)
 
     # Contact & address fields
-    mobile = serializers.CharField(required=False, allow_blank=True)
+    mobile = serializers.CharField(required=True, allow_blank=False)
     street = serializers.CharField(required=False, allow_blank=True)
     barangay = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
@@ -65,12 +108,14 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'city', 'province', 'postal_code',
         )
 
+
+        
+
     def validate_email(self, value):
-        validate_email_format(value)
-        value = value.lower().strip()
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('A user with this email already exists.')
-        return value
+        return RegistrationContactSerializer().validate_email(value)
+
+    def validate_mobile(self, value):
+        return RegistrationContactSerializer().validate_mobile(value)
 
     def validate_full_name(self, value):
         value = value.strip()

@@ -268,7 +268,12 @@ export async function performJsonRequest(method, path, body, options = {}) {
   if (body instanceof FormData) payload = body;
   else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    payload = JSON.stringify(body);
+    // KAN-FIX (fit rating 400 "Expected a dictionary, but got str"): legacy
+    // callers (RatingControl) hand over an ALREADY-stringified body; the
+    // unconditional JSON.stringify re-encoded it into a JSON *string* root,
+    // which DRF rejects with non_field_errors. Pass strings through untouched
+    // and serialize plain objects exactly once.
+    payload = typeof body === 'string' ? body : JSON.stringify(body);
   }
 
   const url = `${API_BASE}${path}`;
@@ -509,6 +514,18 @@ export const getProfile = () => authApi.getProfile();
 export const updateProfile = (patch) => authApi.updateProfile(patch);
 export const changePassword = (o, n, c) => authApi.changePassword(o, n, c);
 export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
+
+// ----------------------------------------------------------------------------
+// Registration contact probe (PROVISIONAL CONTRACT — unblocks SignupPage.jsx)
+// SignupPage imports checkRegistrationContact; until its exact consumption is
+// confirmed against SignupPage.jsx, this helper behaves conservatively:
+//   200        -> returns the server payload verbatim
+//   400        -> contact rejected / already registered -> truthy flag object
+//   404/405/0  -> endpoint not deployed / backend offline -> false, so a
+//                 missing probe can NEVER block a legitimate signup
+// Replace with the exact contract once SignupPage.jsx + accounts urls/views
+// are reviewed.
+// ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
@@ -882,6 +899,7 @@ export default {
   validateSizeLabel, SIZE_RANGE_TABLE, SIZE_OPTIONS, HEIGHT_RANGE, BODY_BUILD_RANGE,
   sizeForBodyBuild, bodyProportion,
   bodyShapeForAvatar, avatarQueryParams, fetchRankedRecommendations, loadMatchReasons,
+  checkRegistrationContact,
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,
   outfitsApi, outfitsAPI, cartApi, cartAPI, checkoutApi, checkoutAPI,
   ordersApi, ordersAPI, recommendationsApi, recommendationsAPI,
@@ -891,3 +909,59 @@ export default {
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
   BASE_URL, API_URL,
 };
+
+export async function checkRegistrationContact(
+  email,
+  mobile,
+  storeName = "",
+  { signal } = {}
+) {
+  try {
+    const response = await fetch(`${API_BASE}/auth/check-registration/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        mobile,
+        store_name: storeName
+      }),
+      signal
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 400 && data) {
+      return {
+        email: data.email?.[0] ?? null,
+        mobile: data.mobile?.[0] ?? null,
+        store_name: data.store_name?.[0] ?? null
+      };
+    }
+
+    if (response.ok) {
+      return {
+        email: null,
+        mobile: null,
+        store_name: null
+      };
+    }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw error;
+    }
+
+    return {
+      email: null,
+      mobile: null,
+      store_name: null
+    };
+  }
+}
