@@ -4,12 +4,24 @@ import { authAPI } from "../services/api";
 import "./css/AccountManagementPage.css";
 
 function clearAuthStorage() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("fitfusion-current-user");
-  sessionStorage.removeItem("userRole");
-  sessionStorage.removeItem("userEmail");
-  sessionStorage.removeItem("registeredAccount");
+  const authKeys = [
+    "access_token",
+    "refresh_token",
+    "fitfusion_access",
+    "fitfusion_refresh",
+    "fitfusion_user",
+    "fitfusion-current-user",
+    "userRole",
+    "userEmail",
+    "registeredAccount",
+    "session",
+    "fitfusion_session",
+  ];
+
+  authKeys.forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
 }
 
 function formatJoinDate(value) {
@@ -36,15 +48,19 @@ function AccountManagementPage() {
   /* ---------- deactivation modal ---------- */
   const [showDeactivateModal, setShowDeactivateModal] =
     useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deactivationReason, setDeactivationReason] =
     useState("");
   const [otherReason, setOtherReason] = useState("");
   const [confirmationChecked, setConfirmationChecked] =
     useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deactivationError, setDeactivationError] =
     useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [isDeactivating, setIsDeactivating] =
     useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /* ---------- fetch real account on mount (FR-1.2) ---------- */
   const closeDeactivateModal = useCallback(() => {
@@ -169,6 +185,19 @@ function AccountManagementPage() {
     setShowDeactivateModal(true);
   }
 
+  function openDeleteModal() {
+    setDeleteConfirmed(false);
+    setDeleteError("");
+    setShowDeleteModal(true);
+  }
+
+  function closeDeleteModal() {
+    if (isDeleting) return;
+    setShowDeleteModal(false);
+    setDeleteConfirmed(false);
+    setDeleteError("");
+  }
+
   async function handleDeactivateAccount() {
     if (!reasonIsValid) {
       setDeactivationError("Please select a reason for deactivation.");
@@ -215,6 +244,35 @@ function AccountManagementPage() {
         "Unable to deactivate your account. Please try again."
       );
       setIsDeactivating(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!deleteConfirmed) {
+      setDeleteError("Please confirm that you want to permanently delete your account.");
+      return;
+    }
+
+    if (isDeleting) return;
+
+    setIsDeleting(true);
+    setDeleteError("");
+
+    try {
+      const refresh = localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh_token") || "";
+      await authAPI.deleteAccount(refresh);
+      clearAuthStorage();
+      navigate("/login", {
+        replace: true,
+        state: {
+          deleted: true,
+          message: "Your account has been permanently deleted. This action is irreversible and compliant with RA 10173.",
+        },
+      });
+    } catch (error) {
+      console.error("Account deletion failed:", error);
+      setDeleteError("Unable to delete your account. Please try again.");
+      setIsDeleting(false);
     }
   }
 
@@ -310,6 +368,15 @@ function AccountManagementPage() {
               buttonLabel="Deactivate Account"
               danger
               onClick={openDeactivateModal}
+            />
+
+            <AccountAction
+              icon={<DeleteIcon />}
+              title="Delete Account"
+              description="Permanently erase your account and personal data from active collections. Archived order records are retained only in pseudonymized form to comply with RA 10173."
+              buttonLabel="Delete Account"
+              danger
+              onClick={openDeleteModal}
             />
           </div>
         </article>
@@ -483,6 +550,99 @@ function AccountManagementPage() {
           </section>
         </div>
       )}
+
+      {showDeleteModal && (
+        <div
+          className="account-deactivate-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeDeleteModal();
+            }
+          }}
+        >
+          <section
+            className="account-deactivate-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            aria-describedby="delete-modal-description"
+          >
+            <button
+              type="button"
+              className="account-deactivate-close"
+              onClick={closeDeleteModal}
+              aria-label="Close delete dialog"
+              disabled={isDeleting}
+            >
+              ×
+            </button>
+
+            <div className="account-deactivate-icon">
+              <DeleteIcon />
+            </div>
+
+            <p className="account-deactivate-eyebrow">DATA PRIVACY</p>
+
+            <h2 id="delete-modal-title">Delete Your Account?</h2>
+
+            <p id="delete-modal-description" className="account-deactivate-description">
+              This action permanently removes your account and active personal data.
+              Presets, saved outfits, and cart data are deleted immediately.
+              Archived order records are retained only in pseudonymized form to comply with RA 10173.
+            </p>
+
+            <div className="account-deactivate-warning">
+              <strong>Warning</strong>
+              <p>
+                This cannot be undone. Your login session will end and your account
+                will be permanently removed from active collections. Only a restricted,
+                pseudonymized order archive remains.
+              </p>
+            </div>
+
+            <label className="account-deactivate-confirmation">
+              <input
+                type="checkbox"
+                checked={deleteConfirmed}
+                onChange={(event) => {
+                  setDeleteConfirmed(event.target.checked);
+                  setDeleteError("");
+                }}
+              />
+              <span>
+                I understand this permanently deletes my account and removes active
+                personal data, and that archived orders remain only in pseudonymized form.
+              </span>
+            </label>
+
+            {deleteError && (
+              <div className="account-deactivate-error" role="alert">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="account-deactivate-actions">
+              <button
+                type="button"
+                className="account-deactivate-cancel"
+                onClick={closeDeleteModal}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="account-deactivate-submit"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -539,6 +699,18 @@ function DeactivateIcon() {
       <path d="M12 3a9 9 0 1 0 9 9" />
       <path d="M12 2v10" />
       <path d="M16 3a9 9 0 0 1 5 5" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </svg>
   );
 }

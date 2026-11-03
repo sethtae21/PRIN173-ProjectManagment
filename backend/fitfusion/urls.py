@@ -29,9 +29,9 @@ if settings.DEBUG:
 
 # Startup banner
 print("\n" + "=" * 60)
-print("🚀 FITFUSION AI SERVER IS RUNNING!")
+print("FITFUSION AI SERVER IS RUNNING!")
 print("=" * 60)
-print("🔗 Available Test Links:")
+print("Available Test Links:")
 print("1. Test Upload Page:       http://127.0.0.1:8000/test-upload/")
 print("2. Django Admin:           http://127.0.0.1:8000/admin/")
 print("3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/")

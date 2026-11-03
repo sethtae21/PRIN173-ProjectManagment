@@ -2,8 +2,10 @@ from django.test import TestCase
 from django.test import SimpleTestCase
 from unittest.mock import Mock, patch
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import User
-from outfits.models import AvatarPreset
+from commerce.models import Cart, Order
+from outfits.models import AvatarPreset, Outfit
 from accounts.storage import GridFSStorage
 
 
@@ -141,22 +143,49 @@ class AccountManagementTests(TestCase):
                                  {'email': 'acct@test.com', 'password': 'NewPass123!@#'}, format='json')
         self.assertEqual(login.status_code, 200)
 
-    def test_delete_account_cascades_and_blocks_login(self):
+    @patch('accounts.views.core.blacklist_refresh_token')
+    def test_delete_account_cascades_and_blocks_login(self, mock_blacklist):
         # Create related data to verify CASCADE deletion
-        AvatarPreset.objects.create(
+        preset = AvatarPreset.objects.create(
             user=self.user, name='P', gender='female',
             height=165, weight=55, skin_tone='#d9aa82'
         )
+        outfit = Outfit.objects.create(user=self.user, name='My Outfit')
+        cart = Cart.objects.create(user=self.user)
+        order = Order.objects.create(
+            user=self.user,
+            order_number='FF-DELETE-0001',
+            status='paid',
+            recipient_name='Acct User',
+            recipient_email='acct@test.com',
+            contact_number='09123456789',
+            shipping_address='123 Sample Street, Makati',
+            payment_method='Cash',
+            total_amount='250.00',
+        )
 
-        # Delete account
-        res = self.client.delete('/profile/')
+        refresh = RefreshToken.for_user(self.user)
+
+        # Delete account with refresh token to blacklist it
+        res = self.client.delete('/profile/', {'refresh': str(refresh)}, format='json')
         self.assertEqual(res.status_code, 204)
+        mock_blacklist.assert_called_once()
 
         # Verify user is gone
         self.assertFalse(User.objects.filter(email='acct@test.com').exists())
 
-        # Verify cascaded data is also gone (RA 10173 erasure proof)
-        self.assertFalse(AvatarPreset.objects.filter(name='P').exists())
+        # Verify active personal data is removed (RA 10173 erasure proof)
+        self.assertFalse(AvatarPreset.objects.filter(pk=preset.pk).exists())
+        self.assertFalse(Outfit.objects.filter(pk=outfit.pk).exists())
+        self.assertFalse(Cart.objects.filter(pk=cart.pk).exists())
+
+        # Verify the archived order remains but all active PII is stripped
+        order.refresh_from_db()
+        self.assertIsNone(order.user)
+        self.assertEqual(order.recipient_name, '')
+        self.assertEqual(order.contact_number, '')
+        self.assertEqual(order.recipient_email, '')
+        self.assertEqual(order.shipping_address, '')
 
         # Verify login now fails
         self.client.force_authenticate(None)
