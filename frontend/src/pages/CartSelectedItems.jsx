@@ -1,15 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import logo from "../assets/fitfusion-logo.svg";
+import { useNavigate } from "react-router-dom";
 import { cartAPI, getCachedCart, API_URL } from "../services/api";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CartSelectedItems.css";
 
-// Visual-only fallback shown when no equipped selection exists in storage. Size is a
-// fixed per-variant attribute (SRS FR-3.2/FR-4.1); there is no availableSizes list
-// because the cart cannot store a different size than the variant's (commerce/views.py:
-// CartItem = cart/item/quantity only). The card renders size read-only, matching the
-// studio equipped card and the catalog's fixed-variant add.
 const DEFAULT_ITEMS = [
   {
     id: "equipped-linen-shirt",
@@ -53,18 +47,11 @@ const DEFAULT_ITEMS = [
   },
 ];
 
-// FIX (Defect B): carry the garment image through. The studio's continueToCart spreads
-// the normalized item (which includes `image`, stored root-relative by the studio's own
-// mediaUrl); we also accept the catalog detail aliases so a hydrated record works. The
-// mediaUrl() below re-prefixes a root-relative /media/... to the API origin, exactly as
-// the catalog page does (the proven pattern), so no studio change is required.
 function readEquippedItems() {
   try {
     const storedValue = localStorage.getItem("fitfusion-selected-items");
 
-    if (!storedValue) {
-      return DEFAULT_ITEMS;
-    }
+    if (!storedValue) return DEFAULT_ITEMS;
 
     const parsedValue = JSON.parse(storedValue);
 
@@ -105,31 +92,28 @@ function formatPrice(price) {
   }).format(Number(price) || 0);
 }
 
-// Prefixes API_URL so a root-relative /media/... stored by the studio resolves against
-// the backend origin (same helper shape as CatalogPage.jsx, which is proven to render).
 function mediaUrl(path) {
   if (!path) return null;
-  if (String(path).startsWith("http")) return path;
-  return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
+
+  const value = String(path);
+
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
+
+  return `${API_URL}${value.startsWith("/") ? "" : "/"}${value}`;
 }
 
-// Server cart is the single source of truth (FR-6.1/6.2, KAN-69). The badge is the sum
-// of line quantities -- identical formula to SavedOutfitsPage / EditSavedOutfitPage, and
-// justified by commerce/views.py (CartItem stores cart/item/quantity; quantity is the unit).
 function computeCartCount(cart) {
-  const items = Array.isArray(cart?.items) ? cart.items : [];
-  return items.reduce(
-    (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
-    0,
-  );
+  if (Array.isArray(cart?.items)) {
+    return cart.items.reduce(
+      (sum, item) => sum + Math.max(0, Number(item.quantity) || 0),
+      0
+    );
+  }
+
+  const count = Number(cart?.item_count);
+  return Number.isFinite(count) ? Math.max(0, count) : null;
 }
 
-// A cart line is keyed by a CatalogItem ObjectId (commerce/views.py add_item ->
-// AddToCartSerializer.PrimaryKeyRelatedField). The select-items ids arrive via
-// /api/recommendations/ -> normalizeStudioItem, which may surface the pk under a
-// different key/shape than /catalog/ does. We validate SYNCHRONOUSLY (24-hex) before
-// any fetch, so a contract mismatch fails with a clear, reload-proof message instead of
-// a silent 400 that a refresh would wipe.
 function isCatalogObjectId(value) {
   return /^[0-9a-fA-F]{24}$/.test(String(value ?? ""));
 }
@@ -138,37 +122,31 @@ function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-// Read the server cart with a FORCED fresh fetch (bypasses the in-memory GET cache) and
-// up to `attempts` tries. Two reasons this is the badge's correctness backbone:
-//   (1) CACHE: the mount effect memoizes a 'cart' snapshot; a plain cartAPI.get() after
-//       an add can return that stale pre-add value, which is exactly how the badge sticks
-//       BELOW the true total. getCachedCart(true) deletes the key first, so the read is
-//       always post-write truth -- the server number wins, never a cached floor.
-//   (2) TRANSIENCE: the local stack intermittently 503s on GridFS/Atlas hiccups (seen
-//       verbatim in the Django log: "GridFS unreachable while serving ... Service
-//       Unavailable"). Three attempts with backoff absorb those blips; if all fail the
-//       CALLER keeps the add-response floor rather than reverting to a stale 0, so a
-//       transient read can never silently zero-out a confirmed write (FR-6.2 / KAN-69).
 async function fetchCartFresh(attempts = 3) {
-  let lastError = null;
-  for (let i = 0; i < attempts; i += 1) {
+  let lastError;
+
+  for (let index = 0; index < attempts; index += 1) {
     try {
       return await getCachedCart(true);
     } catch (error) {
       lastError = error;
-      if (i < attempts - 1) await sleep(300 * (i + 1));
+
+      if (index < attempts - 1) {
+        await sleep(300 * (index + 1));
+      }
     }
   }
+
   throw lastError;
 }
 
-/* FIX (Defect B): port the catalog's image pipeline (useAlphaCrop hole-repair + union
-   crop, mediaUrl origin-prefix, onError fallback) so each unique garment shows its real,
-   centred, transparent photo. The CSS glyph remains only as a no-image / load-failure
-   fallback -- exactly like CatalogPreview. */
 function EquippedPreview({ src, alt, colorCode }) {
   const [failed, setFailed] = useState(false);
   const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   if (!src || failed) {
     return (
@@ -202,33 +180,39 @@ function CartSelectedItems() {
       ...item,
       selected: true,
       quantity: 1,
-    })),
+    }))
   );
 
   const [notification, setNotification] = useState("");
   const [pageError, setPageError] = useState("");
   const [itemsAdded, setItemsAdded] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  const [cartCount, setCartCount] = useState(null);
   const [isLoadingCart, setIsLoadingCart] = useState(true);
 
-  // Guard async state updates so navigating away mid-request never logs a
-  // set-state-on-unmounted warning (console hygiene).
-  const aliveRef = useRef(true);
-  useEffect(() => () => { aliveRef.current = false; }, []);
+  const aliveRef = useRef(false);
+  const addingRef = useRef(false);
+  const cartRevisionRef = useRef(0);
 
-  // FIX (Defect A + the stuck-0/stale-on-load): read the badge from the real endpoint,
-  // FORCED fresh with retry, not the non-existent cartAPI.getCart and not a cached
-  // snapshot. A transient or stale mount read no longer leaves a misleading number on a
-  // non-empty cart. `active` guard prevents a StrictMode double-mount setting state after
-  // unmount.
+  useEffect(() => {
+    aliveRef.current = true;
+
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
+    const revision = cartRevisionRef.current;
 
-    async function fetchCartCount() {
+    async function loadCart() {
       try {
         const cart = await fetchCartFresh();
-        if (active) setCartCount(computeCartCount(cart));
+
+        if (active && cartRevisionRef.current === revision) {
+          setCartCount(computeCartCount(cart));
+        }
       } catch (error) {
         console.error("Failed to load cart count:", error);
       } finally {
@@ -236,7 +220,7 @@ function CartSelectedItems() {
       }
     }
 
-    fetchCartCount();
+    loadCart();
 
     return () => {
       active = false;
@@ -246,87 +230,66 @@ function CartSelectedItems() {
   useEffect(() => {
     if (!notification) return undefined;
 
-    const timer = window.setTimeout(() => {
-      setNotification("");
-    }, 3000);
+    const timer = window.setTimeout(() => setNotification(""), 3000);
 
     return () => window.clearTimeout(timer);
   }, [notification]);
 
   const selectedItems = useMemo(
     () => items.filter((item) => item.selected),
-    [items],
+    [items]
   );
 
   const allSelected =
-    items.length > 0 &&
-    selectedItems.length === items.length;
-
-  const selectedProductCount = selectedItems.length;
+    items.length > 0 && selectedItems.length === items.length;
 
   const totalQuantity = selectedItems.reduce(
     (total, item) => total + item.quantity,
-    0,
+    0
   );
 
   const subtotal = selectedItems.reduce(
-    (total, item) =>
-      total + item.price * item.quantity,
-    0,
+    (total, item) => total + item.price * item.quantity,
+    0
   );
 
-  function toggleItem(itemId) {
+  function resetFeedback() {
     setPageError("");
+    setNotification("");
     setItemsAdded(false);
+  }
+
+  function toggleItem(itemId) {
+    if (addingRef.current) return;
+
+    resetFeedback();
 
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.id === itemId
-          ? {
-              ...item,
-              selected: !item.selected,
-            }
-          : item,
-      ),
+          ? { ...item, selected: !item.selected }
+          : item
+      )
     );
   }
 
   function toggleSelectAll() {
-    setPageError("");
-    setItemsAdded(false);
+    if (addingRef.current) return;
 
-    const nextSelectedValue = !allSelected;
+    resetFeedback();
 
     setItems((currentItems) =>
       currentItems.map((item) => ({
         ...item,
-        selected: nextSelectedValue,
-      })),
+        selected: !allSelected,
+      }))
     );
   }
 
-  function decreaseQuantity(itemId) {
-    setPageError("");
-    setItemsAdded(false);
+  function changeQuantity(itemId, difference) {
+    if (addingRef.current) return;
 
-    setItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              quantity: Math.max(
-                1,
-                item.quantity - 1,
-              ),
-            }
-          : item,
-      ),
-    );
-  }
-
-  function increaseQuantity(itemId) {
-    setPageError("");
-    setItemsAdded(false);
+    resetFeedback();
 
     setItems((currentItems) =>
       currentItems.map((item) =>
@@ -335,79 +298,88 @@ function CartSelectedItems() {
               ...item,
               quantity: Math.min(
                 10,
-                item.quantity + 1,
+                Math.max(1, item.quantity + difference)
               ),
             }
-          : item,
-      ),
+          : item
+      )
     );
   }
 
-  // FIX (the stuck badge): the badge is now driven by (a) the add responses as a
-  // confirmed-write floor and (b) a FORCED-fresh, retried server read that refines
-  // UPWARD. The previous revision's settle read could return a cached pre-add snapshot
-  // (the mount effect memoizes 'cart'), which is how the badge stuck below the true
-  // total; getCachedCart(true) eliminates that. add_item is incremental and
-  // non-transactional across lines, so Promise.allSettled keeps every committed line
-  // reflected even if one line fails, and partial/full failures speak (FR-6.2 / KAN-115 /
-  // SRS 4.4) instead of going silent. The cart line is keyed by the catalog variant
-  // (views.py), so size is NOT sent -- it is intrinsic to the variant and shown read-only.
   async function addSelectedItemsToCart() {
-    if (isAdding) return; // double-submit guard
+    if (addingRef.current) return;
+
     setPageError("");
+    setNotification("");
+    setItemsAdded(false);
 
     if (selectedItems.length === 0) {
       setPageError(
-        "Select at least one equipped product before adding items to your cart.",
+        "Select at least one equipped product before adding items to your cart."
       );
       return;
     }
 
-    // Synchronous contract check (see isCatalogObjectId). Runs before any network call,
-    // so its error survives a reload -- unlike an async 400 that a refresh would wipe.
-    const badItems = selectedItems.filter((item) => !isCatalogObjectId(item.id));
-    if (badItems.length > 0) {
-      const detail = badItems
-        .map((item) => `${item.name} (id: ${String(item.id)})`)
-        .join(", ");
+    const invalidItems = selectedItems.filter(
+      (item) => !isCatalogObjectId(item.id)
+    );
+
+    if (invalidItems.length > 0) {
       setPageError(
-        `Cannot add to cart: these items don't carry a valid catalog item id yet — ${detail}. ` +
-          `The cart keys each line by the catalog ObjectId, so the recommendation list ` +
-          `isn't returning the catalog id in the expected field.`,
+        `These products do not have valid catalog IDs: ${invalidItems
+          .map((item) => item.name)
+          .join(", ")}. Return to the Fitting Studio and select catalog products.`
       );
       return;
     }
 
+    const invalidQuantity = selectedItems.some(
+      (item) =>
+        !Number.isInteger(item.quantity) ||
+        item.quantity < 1 ||
+        item.quantity > 10
+    );
+
+    if (invalidQuantity) {
+      setPageError("Each quantity must be a whole number from 1 to 10.");
+      return;
+    }
+
+    addingRef.current = true;
+    cartRevisionRef.current += 1;
     setIsAdding(true);
 
     try {
       const results = await Promise.allSettled(
-        selectedItems.map((selectedItem) =>
-          cartAPI.add(selectedItem.id, selectedItem.quantity),
-        ),
+        selectedItems.map((item) =>
+          cartAPI.add(item.id, item.quantity)
+        )
       );
 
       if (!aliveRef.current) return;
 
-      const okCarts = results
-        .filter((r) => r.status === "fulfilled")
-        .map((r) => r.value);
-      const failures = results
-        .map((r, i) =>
-          r.status === "rejected"
-            ? { item: selectedItems[i], reason: r.reason }
-            : null,
-        )
-        .filter(Boolean);
+      const successes = [];
+      const failures = [];
 
-      // Confirmed-write floor from the add responses themselves (no extra GET needed).
-      const fromAdds = okCarts.reduce(
-        (maxCount, cart) => Math.max(maxCount, computeCartCount(cart)),
-        0,
-      );
+      results.forEach((result, index) => {
+        const item = selectedItems[index];
 
-      if (fromAdds > 0) {
-        setCartCount(fromAdds);
+        if (result.status === "fulfilled") {
+          successes.push({ item, cart: result.value });
+        } else {
+          failures.push({ item, error: result.reason });
+        }
+      });
+
+      const responseCounts = successes
+        .map(({ cart }) => computeCartCount(cart))
+        .filter((count) => count !== null);
+
+      if (responseCounts.length > 0) {
+        setCartCount(Math.max(...responseCounts));
+      }
+
+      if (successes.length > 0) {
         window.dispatchEvent(new Event("fitfusion-cart-updated"));
       }
 
@@ -416,47 +388,61 @@ function CartSelectedItems() {
         setNotification(
           `${totalQuantity} ${
             totalQuantity === 1 ? "item was" : "items were"
-          } added to your cart.`,
+          } added to your cart.`
         );
       } else {
-        const names = failures.map((f) => f.item.name).join(", ");
-        const reasonMsg = failures[0]?.reason?.message || "the request failed";
-        if (fromAdds > 0) {
-          setPageError(
-            `${fromAdds} of ${selectedItems.length} item(s) added. Could not add: ${names} (${reasonMsg}). Open the cart to confirm what landed.`,
-          );
-        } else {
-          setPageError(
-            `Could not add to cart: ${names} (${reasonMsg}).`,
-          );
-        }
+        const failedNames = failures
+          .map(({ item }) => item.name)
+          .join(", ");
+
+        const reason =
+          failures[0]?.error?.message || "The request failed.";
+
+        setPageError(
+          `${successes.length} of ${selectedItems.length} selected products added. ` +
+            `Could not confirm adding: ${failedNames}. ${reason} ` +
+            "Check your cart before retrying."
+        );
+
+        // Keep confirmed additions out of the next retry.
+        const successfulIds = new Set(
+          successes.map(({ item }) => item.id)
+        );
+
+        setItems((currentItems) =>
+          currentItems.map((item) =>
+            successfulIds.has(item.id)
+              ? { ...item, selected: false }
+              : item
+          )
+        );
       }
 
-      // Authoritative refine: FORCED-fresh (never a cached pre-add snapshot), retried to
-      // absorb transient 503s, and applied UPWARD only so a confirmed write is never
-      // under-reported. On total failure we keep fromAdds (the real-response floor), not 0.
-      let settle = null;
       try {
-        const settledCart = await fetchCartFresh();
-        const n = computeCartCount(settledCart);
-        if (Number.isFinite(n)) settle = n;
-      } catch {
-        settle = null;
-      }
-      if (aliveRef.current && settle !== null) {
-        setCartCount(Math.max(fromAdds, settle));
+        const freshCart = await fetchCartFresh();
+        const freshCount = computeCartCount(freshCart);
+
+        if (aliveRef.current && freshCount !== null) {
+          setCartCount(freshCount);
+        }
+      } catch (error) {
+        console.error("Failed to refresh cart count:", error);
+        // Preserve the count from confirmed add responses.
       }
     } catch (error) {
-      // Safety net for anything outside the per-line adds (allSettled itself never
-      // rejects, so this is rare); surface it rather than leaving the badge stale.
       console.error("Failed to add items to cart:", error);
+
       if (aliveRef.current) {
         setPageError(
-          `${error?.message || "We couldn't add items to your cart."} Open the cart to confirm before retrying.`,
+          "We couldn't confirm the cart update. Open your cart before retrying."
         );
       }
     } finally {
-      setIsAdding(false);
+      addingRef.current = false;
+
+      if (aliveRef.current) {
+        setIsAdding(false);
+      }
     }
   }
 
@@ -466,60 +452,14 @@ function CartSelectedItems() {
 
   return (
     <div className="select-items-page">
-      <aside className="select-items-sidebar">
-        <img
-          className="select-items-logo"
-          src={logo}
-          alt="FitFusion AI"
-        />
-
-        <nav className="select-items-navigation">
-          <NavLink to="/shopper/dashboard">
-            Dashboard
-          </NavLink>
-
-          <NavLink to="/shopper/fitting-studio">
-            Fitting Studio
-          </NavLink>
-
-          <NavLink to="/shopper/avatar-presets">
-            Avatar Presets
-          </NavLink>
-
-          <NavLink to="/shopper/catalog">
-            Catalog
-          </NavLink>
-
-          <NavLink to="/shopper/saved-outfits">
-            Saved Outfits
-          </NavLink>
-
-          <NavLink to="/shopper/orders">
-            Order History
-          </NavLink>
-
-          <NavLink to="/shopper/account">
-            Account
-          </NavLink>
-        </nav>
-
-        <button
-          className="select-items-logout"
-          type="button"
-          onClick={() => navigate("/login")}
-        >
-          Logout
-        </button>
-      </aside>
-
       <div className="select-items-content">
         <header className="select-items-header">
           <div>
-            <h1>15 — SELECT ITEMS FOR CART</h1>
-
-            <p>
-              Review each equipped product, size, and quantity
-              before adding it to your cart.
+            <p className="select-items-eyebrow">OUTFIT TO CART</p>
+            <h1>Select items for cart</h1>
+            <p className="select-items-header-description">
+              Review each equipped product, size, and quantity before
+              adding it to your cart.
             </p>
           </div>
 
@@ -528,29 +468,38 @@ function CartSelectedItems() {
               className="select-header-cart"
               type="button"
               onClick={openCart}
-              disabled={isLoadingCart}
             >
-              <span aria-hidden="true">🛒</span>
-              Cart
-              <strong>{cartCount}</strong>
-            </button>
+              <svg
+                width="19"
+                height="19"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 3h2l2.4 12h11.2L21 7H6" />
+                <circle cx="9" cy="20" r="1" />
+                <circle cx="18" cy="20" r="1" />
+              </svg>
 
-            <span className="select-shopper-role">
-              REGISTERED SHOPPER
-            </span>
+              <span>Cart</span>
+              <strong>
+                {isLoadingCart ? "…" : cartCount ?? "—"}
+              </strong>
+            </button>
           </div>
         </header>
 
         <main className="select-items-main">
           <section className="select-items-introduction">
             <div>
-              <span>OUTFIT TO CART</span>
-
               <h2>Select equipped products</h2>
-
               <p>
-                Each selected product will be added as an
-                individual cart item from its respective seller.
+                Each selected product will be added as an individual
+                cart item from its respective seller.
               </p>
             </div>
 
@@ -558,6 +507,8 @@ function CartSelectedItems() {
               className="select-all-button"
               type="button"
               onClick={toggleSelectAll}
+              aria-pressed={allSelected}
+              disabled={isAdding}
             >
               <span
                 className={`custom-checkbox ${
@@ -575,13 +526,14 @@ function CartSelectedItems() {
           </section>
 
           <div className="select-items-layout">
-            <section className="equipped-products-list">
+            <section
+              className="equipped-products-list"
+              aria-label="Equipped products"
+            >
               {items.map((item) => (
                 <article
                   className={`equipped-product-card ${
-                    item.selected
-                      ? "product-selected"
-                      : ""
+                    item.selected ? "product-selected" : ""
                   }`}
                   key={item.id}
                 >
@@ -597,13 +549,13 @@ function CartSelectedItems() {
                     }
                     aria-pressed={item.selected}
                     onClick={() => toggleItem(item.id)}
+                    disabled={isAdding}
                   >
                     {item.selected ? "✓" : ""}
                   </button>
 
-                  {/* FIX (Defect B): real garment photo via the catalog pipeline,
-                      glyph retained only as the no-image / load-failure fallback. */}
                   <EquippedPreview
+                    key={`${item.id}-${item.image || ""}`}
                     src={mediaUrl(item.image)}
                     alt={item.name}
                     colorCode={item.colorCode}
@@ -611,13 +563,8 @@ function CartSelectedItems() {
 
                   <div className="equipped-product-information">
                     <h3>{item.name}</h3>
-
                     <p>{item.seller}</p>
 
-                    {/* Read-only size, matching the studio equipped card and the
-                        catalog's fixed-variant add. The cart stores no size column
-                        (views.py), so a dropdown here could only misrepresent what
-                        is purchased. */}
                     {(item.size || item.color) && (
                       <small className="equipped-product-size">
                         {item.size ? `Size ${item.size}` : ""}
@@ -634,13 +581,12 @@ function CartSelectedItems() {
                           <button
                             type="button"
                             disabled={
+                              isAdding ||
                               !item.selected ||
                               item.quantity <= 1
                             }
                             aria-label={`Decrease quantity for ${item.name}`}
-                            onClick={() =>
-                              decreaseQuantity(item.id)
-                            }
+                            onClick={() => changeQuantity(item.id, -1)}
                           >
                             −
                           </button>
@@ -650,13 +596,12 @@ function CartSelectedItems() {
                           <button
                             type="button"
                             disabled={
+                              isAdding ||
                               !item.selected ||
                               item.quantity >= 10
                             }
                             aria-label={`Increase quantity for ${item.name}`}
-                            onClick={() =>
-                              increaseQuantity(item.id)
-                            }
+                            onClick={() => changeQuantity(item.id, 1)}
                           >
                             +
                           </button>
@@ -666,35 +611,30 @@ function CartSelectedItems() {
                   </div>
 
                   <strong className="equipped-product-price">
-                    {formatPrice(
-                      item.price * item.quantity,
-                    )}
+                    {formatPrice(item.price * item.quantity)}
                   </strong>
                 </article>
               ))}
             </section>
 
-            <aside className="selection-summary">
-              <span className="summary-label">
-                SELECTION SUMMARY
-              </span>
+            <aside
+              className="selection-summary"
+              aria-label="Selection summary"
+            >
+              <span className="summary-label">SELECTION SUMMARY</span>
 
               <div className="summary-row">
                 <span>Selected products</span>
-
                 <strong>
-                  {selectedProductCount} of {items.length}
+                  {selectedItems.length} of {items.length}
                 </strong>
               </div>
 
               <div className="summary-row">
                 <span>Total quantity</span>
-
                 <strong>
                   {totalQuantity}{" "}
-                  {totalQuantity === 1
-                    ? "item"
-                    : "items"}
+                  {totalQuantity === 1 ? "item" : "items"}
                 </strong>
               </div>
 
@@ -702,28 +642,21 @@ function CartSelectedItems() {
 
               <div className="summary-subtotal">
                 <span>Subtotal</span>
-
-                <strong>
-                  {formatPrice(subtotal)}
-                </strong>
+                <strong>{formatPrice(subtotal)}</strong>
               </div>
 
               <div className="separate-items-notice">
                 <div aria-hidden="true">i</div>
-
                 <p>
                   <strong>Separate cart items</strong>
                   <span>
-                    Seller, size, and quantity stay attached.
+                    Selected products are added individually.
                   </span>
                 </p>
               </div>
 
               {pageError && (
-                <div
-                  className="select-items-error"
-                  role="alert"
-                >
+                <div className="select-items-error" role="alert">
                   {pageError}
                 </div>
               )}
@@ -735,11 +668,7 @@ function CartSelectedItems() {
                 type="button"
                 disabled={isAdding}
                 onClick={
-                  isAdding
-                    ? undefined
-                    : itemsAdded
-                      ? openCart
-                      : addSelectedItemsToCart
+                  itemsAdded ? openCart : addSelectedItemsToCart
                 }
               >
                 {isAdding
@@ -747,9 +676,7 @@ function CartSelectedItems() {
                   : itemsAdded
                     ? "View Shopping Cart"
                     : `Add ${totalQuantity} ${
-                        totalQuantity === 1
-                          ? "Item"
-                          : "Items"
+                        totalQuantity === 1 ? "Item" : "Items"
                       } to Cart`}
               </button>
 
@@ -757,9 +684,7 @@ function CartSelectedItems() {
                 className="back-studio-button"
                 type="button"
                 onClick={() =>
-                  navigate(
-                    "/shopper/fitting-studio/customize",
-                  )
+                  navigate("/shopper/fitting-studio/customize")
                 }
               >
                 Back to Fitting Studio
@@ -769,21 +694,17 @@ function CartSelectedItems() {
 
           <section className="before-adding-notice">
             <strong>Before adding your outfit</strong>
-
             <p>
-              Every selected product is added at its listed size and the
-              quantity you set. Uncheck any garment you do not want to
-              purchase.
+              Every selected product is added at its listed size and
+              the quantity you set. Uncheck any garment you do not
+              want to purchase.
             </p>
           </section>
         </main>
       </div>
 
       {notification && (
-        <div
-          className="select-items-notification"
-          role="status"
-        >
+        <div className="select-items-notification" role="status">
           {notification}
         </div>
       )}
