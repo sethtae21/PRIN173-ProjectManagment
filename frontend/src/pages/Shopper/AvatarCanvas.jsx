@@ -4,6 +4,7 @@ import {
   imageToCanvas,
   detectBodyBounds,
   makeLattice,
+  makeGarmentMesh,
   renderLayer,
   tintBody,
   catalogIllustration,
@@ -252,12 +253,15 @@ export default function AvatarCanvas({
     };
   }, [garmentItems]);
 
-  const garments = useMemo(() => {
+  // CHANGED: keep the item next to its rendered layer so the render loop can
+  // build a per-garment size-true mesh (anchor depends on the category).
+  const garmentLayers = useMemo(() => {
     if (!bounds) return [];
 
     return garmentItems
-      .map(
-        (item) =>
+      .map((item) => ({
+        item,
+        layer:
           garmentImageLayer(
             item,
             bounds,
@@ -266,10 +270,9 @@ export default function AvatarCanvas({
             HEIGHT,
             source,
             gender
-          ) ||
-          catalogIllustration(item, bounds, angle, WIDTH, HEIGHT)
-      )
-      .filter(Boolean);
+          ) || catalogIllustration(item, bounds, angle, WIDTH, HEIGHT),
+      }))
+      .filter((entry) => Boolean(entry.layer));
   }, [
     garmentItems,
     bounds,
@@ -298,6 +301,7 @@ export default function AvatarCanvas({
       if (!active) return;
 
       try {
+        // Body mesh: full deformation from all avatar parameters.
         const config = {
           gender,
           view: angle,
@@ -320,8 +324,20 @@ export default function AvatarCanvas({
 
         renderLayer(ctx, skin, mesh);
 
-        garments.forEach((garment) => {
-          renderLayer(ctx, garment, mesh);
+        // CHANGED: each garment renders through its OWN size-true mesh:
+        // it follows the body's position (rigid translation at its anchor:
+        // shoulder line / waist / feet) and the FR-2.7 shape controls, but
+        // its dimensions never squeeze or stretch with Height / Body Build.
+        garmentLayers.forEach((entry) => {
+          const garmentMesh = makeGarmentMesh(
+            WIDTH,
+            HEIGHT,
+            bounds,
+            config,
+            entry.item
+          );
+
+          renderLayer(ctx, entry.layer, garmentMesh);
         });
 
         if (active) {
@@ -342,7 +358,7 @@ export default function AvatarCanvas({
   }, [
     skin,
     bounds,
-    garments,
+    garmentLayers,
     gender,
     angle,
     avatar?.height,

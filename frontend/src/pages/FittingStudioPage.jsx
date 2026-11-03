@@ -6,6 +6,8 @@ import {
   bodyProportion,
   fetchRankedRecommendations,
   loadMatchReasons,
+  SIZE_RANGE_TABLE,
+  sizeForBodyBuild,
 } from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -137,11 +139,11 @@ function readStudioSession(isGuest) {
   return session && typeof session === "object" ? session : null;
 }
 
-// NEW (gender-switch reset): detect a cached studio session whose equipped
-// look belongs to a DIFFERENT avatar gender than the one resolved for this
-// mount. The Choose-Avatar-Gender page patches session.avatar.gender IN PLACE
-// when the shopper picks a new body (syncStudioSessionGender), so comparing
-// stored-vs-session gender alone cannot see that switch -- but the
+// NEW (size-band lock, option a): detect a cached studio session whose
+// equipped look belongs to a DIFFERENT avatar gender than the one resolved
+// for this mount. The Choose-Avatar-Gender page patches session.avatar.gender
+// IN PLACE when the shopper picks a new body (syncStudioSessionGender), so
+// comparing stored-vs-session gender alone cannot see that switch -- but the
 // `equippedGender` stamp written by THIS page's session persistence can.
 // Sessions without a stamp (written by other pages, e.g. Saved Outfits ->
 // "Open Fitting Studio", FR-5.6 re-equip) are left untouched on purpose.
@@ -986,6 +988,94 @@ function weightToVisualBuild(heightCm, weightKg) {
   return Math.round(clamp(build, BODY_BUILD_RANGE) * 10) / 10;
 }
 
+// ---------------------------------------------------------------------------
+// SIZE CAPS (revised lock policy): while clothing is equipped, the slider
+// MINIMUMS stay fixed (Body Build 86 cm, Height 120 cm) and ONLY the MAXIMUMS
+// snap to the equipped garment size:
+//   * buildMax  = top of the smallest equipped clothing size band
+//                 (SIZE_RANGE_TABLE, client mirror of backend
+//                 knowledge_table.py), pulled 0.1 cm down because bands are
+//                 half-open [lo, hi) except 4XL -- so a size-M garment is
+//                 never stretched onto an L body. Smaller bodies remain
+//                 allowed (a larger garment fits a smaller body loosely).
+//   * heightMax = HEIGHT_RANGE.max * (buildMax / BODY_BUILD_RANGE.max).
+//                 The backend size policy defines NO per-size height band
+//                 (height is a single 120-218 cm range), but the canvas
+//                 lattice scales the garment photo using height AND girth
+//                 together, so the height cap is derived proportionally from
+//                 the same band top (M -> 182.8 cm, L -> 190.6 cm,
+//                 4XL -> full 218 cm).
+// Footwear carries no body-build band and is ignored. With nothing equipped
+// the caps are null and both sliders keep their full ranges.
+// ---------------------------------------------------------------------------
+function sizeBandForLabel(label) {
+  const band = SIZE_RANGE_TABLE[String(label || "").toUpperCase()];
+  return Array.isArray(band) && band.length === 2 ? band : null;
+}
+
+function equippedClothingSizeLabels(equipped) {
+  const labels = [];
+
+  for (const item of Object.values(equipped || {})) {
+    if (!item || item.category === "shoes") continue;
+    const label = String(item.catalogSize || item.size || "").toUpperCase();
+    if (label && !labels.includes(label)) labels.push(label);
+  }
+
+  return labels;
+}
+
+function sizeCapsForEquipped(equipped) {
+  let buildMax = Infinity;
+
+  for (const label of equippedClothingSizeLabels(equipped)) {
+    const band = sizeBandForLabel(label);
+    if (!band) continue;
+
+    const [lo, hi] = band;
+    let top = hi;
+    if (sizeForBodyBuild(hi) !== sizeForBodyBuild(lo)) {
+      top = Math.max(lo, Math.round((hi - 0.1) * 10) / 10);
+    }
+    buildMax = Math.min(buildMax, top);
+  }
+
+  if (!Number.isFinite(buildMax)) return null;
+
+  const heightMax = Math.min(
+    HEIGHT_RANGE.max,
+    Math.round((HEIGHT_RANGE.max * (buildMax / BODY_BUILD_RANGE.max)) * 10) / 10
+  );
+
+  return { buildMax, heightMax };
+}
+
+function applySizeCaps(avatar, caps) {
+  if (!caps) return avatar;
+
+  let next = avatar;
+
+  const height = Number(next.height);
+  if (height > caps.heightMax) {
+    const build = weightToVisualBuild(next.height, next.weight);
+    next = {
+      ...next,
+      height: String(caps.heightMax),
+      weight: String(visualBuildToWeight(build, caps.heightMax)),
+    };
+  }
+
+  const build = weightToVisualBuild(next.height, next.weight);
+  if (build > caps.buildMax) {
+    next = {
+      ...next,
+      weight: String(visualBuildToWeight(caps.buildMax, next.height)),
+    };
+  }
+
+  return next === avatar ? avatar : next;
+}
+
 function FittingStudioPage({ isGuest = false }) {
   const navigate = useNavigate();
   const recommendationsRef = useRef(null);
@@ -1069,6 +1159,17 @@ function FittingStudioPage({ isGuest = false }) {
     [avatar.height, bodyBuild]
   );
 
+  // NEW: active maximum caps derived from the equipped garment sizes.
+  const sizeCaps = useMemo(
+    () => sizeCapsForEquipped(equippedItems),
+    [equippedItems]
+  );
+
+  const sizeCapLabels = useMemo(
+    () => equippedClothingSizeLabels(equippedItems),
+    [equippedItems]
+  );
+
   const equippedItemsArray = useMemo(
     () => Object.values(equippedItems).filter(Boolean),
     [equippedItems]
@@ -1078,6 +1179,28 @@ function FittingStudioPage({ isGuest = false }) {
     () => combinedFitLimits(equippedItems),
     [equippedItems]
   );
+
+  // NEW: slider ranges. Minimums stay fixed; only maximums snap to the caps
+  // (seller fit-limits still apply on top when present).
+  const buildRange = useMemo(
+    () => ({
+      min: BODY_BUILD_RANGE.min,
+      max: sizeCaps ? sizeCaps.buildMax : BODY_BUILD_RANGE.max,
+    }),
+    [sizeCaps]
+  );
+
+  const heightRange = useMemo(() => {
+    const min = fitLimits.height.min;
+    const max = Math.max(
+      min,
+      Math.min(
+        fitLimits.height.max,
+        sizeCaps ? sizeCaps.heightMax : HEIGHT_RANGE.max
+      )
+    );
+    return { min, max };
+  }, [fitLimits, sizeCaps]);
 
   const recommendationItems = useMemo(
     () =>
@@ -1203,6 +1326,13 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }, [avatar.gender]);
 
+  // NEW: keep the avatar inside the equipped garment's caps even when a
+  // restored session (or a pending item equipped from product details) put
+  // the body above them. No-op when already inside the caps.
+  useEffect(() => {
+    setAvatar((current) => applySizeCaps(current, sizeCaps));
+  }, [sizeCaps]);
+
   useEffect(() => {
     const key = pendingKey(isGuest);
     const pending = readJson(sessionStorage, key);
@@ -1241,7 +1371,9 @@ function FittingStudioPage({ isGuest = false }) {
 
     setEquippedItems(next);
     setSelectedMatchItem(item);
-    setAvatar((current) => applyFitLimits(current, nextLimits));
+    setAvatar((current) =>
+      applySizeCaps(applyFitLimits(current, nextLimits), sizeCapsForEquipped(next))
+    );
 
     displayNotification(
       !nextLimits.hasHeight && !nextLimits.hasWeight
@@ -1284,9 +1416,10 @@ function FittingStudioPage({ isGuest = false }) {
     });
   }
 
+  // CHANGED: height now clamps to heightRange (fixed min, capped max).
   function updateAvatar(field, value) {
     if (field === "height") {
-      const nextHeight = clamp(value, fitLimits.height);
+      const nextHeight = clamp(value, heightRange);
       const currentHeight = Number(avatar.height);
       const currentWeight = Number(avatar.weight);
 
@@ -1325,8 +1458,9 @@ function FittingStudioPage({ isGuest = false }) {
     setAvatar((current) => ({ ...current, [field]: value }));
   }
 
+  // CHANGED: body build clamps to buildRange (fixed 86 cm min, capped max).
   function selectBodyBuild(value) {
-    const nextBuild = clamp(value, BODY_BUILD_RANGE);
+    const nextBuild = clamp(value, buildRange);
     const nextWeight = visualBuildToWeight(nextBuild, avatar.height);
 
     if (
@@ -1472,7 +1606,9 @@ function FittingStudioPage({ isGuest = false }) {
 
     setSelectedMatchItem(item);
     setEquippedItems(next);
-    setAvatar((current) => applyFitLimits(current, nextLimits));
+    setAvatar((current) =>
+      applySizeCaps(applyFitLimits(current, nextLimits), sizeCapsForEquipped(next))
+    );
 
     displayNotification(
       !nextLimits.hasHeight && !nextLimits.hasWeight
@@ -1511,7 +1647,12 @@ function FittingStudioPage({ isGuest = false }) {
       }
       setOriginalDimensions(null);
     } else {
-      setAvatar((current) => applyFitLimits(current, combinedFitLimits(next)));
+      setAvatar((current) =>
+        applySizeCaps(
+          applyFitLimits(current, combinedFitLimits(next)),
+          sizeCapsForEquipped(next)
+        )
+      );
     }
   }
 
@@ -1712,10 +1853,10 @@ function FittingStudioPage({ isGuest = false }) {
                       id="studio-height"
                       className="studio-slider"
                       type="range"
-                      min={fitLimits.height.min}
-                      max={fitLimits.height.max}
+                      min={heightRange.min}
+                      max={heightRange.max}
                       step="0.1"
-                      value={clamp(avatar.height, fitLimits.height)}
+                      value={clamp(avatar.height, heightRange)}
                       onPointerUp={() => notifyAtLimit("height")}
                       onKeyUp={() => notifyAtLimit("height")}
                       onChange={(event) =>
@@ -1724,8 +1865,8 @@ function FittingStudioPage({ isGuest = false }) {
                       aria-valuetext={`${avatar.height} centimeters`}
                     />
                     <div className="studio-slider-limits">
-                      <span>{fitLimits.height.min} cm</span>
-                      <span>{fitLimits.height.max} cm</span>
+                      <span>{heightRange.min} cm</span>
+                      <span>{heightRange.max} cm</span>
                     </div>
                   </div>
 
@@ -1738,10 +1879,10 @@ function FittingStudioPage({ isGuest = false }) {
                       id="studio-body-build"
                       className="studio-slider"
                       type="range"
-                      min={BODY_BUILD_RANGE.min}
-                      max={BODY_BUILD_RANGE.max}
+                      min={buildRange.min}
+                      max={buildRange.max}
                       step="0.1"
-                      value={clamp(bodyBuild, BODY_BUILD_RANGE)}
+                      value={clamp(bodyBuild, buildRange)}
                       onPointerUp={() => notifyAtLimit("weight")}
                       onKeyUp={() => notifyAtLimit("weight")}
                       onChange={(event) =>
@@ -1750,8 +1891,8 @@ function FittingStudioPage({ isGuest = false }) {
                       aria-valuetext={`${bodyBuild} centimeters`}
                     />
                     <div className="studio-slider-limits">
-                      <span>{BODY_BUILD_RANGE.min} cm</span>
-                      <span>{BODY_BUILD_RANGE.max} cm</span>
+                      <span>{buildRange.min} cm</span>
+                      <span>{buildRange.max} cm</span>
                     </div>
                   </div>
                 </div>
@@ -1771,6 +1912,16 @@ function FittingStudioPage({ isGuest = false }) {
                       lineHeight: 1.5,
                     }}
                   >
+                    {sizeCaps && (
+                      <p style={{ margin: "0 0 6px" }}>
+                        <strong>Size cap active:</strong> while a size{" "}
+                        {sizeCapLabels.join(" / ")} garment is equipped, Body
+                        Build is capped at {sizeCaps.buildMax} cm and Height at{" "}
+                        {sizeCaps.heightMax} cm (minimums stay{" "}
+                        {BODY_BUILD_RANGE.min} cm / {HEIGHT_RANGE.min} cm).
+                        Remove all clothing to restore the full ranges.
+                      </p>
+                    )}
                     {atHeightMax || atWeightMax ? (
                       <strong>
                         Maximum{" "}
