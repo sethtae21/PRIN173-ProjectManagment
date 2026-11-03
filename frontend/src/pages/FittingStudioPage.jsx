@@ -137,6 +137,36 @@ function readStudioSession(isGuest) {
   return session && typeof session === "object" ? session : null;
 }
 
+// NEW (gender-switch reset): detect a cached studio session whose equipped
+// look belongs to a DIFFERENT avatar gender than the one resolved for this
+// mount. The Choose-Avatar-Gender page patches session.avatar.gender IN PLACE
+// when the shopper picks a new body (syncStudioSessionGender), so comparing
+// stored-vs-session gender alone cannot see that switch -- but the
+// `equippedGender` stamp written by THIS page's session persistence can.
+// Sessions without a stamp (written by other pages, e.g. Saved Outfits ->
+// "Open Fitting Studio", FR-5.6 re-equip) are left untouched on purpose.
+function sessionNeedsEquipReset(session, storedGender, avatarGender) {
+  if (!session || typeof session !== "object") return false;
+
+  const equippedGender = session.equippedGender
+    ? normalizeGender(session.equippedGender)
+    : null;
+
+  if (equippedGender && equippedGender !== normalizeGender(avatarGender)) {
+    return true;
+  }
+
+  const sessionGender = session.avatar?.gender
+    ? normalizeGender(session.avatar.gender)
+    : null;
+
+  if (storedGender && sessionGender && storedGender !== sessionGender) {
+    return true;
+  }
+
+  return false;
+}
+
 function calculateBodyType(height, weight) {
   const meters = Number(height) / 100;
   const mass = Number(weight);
@@ -976,21 +1006,40 @@ function FittingStudioPage({ isGuest = false }) {
 
   const [activePanel, setActivePanel] = useState("customize");
 
-  const [equippedItems, setEquippedItems] = useState(
-    () =>
-      sanitizeEquipped(
-        readStudioSession(isGuest)?.equippedItems || {
-          top: null,
-          bottom: null,
-          shoes: null,
-        },
-        avatar.gender
-      )
-  );
+  // CHANGED: reset the wardrobe when the cached session was equipped under a
+  // different gender (e.g. sidebar -> Fitting Studio -> pick other gender,
+  // which patches session.avatar.gender in place but keeps equippedItems).
+  const [equippedItems, setEquippedItems] = useState(() => {
+    const session = readStudioSession(isGuest);
 
-  const [originalDimensions, setOriginalDimensions] = useState(
-    () => readStudioSession(isGuest)?.originalDimensions || null
-  );
+    if (
+      sessionNeedsEquipReset(session, readStoredGender(isGuest), avatar.gender)
+    ) {
+      return { top: null, bottom: null, shoes: null };
+    }
+
+    return sanitizeEquipped(
+      session?.equippedItems || {
+        top: null,
+        bottom: null,
+        shoes: null,
+      },
+      avatar.gender
+    );
+  });
+
+  // CHANGED: a stale dimension snapshot must not survive a gender reset.
+  const [originalDimensions, setOriginalDimensions] = useState(() => {
+    const session = readStudioSession(isGuest);
+
+    if (
+      sessionNeedsEquipReset(session, readStoredGender(isGuest), avatar.gender)
+    ) {
+      return null;
+    }
+
+    return session?.originalDimensions || null;
+  });
 
   const [catalogRecommendations, setCatalogRecommendations] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -1076,10 +1125,19 @@ function FittingStudioPage({ isGuest = false }) {
     ]
   );
 
+  // CHANGED: stamp the session with the gender the look was equipped under so
+  // a later mount can detect a gender switch even when another page patched
+  // session.avatar.gender in place.
   useEffect(() => {
     sessionStorage.setItem(
       sessionKey(isGuest),
-      JSON.stringify({ avatar, currentView, equippedItems, originalDimensions })
+      JSON.stringify({
+        avatar,
+        currentView,
+        equippedItems,
+        originalDimensions,
+        equippedGender: avatar.gender,
+      })
     );
   }, [avatar, currentView, equippedItems, originalDimensions, isGuest]);
 
@@ -1129,9 +1187,20 @@ function FittingStudioPage({ isGuest = false }) {
     setCurrentPage(1);
   }, [proportion.size]);
 
-  // Purge a female-only cut the instant the avatar becomes Male.
+  const prevGenderRef = useRef(avatar.gender);
+
+  // Clear all equipped items the instant the avatar gender changes.
   useEffect(() => {
-    setEquippedItems((current) => sanitizeEquipped(current, avatar.gender));
+    if (prevGenderRef.current !== avatar.gender) {
+      setEquippedItems({
+        top: null,
+        bottom: null,
+        shoes: null,
+      });
+      setSelectedMatchItem(null);
+      setOriginalDimensions(null);
+      prevGenderRef.current = avatar.gender;
+    }
   }, [avatar.gender]);
 
   useEffect(() => {
@@ -1197,10 +1266,17 @@ function FittingStudioPage({ isGuest = false }) {
     window.setTimeout(() => setNotification(""), 2500);
   }
 
+  // CHANGED: snapshot now carries the equippedGender stamp as well.
   function openProductDetails(item) {
     sessionStorage.setItem(
       sessionKey(isGuest),
-      JSON.stringify({ avatar, currentView, equippedItems, originalDimensions })
+      JSON.stringify({
+        avatar,
+        currentView,
+        equippedItems,
+        originalDimensions,
+        equippedGender: avatar.gender,
+      })
     );
 
     navigate(`${basePath}/products/${encodeURIComponent(item.id)}`, {
