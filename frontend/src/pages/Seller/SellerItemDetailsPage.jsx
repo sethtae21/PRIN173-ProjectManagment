@@ -52,13 +52,16 @@ const CHECKER = {
   backgroundSize: "16px 16px",
 };
 
-const ALPHA_STEPS = [128, 64, 24];
-const MIN_COMPONENT_AREA = 24;
+/* Two-threshold clustered crop tuning (mirrors useAlphaCrop.js). */
+const CONNECT_STEPS = [24, 12];
+const LOW_ALPHA = 8;
+const LINK_RATIO = 0.05;
+const MIN_COMPONENT_AREA_RATIO = 0.0008;
 
 function fillTransparentHoles(imageData) {
   const { data, width: w, height: h } = imageData;
   const total = w * h;
-  const isTransparent = (i) => data[i * 4 + 3] <= ALPHA_STEPS[0];
+  const isTransparent = (i) => data[i * 4 + 3] <= CONNECT_STEPS[0];
 
   const outside = new Uint8Array(total);
   const stack = new Int32Array(total);
@@ -158,26 +161,25 @@ function fillTransparentHoles(imageData) {
   return filled;
 }
 
-function scanLargestComponentBox(data, sw, sh, threshold) {
+// TWO-THRESHOLD CLUSTERED CROP (identical to useAlphaCrop.js). See that file's
+// header for the full rationale: low connect threshold keeps the translucent
+// folded hood, adjacency-absorb pulls in sub-min hood slivers, low-grow recovers
+// soft fringes (overcrop fix), largest-cluster drops a second garment (pants).
+function scanClusteredComponentBox(data, sw, sh, connectThreshold, lowThreshold, minRatio, linkRatio) {
   const total = sw * sh;
   const visited = new Uint8Array(total);
   const stack = new Int32Array(total);
-  let bestArea = 0;
-  let bestBox = null;
+  const minArea = Math.max(16, Math.floor(total * minRatio));
+  const allComps = [];
+  const comps = [];
 
   for (let start = 0; start < total; start += 1) {
-    if (visited[start] || data[start * 4 + 3] <= threshold) continue;
-
+    if (visited[start] || data[start * 4 + 3] <= connectThreshold) continue;
     let sp = 0;
     stack[sp++] = start;
     visited[start] = 1;
-
     let area = 0;
-    let minX = sw;
-    let minY = sh;
-    let maxX = -1;
-    let maxY = -1;
-
+    let minX = sw, minY = sh, maxX = -1, maxY = -1;
     while (sp > 0) {
       const idx = stack[--sp];
       const x = idx % sw;
@@ -187,45 +189,122 @@ function scanLargestComponentBox(data, sw, sh, threshold) {
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
-
-      if (x > 0) {
-        const n = idx - 1;
-        if (!visited[n] && data[n * 4 + 3] > threshold) {
-          visited[n] = 1;
-          stack[sp++] = n;
-        }
-      }
-      if (x < sw - 1) {
-        const n = idx + 1;
-        if (!visited[n] && data[n * 4 + 3] > threshold) {
-          visited[n] = 1;
-          stack[sp++] = n;
-        }
-      }
-      if (y > 0) {
-        const n = idx - sw;
-        if (!visited[n] && data[n * 4 + 3] > threshold) {
-          visited[n] = 1;
-          stack[sp++] = n;
-        }
-      }
-      if (y < sh - 1) {
-        const n = idx + sw;
-        if (!visited[n] && data[n * 4 + 3] > threshold) {
-          visited[n] = 1;
-          stack[sp++] = n;
-        }
-      }
+      if (x > 0 && !visited[idx - 1] && data[(idx - 1) * 4 + 3] > connectThreshold) { visited[idx - 1] = 1; stack[sp++] = idx - 1; }
+      if (x < sw - 1 && !visited[idx + 1] && data[(idx + 1) * 4 + 3] > connectThreshold) { visited[idx + 1] = 1; stack[sp++] = idx + 1; }
+      if (y > 0 && !visited[idx - sw] && data[(idx - sw) * 4 + 3] > connectThreshold) { visited[idx - sw] = 1; stack[sp++] = idx - sw; }
+      if (y < sh - 1 && !visited[idx + sw] && data[(idx + sw) * 4 + 3] > connectThreshold) { visited[idx + sw] = 1; stack[sp++] = idx + sw; }
     }
+    const comp = { minX, minY, maxX, maxY, area };
+    allComps.push(comp);
+    if (area >= minArea) comps.push(comp);
+  }
 
-    if (area > bestArea) {
-      bestArea = area;
-      bestBox = { minX, minY, maxX, maxY, area };
+  if (!comps.length) {
+    let biggest = null;
+    for (const c of allComps) if (!biggest || c.area > biggest.area) biggest = c;
+    if (!biggest) return null;
+    comps.push(biggest);
+  }
+
+  const linkGap = Math.max(3, Math.round(linkRatio * Math.max(sw, sh)));
+  const parent = comps.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const unite = (a, b) => { const ra = find(a); const rb = find(b); if (ra !== rb) parent[ra] = rb; };
+  const linked = (a, b) =>
+    a.minX - linkGap <= b.maxX + linkGap && b.minX - linkGap <= a.maxX + linkGap &&
+    a.minY - linkGap <= b.maxY + linkGap && b.minY - linkGap <= a.maxY + linkGap;
+
+  for (let i = 0; i < comps.length; i += 1)
+    for (let j = i + 1; j < comps.length; j += 1)
+      if (linked(comps[i], comps[j])) unite(i, j);
+
+  const clusters = new Map();
+  for (let i = 0; i < comps.length; i += 1) {
+    const r = find(i);
+    let c = clusters.get(r);
+    if (!c) { c = { minX: sw, minY: sh, maxX: -1, maxY: -1, area: 0 }; clusters.set(r, c); }
+    const b = comps[i];
+    if (b.minX < c.minX) c.minX = b.minX;
+    if (b.minY < c.minY) c.minY = b.minY;
+    if (b.maxX > c.maxX) c.maxX = b.maxX;
+    if (b.maxY > c.maxY) c.maxY = b.maxY;
+    c.area += b.area;
+  }
+
+  let core = null;
+  for (const c of clusters.values()) if (!core || c.area > core.area) core = c;
+  if (!core) return null;
+
+  const subMin = allComps.filter((c) => c.area < minArea);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const c of subMin) {
+      if (c.__absorbed) continue;
+      if (linked(c, core)) {
+        c.__absorbed = true;
+        if (c.minX < core.minX) core.minX = c.minX;
+        if (c.minY < core.minY) core.minY = c.minY;
+        if (c.maxX > core.maxX) core.maxX = c.maxX;
+        if (c.maxY > core.maxY) core.maxY = c.maxY;
+        grew = true;
+      }
     }
   }
 
-  if (!bestBox || bestArea < MIN_COMPONENT_AREA) return null;
-  return bestBox;
+  const margin = Math.max(2, Math.round(0.06 * Math.max(sw, sh)));
+  const gx0 = Math.max(0, core.minX - margin);
+  const gy0 = Math.max(0, core.minY - margin);
+  const gx1 = Math.min(sw - 1, core.maxX + margin);
+  const gy1 = Math.min(sh - 1, core.maxY + margin);
+  const gw = gx1 - gx0 + 1;
+  const gh = gy1 - gy0 + 1;
+  const gVisited = new Uint8Array(gw * gh);
+  const gQueue = new Int32Array(gw * gh);
+  let gHead = 0;
+  let gTail = 0;
+  let outMinX = sw, outMinY = sh, outMaxX = -1, outMaxY = -1;
+  const gi = (x, y) => (y - gy0) * gw + (x - gx0);
+  for (let y = Math.max(gy0, core.minY); y <= Math.min(gy1, core.maxY); y += 1)
+    for (let x = Math.max(gx0, core.minX); x <= Math.min(gx1, core.maxX); x += 1)
+      if (data[(y * sw + x) * 4 + 3] > connectThreshold) {
+        const id = gi(x, y);
+        if (!gVisited[id]) {
+          gVisited[id] = 1;
+          gQueue[gTail++] = id;
+          if (x < outMinX) outMinX = x;
+          if (x > outMaxX) outMaxX = x;
+          if (y < outMinY) outMinY = y;
+          if (y > outMaxY) outMaxY = y;
+        }
+      }
+  while (gHead < gTail) {
+    const id = gQueue[gHead++];
+    const lx = id % gw;
+    const ly = (id / gw) | 0;
+    const x = lx + gx0;
+    const y = ly + gy0;
+    const nbx = [x + 1, x - 1, x, x];
+    const nby = [y, y, y + 1, y - 1];
+    for (let k = 0; k < 4; k += 1) {
+      const nx = nbx[k];
+      const ny = nby[k];
+      if (nx < gx0 || nx > gx1 || ny < gy0 || ny > gy1) continue;
+      const nid = gi(nx, ny);
+      if (gVisited[nid] || data[(ny * sw + nx) * 4 + 3] <= lowThreshold) continue;
+      gVisited[nid] = 1;
+      gQueue[gTail++] = nid;
+      if (nx < outMinX) outMinX = nx;
+      if (nx > outMaxX) outMaxX = nx;
+      if (ny < outMinY) outMinY = ny;
+      if (ny > outMaxY) outMaxY = ny;
+    }
+  }
+
+  if (outMaxX < outMinX) {
+    return { minX: core.minX, minY: core.minY, maxX: core.maxX, maxY: core.maxY, area: core.area };
+  }
+  return { minX: outMinX, minY: outMinY, maxX: outMaxX, maxY: outMaxY, area: core.area };
 }
 
 function useAlphaCrop(src) {
@@ -270,9 +349,9 @@ function useAlphaCrop(src) {
 
         let box = null;
         let usedThreshold = null;
-        for (let i = 0; i < ALPHA_STEPS.length && !box; i += 1) {
-          box = scanLargestComponentBox(data, sw, sh, ALPHA_STEPS[i]);
-          if (box) usedThreshold = ALPHA_STEPS[i];
+        for (let i = 0; i < CONNECT_STEPS.length && !box; i += 1) {
+          box = scanClusteredComponentBox(data, sw, sh, CONNECT_STEPS[i], LOW_ALPHA, MIN_COMPONENT_AREA_RATIO, LINK_RATIO);
+          if (box) usedThreshold = CONNECT_STEPS[i];
         }
         if (!box) {
           console.info("[alpha-crop] fully transparent canvas, keeping original:", src);

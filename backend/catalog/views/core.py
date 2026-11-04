@@ -52,6 +52,22 @@ IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=IMAGE_WORKERS)
 _REMBG_SESSION = None
 _REMBG_SESSION_LOCK = threading.Lock()
 
+# MATTE PIPELINE VERSION SALT (LARGEST-CLUSTER v3 cleanup).
+# Bump this string whenever the matte pipeline changes so stale cached PNGs
+# (e.g. the v2/v3 blackened mattes) are auto-invalidated and recomputed.
+# v4 = clean matte only: the speculative face/hood blackener has been removed
+# because it smeared black over garment-interior voids (neckline, zipper,
+# logos). Genuine enclosed holes are repaired frontend-side by
+# fillTransparentHoles using NEIGHBOUR colour, never black.
+MATTE_PIPELINE_VERSION = "v4-clean-matte"
+
+
+def _matte_cache_digest(original: bytes) -> str:
+    """Versioned sha256 so pipeline changes never serve a stale matte."""
+    return hashlib.sha256(
+        MATTE_PIPELINE_VERSION.encode("utf-8") + original
+    ).hexdigest()
+
 
 def get_shared_rembg_session():
     """One onnxruntime session for the whole process (Run() is thread-safe)."""
@@ -293,7 +309,7 @@ class CatalogValidator:
         try:
             image_file.seek(0)
             original = image_file.read()
-            digest = hashlib.sha256(original).hexdigest()
+            digest = _matte_cache_digest(original)
             cache_path = REMBG_CACHE_DIR / f"{digest}.png"
             if cache_path.exists():
                 try:
@@ -452,7 +468,7 @@ def process_batch_background(batch_id):
                 result['errors'].append(f"{view_label} read failed: {e}")
                 return result
 
-            digest = hashlib.sha256(original).hexdigest()
+            digest = _matte_cache_digest(original)
             with inflight_lock:
                 entry = inflight.get(digest)
                 owner = entry is None
@@ -625,7 +641,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-package')
     def download_package(self, request):
-        archive = io.BytesIO()
+        archive = io.StringIO() if False else io.BytesIO()
         with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as package:
             package.writestr('catalog_products.csv', build_catalog_template_csv())
             package.writestr('seller_image_guidelines.txt', SELLER_IMAGE_GUIDELINES)

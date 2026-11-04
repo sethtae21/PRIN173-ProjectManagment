@@ -18,6 +18,10 @@ import {
 const WIDTH = 320;
 const HEIGHT = 640;
 
+// Lift outerwear slightly so the jacket collar and shoulder seams
+// align more closely with the avatar's shoulders.
+const OUTERWEAR_LIFT_PX = 16;
+
 const imageCache = new Map();
 
 // FIX (dress on male): defensive render-side gate. Even if a dress-class
@@ -33,6 +37,21 @@ function isFemaleOnlyAvatarItem(item) {
   return (
     FEMALE_ONLY_CATEGORY_PATTERN.test(String(item.rawCategory || "")) ||
     FEMALE_ONLY_CATEGORY_PATTERN.test(String(item.category || ""))
+  );
+}
+
+function isOuterwearItem(item) {
+  if (!item) return false;
+
+  const category = String(
+    item.rawCategory || item.category || ""
+  ).toLowerCase();
+
+  const name = String(item.name || "").toLowerCase();
+
+  return (
+    category.includes("outer") ||
+    /blazer|jacket|coat|parka|hoodie|windbreaker|trench/.test(name)
   );
 }
 
@@ -435,7 +454,16 @@ export default function AvatarCanvas({
             entry.item
           );
 
-          renderLayer(ctx, entry.layer, garmentMesh);
+          // Lift outerwear slightly to align its collar and shoulder seams.
+          // Save/restore keeps this translation from affecting later layers.
+          if (isOuterwearItem(entry.item)) {
+            ctx.save();
+            ctx.translate(0, -OUTERWEAR_LIFT_PX);
+            renderLayer(ctx, entry.layer, garmentMesh);
+            ctx.restore();
+          } else {
+            renderLayer(ctx, entry.layer, garmentMesh);
+          }
         });
 
         if (active) {
