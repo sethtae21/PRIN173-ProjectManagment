@@ -2,9 +2,9 @@
  * FitFusion AI
  * Weight-responsive 2D Avatar Engine
  *
- * BUILD MARKER: DRESS-LENGTH-FIX v2 + SLEEVE-ASPECT v3
- * (grep for DRESS_HEM_MIN_T and MIN_SLEEVE_ASPECT to confirm this exact file
- * is the one Vite is serving.)
+ * BUILD MARKER: DRESS-LENGTH-FIX v2 + SLEEVE-ASPECT v3 + TOPS-LAYER-FIT v12
+ * (grep for DRESS_HEM_MIN_T, MIN_SLEEVE_ASPECT, TOPS_HEM_MIN_T and
+ * TOPS_LAYER_SHRINK to confirm this exact file is the one Vite is serving.)
  *
  * Supports:
  * - Female and Male Standard avatars
@@ -24,13 +24,20 @@
  *   2. largest-connected-component + hole-fill alpha crop
  *   3. category -> anatomical region (gender-aware; knitwear has its own
  *      region with the collar at the shoulder line and the hem at the hip)
- *   4. long-sleeve drape: ONLY flat-lays whose side wings are true horizontal
- *      sleeves (wing length >= 0.5 x torso width AND wing aspect
- *      length/thickness >= 2.2) are composited as torso + two 90-degree
- *      rotated sleeve panels draped shoulder->wrist. Short-sleeve tees and
- *      vertical-sleeve jackets fail the aspect test and keep the proven plain
- *      stretch, so they render as ONE connected, fully visible layer.
- *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs)
+ *   4. TOPS-LAYER-FIT v12: tops/knits that are NOT long-sleeve flat lays
+ *      render with the approved dress-style geometry (shoulder-aligned
+ *      region width, photo aspect drives height, hem clamped to the hip),
+ *      uniformly scaled by TOPS_LAYER_SHRINK (0.90) and dropped by
+ *      TOPS_LAYER_DROP_T (2% of body height) so the collar and sleeve
+ *      seams sit exactly ON the shoulder line and the whole tee reads a
+ *      little smaller on the body. The shrink is UNIFORM (width and height
+ *      together) so the garment photo's proportions and the catalog size
+ *      stay fixed -- nothing is stretched or squeezed. ONLY true
+ *      horizontal long sleeves (wing length >= 0.5 x torso width AND
+ *      aspect >= 2.2, e.g. the sweater) still drape shoulder->wrist.
+ *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs) for
+ *      outerwear / bottoms / footwear and the long-sleeve drape; dresses
+ *      and layered tops skip it.
  *   6. shared lattice warp (garment deforms with the body)
  * catalogIllustration() remains the fallback while loading / when missing.
  *
@@ -236,7 +243,6 @@ export function detectBodyBounds(canvas) {
 
     left = Math.min(left, rowLeft);
     right = Math.max(right, rowRight);
-
     top = Math.min(top, y);
     bottom = Math.max(bottom, y);
   }
@@ -1191,7 +1197,7 @@ const GARMENT_REGIONS = {
     footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
   },
   female: {
-    tops: { x0: -0.55, x1: 0.55, y0: 0.125, y1: 0.47 },
+    tops: { x0: -0.50, x1: 0.50, y0: 0.125, y1: 0.47 },
     knits: { x0: -0.50, x1: 0.50, y0: 0.135, y1: 0.475 },
     outerwear: { x0: -0.57, x1: 0.57, y0: 0.120, y1: 0.55 },
     bottoms: { x0: -0.35, x1: 0.35, y0: 0.43, y1: 0.91 },
@@ -1204,6 +1210,17 @@ const GARMENT_REGIONS = {
 // Hem floor for one-piece garments: the dress must always cover past the
 // knee (fraction of body height from the top of the bounds).
 const DRESS_HEM_MIN_T = 0.75;
+
+// Hem floor for layered tops, as a fraction of the tops region height.
+const TOPS_HEM_MIN_T = 0.85;
+
+// TOPS-LAYER-FIT v12: uniform overlay shrink for layered tops (width AND
+// height together, photo aspect and catalog size stay fixed).
+const TOPS_LAYER_SHRINK = 0.90;
+
+// TOPS-LAYER-FIT v12: vertical drop (fraction of body height) so the collar
+// and sleeve seams sit exactly on the shoulder line.
+const TOPS_LAYER_DROP_T = 0.02;
 
 // Only flat-lay knits and tees are eligible for the long-sleeve drape.
 const DRAPEABLE = new Set(["tops", "knits"]);
@@ -1522,19 +1539,18 @@ function regionForProduct(product, gender = "male") {
   return table[regionKeyForProduct(product)];
 }
 
-// ---- Long-sleeve (horizontal-sleeve) detector --------------------------
+// ---- Garment shape detector (torso column + side wings) -----------------
 // Orientation-agnostic: the TRUE torso width is the median opaque width of
 // the HEM band (bottom 22%, never touched by sleeves). The centre x is the
 // hem-band median centre. We then scan the upper band for opaque pixels that
 // sit outside the torso column ("side wings").
 //
-// FIX (SLEEVE-ASPECT v3): each wing now records its OWN vertical extent, and
-// a wing only counts as a laid-flat LONG sleeve when
+// FIX (SLEEVE-ASPECT v3): each wing records its OWN vertical extent, and a
+// wing only counts as a laid-flat LONG sleeve when
 //     length >= 0.5 x torso width  AND  length / thickness >= 2.2.
-// Short-sleeve tees (diagonal caps, aspect ~1-1.5) fail the aspect test and
-// keep the plain stretch, so they render as ONE connected, fully visible
-// layer instead of a tank torso + detached arm tubes. True horizontal sleeves
-// (the sweater) have aspect ~3+ and still drape shoulder->wrist.
+// True horizontal sleeves (the sweater) get sleeveClass "long" and drape
+// shoulder->wrist. Everything else returns sleeveClass "plain" and renders
+// through the TOPS-LAYER-FIT v12 layered region mapping.
 function analyzeTShape(cropped) {
   const cw = cropped.width;
   const ch = cropped.height;
@@ -1660,13 +1676,10 @@ function analyzeTShape(cropped) {
   const LONG_WING_RATIO = 0.5;
   const MIN_SLEEVE_ASPECT = 2.2;
 
-  if (
-    longest < torsoW * LONG_WING_RATIO ||
-    longest < 8 ||
-    bestAspect < MIN_SLEEVE_ASPECT
-  ) {
-    return null;
-  }
+  const isLong =
+    longest >= torsoW * LONG_WING_RATIO &&
+    longest >= 8 &&
+    bestAspect >= MIN_SLEEVE_ASPECT;
 
   return {
     torso: {
@@ -1677,11 +1690,17 @@ function analyzeTShape(cropped) {
     },
     leftWing,
     rightWing,
+    sleeveClass: isLong ? "long" : "plain",
+    torsoW,
+    wingLenL,
+    wingLenR,
+    wingThickL,
+    wingThickR,
   };
 }
 
 // Draw one photo-space rectangle, rotated 90 degrees, into a body-space
-// vertical strip.
+// vertical strip (LONG-sleeve drape only).
 function drawRotatedPanel(
   ctx,
   img,
@@ -1753,6 +1772,10 @@ export function garmentImageLayer(
 
   if (rh <= 0) return null;
 
+  // Dresses AND layered tops skip the silhouette clip (garment is layered
+  // on the avatar, not fitted to it).
+  let skipClip = regionKey === "dresses";
+
   try {
     if (regionKey === "footwear") {
       const aspect =
@@ -1790,7 +1813,18 @@ export function garmentImageLayer(
     } else if (DRAPEABLE.has(regionKey)) {
       const shape = analyzeTShape(cropped);
 
-      if (shape) {
+      // DEBUG v12 (TEMPORARY - remove after verification).
+      console.info(
+        "[canvasWarp2D] TOPS_LAYER_FIT v12",
+        {
+          regionKey,
+          sleeveClass: shape ? shape.sleeveClass : "fallback",
+        }
+      );
+
+      if (shape && shape.sleeveClass === "long") {
+        // Approved sweater drape: torso panel + two rotated sleeve panels,
+        // shoulder -> wrist. Keeps the hug clip (skipClip stays false).
         const arm =
           String(gender).toLowerCase() === "female"
             ? ARM_DRAPE.female
@@ -1852,7 +1886,38 @@ export function garmentImageLayer(
             -Math.PI / 2
           );
         }
+      } else if (shape) {
+        // TOPS-LAYER-FIT v12: approved dress-style geometry, uniformly
+        // shrunk by TOPS_LAYER_SHRINK and dropped by TOPS_LAYER_DROP_T so
+        // the collar/sleeve seams sit ON the shoulder line and the tee
+        // reads a little smaller on the body. Width and height scale
+        // TOGETHER (photo aspect and catalog size stay fixed -- nothing
+        // stretched, nothing squeezed). Hem clamped to [85%, 100%] of the
+        // shrunk region height so it lands at the upper hip, never
+        // tunic-length. One connected layered image, no clip.
+        const fullW = X(region.x1) - X(region.x0);
+        const rw = fullW * TOPS_LAYER_SHRINK;
+        const rx = bounds.cx - rw / 2;
+
+        const ryDrop = ry + bounds.height * TOPS_LAYER_DROP_T;
+        const rhShrunk = rh * TOPS_LAYER_SHRINK;
+
+        const aspect =
+          cropped.width / Math.max(1, cropped.height);
+
+        const naturalH = rw / Math.max(0.2, aspect);
+        const minH = rhShrunk * TOPS_HEM_MIN_T;
+        const maxH = rhShrunk;
+        const topH = Math.min(
+          Math.max(naturalH, minH),
+          maxH
+        );
+
+        ctx.drawImage(cropped, rx, ryDrop, rw, topH);
+
+        skipClip = true;
       } else {
+        // Unmeasurable photo fallback: region stretch + hug clip.
         const rx = X(region.x0);
         const rw = X(region.x1) - rx;
 
@@ -1874,8 +1939,9 @@ export function garmentImageLayer(
     if (rw > 0) ctx.drawImage(cropped, rx, ry, rw, rh);
   }
 
-  // Silhouette clip (cloth hugs arms / legs / feet); dresses skip it.
-  if (bodyMaskSource && regionKey !== "dresses") {
+  // Silhouette clip (cloth hugs arms / legs / feet).
+  // Skipped for dresses and layered tops (v12).
+  if (bodyMaskSource && !skipClip) {
     const mask = newCanvas(width, height);
     const mctx = mask.getContext("2d");
 
