@@ -939,58 +939,110 @@ export default {
   BASE_URL, API_URL,
 };
 
+// ----------------------------------------------------------------------------
+// Registration contact probe (PROVISIONAL CONTRACT — unblocks SignupPage.jsx)
+// RETURN-VALUE CONTRACT (do not regress — SignupPage's Next gate depends on it):
+//   falsy (false)  -> "no duplicate-contact messages; NEVER block signup"
+//                     (contact available / 200, endpoint missing, backend
+//                     offline, partially-typed input, degraded shopper probe)
+//   truthy object  -> { email, mobile, store_name, detail } field messages,
+//                     returned ONLY when the backend actually rejected at
+//                     least one field (400 with real messages)
+// `false` is property-safe (`false.email` -> undefined) and destructuring-safe,
+// so both consumer styles work: `if (taken) block` AND `messages.email || ""`.
+//
+// KAN-FIX (console 400 spam at this file's fetch line on /signup/shopper):
+// store_name is OMITTED when blank (a present-but-blank CharField fails DRF
+// validation), `role` is sent so backend seller-only rules apply, and
+// partially-typed contacts are answered locally so typing can never emit
+// "required/format" 400s.
+// KAN-FIX (Next button silently stuck on step 1): success used to return an
+// all-null OBJECT, which is truthy — SignupPage's "contact taken?" gate read it
+// as a rejection and returned without advancing or showing any error. Success
+// now returns the falsy sentinel `false`.
+// ----------------------------------------------------------------------------
+let shopperProbeUnsupported = false;
+
 export async function checkRegistrationContact(
   email,
   mobile,
   storeName = "",
   { signal } = {}
 ) {
+  // Falsy sentinel = "nothing taken, never block". MUST stay falsy.
+  const PROBE_CLEAN = false;
+
+  const cleanEmail = String(email || "").trim();
+  const cleanMobile = String(mobile || "").trim();
+  const cleanStore = String(storeName || "").trim();
+
+  // Local gate: only a complete, well-formed contact reaches the network
+  // (mirrors the UI rule: PH mobile = 11 digits starting with 09).
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+  const mobileLooksValid = /^\d{11}$/.test(cleanMobile) && cleanMobile.startsWith("09");
+  if (!emailLooksValid || !mobileLooksValid) return PROBE_CLEAN;
+
+  // Shopper path already known to be unsupported by this backend build:
+  // answer offline so the console stays clean and signup is never blocked.
+  if (!cleanStore && shopperProbeUnsupported) return PROBE_CLEAN;
+
+  // store_name is sent ONLY when non-blank; role tells the backend which rule
+  // set applies (seller requires a store, shopper must not send one).
+  const payload = {
+    email: cleanEmail,
+    mobile: cleanMobile,
+    role: cleanStore ? "seller" : "shopper",
+  };
+  if (cleanStore) payload.store_name = cleanStore;
+
   try {
     const response = await fetch(`${API_BASE}/auth/check-registration/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        email,
-        mobile,
-        store_name: storeName
-      }),
+      body: JSON.stringify(payload),
       signal
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 400 && data) {
+      // Tolerate list-or-string DRF error values, plus detail/error fallbacks.
+      const firstMessage = (value) =>
+        Array.isArray(value)
+          ? (value[0] ?? null)
+          : (typeof value === "string" ? value : null);
+      const emailMsg = firstMessage(data.email);
+      const mobileMsg = firstMessage(data.mobile);
+      const storeMsg = firstMessage(data.store_name);
+
+      // A 400 that complains ONLY about store_name/role (never email/mobile)
+      // means this backend build requires a store name shoppers don't have.
+      // Degrade once, then probe shoppers offline.
+      if (!cleanStore && !emailMsg && !mobileMsg) {
+        shopperProbeUnsupported = true;
+        return PROBE_CLEAN;
+      }
+
+      // No real field messages at all -> treat as available, never block.
+      if (!emailMsg && !mobileMsg && !storeMsg) return PROBE_CLEAN;
+
+      // Truthy rejection object: SignupPage renders these + blocks Next.
       return {
-        email: data.email?.[0] ?? null,
-        mobile: data.mobile?.[0] ?? null,
-        store_name: data.store_name?.[0] ?? null
+        email: emailMsg || null,
+        mobile: mobileMsg || null,
+        store_name: cleanStore ? (storeMsg || null) : null,
+        detail: firstMessage(data.detail) || firstMessage(data.error) || null
       };
     }
 
-    if (response.ok) {
-      return {
-        email: null,
-        mobile: null,
-        store_name: null
-      };
-    }
-
-    return {
-      email: null,
-      mobile: null,
-      store_name: null
-    };
+    // 200 (available) or any other status: never block the signup flow.
+    return PROBE_CLEAN;
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw error;
+      throw error; // let SignupPage cancel debounced probes silently
     }
-
-    return {
-      email: null,
-      mobile: null,
-      store_name: null
-    };
+    return PROBE_CLEAN;
   }
 }
