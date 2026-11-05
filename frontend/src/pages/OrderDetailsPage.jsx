@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   API_URL,
+  apiFetch,
   cartAPI,
   catalogAPI,
   checkoutAPI,
-  getCachedOrder,
+  invalidateCache,
 } from "../services/api";
 import "./css/OrderDetailsPage.css";
 
@@ -263,10 +264,13 @@ function OrderDetailsPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
 
-  /* Instant first paint from memory cache or localStorage */
+  /* Instant first paint from the durable local order record.
+     FIX (cancelled order reverted to Processing): the previous initializer
+     read getCachedOrder() SYNCHRONOUSLY, but that helper is async and returns
+     a Promise (always truthy), so it produced a garbage first paint and never
+     saw the locally-cancelled status. localStorage is now the synchronous
+     source of truth; the server sync below refreshes everything else. */
   const [order, setOrder] = useState(() => {
-    const cachedOrder = getCachedOrder(orderId);
-    if (cachedOrder) return normalizeBackendOrder(cachedOrder);
     const stored = readArray(ORDERS_STORAGE_KEY).find(
       (entry) => String(entry.id) === String(orderId)
     );
@@ -278,6 +282,7 @@ function OrderDetailsPage() {
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [notice, setNotice] = useState("");
   const [isBuying, setIsBuying] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const orderRef = useRef(order);
 
@@ -303,10 +308,16 @@ function OrderDetailsPage() {
         const stored = readArray(ORDERS_STORAGE_KEY).find(
           (entry) => String(entry.id) === String(orderId)
         );
-        let merged = mergeStoredIntoBackend(
-          backendOrder,
-          stored && isRealOrderId(stored.id) ? normalizeStoredOrder(stored) : null
-        );
+        const storedOrder =
+          stored && isRealOrderId(stored.id) ? normalizeStoredOrder(stored) : null;
+        let merged = mergeStoredIntoBackend(backendOrder, storedOrder);
+        /* FIX: a cancellation recorded on this device (offline fallback) must
+           survive every server sync, e.g. when the cancel call never reached
+           the backend. Server-truth cancellations arrive as 'cancelled' and
+           map to "Cancelled" on their own. */
+        if (storedOrder && storedOrder.status === "Cancelled") {
+          merged = { ...merged, status: "Cancelled" };
+        }
         merged = await enrichOrderImages(merged);
         if (cancelled) return;
         orderRef.current = merged;
@@ -438,19 +449,60 @@ function OrderDetailsPage() {
     }
   }
 
-  function handleCancelOrder() {
-    setOrder((current) => (current ? { ...current, status: "Cancelled" } : current));
+  /* Durable local cancellation record (offline fallback + instant paint).
+     Upserts so a cancel always persists even when the order was never
+     cached in localStorage (e.g. deep-linked details page). */
+  function recordLocalCancellation() {
     const stored = readArray(ORDERS_STORAGE_KEY);
-    const updated = stored.map((entry) =>
-      String(entry.id) === String(orderId) ? { ...entry, status: "Cancelled" } : entry
-    );
+    const index = stored.findIndex((entry) => String(entry.id) === String(orderId));
+    if (index >= 0) {
+      stored[index] = { ...stored[index], status: "Cancelled" };
+    } else if (orderRef.current) {
+      const snapshot = orderRef.current;
+      stored.push({
+        id: String(snapshot.id || orderId),
+        orderNumber: snapshot.orderNumber || String(orderId),
+        timestamp: snapshot.timestamp || new Date().toISOString(),
+        placedAt: snapshot.placedAt || "",
+        status: "Cancelled",
+        customer: snapshot.customer || null,
+        paymentMethod: snapshot.paymentMethod || "Cash on Delivery",
+        shippingFee: Number(snapshot.shippingFee || 0),
+        total: Number(snapshot.total || 0),
+        items: (snapshot.items || []).map((item) => ({ ...item })),
+      });
+    }
     try {
-      localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(stored));
     } catch {
       /* non-critical */
     }
+  }
+
+  /* FIX (cancelled order reverted to Processing): cancellation is now persisted
+     in TWO places — the server (POST /orders/<id>/cancel/, new backend action)
+     and the durable local record (offline fallback overlay). The server call
+     busts the orders cache so every later sync sees the real cancelled status
+     instead of a stale cached 'processing' row. */
+  async function handleCancelOrder() {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    setOrder((current) => (current ? { ...current, status: "Cancelled" } : current));
+    recordLocalCancellation();
     setShowCancelModal(false);
-    showNotice("Your order has been cancelled.");
+    try {
+      await apiFetch(`/orders/${encodeURIComponent(orderId)}/cancel/`, { method: "POST" });
+      invalidateCache(["orders", `orders:${orderId}`]);
+      showNotice("Your order has been cancelled.");
+    } catch (error) {
+      console.warn(
+        "Order cancel: server unreachable, keeping local cancellation →",
+        error?.message || error
+      );
+      showNotice("Your order has been cancelled on this device (server unreachable).");
+    } finally {
+      setIsCancelling(false);
+    }
   }
 
   if (isLoading) {
@@ -718,6 +770,7 @@ function OrderDetailsPage() {
                 type="button"
                 className="order-details-cancel-button"
                 onClick={handleCancelOrder}
+                disabled={isCancelling}
               >
                 Confirm Cancellation
               </button>

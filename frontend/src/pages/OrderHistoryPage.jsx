@@ -130,16 +130,36 @@ function mergeOrderLists(primary, secondary) {
   return merged;
 }
 
+/* FIX (cancelled order reverted to Processing / empty Cancelled filter):
+   cancellations are recorded in localStorage by OrderDetailsPage (server call
+   + offline fallback). The server sync gives backend rows precedence and then
+   re-persists the list, which previously erased the local "Cancelled" status.
+   This overlay re-applies stored cancellations on first paint AND after every
+   sync, before setOrders + the localStorage rewrite, so the badge, the row,
+   and the Cancelled filter always agree. */
+function applyStoredCancellations(orderList) {
+  const cancelledIds = new Set(
+    readArray(ORDERS_STORAGE_KEY)
+      .filter((entry) => String(entry.status || "").toLowerCase() === "cancelled")
+      .map((entry) => String(entry.id))
+  );
+  if (cancelledIds.size === 0) return orderList;
+  return orderList.map((order) =>
+    cancelledIds.has(String(order.id)) && order.status !== "Cancelled"
+      ? { ...order, status: "Cancelled" }
+      : order
+  );
+}
+
 /* Instant first paint: memory cache (this session) + localStorage (last visit) */
 function initialOrders() {
   const cached = (Array.isArray(getCachedOrders()) ? getCachedOrders() : []).map(normalizeBackendOrder);
 
-
   const stored = readArray(ORDERS_STORAGE_KEY)
     .filter((entry) => isRealOrderId(entry?.id))
     .map(normalizeStoredOrder);
-   
-  return mergeOrderLists(cached, stored);
+
+  return applyStoredCancellations(mergeOrderLists(cached, stored));
 }
 
 async function enrichImages(orderList) {
@@ -286,7 +306,12 @@ function OrderHistoryPage() {
         const data = await checkoutAPI.getOrders();
         const backendOrders = (Array.isArray(data) ? data : []).map(normalizeBackendOrder);
         if (cancelled) return;
-        const merged = mergeOrderLists(backendOrders, ordersRef.current);
+        /* FIX: re-apply stored cancellations BEFORE rendering and BEFORE the
+           localStorage rewrite, so a cancelled order can never flip back to
+           its pre-cancel server status and the Cancelled filter stays populated. */
+        const merged = applyStoredCancellations(
+          mergeOrderLists(backendOrders, ordersRef.current)
+        );
         const enriched = await enrichImages(merged);
         if (cancelled) return;
         ordersRef.current = enriched;

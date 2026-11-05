@@ -253,11 +253,54 @@ class CheckoutView(MongoRetryMixin, APIView):
 
 
 class OrderViewSet(MongoRetryMixin, viewsets.ReadOnlyModelViewSet):
-    """Read-only order history scoped to the authenticated owner."""
+    """Read-only order history scoped to the authenticated owner.
+
+    FIX (cancelled order reverted to Processing): the history/details pages
+    could only cancel client-side, so the server row never changed and the
+    next sync overwrote the local "Cancelled" status. A shopper-facing cancel
+    action is now exposed; the DefaultRouter registers it automatically as
+    POST /orders/<pk>/cancel/ (no urls.py change required).
+    """
 
     serializer_class = OrderSerializer
     permission_classes = (IsAuthenticated,)
 
+    # Lifecycle states that still allow a shopper-initiated cancellation.
+    # Anything already shipped/delivered must go through seller support.
+    CANCELLABLE_STATUSES = ('pending', 'paid', 'processing', 'to_ship')
+
     def get_queryset(self):
         """Never expose another user's orders, even by direct ID lookup."""
         return self.request.user.orders.all().prefetch_related('items')
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: OrderSerializer,
+            400: OpenApiTypes.OBJECT,
+        },
+    )
+    @action(detail=True, methods=('post',), url_path='cancel')
+    def cancel(self, request, pk=None):
+        """Cancel a not-yet-shipped order owned by the authenticated shopper."""
+        order = self.get_object()
+
+        # Idempotent: re-cancelling an already cancelled order is a no-op 200.
+        if order.status == 'cancelled':
+            return Response(OrderSerializer(order).data)
+
+        if order.status not in self.CANCELLABLE_STATUSES:
+            return Response(
+                {
+                    'detail': (
+                        'This order can no longer be cancelled '
+                        f'(current status: {order.get_status_display()}).'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.status = 'cancelled'
+        order.save()
+        logger.info("Order %s cancelled by user %s", order.pk, request.user.pk)
+        return Response(OrderSerializer(order).data)
