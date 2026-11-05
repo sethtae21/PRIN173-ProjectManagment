@@ -6,6 +6,8 @@ import {
   catalogAPI,
   checkoutAPI,
   getCachedOrders,
+  invalidateCache,
+  ratingsApi,
 } from "../services/api";
 import "./css/OrderHistoryPage.css";
 
@@ -422,10 +424,34 @@ function OrderHistoryPage() {
     }
   }
 
-  function handleRating(orderId, productId, rating) {
+  /* FIX (order-page rating never reached the product page): the star control
+     used to write ONLY to localStorage, while ProductDetailsPage renders its
+     score from the backend /ratings/summary/ endpoint — so order ratings never
+     appeared there (0.0 / 0 verified ratings). The rating is now submitted to
+     the real ratings API using the exact contract ProductDetailsPage uses, the
+     cached summary is invalidated, and "fitfusion-rating-updated" is broadcast
+     so any OPEN product page refreshes instantly; a later visit re-fetches the
+     summary on mount anyway. localStorage stays as the per-order UI memory of
+     which stars you picked; if the server is unreachable the rating remains
+     device-only and the notice says so. */
+  async function handleRating(orderId, productId, rating) {
     const ratingKey = `${orderId}-${productId}`;
     setRatings((currentRatings) => ({ ...currentRatings, [ratingKey]: rating }));
-    setNotice(`Your ${rating}-star rating was saved.`);
+    try {
+      await ratingsApi.submit({
+        target_type: "item",
+        target_id: String(productId),
+        score: rating,
+      });
+      invalidateCache(`ratings:item:${productId}`);
+      window.dispatchEvent(new Event("fitfusion-rating-updated"));
+      setNotice(`Your ${rating}-star rating was saved.`);
+    } catch (error) {
+      console.warn("Order history: rating sync skipped →", error?.message || error);
+      setNotice(
+        `Your ${rating}-star rating was saved on this device (server unreachable).`
+      );
+    }
   }
 
   const showLoadingCard = orders.length === 0 && syncInFlight;
