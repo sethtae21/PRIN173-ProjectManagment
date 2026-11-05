@@ -40,11 +40,14 @@ const BUILD_BMI = {
   Curve: 32,
 };
 
+// KAN-FIX: The rule id "styleOccasion" is kept to map to the frozen backend
+// rule id (style_occasion / WEIGHTS untouched), but the UI label is now
+// "Style match" since occasion_tags were removed from the pipeline.
 const MATCH_CATEGORIES = [
   { key: "colorCompatibility", label: "Color compatibility" },
   { key: "heightContrast", label: "Height contrast" },
   { key: "proportionShading", label: "Proportion shading" },
-  { key: "styleOccasion", label: "Style / occasion match" },
+  { key: "styleOccasion", label: "Style match" },
 ];
 
 // FIX (dress on male): one-piece DRESS-class cuts are female-only in this
@@ -570,8 +573,8 @@ function loadAvatar(isGuest) {
       savedPreset?.skinTone || savedPreset?.skin_tone || "#dca77d",
     undertone: capitalizeChoice(savedPreset?.undertone, "Neutral"),
     // FIX (style_occasion always 0): the shopper's dressing-for context is a
-    // first-class avatar field; api.js maps it to approved style/occasion tags
-    // and sends them with every recommendation / match-reasons request.
+    // first-class avatar field; api.js maps it to approved style tags and
+    // sends them with every recommendation / match-reasons request.
     styleFocus: savedPreset?.styleFocus || "Casual",
   };
 }
@@ -2113,7 +2116,7 @@ function FittingStudioPage({ isGuest = false }) {
 
                 {/* FIX (style_occasion always 0 / ceiling 6/7): the shopper's
                     dressing-for context. api.js maps this to approved
-                    style/occasion tags and sends them with every
+                    style tags and sends them with every
                     recommendation + match-reasons request, so FR-7.2 rule 4
                     can finally fire on tag overlap. */}
                 <ControlGroup

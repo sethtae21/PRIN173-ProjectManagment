@@ -114,28 +114,32 @@ def _jpeg_working_copy(image_bytes, max_side):
         return buf.getvalue(), (orig_w, orig_h)
 
 
+# ----------------------------------------------------------------------------
+# TAG VOCABULARY (seller CSV + validation).
+# KAN-FIX: occasion_tags REMOVED from the upload pipeline entirely (template,
+# guidelines, validator, item creation). The approved style_tags vocabulary is
+# now EXACTLY the four shopper Style-Focus options (Fitting Studio bottom-left
+# control), lowercased: casual / smart / formal / sporty. Validation remains
+# case-insensitive, so "Casual" and "casual" are both accepted.
+# Legacy note: CatalogItem.occasion_tags still exists in MongoDB for old rows
+# but is read-only/ignored everywhere (serializer read_only, scoring ignores).
+# ----------------------------------------------------------------------------
 STYLE_TAG_OPTIONS = (
-    'casual', 'minimalist', 'resort', 'classic', 'work',
-    'streetwear', 'elegant', 'romantic', 'formal', 'sporty',
-)
-OCCASION_TAG_OPTIONS = (
-    'everyday', 'summer', 'office', 'weekend', 'evening',
-    'formal', 'winter', 'vacation', 'outdoor',
+    'casual', 'smart', 'formal', 'sporty',
 )
 CATALOG_CSV_COLUMNS = [
     'name', 'description', 'category', 'size', 'color', 'color_description',
-    'color_family', 'price', 'style_tags', 'occasion_tags',
+    'color_family', 'price', 'style_tags',
     'front_image_filename', 'rear_image_filename',
 ]
 CATALOG_EXAMPLE_ROW = [
     'Example Product', 'Replace with a product description.', 'tops', 'M',
-    'White', 'Pure White', 'neutral', '599.00', 'casual, minimalist',
-    'everyday, summer', 'front.jpg', 'rear.jpg',
+    'White', 'Pure White', 'neutral', '599.00', 'casual',
+    'front.jpg', 'rear.jpg',
 ]
 SELLER_IMAGE_GUIDELINES = (
     'FitFusion AI Seller Catalog Upload Guidelines\n'
     f'Use only these style_tags: {", ".join(STYLE_TAG_OPTIONS)}. '
-    f'Use only these occasion_tags: {", ".join(OCCASION_TAG_OPTIONS)}. '
     'Separate multiple tags with commas; tags are validated without regard to capitalization.\n'
     'Upload exactly two clear garment photographs per item: Front and Rear. '
     'Photograph the garment laid flat or on a mannequin against a plain, contrasting background.\n'
@@ -163,7 +167,6 @@ def build_catalog_template_csv():
         (
             '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front and Rear image filenames. '
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
-            f'Use occasion_tags from: {", ".join(OCCASION_TAG_OPTIONS)}. '
             'Separate multiple tags with commas. '
             'SIZE RULE: clothing sizes are S, M, or L ONLY - cm measurements are rejected; '
             'the product page shows the cm range bracket automatically. Footwear: regional '
@@ -191,9 +194,10 @@ class CatalogValidator:
         'color_description', 'color_family', 'price',
         'front_image_filename', 'rear_image_filename'
     ]
+    # KAN-FIX: occasion_tags validation REMOVED; style_tags limited to the four
+    # Style-Focus tags. An occasion_tags column in an OLD template is ignored.
     TAG_OPTIONS = {
         'style_tags': frozenset(STYLE_TAG_OPTIONS),
-        'occasion_tags': frozenset(OCCASION_TAG_OPTIONS),
     }
     # Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     ORIENTATION_MAX_W_H = 1.0
@@ -744,6 +748,9 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         price = Decimal('0.00')
                 except (InvalidOperation, ValueError):
                     price = Decimal('0.00')
+                # KAN-FIX: occasion_tags is NO LONGER read from the CSV and NO
+                # LONGER written; the model field keeps its default empty list
+                # (legacy rows keep their stored values, display-only).
                 item = CatalogItem.objects.create(
                     name=item_name, description=row.get('description', ''),
                     category=category_map.get(raw_category, raw_category),
@@ -752,7 +759,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     color_family=row.get('color_family', ''),
                     price=price,
                     style_tags=[tag.strip() for tag in str(row.get('style_tags', '')).split(',') if tag.strip()],
-                    occasion_tags=[tag.strip() for tag in str(row.get('occasion_tags', '')).split(',') if tag.strip()],
                     seller=request.user, store_name=request.user.store_name or "Unknown Store",
                     batch=batch, status='rejected' if item_errors else 'processing',
                     rejection_reasons=item_errors
@@ -788,6 +794,10 @@ class CatalogViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsSeller])
     def my_listings(self, request):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
+        # KAN-FIX (500 "Object of type ListSerializer is not JSON serializable"):
+        # Response() must receive .data (plain primitives), NOT the serializer
+        # object itself. The missing .data made every /catalog/my_listings/
+        # call (Product Listings, dashboard stats, validation page) crash.
         return Response(CatalogItemSerializer(items, many=True).data)
 
     @extend_schema(

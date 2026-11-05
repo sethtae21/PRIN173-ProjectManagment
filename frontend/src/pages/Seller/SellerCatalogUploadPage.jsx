@@ -13,7 +13,6 @@ const requiredColumns = [
   "color_family",
   "price",
   "style_tags",
-  "occasion_tags",
   "front_image_filename",
   "rear_image_filename",
 ];
@@ -26,30 +25,13 @@ const initialImages = {
 const MAX_PRODUCTS = 10;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// KAN-FIX: occasion_tags removed from the upload pipeline entirely (template,
+// guidelines, validation). The approved style_tags vocabulary is now EXACTLY
+// the four shopper Style-Focus options (casual, smart, formal, sporty), which
+// is also the vocabulary the backend CSV validator enforces.
 const TAG_OPTIONS = {
-  style_tags: [
-    "casual",
-    "minimalist",
-    "resort",
-    "classic",
-    "work",
-    "streetwear",
-    "elegant",
-    "romantic",
-    "formal",
-    "sporty",
-  ],
-  occasion_tags: [
-    "everyday",
-    "summer",
-    "office",
-    "weekend",
-    "evening",
-    "formal",
-    "winter",
-    "vacation",
-    "outdoor",
-  ],
+  style_tags: ["casual", "smart", "formal", "sporty"],
 };
 
 const POLL_INTERVAL_MS = 2500;
@@ -506,7 +488,7 @@ function SellerCatalogUploadPage() {
       if (invalidTags.length > 0) {
         setValidationResult({
           type: "error",
-          title: "Invalid style or occasion tags",
+          title: "Invalid style tags",
           message:
             "Update the CSV to use only the approved tags below. Separate multiple tags with commas.",
           details: invalidTags,
@@ -1003,10 +985,6 @@ function SellerCatalogUploadPage() {
                 <div>
                   <strong>Choose style_tags from:</strong>
                   <p>{TAG_OPTIONS.style_tags.join(", ")}</p>
-                </div>
-                <div>
-                  <strong>Choose occasion_tags from:</strong>
-                  <p>{TAG_OPTIONS.occasion_tags.join(", ")}</p>
                 </div>
                 <small>
                   Enter one or more approved values in the matching CSV

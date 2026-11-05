@@ -21,8 +21,11 @@ class CatalogItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CatalogItem
         fields = '__all__'
+        # KAN-FIX: occasion_tags is LEGACY (removed from the upload pipeline).
+        # It stays in the payload for old-row display but can never be written
+        # by sellers via PUT/PATCH anymore.
         read_only_fields = ['seller', 'store_name', 'status', 'rejection_reasons',
-                            'created_at', 'updated_at', 'batch']
+                            'created_at', 'updated_at', 'batch', 'occasion_tags']
 
     def get_size_cm(self, obj):
         ranges = get_size_ranges(obj.size)

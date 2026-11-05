@@ -36,8 +36,8 @@
 // KAN-FIX (cross-account order/cart leak): the in-memory GET cache is keyed by
 // resource name only ('orders', 'cart'), so an SPA account switch WITHOUT a
 // full page reload could serve the PREVIOUS user's cached /orders/ or /cart/
-// payload to the newly logged-in user. This file now subscribes to session.js
-// and busts the entire cache whenever the authenticated identity changes.
+// payload to the newly logged-in user. This file subscribes to session.js and
+// busts the entire cache whenever the authenticated identity changes.
 // (The localStorage mirror half of the leak is purged in session.js
 // setSession()/clearSession() — see COMMERCE_SCOPE_KEYS there.)
 //
@@ -53,16 +53,18 @@
 // /api/recommendations/ and /api/recommendations/<id>/match-reasons/.
 // Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | OBJ-05.
 //
-// FIX (style_occasion always 0 / max 6/7): the scorer's style/occasion rule
-// fires ONLY when the avatar profile's tag set overlaps the item's tag set
-// (recommendations/scoring.py _rule_style). The backend query serializer
-// accepts `styles` and `occasions` CSV params, but this client never sent
-// them, so the avatar tag set was ALWAYS empty and the rule could never fire
-// (ceiling 6/7). The shopper's "dressing for" context is now a first-class
-// avatar field (styleFocus) mapped deterministically to the APPROVED seller
-// tag vocabulary (the same lists the CSV validator enforces), and is sent on
-// every recommendation + match-reasons request. No weights / knowledge tables
-// changed, so the KAN-103 freeze and co-change rule are untouched.
+// FIX (style_occasion always 0 / max 6/7) + KAN-FIX (occasion_tags removal):
+// the scorer's style rule fires ONLY when the avatar profile's STYLE tag set
+// overlaps the item's style tag set (recommendations/scoring.py _rule_style;
+// occasion tags were removed from the whole pipeline — CSV, template,
+// validation, scoring). The backend query serializer accepts a `styles` CSV
+// param, but this client never sent it, so the avatar tag set was ALWAYS empty
+// and the rule could never fire (ceiling 6/7). The shopper's "dressing for"
+// context is now a first-class avatar field (styleFocus) mapped 1:1 to the
+// APPROVED seller style vocabulary — exactly the four CSV-allowed tags
+// (casual, smart, formal, sporty) — and is sent on every recommendation +
+// match-reasons request. No weights / knowledge tables changed, so the
+// KAN-103 freeze and co-change rule are untouched.
 // ============================================================================
 
 import { 
@@ -666,6 +668,8 @@ export function bodyProportion(heightCm, bodyBuildCm) {
 // ----------------------------------------------------------------------------
 
 // Backend rule id -> MatchReasonsCard detail key (validateMatchDetails).
+// NOTE: the rule id stays "style_occasion" (weights freeze / KAN-103); only
+// the UI label changed to "Style match" (see MatchReasonsCard / studio page).
 const RULE_TO_KEY = {
   color_compatibility: 'colorCompatibility',
   height_contrast: 'heightContrast',
@@ -682,24 +686,26 @@ const DEFAULT_WEIGHTS = {
 };
 
 // ----------------------------------------------------------------------------
-// STYLE / OCCASION FOCUS — FIX (style_occasion always 0, ceiling 6/7)
-// The scorer's style_occasion rule fires ONLY on overlap between the avatar's
-// style/occasion tag set and the item's tag set. The backend query serializer
-// accepts `styles` + `occasions` CSV params, but this client never sent them,
-// so the avatar set was always empty and the rule could NEVER fire.
-// The shopper's "dressing for" context is now a first-class avatar field
-// (avatar.styleFocus) mapped deterministically to the APPROVED seller tag
-// vocabulary (the same lists the CSV validator enforces in catalog upload),
-// and is sent on every recommendation + match-reasons request.
+// STYLE FOCUS — FIX (style_occasion always 0, ceiling 6/7) + KAN-FIX
+// (occasion_tags removal + 4-tag vocabulary):
+// The scorer's style rule fires ONLY on overlap between the avatar's style tag
+// set and the item's style tag set. The backend query serializer accepts a
+// `styles` CSV param, but this client never sent it, so the avatar set was
+// always empty and the rule could NEVER fire.
+// KAN-FIX: the approved seller style vocabulary is now EXACTLY the four
+// Style-Focus options (the same list the CSV validator enforces):
+// casual / smart / formal / sporty. Each Style-Focus button maps 1:1 to its
+// lowercase tag, and the `occasions` param is GONE (occasion tags were removed
+// from the CSV template, the upload validation and the scoring rule).
 // No weights / knowledge tables changed -> KAN-103 freeze untouched.
 // ----------------------------------------------------------------------------
 export const STYLE_FOCUS_OPTIONS = ['Casual', 'Smart', 'Formal', 'Sporty'];
 
 export const STYLE_FOCUS_TAGS = {
-  Casual: { styles: ['casual'], occasions: ['everyday', 'weekend', 'summer'] },
-  Smart: { styles: ['smart', 'minimalist'], occasions: ['office'] },
-  Formal: { styles: ['formal', 'elegant'], occasions: ['formal', 'evening'] },
-  Sporty: { styles: ['sporty'], occasions: ['outdoor', 'vacation'] },
+  Casual: { styles: ['casual'], occasions: [] },
+  Smart: { styles: ['smart'], occasions: [] },
+  Formal: { styles: ['formal'], occasions: [] },
+  Sporty: { styles: ['sporty'], occasions: [] },
 };
 
 export function styleFocusTags(focus) {
@@ -730,9 +736,10 @@ export function avatarQueryParams(avatar) {
       _clampRange(avatar?.height, HEIGHT_RANGE.min, HEIGHT_RANGE.max)
     ),
     body_shape: bodyShapeForAvatar(avatar),
-    // FIX: supply the shopper's style/occasion context so FR-7.2 rule 4 can fire.
+    // FIX: supply the shopper's style context so the style rule can fire.
+    // KAN-FIX: occasions param removed — the pipeline no longer has occasion
+    // tags; the rule overlaps style tags only.
     styles: focus.styles.join(','),
-    occasions: focus.occasions.join(','),
   };
 }
 

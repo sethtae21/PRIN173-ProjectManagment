@@ -8,6 +8,14 @@ produce identical outputs (auditability, Charter OBJ-05).
 Size-policy revision: the height_contrast rule no longer uses petite/average/
 tall bands; it uses the 120-218 cm range midpoint split exposed by
 knowledge_table.height_zone / knowledge_table.allowed_contrast.
+
+KAN-FIX (occasion_tags removal): the style_occasion rule now overlaps STYLE
+TAGS ONLY. The rule id intentionally remains "style_occasion" so WEIGHTS /
+MAX_SCORE and the KAN-103 freeze stay untouched; only the overlap inputs and
+the human-readable reason changed ("shared style tags: ..."). The UI label
+rename ("Style match") is handled frontend-side. AvatarProfile.occasion_tags
+and ItemProfile.occasion_tags are kept as ignored legacy fields so existing
+callers (recommendations view, query params) keep working.
 """
 from dataclasses import dataclass
 
@@ -27,6 +35,7 @@ class AvatarProfile:
     height_cm: float
     body_shape: str = "balanced"   # "top-heavy" | "bottom-heavy" | "balanced"
     style_tags: tuple = ()
+    # LEGACY (ignored by every rule since the occasion_tags removal):
     occasion_tags: tuple = ()
 
 
@@ -37,6 +46,7 @@ class ItemProfile:
     color_family: tuple = ()
     color_description: str = ""
     style_tags: tuple = ()
+    # LEGACY (ignored by every rule since the occasion_tags removal):
     occasion_tags: tuple = ()
     contrast_level: str = ""       # optional; inferred from description if empty
     shade: str = ""                # optional; inferred from description if empty
@@ -116,12 +126,15 @@ def _rule_shading(avatar, item, weights):
 
 
 def _rule_style(avatar, item, weights):
-    item_tags = _norm(item.style_tags) | _norm(item.occasion_tags)
-    avatar_tags = _norm(avatar.style_tags) | _norm(avatar.occasion_tags)
+    """KAN-FIX: STYLE-TAG overlap only (occasion tags removed from the pipeline).
+    Rule id stays "style_occasion" for weight/freeze continuity; the reason
+    text and the frontend label now say "style"."""
+    item_tags = _norm(item.style_tags)
+    avatar_tags = _norm(avatar.style_tags)
     hit = item_tags & avatar_tags
     fired = bool(hit)
-    reason = (f"shared style/occasion tags: {sorted(hit)}"
-              if fired else "no style/occasion tag overlap with avatar profile")
+    reason = (f"shared style tags: {sorted(hit)}"
+              if fired else "no style tag overlap with avatar profile")
     return RuleResult("style_occasion", weights["style_occasion"] if fired else 0,
                       fired, reason)
 
@@ -136,7 +149,7 @@ _RULE_FUNCS = {
 
 def score_item(avatar: AvatarProfile, item: ItemProfile,
                weights: dict | None = None) -> ScoreBreakdown:
-    """Score one item against one avatar profile. Fixed rule order = auditable."""
+    """Score one item against an avatar profile. Fixed rule order = auditable."""
     weights = weights or WEIGHTS
     rules = tuple(_RULE_FUNCS[rid](avatar, item, weights) for rid in RULE_ORDER)
     return ScoreBreakdown(item_name=item.name, rules=rules,
