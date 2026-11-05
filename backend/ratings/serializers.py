@@ -7,6 +7,7 @@ class RatingSerializer(serializers.ModelSerializer):
     """
     Accepts score (1-5) and/or vote (like/dislike) independently.
     At least one must be present on CREATE. Neither is folded into the other.
+    Accepts optional `source` to tag the UI surface that produced the rating.
     """
     id = serializers.CharField(read_only=True)
     user = serializers.CharField(read_only=True, source='user_id')
@@ -15,11 +16,16 @@ class RatingSerializer(serializers.ModelSerializer):
                                      min_value=1, max_value=5)
     vote = serializers.ChoiceField(choices=['like', 'dislike'],
                                    required=False, allow_null=True, allow_blank=True)
+    source = serializers.ChoiceField(
+        choices=['', 'recommendation_panel', 'fit_visualization',
+                 'product_page', 'order_history'],
+        required=False, allow_blank=True, default='',
+    )
 
     class Meta:
         model = Rating
         fields = ['id', 'user', 'target_type', 'target_id', 'score', 'vote',
-                  'created_at', 'updated_at']
+                  'source', 'created_at', 'updated_at']
         read_only_fields = ['user', 'created_at', 'updated_at']
 
     def validate(self, attrs):
@@ -41,15 +47,16 @@ class RatingSummarySerializer(serializers.Serializer):
     """Read-only aggregate payload for GET /ratings/summary/."""
     target_type = serializers.CharField()
     target_id = serializers.CharField()
+    source = serializers.CharField(allow_blank=True)
     # Star dimension (score only)
     score_count = serializers.IntegerField()
     average = serializers.FloatField()
-    # NEW: per-star histogram for distribution bars
     star_counts = serializers.DictField(child=serializers.IntegerField())
     # Reaction dimension (like/dislike only)
     like_count = serializers.IntegerField()
     dislike_count = serializers.IntegerField()
-    # Guest per-session aggregates (FR-1.9)
+    # Guest per-session aggregates (FR-1.9). Guests can no longer submit
+    # ratings, so these always read 0; kept for contract stability.
     guest_session_score_count = serializers.IntegerField()
     guest_session_average = serializers.FloatField()
     guest_session_like_count = serializers.IntegerField()

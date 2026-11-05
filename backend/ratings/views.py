@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 GUEST_TTL = getattr(settings, 'GUEST_SESSION_TTL', 3600)
 
+VALID_SOURCES = {
+    '', 'recommendation_panel', 'fit_visualization',
+    'product_page', 'order_history',
+}
+
 
 def _guest_index_key(session_key):
     return f'guest_rating_keys:{session_key}'
@@ -29,30 +34,32 @@ def _guest_key(request, target_type, target_id, create=True):
     return f"guest_rating:{key}:{target_type}:{target_id}"
 
 
-def _track_guest_key(request, guest_key):
-    session_key = request.session.session_key
-    index_key = _guest_index_key(session_key)
-    guest_keys = cache.get(index_key) or []
-    if guest_key not in guest_keys:
-        guest_keys.append(guest_key)
-    cache.set(index_key, guest_keys, GUEST_TTL)
-
-
-def _empty_session_agg():
-    return {'score_count': 0, 'score_sum': 0, 'like_count': 0, 'dislike_count': 0}
-
-
 class RatingSubmitView(APIView):
     """
-    POST /ratings/
-      - Registered user -> upsert the (user,target) row, updating ONLY the
-        dimensions present in the payload (stars never overwrite a like, etc.).
-      - Guest -> NOT persisted; accumulate per-session in cache (discarded with
-        session, FR-1.9) and return the sign-up/login prompt (FR-7.5).
+    POST /ratings/ — REGISTERED USERS ONLY. Guests have no rating rights:
+    unauthenticated submissions are refused with 403 + a signup/login prompt
+    payload (FR-7.5). Nothing is cached or persisted for guests (FR-1.9).
+
+    Registered user -> upsert the (user, target, source) row, updating ONLY the
+    dimensions present in the payload (stars never overwrite a like, etc.).
+
+    NOTE: permission_classes stays AllowAny on purpose so we can answer a clean
+    403; DRF's IsAuthenticated would answer 401, which the frontend's token
+    lifecycle interprets as a session reset for guests.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # ---------- GUEST REJECTION (no rating rights) ----------
+        if not request.user.is_authenticated:
+            logger.info("Guest rating attempt refused (403): no rating rights.")
+            return Response({
+                'detail': 'Registration is required to rate items.',
+                'prompt': 'signup_login',
+                'persisted': False,
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # ---------- REGISTERED PATH ----------
         serializer = RatingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         vd = serializer.validated_data
@@ -60,36 +67,20 @@ class RatingSubmitView(APIView):
         target_id = vd['target_id']
         score = vd.get('score')
         vote = vd.get('vote')
+        source = vd.get('source', '') or ''
+        if source not in VALID_SOURCES:
+            return Response(
+                {'detail': f'Invalid source "{source}". '
+                           f'Allowed: {sorted(VALID_SOURCES)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # ---------- GUEST PATH ----------
-        if not request.user.is_authenticated:
-            key = _guest_key(request, target_type, target_id)
-            _track_guest_key(request, key)
-            agg = cache.get(key) or _empty_session_agg()
-            if score is not None:
-                agg['score_count'] += 1
-                agg['score_sum'] += score
-            if vote == 'like':
-                agg['like_count'] += 1
-            elif vote == 'dislike':
-                agg['dislike_count'] += 1
-            cache.set(key, agg, GUEST_TTL)
-            logger.info(f"Guest session rating {target_type}:{target_id} -> {agg}")
-            return Response({
-                'persisted': False,
-                'prompt': 'signup_login',
-                'message': 'Sign up or log in to save your rating permanently.',
-                'session_aggregate': {
-                    'score_count': agg['score_count'],
-                    'average': round(agg['score_sum'] / agg['score_count'], 2) if agg['score_count'] else 0.0,
-                    'like_count': agg['like_count'],
-                    'dislike_count': agg['dislike_count'],
-                },
-            }, status=status.HTTP_200_OK)
-
-        # ---------- REGISTERED PATH ----------
         rating, created = Rating.objects.get_or_create(
-            user=request.user, target_type=target_type, target_id=target_id)
+            user=request.user,
+            target_type=target_type,
+            target_id=target_id,
+            source=source,
+        )
         # Apply ONLY the dimensions supplied, preserving the other one
         if 'score' in vd:
             rating.score = vd['score']
@@ -105,7 +96,11 @@ class RatingSubmitView(APIView):
 
 
 class RatingSummaryView(APIView):
-    """GET /ratings/summary/?target_type=&target_id= — public aggregate."""
+    """
+    GET /ratings/summary/?target_type=&target_id=[&source=]
+    Public aggregate. Optional `source` filter restricts the counts to one UI
+    surface (e.g. ?source=recommendation_panel for UAT OBJ-05 evidence).
+    """
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -115,38 +110,48 @@ class RatingSummaryView(APIView):
             return Response({'error': 'target_type and target_id are required'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        source = request.query_params.get('source', '')
+        if source and source not in VALID_SOURCES:
+            return Response(
+                {'error': f'Invalid source "{source}". '
+                          f'Allowed: {sorted(VALID_SOURCES)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         qs = Rating.objects.filter(target_type=target_type, target_id=target_id)
+        if source:
+            qs = qs.filter(source=source)
 
         # Star dimension: ignore nulls so likes/dislikes never skew the average
         scores = [s for s in qs.values_list('score', flat=True) if s is not None]
         score_count = len(scores)
         average = round(sum(scores) / score_count, 2) if score_count else 0.0
 
-        # NEW: per-star histogram for the distribution bars
         star_counts = {str(i): 0 for i in range(1, 6)}
         for row in qs.values('score').annotate(count=Count('id')):
             if row['score'] is not None:
                 star_counts[str(row['score'])] = row['count']
 
-        # Reaction dimension
         like_count = qs.filter(vote='like').count()
         dislike_count = qs.filter(vote='dislike').count()
 
-        # Guest per-session aggregates
+        # Guest per-session aggregates: guests can no longer submit ratings, so
+        # any legacy cache entry is the only possible source; normally zero.
         g_score_count = g_avg = 0.0
         g_like = g_dislike = 0
         if not request.user.is_authenticated:
             key = _guest_key(request, target_type, target_id, create=False)
             agg = cache.get(key) if key else None
             if agg:
-                g_score_count = agg['score_count']
-                g_avg = round(agg['score_sum'] / g_score_count, 2) if g_score_count else 0.0
-                g_like = agg['like_count']
-                g_dislike = agg['dislike_count']
+                g_score_count = agg.get('score_count', 0)
+                g_avg = round(agg.get('score_sum', 0) / g_score_count, 2) if g_score_count else 0.0
+                g_like = agg.get('like_count', 0)
+                g_dislike = agg.get('dislike_count', 0)
 
         data = {
             'target_type': target_type,
             'target_id': target_id,
+            'source': source or 'all',
             'score_count': score_count,
             'average': average,
             'like_count': like_count,
@@ -161,6 +166,8 @@ class RatingSummaryView(APIView):
 
 
 class GuestSessionClearView(APIView):
+    """POST /ratings/guest-session/clear/ — discards any legacy guest cache
+    aggregates and flushes the guest session (FR-1.9 housekeeping)."""
     permission_classes = [AllowAny]
 
     def post(self, request):

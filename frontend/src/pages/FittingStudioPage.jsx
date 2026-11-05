@@ -10,6 +10,7 @@ import {
   sizeForBodyBuild,
   getAccessToken,
   STYLE_FOCUS_OPTIONS,
+  ratingsApi,
 } from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -1204,6 +1205,10 @@ function FittingStudioPage({ isGuest = false }) {
   });
   const [matchRequestVersion, setMatchRequestVersion] = useState(0);
 
+  // NEW (OBJ-05 / FR-7.5): your persisted 1-5 ratings keyed by catalog item id,
+  // used to pre-fill the star control on every recommendation row.
+  const [myRatings, setMyRatings] = useState({});
+
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [showSaveOutfitModal, setShowSaveOutfitModal] = useState(false);
   const [showSaveAvatarModal, setShowSaveAvatarModal] = useState(false);
@@ -1400,6 +1405,36 @@ function FittingStudioPage({ isGuest = false }) {
   useEffect(() => {
     setAvatar((current) => applySizeCaps(current, sizeCaps));
   }, [sizeCaps]);
+
+  /* NEW (OBJ-05 / FR-7.5): load the shopper's persisted item ratings once so
+     recommendation stars pre-fill with what you already rated. Guests skip the
+     call entirely (/ratings/mine/ is IsAuthenticated and would 401). */
+  useEffect(() => {
+    if (isGuest) return undefined;
+    let active = true;
+
+    async function loadMyRatings() {
+      try {
+        const list = await ratingsApi.mine();
+        if (!active) return;
+        const map = {};
+        (Array.isArray(list) ? list : []).forEach((entry) => {
+          if (entry && entry.score != null) {
+            map[String(entry.target_id)] = Number(entry.score);
+          }
+        });
+        setMyRatings(map);
+      } catch (error) {
+        console.warn("Unable to load your saved ratings:", error?.message || error);
+      }
+    }
+
+    loadMyRatings();
+
+    return () => {
+      active = false;
+    };
+  }, [isGuest]);
 
   useEffect(() => {
     const key = pendingKey(isGuest);
@@ -2105,7 +2140,8 @@ function FittingStudioPage({ isGuest = false }) {
                 <p className="studio-recommendation-note">
                   Select Try Item to preview clothing on your avatar. Select
                   View Match Reasons to review its recommendation details. Click
-                  a catalog product name to view its listing.
+                  a catalog product name to view its listing. Rate a
+                  recommendation with the stars to feed your feedback (FR-7.5).
                 </p>
 
                 <p
@@ -2159,6 +2195,21 @@ function FittingStudioPage({ isGuest = false }) {
                           Size {item.size} {item.size_cm}
                         </small>
                       )}
+                      {/* NEW (OBJ-05 / FR-7.5): rate the recommendation itself.
+                          Registered: persisted via POST /ratings/ (upsert,
+                          updateable). Guest: session-aggregated by the backend
+                          + sign-up/login prompt. */}
+                      <RatingControl
+                        key={`rec-rating-${item.id}`}
+                        itemId={item.id}
+                        alwaysVisible
+                        allowUpdate
+                        label="Rate recommendation"
+                        successNotice="Thanks for rating this recommendation."
+                        initialRating={myRatings[String(item.id)] || 0}
+                        authState={isGuest ? null : readAuthState()}
+                        onGuestRate={openRegistrationPopup}
+                      />
                     </div>
 
                     {item.total_score !== undefined &&
