@@ -294,7 +294,18 @@ function CatalogPage({ isGuest = false }) {
       showGuestRestriction("view the seller's complete store");
       return;
     }
-    console.log("Viewing store for:", product.store_name);
+    
+    // FIX: The CatalogItemSerializer exposes the seller ID as `seller` (mapped from `seller_id`).
+    // We check `product.seller` first, with fallbacks for legacy or alternate payload shapes.
+    const sellerId = product.seller || product.seller_id || product.store_id;
+    
+    if (sellerId) {
+      // FIX: Navigate to the correct route defined in App.jsx (/shopper/sellers/:sellerId)
+      // instead of the mismatched /shopper/stores/:id.
+      navigate(`/shopper/sellers/${sellerId}`);
+    } else {
+      console.warn("Seller ID not found for product:", product);
+    }
   }
 
   // === picker actions (edit mode only) ====================================

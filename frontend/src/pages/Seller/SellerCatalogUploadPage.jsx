@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { catalogAPI } from "../../services/api";
+import { catalogAPI, getCachedProfile } from "../../services/api";
 import "../css/SellerCatalogUploadPage.css";
 
 const requiredColumns = [
@@ -55,34 +55,89 @@ const TAG_OPTIONS = {
 const POLL_INTERVAL_MS = 2500;
 const MAX_POLL_ATTEMPTS = 240;
 
-function getSellerStoreName() {
-  const storageKeys = [
-    "fitfusion-current-user",
-    "registeredAccount",
-    "sellerAccount",
-  ];
+/* ---------------------------------------------------------------------------
+   ASSIGNED STORE NAME — live resolution, no placeholder.
+   The old getSellerStoreName() ended with `return "Maison Aurelia";`, an
+   invented brand shown whenever no storage blob carried store_name (e.g. a
+   session whose profile was never cached). That violated the
+   "placeholders must not masquerade as backend truth" rule.
 
-  for (const key of storageKeys) {
-    const savedValue =
-      localStorage.getItem(key) ||
-      sessionStorage.getItem(key);
+   New behavior:
+     1. Synchronous first paint from any storage blob that carries store_name
+        (instant, no flash).
+     2. Authoritative reconciliation from GET /profile/ (force = fresh cache),
+        the SAME source the seller dashboard uses ("Welcome, seth storeeee"),
+        so the banner and the dashboard can never disagree.
+     3. NO hardcoded fallback: when nothing resolves, the UI shows a neutral
+        label ("Your authenticated store"), never a fake store name.
+--------------------------------------------------------------------------- */
+const STORE_NAME_STORAGE_KEYS = [
+  "fitfusion-current-user",
+  "registeredAccount",
+  "sellerAccount",
+  "fitfusion_user",
+];
 
-    if (!savedValue) continue;
+function readStoreNameFromStorage() {
+  for (const key of STORE_NAME_STORAGE_KEYS) {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+    } catch {
+      continue;
+    }
+    if (!raw) continue;
 
     try {
-      const account = JSON.parse(savedValue);
-      const storeName =
-        account.storeName ||
-        account.store_name ||
-        account.businessName;
-
-      if (storeName) return storeName;
+      const account = JSON.parse(raw);
+      const name =
+        account?.store_name ||
+        account?.storeName ||
+        account?.businessName ||
+        account?.user?.store_name ||
+        "";
+      const trimmed = String(name).trim();
+      if (trimmed) return trimmed;
     } catch {
-      // Continue checking the next saved account.
+      // Malformed blob: keep scanning the next saved account.
     }
   }
 
-  return "Maison Aurelia";
+  return "";
+}
+
+function useSellerStoreName() {
+  const [storeName, setStoreName] = useState(() => readStoreNameFromStorage());
+
+  useEffect(() => {
+    let active = true;
+
+    async function reconcileWithProfile() {
+      try {
+        // force = true bypasses the in-memory cache so a freshly edited Store
+        // Profile is reflected immediately on the upload page.
+        const payload = await getCachedProfile(true);
+        const resolved =
+          payload?.store_name || payload?.user?.store_name || "";
+        const trimmed = String(resolved).trim();
+        if (active && trimmed) setStoreName(trimmed);
+      } catch (error) {
+        // Offline / token expiry: keep whatever storage gave us; never fake it.
+        console.warn(
+          "Upload page: store name profile sync skipped →",
+          error?.message || error
+        );
+      }
+    }
+
+    reconcileWithProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return storeName;
 }
 
 function parseCsvRows(text) {
@@ -267,7 +322,9 @@ function hexToColorFamily(hex) {
 function SellerCatalogUploadPage() {
   const navigate = useNavigate();
 
-  const [storeName] = useState(getSellerStoreName);
+  // Live-resolved store name (storage instant paint + /profile/ reconciliation).
+  const storeName = useSellerStoreName();
+
   const [csvFile, setCsvFile] = useState(null);
   const [csvData, setCsvData] = useState(null);
   const [images, setImages] = useState(initialImages);
@@ -907,7 +964,8 @@ function SellerCatalogUploadPage() {
         <section className="seller-upload-store">
           <div>
             <span>ASSIGNED STORE NAME</span>
-            <strong>{storeName}</strong>
+            {/* Live value only; neutral label when unresolved — never a fake brand. */}
+            <strong>{storeName || "Your authenticated store"}</strong>
           </div>
 
           <p>
