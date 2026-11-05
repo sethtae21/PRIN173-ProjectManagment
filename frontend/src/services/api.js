@@ -44,6 +44,17 @@
 // Studio can fetch real ranked catalog items and per-rule explanations from
 // /api/recommendations/ and /api/recommendations/<id>/match-reasons/.
 // Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | OBJ-05.
+//
+// FIX (style_occasion always 0 / max 6/7): the scorer's style/occasion rule
+// fires ONLY when the avatar profile's tag set overlaps the item's tag set
+// (recommendations/scoring.py _rule_style). The backend query serializer
+// accepts `styles` and `occasions` CSV params, but this client never sent
+// them, so the avatar tag set was ALWAYS empty and the rule could never fire
+// (ceiling 6/7). The shopper's "dressing for" context is now a first-class
+// avatar field (styleFocus) mapped deterministically to the APPROVED seller
+// tag vocabulary (the same lists the CSV validator enforces), and is sent on
+// every recommendation + match-reasons request. No weights / knowledge tables
+// changed, so the KAN-103 freeze and co-change rule are untouched.
 // ============================================================================
 
 import { 
@@ -507,25 +518,13 @@ export const authApi = {
 export const login = (email, password) => authApi.login(email, password);
 export const logout = (refresh) => authApi.logout(refresh);
 export const register = (payload) => authApi.register(payload);
-export const registerSeller = (payload) => authApi.registerSeller(payload);
-export const registerShopper = (payload) => authApi.registerShopper(payload);
+export const registerSeller = (payload) => authApi.register({ ...payload, role: 'seller' });
+export const registerShopper = (payload) => authApi.register({ ...payload, role: 'shopper' });
 export const refreshTokens = (refresh) => authApi.refresh(refresh);
 export const getProfile = () => authApi.getProfile();
 export const updateProfile = (patch) => authApi.updateProfile(patch);
 export const changePassword = (o, n, c) => authApi.changePassword(o, n, c);
 export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
-
-// ----------------------------------------------------------------------------
-// Registration contact probe (PROVISIONAL CONTRACT — unblocks SignupPage.jsx)
-// SignupPage imports checkRegistrationContact; until its exact consumption is
-// confirmed against SignupPage.jsx, this helper behaves conservatively:
-//   200        -> returns the server payload verbatim
-//   400        -> contact rejected / already registered -> truthy flag object
-//   404/405/0  -> endpoint not deployed / backend offline -> false, so a
-//                 missing probe can NEVER block a legitimate signup
-// Replace with the exact contract once SignupPage.jsx + accounts urls/views
-// are reviewed.
-// ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
@@ -576,7 +575,7 @@ export function validateSizeLabel(sizeText, category = '') {
       const n = Number(m[1]);
       const [lo, hi] = _FOOTWEAR_RANGES[prefix];
       if (Number.isInteger(n) && n >= lo && n <= hi) return null;
-      return 'Regional shoe sizes must be whole sizes in the supported range: EU 35-46, US 4-15, or UK 2-13.';
+      return `Regional shoe sizes must be whole sizes in the supported range: EU 35-46, US 4-15, or UK 2-13.`;
     }
     return `Invalid size "${raw}". Footwear sizes need a region prefix (EU 40, US 9, UK 7) or ${_CLOTHING_SIZE_OPTIONS.join('/')}.`;
   }
@@ -642,6 +641,31 @@ const DEFAULT_WEIGHTS = {
   style_occasion: 1,
 };
 
+// ----------------------------------------------------------------------------
+// STYLE / OCCASION FOCUS — FIX (style_occasion always 0, ceiling 6/7)
+// The scorer's style_occasion rule fires ONLY on overlap between the avatar's
+// style/occasion tag set and the item's tag set. The backend query serializer
+// accepts `styles` + `occasions` CSV params, but this client never sent them,
+// so the avatar set was always empty and the rule could NEVER fire.
+// The shopper's "dressing for" context is now a first-class avatar field
+// (avatar.styleFocus) mapped deterministically to the APPROVED seller tag
+// vocabulary (the same lists the CSV validator enforces in catalog upload),
+// and is sent on every recommendation + match-reasons request.
+// No weights / knowledge tables changed -> KAN-103 freeze untouched.
+// ----------------------------------------------------------------------------
+export const STYLE_FOCUS_OPTIONS = ['Casual', 'Smart', 'Formal', 'Sporty'];
+
+export const STYLE_FOCUS_TAGS = {
+  Casual: { styles: ['casual'], occasions: ['everyday', 'weekend', 'summer'] },
+  Smart: { styles: ['smart', 'minimalist'], occasions: ['office'] },
+  Formal: { styles: ['formal', 'elegant'], occasions: ['formal', 'evening'] },
+  Sporty: { styles: ['sporty'], occasions: ['outdoor', 'vacation'] },
+};
+
+export function styleFocusTags(focus) {
+  return STYLE_FOCUS_TAGS[focus] || STYLE_FOCUS_TAGS.Casual;
+}
+
 // Deterministic, auditable body-shape mapping for FR-7.2 rule 3.
 export function bodyShapeForAvatar(avatar) {
   const shoulder = String(avatar?.shoulder || '').toLowerCase();
@@ -659,12 +683,16 @@ export function bodyShapeForAvatar(avatar) {
 }
 
 export function avatarQueryParams(avatar) {
+  const focus = styleFocusTags(avatar?.styleFocus);
   return {
     undertone: String(avatar?.undertone || 'neutral').toLowerCase(),
     height_cm: String(
       _clampRange(avatar?.height, HEIGHT_RANGE.min, HEIGHT_RANGE.max)
     ),
     body_shape: bodyShapeForAvatar(avatar),
+    // FIX: supply the shopper's style/occasion context so FR-7.2 rule 4 can fire.
+    styles: focus.styles.join(','),
+    occasions: focus.occasions.join(','),
   };
 }
 
@@ -898,6 +926,7 @@ export default {
   getCachedRecommendations, getCachedRatingSummary, getCachedMyRatings,
   validateSizeLabel, SIZE_RANGE_TABLE, SIZE_OPTIONS, HEIGHT_RANGE, BODY_BUILD_RANGE,
   sizeForBodyBuild, bodyProportion,
+  STYLE_FOCUS_OPTIONS, STYLE_FOCUS_TAGS, styleFocusTags,
   bodyShapeForAvatar, avatarQueryParams, fetchRankedRecommendations, loadMatchReasons,
   checkRegistrationContact,
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,

@@ -267,6 +267,12 @@ export default function SavedOutfitsPage() {
   const [outfitToDelete, setOutfitToDelete] = useState(null);
   const [message, setMessage] = useState("");
 
+  // FIX (cart badge): the header button used to show the static word "Cart".
+  // It now shows the REAL number of items in the cart (sum of quantities)
+  // and keeps updating whenever anything is added/removed anywhere in the
+  // app (every cart mutation dispatches "fitfusion-cart-updated").
+  const [cartCount, setCartCount] = useState(0);
+
   // ====================================================
   // FETCH OUTFITS FROM DATABASE + HYDRATE ITEM IDS
   // ====================================================
@@ -301,6 +307,36 @@ export default function SavedOutfitsPage() {
       window.removeEventListener("fitfusion-outfits-updated", fetchOutfits);
     };
   }, [fetchOutfits]);
+
+  // ====================================================
+  // LIVE CART COUNT FOR THE HEADER BADGE
+  // ====================================================
+  useEffect(() => {
+    let active = true;
+
+    async function refreshCartCount() {
+      try {
+        const cart = await cartApi.get();
+        const items = cart?.items || [];
+        const count = items.reduce(
+          (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
+          0
+        );
+        if (active) setCartCount(count);
+      } catch {
+        if (active) setCartCount(0);
+      }
+    }
+
+    refreshCartCount();
+
+    window.addEventListener("fitfusion-cart-updated", refreshCartCount);
+
+    return () => {
+      active = false;
+      window.removeEventListener("fitfusion-cart-updated", refreshCartCount);
+    };
+  }, []);
 
   useEffect(() => {
     if (!message) return;
@@ -371,9 +407,15 @@ export default function SavedOutfitsPage() {
   return (
     <main className="saved-outfits-page">
       <header className="saved-outfits-top-header">
-        <button type="button" className="saved-outfits-header-cart" aria-label="Open shopping cart" onClick={() => navigate("/shopper/cart")}>
+        {/* FIX (cart badge): show the live item count instead of the word "Cart". */}
+        <button
+          type="button"
+          className="saved-outfits-header-cart"
+          aria-label={`Open shopping cart with ${cartCount} items`}
+          onClick={() => navigate("/shopper/cart")}
+        >
           <CartIcon />
-          <span>Cart</span>
+          <span>{cartCount}</span>
         </button>
       </header>
 

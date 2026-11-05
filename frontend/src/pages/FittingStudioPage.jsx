@@ -9,6 +9,7 @@ import {
   SIZE_RANGE_TABLE,
   sizeForBodyBuild,
   getAccessToken,
+  STYLE_FOCUS_OPTIONS,
 } from "../services/api";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -567,6 +568,10 @@ function loadAvatar(isGuest) {
     skinTone:
       savedPreset?.skinTone || savedPreset?.skin_tone || "#dca77d",
     undertone: capitalizeChoice(savedPreset?.undertone, "Neutral"),
+    // FIX (style_occasion always 0): the shopper's dressing-for context is a
+    // first-class avatar field; api.js maps it to approved style/occasion tags
+    // and sends them with every recommendation / match-reasons request.
+    styleFocus: savedPreset?.styleFocus || "Casual",
   };
 }
 
@@ -760,7 +765,10 @@ function MatchReasonsCard({
   onBrowse,
   onTryItem,
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // FIX (saved outfits auto-expand): if an item is already selected on mount
+  // (e.g. restored from a saved outfit), open the breakdown immediately so
+  // the scores are visible without an extra click.
+  const [expanded, setExpanded] = useState(() => Boolean(item));
   const [requestCount, setRequestCount] = useState(0);
   const [result, setResult] = useState({
     status: "idle",
@@ -1113,7 +1121,12 @@ function FittingStudioPage({ isGuest = false }) {
         ? session.avatar
         : loadAvatar(isGuest);
 
-    return reconcileAvatarGender(base, isGuest);
+    // FIX (style_occasion always 0): older sessions predate styleFocus;
+    // default them so the avatar profile always carries a dressing-for context.
+    return reconcileAvatarGender(
+      { ...base, styleFocus: base.styleFocus || "Casual" },
+      isGuest
+    );
   });
 
   // NEW: stamp of the preset id the live avatar was loaded from.
@@ -1170,7 +1183,25 @@ function FittingStudioPage({ isGuest = false }) {
   const [catalogRecommendations, setCatalogRecommendations] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
 
-  const [selectedMatchItem, setSelectedMatchItem] = useState(null);
+  // FIX (saved outfits -> Fitting Studio): auto-select the first equipped
+  // garment so the Match Reasons panel renders the item breakdown instead
+  // of the empty "Select View Match Reasons..." state when restoring a
+  // saved look (FR-5.6).
+  const [selectedMatchItem, setSelectedMatchItem] = useState(() => {
+    const session = readStudioSession(isGuest);
+    const externalLook =
+      session &&
+      !("equippedGender" in session) &&
+      session.equippedItems &&
+      typeof session.equippedItems === "object";
+
+    if (externalLook) {
+      const sanitized = sanitizeEquipped(session.equippedItems, avatar.gender);
+      const firstItem = Object.values(sanitized || {}).find(Boolean);
+      return firstItem ? normalizeStudioItem(firstItem) : null;
+    }
+    return null;
+  });
   const [matchRequestVersion, setMatchRequestVersion] = useState(0);
 
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
@@ -1263,6 +1294,9 @@ function FittingStudioPage({ isGuest = false }) {
   const atWeightMax =
     fitLimits.hasWeightMaximum && Number(avatar.weight) >= fitLimits.weight.max;
 
+  // FIX (style_occasion always 0): the Style Focus is part of the recommendation
+  // context, so changing it re-ranks the catalog list (style_occasion is the
+  // additive tie-refiner in FR-7.2) and refreshes match reasons.
   const recommendationKey = useMemo(
     () =>
       JSON.stringify({
@@ -1271,6 +1305,7 @@ function FittingStudioPage({ isGuest = false }) {
         bodyShape: [avatar.shoulder, avatar.waist, avatar.hip, avatar.thigh]
           .map((value) => String(value || "").toLowerCase())
           .join("|"),
+        styleFocus: String(avatar.styleFocus || "Casual"),
       }),
     [
       avatar.undertone,
@@ -1279,6 +1314,7 @@ function FittingStudioPage({ isGuest = false }) {
       avatar.waist,
       avatar.hip,
       avatar.thigh,
+      avatar.styleFocus,
     ]
   );
 
@@ -2038,6 +2074,18 @@ function FittingStudioPage({ isGuest = false }) {
                   value={avatar.undertone}
                   options={["Warm", "Cool", "Neutral"]}
                   onChange={(value) => updateAvatar("undertone", value)}
+                />
+
+                {/* FIX (style_occasion always 0 / ceiling 6/7): the shopper's
+                    dressing-for context. api.js maps this to approved
+                    style/occasion tags and sends them with every
+                    recommendation + match-reasons request, so FR-7.2 rule 4
+                    can finally fire on tag overlap. */}
+                <ControlGroup
+                  label="Style Focus"
+                  value={avatar.styleFocus || "Casual"}
+                  options={STYLE_FOCUS_OPTIONS}
+                  onChange={(value) => updateAvatar("styleFocus", value)}
                 />
 
                 <button

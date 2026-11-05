@@ -14,26 +14,9 @@ const RETURN_KEY_PREFIX = "fitfusion-edit-outfit-return-";
 // FIX: Side view removed. Legacy "side" values normalize to "front".
 const VIEWS = ["front", "rear"];
 
-const OCCASIONS = [
-  "Casual",
-  "Formal",
-  "Business",
-  "Party",
-  "School",
-  "Travel",
-  "Sports",
-  "Other",
-];
-
-const SIZES = [
-  "XXS",
-  "XS",
-  "S",
-  "M",
-  "L",
-  "XL",
-  "2XL",
-];
+// FIX (read-only fields): the OCCASIONS and SIZES option lists were removed
+// together with their dropdowns. Occasion, Size and Color are seller-defined
+// catalog values — the editor displays them as-is and never edits them.
 
 const DEFAULT_AVATAR = {
   gender: "Female",
@@ -450,6 +433,7 @@ export default function EditSavedOutfitPage() {
 
   // ============================================
   // UPDATE BASIC INFORMATION
+  // (Occasion is intentionally NOT editable — seller-defined, display only.)
   // ============================================
   function updateField(event) {
     const { name, value } = event.target;
@@ -460,6 +444,7 @@ export default function EditSavedOutfitPage() {
 
   // ============================================
   // UPDATE CLOTHING
+  // (Only quantity remains editable; size/color are read-only displays.)
   // ============================================
   function updateProduct(index, changes) {
     setOutfit((current) => ({
@@ -483,6 +468,8 @@ export default function EditSavedOutfitPage() {
 
   // ============================================
   // VALIDATION
+  // (Occasion stays validated defensively but can never be empty because
+  // composeOutfit defaults it; the field itself is read-only in the UI.)
   // ============================================
   function validate() {
     const next = {};
@@ -498,7 +485,7 @@ export default function EditSavedOutfitPage() {
     }
 
     if (!outfit.occasion) {
-      next.occasion = "Please select an occasion.";
+      next.occasion = "Occasion is unavailable for this outfit.";
     }
 
     if (!(outfit.products || []).length) {
@@ -553,6 +540,7 @@ export default function EditSavedOutfitPage() {
       const nextOutfit = {
         name: trimmedName,
         items: itemIds,
+        // Occasion is preserved exactly as stored (read-only in the UI).
         occasion: outfit.occasion,
         description: (outfit.description || "").trim(),
         avatar: buildAvatarPayload(outfit.avatar, view),
@@ -825,24 +813,14 @@ export default function EditSavedOutfitPage() {
                   {errors.name && <em>{errors.name}</em>}
                 </label>
 
-                <label className="edit-outfit-field">
-                  <span>Occasion *</span>
-                  <select
-                    name="occasion"
-                    value={outfit.occasion}
-                    onChange={updateField}
-                  >
-                    {!OCCASIONS.includes(outfit.occasion) && (
-                      <option value={outfit.occasion}>{outfit.occasion}</option>
-                    )}
-                    {OCCASIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.occasion && <em>{errors.occasion}</em>}
-                </label>
+                {/* FIX: Occasion is seller-defined — plain read-only text,
+                    no dropdown and no editing. */}
+                <div className="edit-outfit-field">
+                  <span>Occasion</span>
+                  <p className="edit-outfit-readonly-value">
+                    {outfit.occasion || "—"}
+                  </p>
+                </div>
 
                 <label className="edit-outfit-field full-width">
                   <span>Description or Notes</span>
@@ -905,38 +883,23 @@ export default function EditSavedOutfitPage() {
                       </div>
 
                       <div className="edit-outfit-product-options">
-                        <label>
+                        {/* FIX: Size comes from the seller's catalog listing —
+                            read-only text (no dropdown, not editable). */}
+                        <div className="edit-outfit-readonly-group">
                           <span>Size</span>
-                          <select
-                            value={product.size}
-                            onChange={(event) =>
-                              updateProduct(index, {
-                                size: event.target.value,
-                                selectedSize: event.target.value,
-                              })
-                            }
-                          >
-                            {!SIZES.includes(product.size) && product.size && (
-                              <option value={product.size}>{product.size}</option>
-                            )}
-                            {SIZES.map((size) => (
-                              <option key={size} value={size}>
-                                {size}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                          <p className="edit-outfit-readonly-value">
+                            {product.selectedSize || product.size || "Unspecified"}
+                          </p>
+                        </div>
 
-                        <label>
+                        {/* FIX: Color comes from the seller's catalog listing —
+                            read-only text (not editable). */}
+                        <div className="edit-outfit-readonly-group">
                           <span>Color</span>
-                          <input
-                            value={product.color}
-                            maxLength={25}
-                            onChange={(event) =>
-                              updateProduct(index, { color: event.target.value })
-                            }
-                          />
-                        </label>
+                          <p className="edit-outfit-readonly-value">
+                            {product.color || "Unspecified"}
+                          </p>
+                        </div>
 
                         <div className="edit-outfit-quantity-group">
                           <span>Quantity</span>

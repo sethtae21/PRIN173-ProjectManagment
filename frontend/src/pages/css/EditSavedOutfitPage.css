@@ -459,6 +459,7 @@
 
 .edit-outfit-field > span,
 .edit-outfit-product-options label > span,
+.edit-outfit-readonly-group > span,
 .edit-outfit-quantity-group > span {
   color: #29251f;
   font-size: 11px;
@@ -520,6 +521,41 @@
 
 .edit-outfit-field .input-error {
   border-color: #a76559;
+}
+
+/* ==========================================
+   READ-ONLY VALUES (seller-defined)
+   FIX: Occasion, Size and Color are display-only —
+   same box metrics as the old inputs but muted and
+   non-interactive so they read as fixed information.
+   ========================================== */
+
+.edit-outfit-readonly-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+}
+
+.edit-outfit-readonly-value {
+  display: flex;
+  align-items: center;
+  min-height: 47px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid #e2d8c7;
+  border-radius: 9px;
+  background: #f8f5ef;
+  color: #5c554c;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.edit-outfit-product-options .edit-outfit-readonly-value {
+  min-height: 41px;
+  padding: 8px 10px;
+  background: #fffdf9;
 }
 
 /* ==========================================
@@ -618,6 +654,7 @@
 }
 
 .edit-outfit-product-options label,
+.edit-outfit-readonly-group,
 .edit-outfit-quantity-group {
   display: flex;
   flex-direction: column;
