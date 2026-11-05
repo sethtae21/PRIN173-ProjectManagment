@@ -33,6 +33,14 @@
 // of maintaining a parallel local copy. This prevents the frontend from
 // sending stale tokens after login/logout.
 //
+// KAN-FIX (cross-account order/cart leak): the in-memory GET cache is keyed by
+// resource name only ('orders', 'cart'), so an SPA account switch WITHOUT a
+// full page reload could serve the PREVIOUS user's cached /orders/ or /cart/
+// payload to the newly logged-in user. This file now subscribes to session.js
+// and busts the entire cache whenever the authenticated identity changes.
+// (The localStorage mirror half of the leak is purged in session.js
+// setSession()/clearSession() — see COMMERCE_SCOPE_KEYS there.)
+//
 // SIZE-POLICY UPDATE: the client-side size mirror now matches the revised
 // backend knowledge_table.py — clothing sizes S, M, L, XL, 2XL, 3XL, 4XL
 // (pure cm reference table), footwear regional codes (EU/US/UK) restored,
@@ -62,7 +70,10 @@ import {
   getRefreshToken, 
   clearSession, 
   setSession,
-  updateTokens 
+  updateTokens,
+  getSession,
+  subscribe,
+  decodeClaims
 } from './session.js';
 
 // Re-export so pages importing from api.js still work
@@ -348,6 +359,35 @@ export function invalidateCache(key) {
   else cache.delete(key);
 }
 export const clearCache = invalidateCache;
+
+// ----------------------------------------------------------------------------
+// KAN-FIX (cross-account order/cart leak): the cache keys above are resource
+// names only ('orders', 'cart', ...), so an SPA account switch WITHOUT a full
+// page reload could serve the PREVIOUS user's cached /orders/ or /cart/
+// payload to the newly logged-in user. Subscribe to the session store and
+// bust the WHOLE cache whenever the authenticated identity changes
+// (login / register / logout / account swap). Token-only refreshes
+// (updateTokens, same identity) do NOT bust the cache.
+// ----------------------------------------------------------------------------
+function sessionIdentity(session) {
+  if (!session) return null;
+  const user = session.user || {};
+  const claims = decodeClaims(session.access) || {};
+  return String(
+    user.id || user._id || user.email ||
+    claims.user_id || claims.email ||
+    'anonymous'
+  );
+}
+
+let lastSessionIdentity = sessionIdentity(getSession());
+subscribe((session) => {
+  const nextIdentity = sessionIdentity(session);
+  if (nextIdentity !== lastSessionIdentity) {
+    lastSessionIdentity = nextIdentity;
+    invalidateCache('*');
+  }
+});
 
 export async function cachedGet(key, path, { force = false, ...options } = {}) {
   if (force) cache.delete(key);

@@ -26,11 +26,20 @@
  *    shopper's avatar (dein's "axa" on karosu's dashboard/studio).
  *    setSession() and clearSession() therefore erase those keys; guest keys
  *    live in sessionStorage and are untouched.
+ *  - COMMERCE-SCOPE PURGE (cross-account order/cart leak fix): the order
+ *    history, last-order, cart and checkout handoff mirrors are written by the
+ *    pages as GLOBAL localStorage keys (offline first-paint cache only — the
+ *    Django backend remains the source of truth and already scopes orders and
+ *    carts per user). Without a purge, the next account to log in on this
+ *    browser inherits the previous account's Order History rows and cart badge.
+ *    setSession() and clearSession() therefore erase those mirrors too; the
+ *    pages rebuild them from the server on their next sync.
  *  - getAccessToken() is safe to call on every request (read per request,
  *    never captured in a module-level constant at import time).
  *  - Cross-tab safety: a 'storage' event refreshes the mirror in other tabs.
  * Service rule: no React imports, nothing rendered from here.
- * Traceability: RT-01 / FR-1.6 (login/logout session integrity).
+ * Traceability: RT-01 / FR-1.6 (login/logout session integrity),
+ *               FR-6.7 / FR-6.8 (order history must show ONLY the owner's orders).
  */
 const STORAGE_KEY = 'fitfusion.session.v1';
 
@@ -51,6 +60,21 @@ const AVATAR_SCOPE_KEYS = [
   'fitfusion-avatar-presets',
   'fitfusion-avatar-gender',
   'fitfusion-editing-avatar-preset',
+];
+
+/* NEW: per-account commerce mirrors (offline first-paint caches) that must NOT
+   survive an account switch. Product-level image map is intentionally kept
+   (it maps catalog ids to images, contains no personal data). */
+const COMMERCE_SCOPE_KEYS = [
+  'fitfusion-orders',
+  'fitfusion-last-order',
+  'fitfusion-cart',
+  'fitfusion-cart-items',
+  'fitfusion-shopping-cart',
+  'cartItems',
+  'fitfusion-checkout-items',
+  'fitfusion-selected-items',
+  'fitfusion-product-ratings',
 ];
 
 let memory = null;          // in-memory mirror of the stored session
@@ -90,6 +114,17 @@ function writeStorage(session) {
 function purgeAvatarScope() {
   try {
     AVATAR_SCOPE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // ignore storage failures during cleanup
+  }
+}
+
+/** NEW: erase the previous account's commerce mirrors (orders/cart/checkout).
+    The server is the source of truth; this only drops the offline cache so a
+    new login can never paint another user's orders or cart count. */
+function purgeCommerceScope() {
+  try {
+    COMMERCE_SCOPE_KEYS.forEach((key) => window.localStorage.removeItem(key));
   } catch {
     // ignore storage failures during cleanup
   }
@@ -157,10 +192,12 @@ export function getRefreshToken() {
 /**
  * Called by login()/register(): persist FIRST, then navigate. Atomic.
  * CHANGED: a new identity also purges the previous account's avatar-scoped
- * localStorage keys so no page can resurrect another shopper's avatar.
+ * AND commerce-scoped localStorage keys so no page can resurrect another
+ * shopper's avatar, order history, last order, cart or rating UI memory.
  */
 export function setSession({ access, refresh, user }) {
   purgeAvatarScope();
+  purgeCommerceScope();
   memory = normalize({ access, refresh, user });
   writeStorage(memory);
   emit();
@@ -168,7 +205,7 @@ export function setSession({ access, refresh, user }) {
 }
 
 /** Called by a 401 auto-refresh path: replace tokens atomically.
- *  NOTE: deliberately does NOT purge avatar scope (same identity). */
+ *  NOTE: deliberately does NOT purge any scope (same identity). */
 export function updateTokens(access, refresh) {
   const current = getSession();
   if (!current) return null;
@@ -182,7 +219,8 @@ export function updateTokens(access, refresh) {
   return memory;
 }
 
-/** Logout / boot-guard reset: erase canonical AND legacy copies together. */
+/** Logout / boot-guard reset: erase canonical AND legacy copies together,
+ *  plus every avatar-scoped and commerce-scoped mirror. */
 export function clearSession() {
   memory = null;
   hydrated = true;
@@ -195,6 +233,7 @@ export function clearSession() {
     // ignore storage failures during cleanup
   }
   purgeAvatarScope();
+  purgeCommerceScope();
   emit();
 }
 
