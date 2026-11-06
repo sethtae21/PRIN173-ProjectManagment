@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
-import { presetsApi } from "../services/api";
+// CHANGED: Added commerce API helpers to fetch real server data
+import { presetsApi, getCachedCartItems, getCachedOutfits } from "../services/api";
 import "./css/ShopperDashboard.css";
 
 const STANDARD_AVATAR = {
@@ -46,24 +47,7 @@ const GENDER_KEY = "fitfusion-avatar-gender";
 
 /* STORAGE HELPERS */
 
-function readStoredArray(...keys) {
-  for (const key of keys) {
-    try {
-      const saved = localStorage.getItem(key);
-      if (!saved) continue;
-
-      const parsed = JSON.parse(saved);
-
-      if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed?.items)) return parsed.items;
-      if (Array.isArray(parsed?.cartItems)) return parsed.cartItems;
-    } catch {
-      // Try the next storage key.
-    }
-  }
-
-  return [];
-}
+// REMOVED: readStoredArray() — cart and outfits now come strictly from the API.
 
 function readStoredObject(...keys) {
   for (const key of keys) {
@@ -303,27 +287,14 @@ async function loadPresetView() {
   }
 }
 
-/* DASHBOARD DATA (sync part: identity + commerce counters) */
-
+/* DASHBOARD DATA (sync part: identity only) */
+// CHANGED: Commerce counters (cart, outfits) are now loaded asynchronously 
+// via the API in the useEffect below, ensuring real-time accuracy.
 function getSyncDashboardData() {
   const shopper = getCurrentShopper();
 
-  const cartItems = readStoredArray(
-    "fitfusion-cart",
-    "fitfusion-cart-items",
-    "fitfusion-shopping-cart",
-    "cartItems"
-  );
-
-  const savedOutfits = readStoredArray(
-    "fitfusion-saved-outfits",
-    "savedOutfits"
-  );
-
   return {
     username: getShopperName(shopper),
-    cartCount: getCartCount(cartItems),
-    savedOutfitCount: savedOutfits.length,
   };
 }
 
@@ -333,6 +304,8 @@ function ShopperDashboard() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(() => ({
     ...getSyncDashboardData(),
+    cartCount: 0,
+    savedOutfitCount: 0,
     ...EMPTY_PRESET_VIEW,
   }));
   const [standardGender, setStandardGender] = useState("Female");
@@ -340,11 +313,11 @@ function ShopperDashboard() {
   const [presetReloadKey, setPresetReloadKey] = useState(0);
 
   const refreshDashboard = useCallback(() => {
-    setDashboard((current) => ({ ...current, ...getSyncDashboardData() }));
+    // Bumping the key triggers the useEffect to re-fetch all server data
     setPresetReloadKey((key) => key + 1);
   }, []);
 
-  // CHANGED: preset stats/preview now come from the owner-scoped server list.
+  // CHANGED: preset stats/preview AND commerce counters now come from the server.
   useEffect(() => {
     let active = true;
 
@@ -353,6 +326,31 @@ function ShopperDashboard() {
         setDashboard((current) => ({ ...current, ...view }));
       }
     });
+
+    // ADDED: Fetch real cart and outfit counts from the Django API
+    async function loadCommerce() {
+      try {
+        const [cartItemsRes, outfitsRes] = await Promise.allSettled([
+          getCachedCartItems(true), // force=true bypasses in-memory cache
+          getCachedOutfits(true),
+        ]);
+        if (!active) return;
+
+        const cartList = cartItemsRes.status === 'fulfilled' ? (cartItemsRes.value || []) : [];
+        const outfitsRaw = outfitsRes.status === 'fulfilled' ? outfitsRes.value : [];
+        const outfitsList = getPresetList(outfitsRaw);
+
+        setDashboard((current) => ({
+          ...current,
+          cartCount: getCartCount(cartList),
+          savedOutfitCount: outfitsList.length,
+        }));
+      } catch (error) {
+        console.warn("Unable to load commerce data from server:", error);
+      }
+    }
+
+    loadCommerce();
 
     return () => {
       active = false;
