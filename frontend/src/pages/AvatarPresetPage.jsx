@@ -23,30 +23,13 @@ const BUILT_IN_PRESET = {
   hip: "Average",
   thigh: "Average",
   cupSize: "B",
+  // ADDED: Default values for the new fields
+  bodyBuildCm: 99,
+  styleFocus: "Casual",
   builtIn: true,
 };
 
 const VIEWS = ["front", "rear"];
-
-function calculateBodyType(height, weight) {
-  const meters = Number(height) / 100;
-  const mass = Number(weight);
-
-  if (
-    !Number.isFinite(meters) ||
-    !Number.isFinite(mass) ||
-    meters <= 0 ||
-    mass <= 0
-  ) {
-    return "Balanced";
-  }
-
-  const index = mass / (meters * meters);
-  if (index < 18.5) return "Slim";
-  if (index < 25) return "Balanced";
-  if (index < 30) return "Full";
-  return "Curve";
-}
 
 function readJSON(storage, key, fallback = null) {
   try {
@@ -100,6 +83,9 @@ function normalizePreset(preset, index = 0) {
       gender === "Female"
         ? String(preset?.cupSize || preset?.cup_size || "B").toUpperCase()
         : null,
+    // ADDED: Map the new DB fields to the frontend state
+    bodyBuildCm: Number(preset?.body_build_cm || preset?.bodyBuildCm) || 99,
+    styleFocus: capitalizeChoice(preset?.style_focus || preset?.styleFocus, "Casual"),
     builtIn: false,
   };
 }
@@ -240,7 +226,6 @@ export default function AvatarPresetPage({ isGuest = false }) {
 
   const mutationRef = useRef(false);
   const requestVersionRef = useRef(0);
-  // NEW: applies the Product Details modal choice (premade vs custom) once.
   const kindAppliedRef = useRef(false);
 
   useEffect(() => {
@@ -293,8 +278,6 @@ export default function AvatarPresetPage({ isGuest = false }) {
     };
   }, [isGuest, reloadKey]);
 
-  // NEW: honor the try-on modal choice — preselect FitFusion Standard or the
-  // shopper's first saved custom avatar so they only press Use.
   useEffect(() => {
     if (kindAppliedRef.current || loading) return;
 
@@ -620,9 +603,9 @@ export default function AvatarPresetPage({ isGuest = false }) {
                       </div>
 
                       <strong>{preset.name}</strong>
+                      {/* CHANGED: Display actual cm range instead of calculated body type */}
                       <small>
-                        {preset.gender} • {preset.height} cm •{" "}
-                        {calculateBodyType(preset.height, preset.weight)}
+                        {preset.gender} • {preset.height} cm • {preset.bodyBuildCm} cm
                       </small>
                     </button>
 
@@ -705,13 +688,13 @@ export default function AvatarPresetPage({ isGuest = false }) {
                 label="Height"
                 value={`${selectedPreset.height} cm`}
               />
+              {/* CHANGED: Show actual cm range */}
               <Measurement
                 label="Body Build"
-                value={calculateBodyType(
-                  selectedPreset.height,
-                  selectedPreset.weight
-                )}
+                value={`${selectedPreset.bodyBuildCm} cm`}
               />
+              {/* ADDED: Show Style Focus */}
+              <Measurement label="Style Focus" value={selectedPreset.styleFocus} />
               <Measurement label="Shoulders" value={selectedPreset.shoulder} />
               <Measurement label="Waist" value={selectedPreset.waist} />
               <Measurement label="Hips" value={selectedPreset.hip} />

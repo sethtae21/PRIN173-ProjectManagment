@@ -4,20 +4,12 @@ from outfits.models import AvatarPreset
 
 class AvatarPresetSerializer(serializers.ModelSerializer):
     """
-    Avatar preset serializer (FR-2.5, FR-2.7, FR-2.8–2.10).
+    Avatar preset serializer (FR-2.5, FR-2.7, FR-2.8-2.10).
     - id rendered as ObjectId-safe string
     - user assigned server-side only (owner-only, RBAC)
     - cup_size: female-only rule (FR-2.7), but null/blank ACCEPTED and normalized
     - height/weight ranges enforced per checklist confirmation (120-230cm, 30-200)
-
-    KAN-FIX (POST /presets/ 400 "is not a valid choice"):
-    MongoDB stores every choice LOWERCASE ('male', 'neutral', 'broad', 'slim',
-    'average', 'thick'), but the React UI sends display case ("Male", "Neutral",
-    "Broad", ...). Choice validation happens INSIDE each field's run_validation,
-    so a validate_<field>() hook is too late — the payload must be normalized in
-    to_internal_value(), BEFORE field validation. This also maps the frontend's
-    camelCase aliases (skinTone, cupSize, ...) onto the snake_case model fields
-    so skin tone and cup size are actually persisted instead of silently dropped.
+    - ADDED: style_focus (4 options) + body_build_cm (86-112 cm slider)
     """
 
     id = serializers.CharField(read_only=True)
@@ -25,7 +17,6 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
 
     cup_size = serializers.CharField(max_length=5, allow_null=True, allow_blank=True, required=False)
 
-    # Raw payload keys the React app may send -> canonical model field names.
     FIELD_ALIASES = {
         'skinTone': 'skin_tone',
         'skinColor': 'skin_tone',
@@ -34,10 +25,14 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
         'waistSize': 'waist',
         'hipSize': 'hip',
         'thighSize': 'thigh',
+        # ADDED: map the React camelCase keys for the new fields
+        'styleFocus': 'style_focus',
+        'bodyBuildCm': 'body_build_cm',
+        'bodyBuild': 'body_build_cm',
     }
 
-    # Choices are stored lowercase in MongoDB (outfits.models.AvatarPreset).
-    LOWERCASED_FIELDS = ('gender', 'undertone', 'shoulder', 'waist', 'hip', 'thigh')
+    # CHANGED: style_focus added so "Casual" -> "casual" before choice validation
+    LOWERCASED_FIELDS = ('gender', 'undertone', 'shoulder', 'waist', 'hip', 'thigh', 'style_focus')
 
     class Meta:
         model = AvatarPreset
@@ -49,18 +44,15 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
         if isinstance(data, dict):
             data = dict(data)
 
-            # camelCase alias -> snake_case model field
             for alias, canonical in self.FIELD_ALIASES.items():
                 if alias in data and canonical not in data:
                     data[canonical] = data.pop(alias)
 
-            # "Male" -> "male", "Neutral" -> "neutral", "Broad" -> "broad", ...
             for field in self.LOWERCASED_FIELDS:
                 value = data.get(field)
                 if isinstance(value, str):
                     data[field] = value.strip().lower()
 
-            # Cup letters are stored uppercase ('A'-'D'); blank stays blank.
             cup = data.get('cup_size')
             if isinstance(cup, str) and cup.strip():
                 data['cup_size'] = cup.strip().upper()
@@ -82,6 +74,12 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
             return ''
         if value not in ('A', 'B', 'C', 'D'):
             raise serializers.ValidationError('Cup size must be one of: A, B, C, D.')
+        return value
+
+    # ADDED: enforce the cm slider bounds server-side
+    def validate_body_build_cm(self, value):
+        if not (86 <= value <= 112):
+            raise serializers.ValidationError('Body build must be between 86 and 112 cm.')
         return value
 
     def validate(self, attrs):
