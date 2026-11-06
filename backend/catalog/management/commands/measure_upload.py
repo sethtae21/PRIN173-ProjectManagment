@@ -6,6 +6,10 @@ Exit code 0 and prints "PASS" if the total time is under the budget.
 Exit code 1 and prints "FAIL" otherwise — CI/CD will fail the build.
 
 Fixed for this project's custom User model (email-based, no `username` field).
+
+CHANGED: after the verdict the command deletes its own batch + catalog items
+(pass --keep-data to inspect them), so acceptance runs can never leak
+"Timing Product NN" rows into the shopper catalog / recommendations again.
 """
 import csv
 import io
@@ -47,6 +51,17 @@ TIMING_STORE = 'Timing Test Store'
 
 class Command(BaseCommand):
     help = 'Criterion 4 / OBJ-08 acceptance test: upload 10 items, measure batch time, fail if > 60 s.'
+
+    # ADDED: opt-out for the post-run fixture cleanup.
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--keep-data',
+            action='store_true',
+            help=(
+                'Keep the timing batch + items in the catalog after the run '
+                '(default: they are deleted so they never reach shoppers).'
+            ),
+        )
 
     def _get_or_create_timing_seller(self):
         """Get-or-create a seller account using the custom email-based User model."""
@@ -167,6 +182,28 @@ class Command(BaseCommand):
 
         return batch_id, len(rows)
 
+    # ADDED: post-verdict cleanup so acceptance runs stop polluting the
+    # shopper catalog / recommendations. Best-effort GridFS image deletion.
+    def _cleanup_fixtures(self, batch, options):
+        if options.get('keep_data'):
+            self.stdout.write(self.style.WARNING(
+                ' --keep-data given: timing fixtures left in the catalog.'
+            ))
+            return
+
+        items = list(CatalogItem.objects.filter(batch=batch))
+        for item in items:
+            for field_name in ('front_image', 'rear_image'):
+                try:
+                    getattr(item, field_name).delete()
+                except Exception:
+                    pass  # best-effort GridFS cleanup only
+        CatalogItem.objects.filter(batch=batch).delete()
+        batch.delete()
+        self.stdout.write(self.style.SUCCESS(
+            f'🧹 Cleanup: removed {len(items)} timing items + batch {batch.id}.'
+        ))
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS(
             f"\n{'='*70}\n"
@@ -214,24 +251,28 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"⏱️  Total processing time: {total_time:.2f} seconds")
 
-        # 6) Verdict.
+        # 6) Verdict (cleanup runs after the measurement window, so the
+        #    OBJ-08 timing evidence is unchanged).
         if batch.status != 'completed':
             self.stdout.write(self.style.ERROR(
                 f"❌ FAIL — batch ended with status '{batch.status}'. "
                 f"Rejection report: {batch.rejection_report}"
             ))
+            self._cleanup_fixtures(batch, options)
             raise SystemExit(1)
 
-        if total_time <= BUDGET_SECONDS:
+        passed = total_time <= BUDGET_SECONDS
+        if passed:
             self.stdout.write(self.style.SUCCESS(
                 f"✅ PASS — {total_time:.2f}s ≤ {BUDGET_SECONDS}s budget "
                 f"(Criterion 4 / OBJ-08 satisfied)"
             ))
-            raise SystemExit(0)
         else:
             self.stdout.write(self.style.ERROR(
                 f"❌ FAIL — {total_time:.2f}s > {BUDGET_SECONDS}s budget "
                 f"(Criterion 4 / OBJ-08 violated). "
                 f"Try raising IMAGE_WORKERS or lowering REMBG_WORKING_SIZE in settings."
             ))
-            raise SystemExit(1)
+
+        self._cleanup_fixtures(batch, options)
+        raise SystemExit(0 if passed else 1)

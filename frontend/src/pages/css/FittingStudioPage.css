@@ -1162,7 +1162,7 @@
   background: linear-gradient(
     135deg,
     #17130f,
-    #8e641f,
+    #8e641f 60%,
     #d7af4b
   );
 }
@@ -1574,7 +1574,12 @@
 }
 
 /* ==========================================
-   EMPTY / SELECTED ITEM
+   EMPTY STATE + MULTI-ITEM MATCH SECTIONS
+   CHANGED: the single ".studio-match-selected-item"
+   block was removed together with its JSX. The panel
+   now renders one card per tried / reviewed garment
+   (sweater AND jeans), each with its own expandable
+   FR-7.2 breakdown, in the same gold/cream theme.
 ========================================== */
 
 .studio-match-empty {
@@ -1588,8 +1593,16 @@
   line-height: 1.7;
 }
 
-.studio-match-selected-item {
-  margin: 18px 0 14px;
+/* ADDED: container for the per-item match cards. */
+.studio-match-item-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+/* ADDED: one card per selected item (equipped or reviewed). */
+.studio-match-item-card {
+  min-width: 0;
   padding: 14px;
   border: 1px solid #e6d8ba;
   border-radius: 9px;
@@ -1597,27 +1610,38 @@
   overflow-wrap: anywhere;
 }
 
-.studio-match-selected-item > span {
+/* ADDED: category / name / store header of each card. */
+.studio-match-item-title {
+  margin-bottom: 10px;
+}
+
+.studio-match-item-title > span {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   color: #9a6a1d;
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.studio-match-selected-item h3 {
-  margin: 0 0 6px;
+.studio-match-item-title h3 {
+  margin: 0 0 4px;
   color: #17130f;
   font-size: 13px;
   line-height: 1.45;
 }
 
-.studio-match-selected-item p {
+.studio-match-item-title p {
   margin: 0;
   color: #6b6154;
   font-size: 10px;
   line-height: 1.5;
+}
+
+/* ADDED: tighter spacing for a breakdown nested in a card. */
+.studio-match-item-card .studio-match-breakdown {
+  margin-top: 14px;
 }
 
 /* ==========================================

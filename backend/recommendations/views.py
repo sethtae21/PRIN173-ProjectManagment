@@ -23,6 +23,16 @@ from catalog.models import CatalogItem
 from .knowledge_table import WEIGHTS, WEIGHTS_VERSION, get_size_ranges
 from .scoring import AvatarProfile, ItemProfile, score_item
 
+# ADDED (timing fixtures leaking into shopper recommendations): the
+# Criterion 4 / OBJ-08 acceptance command (catalog/management/commands/
+# measure_upload.py) leaves ten active "Timing Product NN" rows behind under
+# this store name. They are legitimate active catalog rows, so the ranked
+# list treated them as sellable goods and the Fitting Studio rendered them
+# (with missing images -> the 503 /media/... console errors). Keep the
+# fixture store out of every shopper-facing recommendation response; the
+# acceptance command reads the database directly and is unaffected.
+TIMING_FIXTURE_STORE = "Timing Test Store"
+
 
 def _as_tuple(value) -> tuple:
     if value is None:
@@ -37,6 +47,14 @@ def _as_float(value, default):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+# ADDED: single source of truth for "what shoppers may be recommended".
+def _active_queryset():
+    """Active catalog items minus the OBJ-08 timing-test fixtures."""
+    return CatalogItem.objects.filter(status="active").exclude(
+        store_name=TIMING_FIXTURE_STORE
+    )
 
 
 class RecommendationQuerySerializer(serializers.Serializer):
@@ -157,7 +175,8 @@ class RecommendationListView(APIView):
         query.is_valid(raise_exception=True)
         values = query.validated_data
         avatar = _avatar_profile(values)
-        queryset = CatalogItem.objects.filter(status="active")
+        # CHANGED: exclude the OBJ-08 timing fixtures (see TIMING_FIXTURE_STORE).
+        queryset = _active_queryset()
         return Response({
             "weights_version": WEIGHTS_VERSION,
             "weights": WEIGHTS,
@@ -187,7 +206,8 @@ class MatchReasonsView(APIView):
         query = RecommendationQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         avatar = _avatar_profile(query.validated_data)
-        item = get_object_or_404(CatalogItem, pk=item_id, status="active")
+        # CHANGED: timing fixtures are not explainable either (404 for them).
+        item = get_object_or_404(_active_queryset(), pk=item_id)
         breakdown = score_item(avatar, _item_profile(item)).as_dict()
         response = {
             "item_id": str(item.pk),

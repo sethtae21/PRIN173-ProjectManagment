@@ -270,6 +270,10 @@ function normalizeStudioItem(item) {
   };
 }
 
+// REMOVED: withUniqueItem() -- the match-reasons panel is now SLOT-KEYED
+// (selectedMatchSlots), so a garment replaces the previous card of its body
+// slot instead of accumulating beside it. No helper needed anymore.
+
 function matchesAvatarSize(item, avatarSize) {
   if (!item) return false;
   if (item.category === "shoes") return true;
@@ -760,19 +764,19 @@ function RecommendationThumb({ item }) {
   );
 }
 
-function MatchReasonsCard({
+// CHANGED (multi-item match reasons): one self-contained section per item.
+// Each section owns its own fetch of the FR-7.2 breakdown so the sweater and
+// the jeans can be expanded, loaded, retried and collapsed independently.
+function MatchReasonSection({
   item,
   avatar,
   isGuest,
-  requestVersion,
+  expanded,
+  onToggle,
   loadMatchReasonsService,
   onBrowse,
   onTryItem,
 }) {
-  // FIX (saved outfits auto-expand): if an item is already selected on mount
-  // (e.g. restored from a saved outfit), open the breakdown immediately so
-  // the scores are visible without an extra click.
-  const [expanded, setExpanded] = useState(() => Boolean(item));
   const [requestCount, setRequestCount] = useState(0);
   const [result, setResult] = useState({
     status: "idle",
@@ -781,29 +785,17 @@ function MatchReasonsCard({
   });
 
   const context = JSON.stringify({ item, avatar, isGuest });
-
   const previousContext = useRef(context);
-  const previousRequestVersion = useRef(requestVersion);
 
+  // Discard stale rows the moment this section's item/avatar context moves.
   useEffect(() => {
-    const requestedFromRecommendation =
-      previousRequestVersion.current !== requestVersion;
-    const contextChanged = previousContext.current !== context;
-
-    previousRequestVersion.current = requestVersion;
+    if (previousContext.current === context) return;
     previousContext.current = context;
-
-    if (requestedFromRecommendation) {
-      setExpanded(true);
-      setRequestCount((count) => count + 1);
-    } else if (contextChanged) {
-      setExpanded(false);
-      setResult({ status: "idle", rows: [], context: "" });
-    }
-  }, [context, requestVersion]);
+    setResult({ status: "idle", rows: [], context: "" });
+  }, [context]);
 
   useEffect(() => {
-    if (!expanded || !item) return;
+    if (!expanded || !item) return undefined;
 
     const controller = new AbortController();
     let active = true;
@@ -858,6 +850,164 @@ function MatchReasonsCard({
     expanded &&
     (currentResult.status === "loading" || currentResult.status === "idle");
 
+  const breakdownId = `studio-match-breakdown-${item.id}`;
+
+  return (
+    <article className="studio-match-item-card">
+      <div className="studio-match-item-title">
+        <span>{item.category}</span>
+        <h3>{item.name}</h3>
+        <p>{item.store}</p>
+      </div>
+
+      <button
+        type="button"
+        className="studio-match-primary-button"
+        aria-expanded={expanded}
+        aria-controls={breakdownId}
+        onClick={onToggle}
+      >
+        {expanded ? "Hide Match Reasons" : "View Match Reasons"}
+        <span aria-hidden="true">{expanded ? "−" : "+"}</span>
+      </button>
+
+      {expanded && (
+        <div
+          id={breakdownId}
+          className="studio-match-breakdown"
+          aria-busy={loading}
+        >
+          {loading && (
+            <p className="studio-match-status" role="status">
+              Loading match details...
+            </p>
+          )}
+
+          {currentResult.status === "error" && (
+            <div className="studio-match-error">
+              <p role="alert">Match details unavailable. Please retry.</p>
+              <button
+                type="button"
+                className="studio-match-outline-button"
+                onClick={() => setRequestCount((count) => count + 1)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {currentResult.status === "success" && (
+            <div className="studio-match-score-list">
+              {currentResult.rows.map((row) => (
+                <article key={row.key} className="studio-match-score">
+                  <div className="studio-match-score-heading">
+                    <h3>{row.label}</h3>
+                    <strong>
+                      {row.score}/{row.maxScore}
+                    </strong>
+                  </div>
+                  <meter
+                    min={0}
+                    max={row.maxScore}
+                    value={row.score}
+                    aria-label={`${row.label} score`}
+                  >
+                    {row.score} out of {row.maxScore}
+                  </meter>
+                  <p>{row.reason}</p>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <div className="studio-match-actions">
+            <button
+              type="button"
+              className="studio-match-outline-button"
+              onClick={() => {
+                onToggle();
+                onBrowse();
+              }}
+            >
+              Back to Recommendations
+            </button>
+            <button
+              type="button"
+              className="studio-match-primary-button"
+              onClick={() => onTryItem(item)}
+            >
+              Try Item
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// CHANGED (slot-keyed match reasons): the card renders AT MOST ONE section
+// per body slot (top / bottom / shoes), in slot order. Trying on or reviewing
+// a garment replaces the previous card of its slot, so the panel shows one
+// upper-body card + one lower-body card (plus footwear only while shoes are
+// equipped/reviewed) and never a stale replaced garment.
+function MatchReasonsCard({
+  items,
+  avatar,
+  isGuest,
+  requestVersion,
+  focusItemId,
+  loadMatchReasonsService,
+  onBrowse,
+  onTryItem,
+}) {
+  const itemIds = items.map((entry) => String(entry.id));
+  const idsKey = itemIds.join("|");
+
+  // FIX (saved outfits auto-expand): items already present on mount (e.g. a
+  // look restored from Saved Outfits) open immediately so the scores are
+  // visible without an extra click.
+  const [expandedIds, setExpandedIds] = useState(() => itemIds);
+
+  const avatarContext = JSON.stringify({ avatar, isGuest });
+  const previousAvatarContext = useRef(avatarContext);
+  const previousRequestVersion = useRef(requestVersion);
+
+  // Preserve the old single-item behaviour: any avatar-profile change
+  // collapses the open breakdowns (their scores no longer apply).
+  useEffect(() => {
+    if (previousAvatarContext.current === avatarContext) return;
+    previousAvatarContext.current = avatarContext;
+    setExpandedIds([]);
+  }, [avatarContext]);
+
+  // Expand the section whose row-level "View Match Reasons" was pressed.
+  useEffect(() => {
+    if (previousRequestVersion.current === requestVersion) return;
+    previousRequestVersion.current = requestVersion;
+
+    if (!focusItemId) return;
+
+    const focus = String(focusItemId);
+    setExpandedIds((current) =>
+      current.includes(focus) ? current : [...current, focus]
+    );
+  }, [requestVersion, focusItemId]);
+
+  // Drop expansions for items that left the list (slot replaced / unequip /
+  // gender change).
+  useEffect(() => {
+    const valid = idsKey ? idsKey.split("|") : [];
+    setExpandedIds((current) => current.filter((id) => valid.includes(id)));
+  }, [idsKey]);
+
+  function toggleExpanded(id) {
+    setExpandedIds((current) =>
+      current.includes(id)
+        ? current.filter((entry) => entry !== id)
+        : [...current, id]
+    );
+  }
+
   return (
     <section className="studio-match-card" aria-labelledby="studio-match-heading">
       <div className="studio-match-heading">
@@ -870,11 +1020,11 @@ function MatchReasonsCard({
         </div>
       </div>
 
-      {!item ? (
+      {items.length === 0 ? (
         <div className="studio-match-empty">
           <p>
-            Select View Match Reasons on a recommended item to review its
-            scores and explanation.
+            Try an item or select View Match Reasons on a recommended item to
+            review its scores and explanation.
           </p>
           <button
             type="button"
@@ -885,95 +1035,24 @@ function MatchReasonsCard({
           </button>
         </div>
       ) : (
-        <>
-          <div className="studio-match-selected-item">
-            <span>SELECTED ITEM</span>
-            <h3>{item.name}</h3>
-            <p>{item.store}</p>
-          </div>
-
-          <button
-            type="button"
-            className="studio-match-primary-button"
-            aria-expanded={expanded}
-            aria-controls="studio-match-breakdown"
-            onClick={() => setExpanded((current) => !current)}
-          >
-            {expanded ? "Hide Match Reasons" : "View Match Reasons"}
-            <span aria-hidden="true">{expanded ? "−" : "+"}</span>
-          </button>
-
-          {expanded && (
-            <div
-              id="studio-match-breakdown"
-              className="studio-match-breakdown"
-              aria-busy={loading}
-            >
-              {loading && (
-                <p className="studio-match-status" role="status">
-                  Loading match details...
-                </p>
-              )}
-
-              {currentResult.status === "error" && (
-                <div className="studio-match-error">
-                  <p role="alert">Match details unavailable. Please retry.</p>
-                  <button
-                    type="button"
-                    className="studio-match-outline-button"
-                    onClick={() => setRequestCount((count) => count + 1)}
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {currentResult.status === "success" && (
-                <div className="studio-match-score-list">
-                  {currentResult.rows.map((row) => (
-                    <article key={row.key} className="studio-match-score">
-                      <div className="studio-match-score-heading">
-                        <h3>{row.label}</h3>
-                        <strong>
-                          {row.score}/{row.maxScore}
-                        </strong>
-                      </div>
-                      <meter
-                        min={0}
-                        max={row.maxScore}
-                        value={row.score}
-                        aria-label={`${row.label} score`}
-                      >
-                        {row.score} out of {row.maxScore}
-                      </meter>
-                      <p>{row.reason}</p>
-                    </article>
-                  ))}
-                </div>
-              )}
-
-              <div className="studio-match-actions">
-                <button
-                  type="button"
-                  className="studio-match-outline-button"
-                  onClick={() => {
-                    setExpanded(false);
-                    onBrowse();
-                  }}
-                >
-                  Back to Recommendations
-                </button>
-                <button
-                  type="button"
-                  className="studio-match-primary-button"
-                  onClick={() => onTryItem(item)}
-                >
-                  Try Item
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+        <div className="studio-match-item-list">
+          {items.map((item) => {
+            const id = String(item.id);
+            return (
+              <MatchReasonSection
+                key={id}
+                item={item}
+                avatar={avatar}
+                isGuest={isGuest}
+                expanded={expandedIds.includes(id)}
+                onToggle={() => toggleExpanded(id)}
+                loadMatchReasonsService={loadMatchReasonsService}
+                onBrowse={onBrowse}
+                onTryItem={onTryItem}
+              />
+            );
+          })}
+        </div>
       )}
     </section>
   );
@@ -1187,11 +1266,13 @@ function FittingStudioPage({ isGuest = false }) {
   const [catalogRecommendations, setCatalogRecommendations] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
 
-  // FIX (saved outfits -> Fitting Studio): auto-select the first equipped
-  // garment so the Match Reasons panel renders the item breakdown instead
-  // of the empty "Select View Match Reasons..." state when restoring a
-  // saved look (FR-5.6).
-  const [selectedMatchItem, setSelectedMatchItem] = useState(() => {
+  // CHANGED (slot-keyed match reasons, max one card per body slot): the panel
+  // state is a {top, bottom, shoes} map instead of an id list. Trying on OR
+  // reviewing a garment REPLACES the card occupying its slot, so a jacket
+  // swapped out for a sweater can never linger beside it -- upper body +
+  // lower body = two cards in the normal clothing flow. A restored saved
+  // look (FR-5.6) seeds the slots from its equipped garments.
+  const [selectedMatchSlots, setSelectedMatchSlots] = useState(() => {
     const session = readStudioSession(isGuest);
     const externalLook =
       session &&
@@ -1199,14 +1280,22 @@ function FittingStudioPage({ isGuest = false }) {
       session.equippedItems &&
       typeof session.equippedItems === "object";
 
-    if (externalLook) {
-      const sanitized = sanitizeEquipped(session.equippedItems, avatar.gender);
-      const firstItem = Object.values(sanitized || {}).find(Boolean);
-      return firstItem ? normalizeStudioItem(firstItem) : null;
+    if (!externalLook) {
+      return { top: null, bottom: null, shoes: null };
     }
-    return null;
+
+    const sanitized = sanitizeEquipped(session.equippedItems, avatar.gender);
+    return {
+      top: normalizeStudioItem(sanitized?.top),
+      bottom: normalizeStudioItem(sanitized?.bottom),
+      shoes: normalizeStudioItem(sanitized?.shoes),
+    };
   });
   const [matchRequestVersion, setMatchRequestVersion] = useState(0);
+
+  // NEW: id of the item whose breakdown should auto-expand after a row-level
+  // "View Match Reasons" press.
+  const [focusMatchItemId, setFocusMatchItemId] = useState("");
 
   // NEW (OBJ-05 / FR-7.5): your persisted 1-5 ratings keyed by catalog item id,
   // used to pre-fill the star control on every recommendation row.
@@ -1248,6 +1337,20 @@ function FittingStudioPage({ isGuest = false }) {
   const equippedItemsArray = useMemo(
     () => Object.values(equippedItems).filter(Boolean),
     [equippedItems]
+  );
+
+  // CHANGED: panel cards in slot order (top, bottom, shoes) -- at most one
+  // per slot, so normally exactly the upper-body + lower-body pair.
+  const selectedMatchItems = useMemo(
+    () => Object.values(selectedMatchSlots).filter(Boolean),
+    [selectedMatchSlots]
+  );
+
+  // CHANGED: id set of everything shown in the View Match Reasons panel;
+  // drives the gold "match-selected" outline on recommendation rows.
+  const selectedMatchIds = useMemo(
+    () => new Set(selectedMatchItems.map((item) => String(item.id))),
+    [selectedMatchItems]
   );
 
   const fitLimits = useMemo(
@@ -1397,7 +1500,8 @@ function FittingStudioPage({ isGuest = false }) {
         bottom: null,
         shoes: null,
       });
-      setSelectedMatchItem(null);
+      setSelectedMatchSlots({ top: null, bottom: null, shoes: null });
+      setFocusMatchItemId("");
       setOriginalDimensions(null);
       prevGenderRef.current = avatar.gender;
     }
@@ -1476,7 +1580,8 @@ function FittingStudioPage({ isGuest = false }) {
     }
 
     setEquippedItems(next);
-    setSelectedMatchItem(item);
+    // CHANGED: pending equip takes over its body slot in the match panel.
+    setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setAvatar((current) =>
       applySizeCaps(
         applyFitLimits(current, nextLimits),
@@ -1714,7 +1819,9 @@ function FittingStudioPage({ isGuest = false }) {
       });
     }
 
-    setSelectedMatchItem(item);
+    // CHANGED: equipping takes over the garment's body slot in the match
+    // reasons panel, replacing any previous card for that slot.
+    setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setEquippedItems(next);
     setAvatar((current) =>
       applySizeCaps(
@@ -1740,19 +1847,14 @@ function FittingStudioPage({ isGuest = false }) {
 
     setEquippedItems(next);
 
-    setSelectedMatchItem((current) => {
-      if (!hasRemaining) return null;
-
-      if (
-        current &&
-        String(current.id) === String(removedItem.id) &&
-        current.category === removedItem.category
-      ) {
-        return null;
-      }
-
-      return current;
-    });
+    // CHANGED: clear the slot card when it IS the removed garment; a merely
+    // reviewed card for that slot survives the unequip.
+    setSelectedMatchSlots((current) =>
+      current[category] &&
+      String(current[category].id) === String(removedItem.id)
+        ? { ...current, [category]: null }
+        : current
+    );
 
     if (!hasRemaining) {
       if (originalDimensions) {
@@ -1781,12 +1883,15 @@ function FittingStudioPage({ isGuest = false }) {
     });
   }
 
+  // CHANGED: reviewing a recommendation takes over its body slot in the
+  // panel (replacing the previous card for that slot) and expands it.
   function handleViewMatchReasons(rawItem) {
     const item = normalizeStudioItem(rawItem);
 
     if (!item) return;
 
-    setSelectedMatchItem(item);
+    setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
+    setFocusMatchItemId(String(item.id));
     setMatchRequestVersion((version) => version + 1);
 
     window.requestAnimationFrame(() => {
@@ -2172,8 +2277,7 @@ function FittingStudioPage({ isGuest = false }) {
                   <article
                     key={item.id}
                     className={`studio-recommendation-item ${
-                      selectedMatchItem &&
-                      String(selectedMatchItem.id) === String(item.id)
+                      selectedMatchIds.has(String(item.id))
                         ? "match-selected"
                         : ""
                     }`}
@@ -2383,13 +2487,14 @@ function FittingStudioPage({ isGuest = false }) {
               ref={matchPanelRef}
               className="studio-match-panel-container"
               tabIndex={-1}
-              aria-label="Match reasons for the selected recommendation"
+              aria-label="Match reasons for your tried and reviewed items"
             >
               <MatchReasonsCard
-                item={selectedMatchItem}
+                items={selectedMatchItems}
                 avatar={avatar}
                 isGuest={isGuest}
                 requestVersion={matchRequestVersion}
+                focusItemId={focusMatchItemId}
                 loadMatchReasonsService={loadMatchReasons}
                 onBrowse={handleRecommendations}
                 onTryItem={tryRecommendedItem}
@@ -2641,7 +2746,9 @@ function FittingStudioPage({ isGuest = false }) {
                 required
                 aria-invalid={Boolean(outfitNameError)}
                 aria-describedby={
-                  outfitNameError ? "studio-outfit-name-error" : undefined
+                  outfitNameError
+                    ? "studio-outfit-name-error"
+                    : undefined
                 }
               />
               <div className="studio-save-outfit-hint">
