@@ -44,7 +44,9 @@ class RegistrationContactSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         value = value.strip().lower()
-        if User.objects.filter(email__iexact=value).exists():
+        # CHANGED: only block LIVE accounts. Archived accounts with the same
+        # email can be re-registered (the old archive stays history).
+        if User.objects.filter(email__iexact=value, status='active').exists():
             raise serializers.ValidationError(
                 "This email is already used. Please use another email address or log in."
             )
@@ -56,7 +58,8 @@ class RegistrationContactSerializer(serializers.Serializer):
             raise serializers.ValidationError("Mobile number must contain exactly 11 digits.")
         if not digits.startswith("09"):
             raise serializers.ValidationError("Mobile number must begin with 09.")
-        if User.objects.filter(mobile=digits).exists():
+        # CHANGED: only block LIVE accounts.
+        if User.objects.filter(mobile=digits, status='active').exists():
             raise serializers.ValidationError(
                 "This mobile number is already registered. Please use another number or log in."
             )
@@ -71,7 +74,8 @@ class RegistrationContactSerializer(serializers.Serializer):
         if len(value) < 2:
             raise serializers.ValidationError("Store name must contain at least 2 characters.")
 
-        if User.objects.filter(store_name__iexact=value, role='seller').exists():
+        # CHANGED: only block LIVE sellers.
+        if User.objects.filter(store_name__iexact=value, role='seller', status='active').exists():
             raise serializers.ValidationError(
                 "This store name is already taken. Please choose a different name."
             )
@@ -108,9 +112,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'city', 'province', 'postal_code',
         )
 
-
-        
-
     def validate_email(self, value):
         return RegistrationContactSerializer().validate_email(value)
 
@@ -137,6 +138,8 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password_confirm', None)
         role = validated_data.pop('role', 'shopper')
+        # CHANGED: explicit status='active' (model default also covers this).
+        validated_data['status'] = 'active'
 
         if role == 'seller':
             user = User.objects.create_seller(
@@ -196,6 +199,11 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid email or password.')
         if not auth_user.is_active:
             raise serializers.ValidationError('This account has been deactivated.')
+        # NEW: block archived (deleted) accounts from logging in.
+        if getattr(auth_user, 'status', 'active') == 'archive':
+            raise serializers.ValidationError(
+                'This account has been archived. Please contact support if this was a mistake.'
+            )
 
         data['user'] = auth_user
         return data

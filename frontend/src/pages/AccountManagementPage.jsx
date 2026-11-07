@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../services/api";
 import "./css/AccountManagementPage.css";
@@ -45,33 +45,13 @@ function AccountManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  /* ---------- deactivation modal ---------- */
-  const [showDeactivateModal, setShowDeactivateModal] =
-    useState(false);
+  /* ---------- delete (archive) modal only ---------- */
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deactivationReason, setDeactivationReason] =
-    useState("");
-  const [otherReason, setOtherReason] = useState("");
-  const [confirmationChecked, setConfirmationChecked] =
-    useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-  const [deactivationError, setDeactivationError] =
-    useState("");
   const [deleteError, setDeleteError] = useState("");
-  const [isDeactivating, setIsDeactivating] =
-    useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   /* ---------- fetch real account on mount (FR-1.2) ---------- */
-  const closeDeactivateModal = useCallback(() => {
-    if (isDeactivating) return;
-    setShowDeactivateModal(false);
-    setDeactivationReason("");
-    setOtherReason("");
-    setConfirmationChecked(false);
-    setDeactivationError("");
-  }, [isDeactivating]);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -145,46 +125,7 @@ function AccountManagementPage() {
     };
   }, [profile]);
 
-  const reasons = [
-    { value: "Taking a break", label: "I want to take a break" },
-    { value: "Privacy concerns", label: "Privacy or security concerns" },
-    { value: "Not using the platform", label: "I am no longer using FitFusion AI" },
-    { value: "Other", label: "Other reason" },
-  ];
-
-  const reasonIsValid =
-    deactivationReason !== "" &&
-    (deactivationReason !== "Other" || otherReason.trim().length > 0);
-
-  const canDeactivate =
-    reasonIsValid && confirmationChecked && !isDeactivating;
-
-  /* ---------- escape-key closing for deactivation modal ---------- */
-  useEffect(() => {
-    if (!showDeactivateModal) return;
-
-    function handleEscape(event) {
-      if (event.key === "Escape") {
-        closeDeactivateModal();
-      }
-    }
-
-    window.addEventListener("keydown", handleEscape);
-
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-    };
-  }, [showDeactivateModal, closeDeactivateModal]);
-
-  /* ---------- DEACTIVATE (FR-1.4, real backend call) ---------- */
-  function openDeactivateModal() {
-    setDeactivationReason("");
-    setOtherReason("");
-    setConfirmationChecked(false);
-    setDeactivationError("");
-    setShowDeactivateModal(true);
-  }
-
+  /* ---------- DELETE (archive) modal ---------- */
   function openDeleteModal() {
     setDeleteConfirmed(false);
     setDeleteError("");
@@ -198,58 +139,9 @@ function AccountManagementPage() {
     setDeleteError("");
   }
 
-  async function handleDeactivateAccount() {
-    if (!reasonIsValid) {
-      setDeactivationError("Please select a reason for deactivation.");
-      return;
-    }
-
-    if (!confirmationChecked) {
-      setDeactivationError(
-        "Please confirm that you understand the effects of deactivation."
-      );
-      return;
-    }
-
-    if (isDeactivating) return;
-
-    setIsDeactivating(true);
-    setDeactivationError("");
-
-    const finalReason =
-      deactivationReason === "Other"
-        ? otherReason.trim()
-        : deactivationReason;
-
-    try {
-      await authAPI.deactivateAccount({
-        reason: finalReason,
-        refresh: localStorage.getItem("refresh_token") || "",
-      });
-
-      window.dispatchEvent(new Event("fitfusion-account-updated"));
-      clearAuthStorage();
-
-      navigate("/login", {
-        replace: true,
-        state: {
-          deactivated: true,
-          message:
-            "Your account has been deactivated. Your data is retained for future reactivation.",
-        },
-      });
-    } catch (error) {
-      console.error("Account deactivation failed:", error);
-      setDeactivationError(
-        "Unable to deactivate your account. Please try again."
-      );
-      setIsDeactivating(false);
-    }
-  }
-
   async function handleDeleteAccount() {
     if (!deleteConfirmed) {
-      setDeleteError("Please confirm that you want to permanently delete your account.");
+      setDeleteError("Please confirm that you want to archive your account.");
       return;
     }
 
@@ -259,19 +151,23 @@ function AccountManagementPage() {
     setDeleteError("");
 
     try {
-      const refresh = localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh_token") || "";
+      const refresh =
+        localStorage.getItem("refresh_token") ||
+        sessionStorage.getItem("refresh_token") ||
+        "";
       await authAPI.deleteAccount(refresh);
       clearAuthStorage();
       navigate("/login", {
         replace: true,
         state: {
-          deleted: true,
-          message: "Your account has been permanently deleted. This action is irreversible and compliant with RA 10173.",
+          archived: true,
+          message:
+            "Your account has been archived. Your profile, saved outfits, and order history are retained for compliance and may be restored by support.",
         },
       });
     } catch (error) {
-      console.error("Account deletion failed:", error);
-      setDeleteError("Unable to delete your account. Please try again.");
+      console.error("Account archive failed:", error);
+      setDeleteError("Unable to archive your account. Please try again.");
       setIsDeleting(false);
     }
   }
@@ -351,30 +247,21 @@ function AccountManagementPage() {
           </div>
         </article>
 
-        {/* ACCOUNT ACTIONS */}
+        {/* ACCOUNT ACTIONS — Archive only */}
         <article className="account-card account-actions-card">
           <div className="account-card-heading">
             <div>
-              <p className="account-card-label">ACCOUNT DEACTIVATION</p>
-              <h2>Deactivate your account</h2>
+              <p className="account-card-label">ACCOUNT ACTIONS</p>
+              <h2>Manage your account</h2>
             </div>
           </div>
 
           <div className="account-action-list">
             <AccountAction
-              icon={<DeactivateIcon />}
-              title="Deactivate Account"
-              description="Temporarily disable your shopper account while retaining your profile, saved outfits, and order information."
-              buttonLabel="Deactivate Account"
-              danger
-              onClick={openDeactivateModal}
-            />
-
-            <AccountAction
               icon={<DeleteIcon />}
-              title="Delete Account"
-              description="Permanently erase your account and personal data from active collections. Archived order records are retained only in pseudonymized form to comply with RA 10173."
-              buttonLabel="Delete Account"
+              title="Archive Account"
+              description="Archive your account and sign out. Your profile, saved outfits, and order history are retained for compliance and may be restored by support."
+              buttonLabel="Archive Account"
               danger
               onClick={openDeleteModal}
             />
@@ -410,147 +297,7 @@ function AccountManagementPage() {
         </article>
       </section>
 
-      {/* DEACTIVATION CONFIRMATION MODAL (FR-1.4) */}
-      {showDeactivateModal && (
-        <div
-          className="account-deactivate-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeDeactivateModal();
-            }
-          }}
-        >
-          <section
-            className="account-deactivate-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="deactivate-modal-title"
-            aria-describedby="deactivate-modal-description"
-          >
-            <button
-              type="button"
-              className="account-deactivate-close"
-              onClick={closeDeactivateModal}
-              aria-label="Close deactivation dialog"
-              disabled={isDeactivating}
-            >
-              ×
-            </button>
-
-            <div className="account-deactivate-icon">
-              <DeactivateIcon />
-            </div>
-
-            <p className="account-deactivate-eyebrow">ACCOUNT SECURITY</p>
-
-            <h2 id="deactivate-modal-title">Deactivate Your Account?</h2>
-
-            <p
-              id="deactivate-modal-description"
-              className="account-deactivate-description"
-            >
-              Your account will be temporarily deactivated.
-              Your profile information, saved outfits,
-              and order history will be retained for
-              future reactivation.
-            </p>
-
-            <div className="account-deactivate-warning">
-              <strong>Before you continue</strong>
-              <p>
-                You will be signed out of FitFusion AI.
-                Deactivation is enforced by the backend:
-                login and all API access are blocked until
-                your account is reactivated. Your data is
-                retained in compliance with RA 10173.
-              </p>
-            </div>
-
-            <fieldset className="account-deactivate-reasons">
-              <legend>Reason for deactivation *</legend>
-
-              {reasons.map((reason) => (
-                <label
-                  key={reason.value}
-                  className={`account-deactivate-reason ${
-                    deactivationReason === reason.value ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="deactivationReason"
-                    value={reason.value}
-                    checked={deactivationReason === reason.value}
-                    onChange={() => {
-                      setDeactivationReason(reason.value);
-                      setDeactivationError("");
-                    }}
-                  />
-                  <span>{reason.label}</span>
-                </label>
-              ))}
-
-              {deactivationReason === "Other" && (
-                <textarea
-                  className="account-deactivate-other"
-                  value={otherReason}
-                  onChange={(event) => {
-                    setOtherReason(event.target.value.slice(0, 300));
-                    setDeactivationError("");
-                  }}
-                  placeholder="Please specify your reason..."
-                  rows={3}
-                  maxLength={300}
-                  aria-label="Other deactivation reason"
-                />
-              )}
-            </fieldset>
-
-            <label className="account-deactivate-confirmation">
-              <input
-                type="checkbox"
-                checked={confirmationChecked}
-                onChange={(event) => {
-                  setConfirmationChecked(event.target.checked);
-                  setDeactivationError("");
-                }}
-              />
-              <span>
-                I understand that my account will be
-                temporarily deactivated and that I
-                will be signed out.
-              </span>
-            </label>
-
-            {deactivationError && (
-              <div className="account-deactivate-error" role="alert">
-                {deactivationError}
-              </div>
-            )}
-
-            <div className="account-deactivate-actions">
-              <button
-                type="button"
-                className="account-deactivate-cancel"
-                onClick={closeDeactivateModal}
-                disabled={isDeactivating}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="account-deactivate-submit"
-                onClick={handleDeactivateAccount}
-                disabled={!canDeactivate}
-              >
-                {isDeactivating ? "Deactivating..." : "Confirm Deactivation"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
+      {/* DELETE (ARCHIVE) CONFIRMATION MODAL */}
       {showDeleteModal && (
         <div
           className="account-deactivate-overlay"
@@ -583,20 +330,20 @@ function AccountManagementPage() {
 
             <p className="account-deactivate-eyebrow">DATA PRIVACY</p>
 
-            <h2 id="delete-modal-title">Delete Your Account?</h2>
+            <h2 id="delete-modal-title">Archive Your Account?</h2>
 
             <p id="delete-modal-description" className="account-deactivate-description">
-              This action permanently removes your account and active personal data.
-              Presets, saved outfits, and cart data are deleted immediately.
-              Archived order records are retained only in pseudonymized form to comply with RA 10173.
+              This action signs you out and archives your account.
+              Your profile, saved outfits, and order history are retained
+              in the database and may be restored by support.
             </p>
 
             <div className="account-deactivate-warning">
-              <strong>Warning</strong>
+              <strong>What happens next</strong>
               <p>
-                This cannot be undone. Your login session will end and your account
-                will be permanently removed from active collections. Only a restricted,
-                pseudonymized order archive remains.
+                You will no longer be able to log in. Your data is not
+                erased — it is archived for compliance with RA 10173.
+                Contact support to reactivate your account in the future.
               </p>
             </div>
 
@@ -610,8 +357,8 @@ function AccountManagementPage() {
                 }}
               />
               <span>
-                I understand this permanently deletes my account and removes active
-                personal data, and that archived orders remain only in pseudonymized form.
+                I understand my account will be archived, I will be signed out,
+                and I will not be able to log in until the account is restored.
               </span>
             </label>
 
@@ -635,9 +382,9 @@ function AccountManagementPage() {
                 type="button"
                 className="account-deactivate-submit"
                 onClick={handleDeleteAccount}
-                disabled={isDeleting}
+                disabled={!deleteConfirmed || isDeleting}
               >
-                {isDeleting ? "Deleting..." : "Confirm Delete"}
+                {isDeleting ? "Archiving..." : "Confirm Archive"}
               </button>
             </div>
           </section>
@@ -689,16 +436,6 @@ function LocationIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
       <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}
-
-function DeactivateIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3a9 9 0 1 0 9 9" />
-      <path d="M12 2v10" />
-      <path d="M16 3a9 9 0 0 1 5 5" />
     </svg>
   );
 }

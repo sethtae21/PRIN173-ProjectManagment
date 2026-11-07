@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
+from django.utils import timezone  # stamp the archive grace-window clock
 
 from rest_framework import status, generics
 from rest_framework.response import Response
@@ -16,9 +17,10 @@ from rest_framework_simplejwt.exceptions import TokenError
 from ..serializers.auth_serializers import RegistrationContactSerializer
 from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSerializer, PasswordChangeSerializer
 # ✅ FIXED: Import from auth_serializers instead of validators
-from accounts.serializers.auth_serializers import validate_password_strength 
+from accounts.serializers.auth_serializers import validate_password_strength
 from accounts.utils import generate_jwt_tokens, blacklist_refresh_token, is_token_blacklisted
 from accounts.models import User
+from accounts.archive import prune_expired_archived_users  # lazy 90-day sweep
 from commerce.models import Order
 
 logger = logging.getLogger(__name__)
@@ -100,6 +102,14 @@ class LoginView(APIView):
     serializer_class = LoginSerializer
 
     def post(self, request):
+        # Lazy, best-effort 90-day cold-relocation sweep. Runs on login so the
+        # capstone needs no cron; wrapped so housekeeping can NEVER block a
+        # login. (The standalone management command is the production path.)
+        try:
+            prune_expired_archived_users()
+        except Exception:  # noqa: BLE001
+            logger.exception("Archive prune failed during login (non-fatal).")
+
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
@@ -143,7 +153,12 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         })
 
     def destroy(self, request, *args, **kwargs):
-        """Delete account + cascade active data + pseudonymize archived orders (RA 10173)."""
+        """
+        FR-1.4 archive (grace window) — mirrors core.ProfileView.destroy:
+        flip status + is_active and stamp archived_at to start the 90-day
+        cold-relocation window. Linked data is left intact here; the prune
+        sweep relocates the profile to accounts_archiveduser after the window.
+        """
         user = self.get_object()
 
         refresh_raw = request.data.get('refresh')
@@ -153,28 +168,15 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
             except TokenError:
                 pass
 
-        # Preserve order archive while removing all active PII.
-        for order in Order.objects.filter(user=user):
-            order.user = None
-            order.recipient_name = ''
-            order.contact_number = ''
-            order.recipient_email = ''
-            order.shipping_address = ''
-            order.save(update_fields=[
-                'user', 'recipient_name', 'contact_number',
-                'recipient_email', 'shipping_address'
-            ])
+        user.status = 'archive'
+        user.is_active = False
+        user.archived_at = timezone.now()  # start the 90-day window
+        user.save(update_fields=['status', 'is_active', 'archived_at'])
 
-        try:
-            user.delete()  # CASCADE: presets, outfits, cart, and remaining active records
-        except Exception as e:
-            logger.error(f"Account deletion failed for user {request.user.id}: {e}")
-            return Response({
-                'success': False,
-                'detail': 'Account could not be deleted due to related records.'
-            }, status=status.HTTP_409_CONFLICT)
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'Your account has been archived. All your data is retained.',
+        }, status=status.HTTP_200_OK)
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -246,7 +248,12 @@ class PasswordChangeView(APIView):
 
 
 class DeactivateAccountView(APIView):
-    """FR-1.4 soft-delete: Sets is_active=False; retains records."""
+    """
+    FR-1.4 soft-delete: Sets is_active=False; retains records.
+    NOTE: the UI deactivate button has been REMOVED from both the shopper
+    and seller account pages. This endpoint is kept alive so any future
+    support/admin tooling can still deactivate accounts.
+    """
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
@@ -261,7 +268,6 @@ class DeactivateAccountView(APIView):
         user.is_active = False
         user.save(update_fields=['is_active'])
 
-        # Invalidate the session server-side
         refresh_raw = request.data.get('refresh')
         if refresh_raw:
             try:
@@ -271,5 +277,5 @@ class DeactivateAccountView(APIView):
 
         return Response({
             'success': True,
-            'message': 'Your seller account has been deactivated. Your store records and products are retained.'
+            'message': 'Your account has been deactivated. Your records are retained.',
         }, status=status.HTTP_200_OK)

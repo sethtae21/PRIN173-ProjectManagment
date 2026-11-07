@@ -5,6 +5,8 @@ so the checkout page can auto-fill delivery information.
 Traceability: SRS FR-1.2, FR-1.3
 """
 
+from django.utils import timezone  # stamp the archive grace-window clock
+
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,10 +24,15 @@ from commerce.models import CartItem, Order
 class ProfileView(generics.RetrieveUpdateDestroyAPIView):
     """
     FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
-    
+
     GET  /api/profile/         → returns full user data (including address fields)
     PATCH /api/profile/        → updates editable profile fields
-    DELETE /api/profile/       → hard-deletes the account (RA 10173 right to erasure)
+    DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                 is_active=False, archived_at=now. ALL linked
+                                 data is retained so support can restore within
+                                 90 days; the prune sweep (accounts/archive.py)
+                                 relocates the profile to accounts_archiveduser
+                                 after the window closes.
     """
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -57,7 +64,11 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         }, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
-        """FR-1.4: Hard-delete the account while pseudonymizing archived orders (RA 10173)."""
+        """
+        FR-1.4 archive (grace window): flip status + is_active and stamp
+        archived_at so the 90-day cold-relocation clock starts. No linked data
+        is touched here — that is the prune sweep's job after the window.
+        """
         user = self.get_object()
         refresh_raw = request.data.get('refresh')
         if refresh_raw:
@@ -66,26 +77,12 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
             except TokenError:
                 pass
 
-        for item in CatalogItem.objects.filter(seller=user):
-            CartItem.objects.filter(item=item).update(
-                item=None,
-                catalog_item_id=str(item.pk),
-                item_name=item.name,
-                store_name=item.store_name,
-                unavailable_reason="This item is unavailable because the seller’s account was deleted.",
-                seller_account_deleted=True,
-            )
+        user.status = 'archive'
+        user.is_active = False
+        user.archived_at = timezone.now()  # start the 90-day window
+        user.save(update_fields=['status', 'is_active', 'archived_at'])
 
-        for order in Order.objects.filter(user=user):
-            order.user = None
-            order.recipient_name = ''
-            order.contact_number = ''
-            order.recipient_email = ''
-            order.shipping_address = ''
-            order.save(update_fields=[
-                'user', 'recipient_name', 'contact_number',
-                'recipient_email', 'shipping_address'
-            ])
-
-        user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'Your account has been archived. All your data is retained.',
+        }, status=status.HTTP_200_OK)

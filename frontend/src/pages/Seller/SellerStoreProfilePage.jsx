@@ -1,40 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { authAPI, catalogAPI } from "../../services/api";
-import "../css/SellerStoreProfilePage.css";
+// EDIT 1: dropped catalogAPI (no longer used after removing the stats card)
+import { authAPI } from "../../services/api";
+// CHANGED: Import AccountManagement CSS to share the exact same UI design
+import "../css/AccountManagementPage.css";
+import "../css/SellerStoreProfilePage.css"; // Keeps your modal/form styles
 
 const PROVINCES = [
-  "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
-  "Albay", "Antique", "Apayao", "Aurora", "Basilan",
-  "Bataan", "Batanes", "Batangas", "Benguet", "Biliran",
-  "Bohol", "Bukidnon", "Bulacan", "Cagayan",
-  "Camarines Norte", "Camarines Sur", "Camiguin",
-  "Capiz", "Catanduanes", "Cavite", "Cebu", "Cotabato",
-  "Davao de Oro", "Davao del Norte", "Davao del Sur",
-  "Davao Occidental", "Davao Oriental", "Dinagat Islands",
-  "Eastern Samar", "Guimaras", "Ifugao", "Ilocos Norte",
-  "Ilocos Sur", "Iloilo", "Isabela", "Kalinga",
-  "La Union", "Laguna", "Lanao del Norte", "Lanao del Sur",
-  "Leyte", "Maguindanao del Norte", "Maguindanao del Sur",
-  "Marinduque", "Masbate", "Metro Manila",
-  "Misamis Occidental", "Misamis Oriental",
-  "Mountain Province", "Negros Occidental",
-  "Negros Oriental", "Northern Samar", "Nueva Ecija",
-  "Nueva Vizcaya", "Occidental Mindoro", "Oriental Mindoro",
-  "Palawan", "Pampanga", "Pangasinan", "Quezon",
-  "Quirino", "Rizal", "Romblon", "Samar", "Sarangani",
-  "Siquijor", "Sorsogon", "South Cotabato",
-  "Southern Leyte", "Sultan Kudarat", "Sulu",
-  "Surigao del Norte", "Surigao del Sur", "Tarlac",
-  "Tawi-Tawi", "Zambales", "Zamboanga del Norte",
-  "Zamboanga del Sur", "Zamboanga Sibugay",
-];
-
-const REASONS = [
-  ["Taking a break", "I want to take a break"],
-  ["Privacy or security concerns", "Privacy or security concerns"],
-  ["No longer using FitFusion AI", "I am no longer using FitFusion AI"],
-  ["Other", "Other reason"],
+  "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan", "Albay", "Antique", "Apayao", "Aurora", "Basilan",
+  "Bataan", "Batanes", "Batangas", "Benguet", "Biliran", "Bohol", "Bukidnon", "Bulacan", "Cagayan",
+  "Camarines Norte", "Camarines Sur", "Camiguin", "Capiz", "Catanduanes", "Cavite", "Cebu", "Cotabato",
+  "Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Occidental", "Davao Oriental", "Dinagat Islands",
+  "Eastern Samar", "Guimaras", "Ifugao", "Ilocos Norte", "Ilocos Sur", "Iloilo", "Isabela", "Kalinga",
+  "La Union", "Laguna", "Lanao del Norte", "Lanao del Sur", "Leyte", "Maguindanao del Norte", "Maguindanao del Sur",
+  "Marinduque", "Masbate", "Metro Manila", "Misamis Occidental", "Misamis Oriental", "Mountain Province", "Negros Occidental",
+  "Negros Oriental", "Northern Samar", "Nueva Ecija", "Nueva Vizcaya", "Occidental Mindoro", "Oriental Mindoro",
+  "Palawan", "Pampanga", "Pangasinan", "Quezon", "Quirino", "Rizal", "Romblon", "Samar", "Sarangani",
+  "Siquijor", "Sorsogon", "South Cotabato", "Southern Leyte", "Sultan Kudarat", "Sulu", "Surigao del Norte",
+  "Surigao del Sur", "Tarlac", "Tawi-Tawi", "Zambales", "Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay",
 ];
 
 const PASSWORD_RULES = [
@@ -57,41 +40,50 @@ function clearAuthStorage() {
 function formatJoinDate(value) {
   if (!value) return "Not available";
   try {
-    return new Date(value).toLocaleDateString("en-PH", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return "Not available";
-  }
+    return new Date(value).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  } catch { return "Not available"; }
 }
 
-function capitalizeRole(role) {
-  const value = String(role || "").trim();
-  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "Seller";
-}
-
+// CHANGED: Using AccountManagement's InformationRow structure
 function InformationRow({ label, value }) {
   return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value || "Not provided"}</dd>
+    <div className="account-information-row">
+      <span>{label}</span>
+      <strong>{value || "Not provided"}</strong>
     </div>
   );
 }
 
-function DeactivateIcon() {
+// ADDED: AccountManagement UI Components
+function AccountAction({ icon, title, description, buttonLabel, danger = false, onClick }) {
+  return (
+    <div className={`account-action-item ${danger ? "danger" : ""}`}>
+      <div className="account-action-icon">{icon}</div>
+      <div className="account-action-text">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+      <button type="button" className={`account-action-button ${danger ? "danger" : ""}`} onClick={onClick}>
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+function LocationIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M12 3a9 9 0 1 0 9 9M12 2v10M16 3a9 9 0 0 1 5 5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" /><path d="M14 11v6" />
     </svg>
   );
 }
@@ -102,116 +94,48 @@ function SellerStoreProfilePage() {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
-  const [stats, setStats] = useState({
-    total: 0,
-    approved: 0,
-    rejected: 0,
-  });
-
+  // EDIT 2: removed the `stats` state declaration (stats card deleted)
   const [notice, setNotice] = useState("");
 
-  /* Edit profile modal */
+  /* Edit profile modal (PRESERVED) */
   const [showEdit, setShowEdit] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: "",
-    store_name: "",
-    mobile: "",
-    street: "",
-    barangay: "",
-    city: "",
-    province: "",
-    postal_code: "",
-  });
+  const [editForm, setEditForm] = useState({ full_name: "", store_name: "", mobile: "", street: "", barangay: "", city: "", province: "", postal_code: "" });
   const [editErrors, setEditErrors] = useState({});
   const [editSaving, setEditSaving] = useState(false);
 
-  /* Change password modal */
+  /* Change password modal (PRESERVED) */
   const [showPassword, setShowPassword] = useState(false);
-  const [pwForm, setPwForm] = useState({
-    old_password: "",
-    new_password: "",
-    new_password_confirm: "",
-  });
-  const [visiblePasswords, setVisiblePasswords] = useState({
-    old_password: false,
-    new_password: false,
-    new_password_confirm: false,
-  });
+  const [pwForm, setPwForm] = useState({ old_password: "", new_password: "", new_password_confirm: "" });
+  const [visiblePasswords, setVisiblePasswords] = useState({ old_password: false, new_password: false, new_password_confirm: false });
   const [pwError, setPwError] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
 
-  /* Deactivate modal */
-  const [showDeactivate, setShowDeactivate] = useState(false);
-  const [reason, setReason] = useState("");
-  const [otherReason, setOtherReason] = useState("");
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [deactivateError, setDeactivateError] = useState("");
-  const [deactivating, setDeactivating] = useState(false);
+  /* CHANGED: Delete (Archive) modal replaces Deactivate */
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const validReason =
-    Boolean(reason) &&
-    (reason !== "Other" || Boolean(otherReason.trim()));
-
-  /* ---------- Load real profile + live stats ---------- */
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       setIsLoading(true);
       setLoadError("");
-
       try {
         const res = await authAPI.getProfile();
         const user = res?.user || res || {};
         if (!cancelled) setProfile(user);
-
-        try {
-          const prev = JSON.parse(
-            localStorage.getItem("fitfusion-current-user") || "{}"
-          );
-          localStorage.setItem(
-            "fitfusion-current-user",
-            JSON.stringify({ ...prev, ...user })
-          );
-        } catch {
-          // non-critical
-        }
       } catch (err) {
-        console.error("Profile load failed:", err);
-        if (!cancelled) {
-          setLoadError(
-            "Could not load your profile. Please try again."
-          );
-        }
+        if (!cancelled) setLoadError("Could not load your profile.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
 
-      try {
-        const listings = await catalogAPI.myListings();
-        const list = Array.isArray(listings) ? listings : [];
-        if (!cancelled) {
-          setStats({
-            total: list.length,
-            approved: list.filter(
-              (item) => String(item.status).toLowerCase() === "active"
-            ).length,
-            rejected: list.filter(
-              (item) => String(item.status).toLowerCase() === "rejected"
-            ).length,
-          });
-        }
-      } catch {
-        // stats are secondary; keep zeros on failure
-      }
+      // EDIT 3: removed the entire listings/stats fetch try/catch block
+      // (it only fed the now-deleted Store Statistics card).
     }
-
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   function showNotice(message) {
@@ -219,18 +143,13 @@ function SellerStoreProfilePage() {
     window.setTimeout(() => setNotice(""), 4000);
   }
 
-  /* ---------- Edit profile ---------- */
+  /* ---------- Edit profile (PRESERVED) ---------- */
   function openEdit() {
     if (!profile) return;
     setEditForm({
-      full_name: profile.full_name || "",
-      store_name: profile.store_name || "",
-      mobile: profile.mobile || "",
-      street: profile.street || "",
-      barangay: profile.barangay || "",
-      city: profile.city || "",
-      province: profile.province || "",
-      postal_code: profile.postal_code || "",
+      full_name: profile.full_name || "", store_name: profile.store_name || "", mobile: profile.mobile || "",
+      street: profile.street || "", barangay: profile.barangay || "", city: profile.city || "",
+      province: profile.province || "", postal_code: profile.postal_code || "",
     });
     setEditErrors({});
     setShowEdit(true);
@@ -244,34 +163,15 @@ function SellerStoreProfilePage() {
 
   function validateEdit() {
     const nextErrors = {};
-
-    if (!editForm.full_name.trim()) {
-      nextErrors.full_name = "Full name is required.";
-    }
-    if (!editForm.store_name.trim()) {
-      nextErrors.store_name = "Store name is required.";
-    }
-    if (!/^\d{11}$/.test(editForm.mobile)) {
-      nextErrors.mobile = "Mobile number must contain exactly 11 digits.";
-    } else if (!editForm.mobile.startsWith("09")) {
-      nextErrors.mobile = "Philippine mobile number must start with 09.";
-    }
-    if (!editForm.street.trim()) {
-      nextErrors.street = "Store address is required.";
-    }
-    if (!editForm.barangay.trim()) {
-      nextErrors.barangay = "Barangay is required.";
-    }
-    if (!editForm.city.trim()) {
-      nextErrors.city = "City or municipality is required.";
-    }
-    if (!editForm.province) {
-      nextErrors.province = "Please select your province.";
-    }
-    if (!/^\d{4}$/.test(editForm.postal_code)) {
-      nextErrors.postal_code = "Postal code must contain exactly 4 digits.";
-    }
-
+    if (!editForm.full_name.trim()) nextErrors.full_name = "Full name is required.";
+    if (!editForm.store_name.trim()) nextErrors.store_name = "Store name is required.";
+    if (!/^\d{11}$/.test(editForm.mobile)) nextErrors.mobile = "Mobile number must contain exactly 11 digits.";
+    else if (!editForm.mobile.startsWith("09")) nextErrors.mobile = "Philippine mobile number must start with 09.";
+    if (!editForm.street.trim()) nextErrors.street = "Store address is required.";
+    if (!editForm.barangay.trim()) nextErrors.barangay = "Barangay is required.";
+    if (!editForm.city.trim()) nextErrors.city = "City or municipality is required.";
+    if (!editForm.province) nextErrors.province = "Please select your province.";
+    if (!/^\d{4}$/.test(editForm.postal_code)) nextErrors.postal_code = "Postal code must contain exactly 4 digits.";
     setEditErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -279,835 +179,228 @@ function SellerStoreProfilePage() {
   async function submitEdit(event) {
     event.preventDefault();
     if (!validateEdit()) return;
-
     setEditSaving(true);
     try {
       const res = await authAPI.updateProfile(editForm);
       const updated = res?.user || res;
-
       setProfile(updated);
-
-      try {
-        const prev = JSON.parse(
-          localStorage.getItem("fitfusion-current-user") || "{}"
-        );
-        localStorage.setItem(
-          "fitfusion-current-user",
-          JSON.stringify({ ...prev, ...updated })
-        );
-      } catch {
-        // non-critical
-      }
-
       setShowEdit(false);
       showNotice("Profile updated successfully.");
     } catch (err) {
-      console.error("Profile update failed:", err);
-      let message = "Update failed. Please try again.";
-      try {
-        const data = JSON.parse(err.message);
-        const firstKey = Object.keys(data)[0];
-        if (firstKey) {
-          message = `${firstKey}: ${
-            Array.isArray(data[firstKey]) ? data[firstKey][0] : data[firstKey]
-          }`;
-        }
-      } catch {
-        // keep default message
-      }
-      setEditErrors({ form: message });
+      setEditErrors({ form: "Update failed. Please try again." });
     } finally {
       setEditSaving(false);
     }
   }
 
-  /* ---------- Change password ---------- */
-  function openPassword() {
-    setShowEdit(false);
-    setPwForm({
-      old_password: "",
-      new_password: "",
-      new_password_confirm: "",
-    });
-    setPwError("");
-    setShowPassword(true);
-  }
-
-  function closePassword() {
-    setShowPassword(false);
-    setShowEdit(true);
-  }
-
-  function togglePasswordVisibility(name) {
-    setVisiblePasswords((current) => ({
-      ...current,
-      [name]: !current[name],
-    }));
-  }
-
-  function handlePwChange(event) {
-    const { name, value } = event.target;
-    setPwForm((current) => ({ ...current, [name]: value }));
-    setPwError("");
-  }
+  /* ---------- Change password (PRESERVED) ---------- */
+  function openPassword() { setShowEdit(false); setPwForm({ old_password: "", new_password: "", new_password_confirm: "" }); setPwError(""); setShowPassword(true); }
+  function closePassword() { setShowPassword(false); setShowEdit(true); }
+  function togglePasswordVisibility(name) { setVisiblePasswords((current) => ({ ...current, [name]: !current[name] })); }
+  function handlePwChange(event) { const { name, value } = event.target; setPwForm((current) => ({ ...current, [name]: value })); setPwError(""); }
 
   async function submitPassword(event) {
     event.preventDefault();
-
-    const failedRules = PASSWORD_RULES.filter(
-      (rule) => !rule.test(pwForm.new_password)
-    );
-
-    if (failedRules.length > 0) {
-      setPwError(
-        `New password must include ${failedRules
-          .map((rule) => rule.label)
-          .join(", ")}.`
-      );
-      return;
-    }
-
-    if (pwForm.new_password !== pwForm.new_password_confirm) {
-      setPwError("Passwords do not match.");
-      return;
-    }
-
+    const failedRules = PASSWORD_RULES.filter((rule) => !rule.test(pwForm.new_password));
+    if (failedRules.length > 0) { setPwError(`New password must include ${failedRules.map((rule) => rule.label).join(", ")}.`); return; }
+    if (pwForm.new_password !== pwForm.new_password_confirm) { setPwError("Passwords do not match."); return; }
     setPwSaving(true);
     try {
       await authAPI.changePassword(pwForm);
       clearAuthStorage();
       window.location.href = "/login";
     } catch (err) {
-      console.error("Password change failed:", err);
-      let message = "Password change failed. Please try again.";
-      try {
-        const data = JSON.parse(err.message);
-        if (data.old_password) {
-          message = Array.isArray(data.old_password)
-            ? data.old_password[0]
-            : data.old_password;
-        } else if (data.new_password) {
-          message = Array.isArray(data.new_password)
-            ? data.new_password[0]
-            : data.new_password;
-        } else if (data.non_field_errors) {
-          message = data.non_field_errors[0];
-        } else if (data.detail) {
-          message = data.detail;
-        }
-      } catch {
-        // keep default message
-      }
-      setPwError(message);
+      setPwError("Password change failed. Please try again.");
     } finally {
       setPwSaving(false);
     }
   }
 
-  /* ---------- Deactivate account ---------- */
-  function openDeactivate() {
-    setReason("");
-    setOtherReason("");
-    setAcknowledged(false);
-    setDeactivateError("");
-    setShowDeactivate(true);
-  }
+  /* ---------- CHANGED: Delete (Archive) Account ---------- */
+  function openDeleteModal() { setDeleteConfirmed(false); setDeleteError(""); setShowDeleteModal(true); }
+  function closeDeleteModal() { if (isDeleting) return; setShowDeleteModal(false); setDeleteConfirmed(false); setDeleteError(""); }
 
-  function closeDeactivate() {
-    setShowDeactivate(false);
-    setDeactivateError("");
-  }
-
-  async function confirmDeactivate() {
-    if (!validReason) {
-      setDeactivateError("Please select a reason for deactivation.");
-      return;
-    }
-    if (!acknowledged) {
-      setDeactivateError("Please acknowledge the deactivation notice.");
-      return;
-    }
-
-    setDeactivating(true);
+  async function handleDeleteAccount() {
+    if (!deleteConfirmed) { setDeleteError("Please confirm that you want to archive your account."); return; }
+    if (isDeleting) return;
+    setIsDeleting(true);
     try {
-      await authAPI.deactivateAccount({
-        reason: reason === "Other" ? otherReason.trim() : reason,
-        refresh: localStorage.getItem("refresh_token") || "",
-      });
-
+      const refresh = localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh_token") || "";
+      await authAPI.deleteAccount(refresh);
       clearAuthStorage();
-      window.location.href = "/";
+      window.location.href = "/login";
     } catch (err) {
-      console.error("Deactivation failed:", err);
-      setDeactivateError("Deactivation failed. Please try again.");
-      setDeactivating(false);
+      setDeleteError("Unable to archive your account. Please try again.");
+      setIsDeleting(false);
     }
-  }
-
-  /* ---------- Logout ---------- */
-  async function logout() {
-    try {
-      await authAPI.logout(localStorage.getItem("refresh_token"));
-    } catch {
-      // ignore logout API failures; clear locally anyway
-    }
-    clearAuthStorage();
-    navigate("/login", { replace: true });
   }
 
   /* ---------- Render states ---------- */
-  if (isLoading) {
-    return (
-      <main className="seller-store-profile-page">
-        <div className="seller-store-profile-body">
-          <section className="seller-store-profile-introduction">
-            <p className="seller-store-profile-label">
-              SELLER STORE PROFILE
-            </p>
-            <h1>Loading…</h1>
-            <p>Fetching your account information from the server.</p>
-          </section>
-        </div>
-      </main>
-    );
-  }
+  if (isLoading) return <main className="account-page"><section className="account-page-introduction"><p className="account-page-eyebrow">SELLER STORE PROFILE</p><h1>Loading…</h1></section></main>;
+  if (loadError || !profile) return <main className="account-page"><section className="account-page-introduction"><p className="account-page-eyebrow">SELLER STORE PROFILE</p><h1>Unavailable</h1><p>{loadError}</p><button className="account-primary-button" onClick={() => window.location.reload()}>Retry</button></section></main>;
 
-  if (loadError || !profile) {
-    return (
-      <main className="seller-store-profile-page">
-        <div className="seller-store-profile-body">
-          <section className="seller-store-profile-introduction">
-            <p className="seller-store-profile-label">
-              SELLER STORE PROFILE
-            </p>
-            <h1>Unavailable</h1>
-            <p>{loadError || "Profile could not be loaded."}</p>
-            <button
-              type="button"
-              className="seller-profile-primary-button"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
-          </section>
-        </div>
-      </main>
-    );
-  }
+  const completeAddress = [profile.street, profile.barangay, profile.city, profile.province, profile.postal_code].filter(Boolean).join(", ");
 
   return (
-    <main className="seller-store-profile-page">
-      <div
-        className="seller-store-profile-body"
-        hidden={showEdit || showPassword}
-      >
-        {/* PAGE INTRODUCTION */}
-        <section className="seller-store-profile-introduction">
-          <p className="seller-store-profile-label">
-            SELLER STORE PROFILE
-          </p>
+    <main className="account-page">
+      <section className="account-page-introduction">
+        <p className="account-page-eyebrow">SELLER STORE PROFILE</p>
+        <h1>{profile.store_name || "My Store"}</h1>
+        <p className="account-page-description">View and manage your personal information, business address, store details, and account security.</p>
+      </section>
 
-          <h1>{profile.store_name || "My Store"}</h1>
+      {notice && <p className="seller-profile-notice" role="status">{notice}</p>}
 
-          <p>
-            View and manage your personal information,
-            business address, store details, and account security.
-          </p>
-        </section>
+      {/* CHANGED: Using AccountManagementPage grid and card classes */}
+      <section className="account-page-grid">
 
-        {notice && (
-          <p className="seller-profile-notice" role="status">
-            {notice}
-          </p>
-        )}
-
-        {/* PROFILE GRID */}
-        <section className="seller-store-profile-grid">
-          {/* SELLER ACCOUNT INFORMATION */}
-          <article className="seller-profile-card seller-profile-account-card">
-            <h2>Seller Account Information</h2>
-
-            <dl className="seller-profile-details">
-              <InformationRow
-                label="Full Name"
-                value={profile.full_name}
-              />
-
-              <InformationRow
-                label="Member Since"
-                value={formatJoinDate(profile.date_joined)}
-              />
-
-              <InformationRow
-                label="Email"
-                value={profile.email}
-              />
-
-              <InformationRow
-                label="Mobile Number"
-                value={profile.mobile}
-              />
-
-              <InformationRow
-                label="Assigned Role"
-                value={capitalizeRole(profile.role)}
-              />
-
-              <InformationRow
-                label="Store Name"
-                value={profile.store_name}
-              />
-            </dl>
-
-            <div className="seller-profile-actions">
-              <button
-                type="button"
-                className="seller-profile-primary-button"
-                onClick={openEdit}
-              >
-                Edit Store Profile
-              </button>
-
+        {/* PROFILE DETAILS CARD */}
+        <article className="account-card account-profile-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">PROFILE DETAILS</p>
+              <h2>Store information</h2>
             </div>
-          </article>
+            <button type="button" className="account-primary-button" onClick={openEdit}>Edit Store Profile</button>
+          </div>
+          <div className="account-information-list">
+            <InformationRow label="Full Name" value={profile.full_name} />
+            <InformationRow label="Member Since" value={formatJoinDate(profile.date_joined)} />
+            <InformationRow label="Email Address" value={profile.email} />
+            <InformationRow label="Mobile Number" value={profile.mobile} />
+            <InformationRow label="Store Name" value={profile.store_name} />
+          </div>
+        </article>
 
-          {/* STORE ADDRESS */}
-          <article className="seller-profile-card seller-profile-address-card">
-            <h2>Store Address</h2>
-
-            <dl className="seller-profile-details">
-              <InformationRow
-                label="Store Address"
-                value={profile.street}
-              />
-
-              <InformationRow
-                label="Barangay"
-                value={profile.barangay}
-              />
-
-              <InformationRow
-                label="City / Municipality"
-                value={profile.city}
-              />
-
-              <InformationRow
-                label="Province"
-                value={profile.province}
-              />
-
-              <InformationRow
-                label="Postal Code"
-                value={profile.postal_code}
-              />
-            </dl>
-          </article>
-
-          {/* PRIVACY AND ACCOUNT ACTIONS */}
-          <article className="seller-profile-card seller-profile-privacy-card">
-            <h2>Privacy & Account Actions</h2>
-
-            <div className="seller-profile-statistics">
-              <p>
-                <span>Owned Listings</span>
-                <strong>{stats.total}</strong>
-              </p>
-
-              <p>
-                <span>Approved Uploads</span>
-                <strong>{stats.approved}</strong>
-              </p>
-
-              <p>
-                <span>Rejected Uploads</span>
-                <strong>{stats.rejected}</strong>
-              </p>
+        {/* ACCOUNT ACTIONS CARD (Archive Only) */}
+        <article className="account-card account-actions-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">ACCOUNT ACTIONS</p>
+              <h2>Manage your account</h2>
             </div>
+          </div>
+          <div className="account-action-list">
+            <AccountAction
+              icon={<DeleteIcon />}
+              title="Archive Account"
+              description="Archive your seller account and sign out. Your store information, product listings, and report records are retained and may be restored by support."
+              buttonLabel="Archive Account"
+              danger
+              onClick={openDeleteModal}
+            />
+          </div>
+        </article>
 
-            <p className="seller-profile-warning">
-              Deactivating your seller account will
-              temporarily disable access. Your store
-              information, uploaded products, and
-              report records will be retained.
-            </p>
+        {/* EDIT 4: the entire Store Statistics / "Listing overview" <article> block was deleted here. */}
 
-            <div className="seller-profile-danger-actions">
-              <button
-                type="button"
-                className="seller-profile-deactivate-button"
-                onClick={openDeactivate}
-              >
-                Deactivate Seller Account
-              </button>
-
-              <button
-                type="button"
-                className="seller-profile-logout-button"
-                onClick={logout}
-              >
-                Logout
-              </button>
+        {/* STORE ADDRESS CARD */}
+        <article className="account-card account-address-card">
+          <div className="account-card-heading">
+            <div>
+              <p className="account-card-label">STORE ADDRESS</p>
+              <h2>Business address</h2>
             </div>
-          </article>
-        </section>
-      </div>
+          </div>
+          <div className="account-address-content">
+            <div className="account-address-icon"><LocationIcon /></div>
+            <div>
+              <strong>Business address</strong>
+              <p>{completeAddress || "Not provided"}</p>
+            </div>
+          </div>
+          <div className="account-address-details">
+            <InformationRow label="Street Address" value={profile.street} />
+            <InformationRow label="Barangay / City" value={`${profile.barangay || ""}, ${profile.city || ""}`} />
+            <InformationRow label="Province" value={profile.province} />
+            <InformationRow label="Postal Code" value={profile.postal_code} />
+          </div>
+        </article>
+      </section>
 
-      {/* EDIT STORE PROFILE */}
+      {/* PRESERVED: EDIT STORE PROFILE MODAL */}
       {showEdit && (
         <div className="seller-profile-edit-page-overlay">
-          <form
-            className="seller-profile-modal seller-profile-edit-modal"
-            onSubmit={submitEdit}
-            noValidate
-          >
-            <button
-              type="button"
-              className="seller-profile-edit-back"
-              onClick={() => setShowEdit(false)}
-            >
-              ← Back to Store Profile
-            </button>
-
-            <p className="seller-store-profile-label">
-              PROFILE DETAILS
-            </p>
-
+          <form className="seller-profile-modal seller-profile-edit-modal" onSubmit={submitEdit} noValidate>
+            <button type="button" className="seller-profile-edit-back" onClick={() => setShowEdit(false)}>← Back to Store Profile</button>
+            <p className="seller-store-profile-label">PROFILE DETAILS</p>
             <h2>Edit Store Profile</h2>
-
-            <p className="seller-profile-modal-description">
-              Changes are saved directly to your seller
-              account in the database.
-            </p>
-
+            <p className="seller-profile-modal-description">Changes are saved directly to your seller account in the database.</p>
             <div className="seller-profile-form-grid">
-              <p className="seller-profile-form-section">
-                PERSONAL INFORMATION
-              </p>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Full Name
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="full_name"
-                value={editForm.full_name}
-                onChange={handleEditChange}
-              />
-              {editErrors.full_name && (
-                <small className="seller-profile-form-error">
-                  {editErrors.full_name}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Store Name
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="store_name"
-                value={editForm.store_name}
-                onChange={handleEditChange}
-              />
-              {editErrors.store_name && (
-                <small className="seller-profile-form-error">
-                  {editErrors.store_name}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Mobile Number
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="tel"
-                name="mobile"
-                value={editForm.mobile}
-                onChange={handleEditChange}
-                maxLength={11}
-              />
-              {editErrors.mobile && (
-                <small className="seller-profile-form-error">
-                  {editErrors.mobile}
-                </small>
-              )}
-            </label>
-
-              <p className="seller-profile-form-section">
-                STORE ADDRESS
-              </p>
-
-            <label className="seller-profile-field full">
-              <span className="seller-store-profile-label">
-                Store Address
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="street"
-                value={editForm.street}
-                onChange={handleEditChange}
-              />
-              {editErrors.street && (
-                <small className="seller-profile-form-error">
-                  {editErrors.street}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Barangay
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="barangay"
-                value={editForm.barangay}
-                onChange={handleEditChange}
-              />
-              {editErrors.barangay && (
-                <small className="seller-profile-form-error">
-                  {editErrors.barangay}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                City / Municipality
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="city"
-                value={editForm.city}
-                onChange={handleEditChange}
-              />
-              {editErrors.city && (
-                <small className="seller-profile-form-error">
-                  {editErrors.city}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Province
-              </span>
-              <select
-                className="seller-profile-deactivate-other"
-                name="province"
-                value={editForm.province}
-                onChange={handleEditChange}
-              >
-                <option value="">Select your province</option>
-                {PROVINCES.map((province) => (
-                  <option key={province} value={province}>
-                    {province}
-                  </option>
-                ))}
-              </select>
-              {editErrors.province && (
-                <small className="seller-profile-form-error">
-                  {editErrors.province}
-                </small>
-              )}
-            </label>
-
-            <label className="seller-profile-field">
-              <span className="seller-store-profile-label">
-                Postal Code
-              </span>
-              <input
-                className="seller-profile-deactivate-other"
-                type="text"
-                name="postal_code"
-                value={editForm.postal_code}
-                onChange={handleEditChange}
-                maxLength={4}
-              />
-              {editErrors.postal_code && (
-                <small className="seller-profile-form-error">
-                  {editErrors.postal_code}
-                </small>
-              )}
-            </label>
+              <p className="seller-profile-form-section">PERSONAL INFORMATION</p>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Full Name</span><input className="seller-profile-deactivate-other" type="text" name="full_name" value={editForm.full_name} onChange={handleEditChange} />{editErrors.full_name && <small className="seller-profile-form-error">{editErrors.full_name}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Store Name</span><input className="seller-profile-deactivate-other" type="text" name="store_name" value={editForm.store_name} onChange={handleEditChange} />{editErrors.store_name && <small className="seller-profile-form-error">{editErrors.store_name}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Mobile Number</span><input className="seller-profile-deactivate-other" type="tel" name="mobile" value={editForm.mobile} onChange={handleEditChange} maxLength={11} />{editErrors.mobile && <small className="seller-profile-form-error">{editErrors.mobile}</small>}</label>
+              <p className="seller-profile-form-section">STORE ADDRESS</p>
+              <label className="seller-profile-field full"><span className="seller-store-profile-label">Store Address</span><input className="seller-profile-deactivate-other" type="text" name="street" value={editForm.street} onChange={handleEditChange} />{editErrors.street && <small className="seller-profile-form-error">{editErrors.street}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Barangay</span><input className="seller-profile-deactivate-other" type="text" name="barangay" value={editForm.barangay} onChange={handleEditChange} />{editErrors.barangay && <small className="seller-profile-form-error">{editErrors.barangay}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">City / Municipality</span><input className="seller-profile-deactivate-other" type="text" name="city" value={editForm.city} onChange={handleEditChange} />{editErrors.city && <small className="seller-profile-form-error">{editErrors.city}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Province</span><select className="seller-profile-deactivate-other" name="province" value={editForm.province} onChange={handleEditChange}><option value="">Select your province</option>{PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}</select>{editErrors.province && <small className="seller-profile-form-error">{editErrors.province}</small>}</label>
+              <label className="seller-profile-field"><span className="seller-store-profile-label">Postal Code</span><input className="seller-profile-deactivate-other" type="text" name="postal_code" value={editForm.postal_code} onChange={handleEditChange} maxLength={4} />{editErrors.postal_code && <small className="seller-profile-form-error">{editErrors.postal_code}</small>}</label>
             </div>
-
-            {editErrors.form && (
-              <p className="seller-profile-form-error" role="alert">
-                {editErrors.form}
-              </p>
-            )}
-
+            {editErrors.form && <p className="seller-profile-form-error" role="alert">{editErrors.form}</p>}
             <div className="seller-profile-modal-actions seller-profile-edit-actions">
-              <button
-                type="button"
-                className="seller-profile-secondary-button"
-                onClick={() => setShowEdit(false)}
-                disabled={editSaving}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="seller-profile-secondary-button"
-                onClick={openPassword}
-                disabled={editSaving}
-              >
-                Change Password
-              </button>
-
-              <button
-                type="submit"
-                className="seller-profile-primary-button"
-                disabled={editSaving}
-              >
-                {editSaving ? "Saving…" : "Save Changes"}
-              </button>
+              <button type="button" className="seller-profile-secondary-button" onClick={() => setShowEdit(false)} disabled={editSaving}>Cancel</button>
+              <button type="button" className="seller-profile-secondary-button" onClick={openPassword} disabled={editSaving}>Change Password</button>
+              <button type="submit" className="seller-profile-primary-button" disabled={editSaving}>{editSaving ? "Saving…" : "Save Changes"}</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* CHANGE PASSWORD PAGE */}
+      {/* PRESERVED: CHANGE PASSWORD MODAL */}
       {showPassword && (
         <div className="seller-profile-edit-page-overlay">
-          <form
-            className="seller-profile-modal seller-profile-edit-modal seller-profile-password-page"
-            onSubmit={submitPassword}
-            noValidate
-          >
-            <button
-              type="button"
-              className="seller-profile-edit-back"
-              onClick={closePassword}
-            >
-              ← Back to Edit Store Profile
-            </button>
-
-            <p className="seller-store-profile-label">
-              ACCOUNT SECURITY
-            </p>
-
+          <form className="seller-profile-modal seller-profile-edit-modal seller-profile-password-page" onSubmit={submitPassword} noValidate>
+            <button type="button" className="seller-profile-edit-back" onClick={closePassword}>← Back to Edit Store Profile</button>
+            <p className="seller-store-profile-label">ACCOUNT SECURITY</p>
             <h2>Change Password</h2>
-
-            <p className="seller-profile-modal-description">
-              Enter your current password and create a secure new password.
-            </p>
-
+            <p className="seller-profile-modal-description">Enter your current password and create a secure new password.</p>
             <div className="seller-profile-password-fields">
-              {[
-                ["old_password", "Current Password", "current-password"],
-                ["new_password", "New Password", "new-password"],
-                ["new_password_confirm", "Confirm New Password", "new-password"],
-              ].map(([name, label, autoComplete]) => (
+              {[["old_password", "Current Password", "current-password"], ["new_password", "New Password", "new-password"], ["new_password_confirm", "Confirm New Password", "new-password"]].map(([name, label, autoComplete]) => (
                 <label className="seller-profile-field" key={name}>
-                  <span className="seller-store-profile-label">
-                    {label}
-                  </span>
+                  <span className="seller-store-profile-label">{label}</span>
                   <div className="seller-profile-password-input">
-                    <input
-                      type={visiblePasswords[name] ? "text" : "password"}
-                      name={name}
-                      value={pwForm[name]}
-                      onChange={handlePwChange}
-                      autoComplete={autoComplete}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility(name)}
-                      aria-label={`${visiblePasswords[name] ? "Hide" : "Show"} ${label}`}
-                    >
-                      {visiblePasswords[name] ? "Hide" : "Show"}
-                    </button>
+                    <input type={visiblePasswords[name] ? "text" : "password"} name={name} value={pwForm[name]} onChange={handlePwChange} autoComplete={autoComplete} />
+                    <button type="button" onClick={() => togglePasswordVisibility(name)}>{visiblePasswords[name] ? "Hide" : "Show"}</button>
                   </div>
                 </label>
               ))}
             </div>
-
             <section className="seller-profile-password-rules">
               <strong>Password requirements</strong>
-              {PASSWORD_RULES.map((rule) => {
-                const passed = rule.test(pwForm.new_password);
-
-                return (
-                  <p className={passed ? "passed" : ""} key={rule.label}>
-                    <span aria-hidden="true">{passed ? "✓" : "○"}</span>
-                    Include {rule.label}.
-                  </p>
-                );
-              })}
+              {PASSWORD_RULES.map((rule) => { const passed = rule.test(pwForm.new_password); return (<p className={passed ? "passed" : ""} key={rule.label}><span>{passed ? "✓" : "○"}</span> Include {rule.label}.</p>); })}
             </section>
-
-            {pwError && (
-              <p className="seller-profile-form-error" role="alert">
-                {pwError}
-              </p>
-            )}
-
+            {pwError && <p className="seller-profile-form-error" role="alert">{pwError}</p>}
             <div className="seller-profile-modal-actions">
-              <button
-                type="button"
-                className="seller-profile-secondary-button"
-                onClick={closePassword}
-                disabled={pwSaving}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="seller-profile-primary-button"
-                disabled={pwSaving}
-              >
-                {pwSaving ? "Updating…" : "Update Password"}
-              </button>
+              <button type="button" className="seller-profile-secondary-button" onClick={closePassword} disabled={pwSaving}>Cancel</button>
+              <button type="submit" className="seller-profile-primary-button" disabled={pwSaving}>{pwSaving ? "Updating…" : "Update Password"}</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* DEACTIVATION CONFIRMATION POPUP */}
-      {showDeactivate && (
-        <div
-          className="seller-profile-modal-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeDeactivate();
-            }
-          }}
-        >
-          <section
-            className="seller-profile-modal seller-profile-deactivate-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="seller-deactivate-title"
-          >
-            <button
-              type="button"
-              className="seller-profile-modal-close"
-              onClick={closeDeactivate}
-              aria-label="Close dialog"
-            >
-              ×
-            </button>
-
-            <div className="seller-profile-deactivate-icon">
-              <DeactivateIcon />
+      {/* CHANGED: DELETE (ARCHIVE) MODAL (Replaces Deactivate) */}
+      {showDeleteModal && (
+        <div className="account-deactivate-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closeDeleteModal(); }}>
+          <section className="account-deactivate-modal" role="dialog" aria-modal="true">
+            <button type="button" className="account-deactivate-close" onClick={closeDeleteModal} disabled={isDeleting}>×</button>
+            <div className="account-deactivate-icon"><DeleteIcon /></div>
+            <p className="account-deactivate-eyebrow">DATA PRIVACY</p>
+            <h2>Archive Your Seller Account?</h2>
+            <p className="account-deactivate-description">This action signs you out and archives your seller account. Your store information, product listings, and report records are retained and may be restored by support.</p>
+            <div className="account-deactivate-warning">
+              <strong>What happens next</strong>
+              <p>You will no longer be able to log in. Your store data is not erased — it is archived for compliance with RA 10173. Contact support to reactivate your account in the future.</p>
             </div>
-
-            <p className="seller-store-profile-label">
-              ACCOUNT SECURITY
-            </p>
-
-            <h2 id="seller-deactivate-title">
-              Deactivate Your Seller Account?
-            </h2>
-
-            <p className="seller-profile-modal-description">
-              Your seller account will be marked as
-              deactivated and you will be signed out.
-              Your store records and products will not
-              be deleted.
-            </p>
-
-            <div className="seller-profile-deactivate-warning">
-              <strong>Before you continue</strong>
-
-              <p>
-                Deactivation is enforced by the backend:
-                login and all API access will be blocked
-                until the account is reactivated by support.
-              </p>
-            </div>
-
-            <fieldset className="seller-profile-deactivate-reasons">
-              <legend>Reason for deactivation *</legend>
-
-              {REASONS.map(([value, label]) => (
-                <label
-                  key={value}
-                  className={`seller-profile-deactivate-reason ${
-                    reason === value ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="deactivationReason"
-                    value={value}
-                    checked={reason === value}
-                    onChange={() => {
-                      setReason(value);
-                      setDeactivateError("");
-                    }}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-
-              {reason === "Other" && (
-                <textarea
-                  className="seller-profile-deactivate-other"
-                  value={otherReason}
-                  onChange={(event) => {
-                    setOtherReason(event.target.value.slice(0, 300));
-                    setDeactivateError("");
-                  }}
-                  placeholder="Please specify your reason..."
-                  rows={3}
-                  maxLength={300}
-                />
-              )}
-            </fieldset>
-
-            <label className="seller-profile-deactivate-confirmation">
-              <input
-                type="checkbox"
-                checked={acknowledged}
-                onChange={(event) => {
-                  setAcknowledged(event.target.checked);
-                  setDeactivateError("");
-                }}
-              />
-              <span>
-                I understand that my seller account will be
-                deactivated and I will be signed out.
-              </span>
+            <label className="account-deactivate-confirmation">
+              <input type="checkbox" checked={deleteConfirmed} onChange={(e) => { setDeleteConfirmed(e.target.checked); setDeleteError(""); }} />
+              <span>I understand my seller account will be archived, I will be signed out, and I will not be able to log in until the account is restored.</span>
             </label>
-
-            {deactivateError && (
-              <p className="seller-profile-form-error" role="alert">
-                {deactivateError}
-              </p>
-            )}
-
-            <div className="seller-profile-modal-actions">
-              <button
-                type="button"
-                className="seller-profile-secondary-button"
-                onClick={closeDeactivate}
-                disabled={deactivating}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="seller-profile-deactivate-button"
-                disabled={!validReason || !acknowledged || deactivating}
-                onClick={confirmDeactivate}
-              >
-                {deactivating ? "Deactivating…" : "Confirm Deactivation"}
-              </button>
+            {deleteError && <div className="account-deactivate-error" role="alert">{deleteError}</div>}
+            <div className="account-deactivate-actions">
+              <button type="button" className="account-deactivate-cancel" onClick={closeDeleteModal} disabled={isDeleting}>Cancel</button>
+              <button type="button" className="account-deactivate-submit" onClick={handleDeleteAccount} disabled={!deleteConfirmed || isDeleting}>{isDeleting ? "Archiving..." : "Confirm Archive"}</button>
             </div>
           </section>
         </div>

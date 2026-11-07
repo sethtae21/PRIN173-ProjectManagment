@@ -17,18 +17,16 @@ class UserSerializer(serializers.ModelSerializer):
     """
     
     # ⭐ CRITICAL FIX: MongoDB ObjectId PK must serialize as a STRING, not int.
-    # Without this, DRF auto-maps the PK to IntegerField and crashes with:
-    # TypeError: int() argument must be ... not 'ObjectId'
     id = serializers.CharField(read_only=True)
 
     class Meta:
         model = User
         fields = (
-            'id', 'email', 'full_name', 'role', 'store_name',
+            'id', 'email', 'full_name', 'role', 'store_name', 'status',
             'mobile', 'street', 'barangay', 'city', 'province', 'postal_code',
             'is_active', 'date_joined',
         )
-        read_only_fields = ('email', 'role', 'is_active', 'date_joined')
+        read_only_fields = ('email', 'role', 'status', 'is_active', 'date_joined')
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -52,4 +50,4 @@ class PasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError({'old_password': 'Current password is incorrect.'})
         user.set_password(self.validated_data['new_password'])
         user.save()
-        return user 
+        return user
