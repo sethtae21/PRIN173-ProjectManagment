@@ -102,6 +102,12 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         if not created:
             cart_item.quantity += quantity
             cart_item.save(update_fields=('quantity',))
+        cart_item.item_name = item.name
+        cart_item.store_name = item.store_name
+        cart_item.unavailable_reason = ''
+        cart_item.seller_account_deleted = False
+        cart_item.catalog_item_id = str(item.pk)
+        cart_item.save(update_fields=('item_name', 'store_name', 'unavailable_reason', 'seller_account_deleted', 'catalog_item_id'))
         return self.cart_response()
 
     @extend_schema(request=UpdateCartItemSerializer, responses=CartSerializer)
@@ -112,7 +118,23 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         input_serializer.is_valid(raise_exception=True)
         cart = self.get_cart()
         item = input_serializer.validated_data['catalog_item']
-        cart_item = get_object_or_404(CartItem, cart=cart, item=item)
+        cart_item = CartItem.objects.filter(cart=cart, item=item).first()
+        if cart_item is None:
+            cart_item = CartItem.objects.filter(
+                cart=cart,
+                catalog_item_id=str(item.pk),
+                item__isnull=True,
+            ).first()
+        if cart_item is None:
+            return Response(
+                {'detail': 'This item is not in your cart.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if cart_item.item is None or cart_item.seller_account_deleted:
+            return Response(
+                {'detail': 'This item is unavailable because the seller’s account was deleted.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         cart_item.quantity = input_serializer.validated_data['quantity']
         cart_item.save(update_fields=('quantity',))
         return self.cart_response()
@@ -126,8 +148,15 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         )
         input_serializer.is_valid(raise_exception=True)
         cart = self.get_cart()
+        catalog_item = input_serializer.validated_data['catalog_item']
         CartItem.objects.filter(
-            cart=cart, item=input_serializer.validated_data['catalog_item']
+            cart=cart,
+            item=catalog_item,
+        ).delete()
+        CartItem.objects.filter(
+            cart=cart,
+            catalog_item_id=str(catalog_item.pk),
+            item__isnull=True,
         ).delete()
         return self.cart_response()
 
@@ -138,9 +167,15 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         input_serializer = RemoveSelectedCartItemsSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
         cart = self.get_cart()
+        selected = input_serializer.validated_data['catalog_items']
         CartItem.objects.filter(
             cart=cart,
-            item_id__in=input_serializer.validated_data['catalog_items'],
+            item_id__in=[value for value in selected if value],
+        ).delete()
+        CartItem.objects.filter(
+            cart=cart,
+            catalog_item_id__in=[str(value) for value in selected if value],
+            item__isnull=True,
         ).delete()
         return self.cart_response()
 
@@ -174,6 +209,8 @@ class CheckoutView(MongoRetryMixin, APIView):
         cart_items = list(cart.items.select_related('item').all())
         submitted_items = input_serializer.validated_data.get('items')
         item_options = {}
+
+        requested_ids = []
         if submitted_items is not None:
             requested_ids = [entry['catalog_item'] for entry in submitted_items]
             if len(requested_ids) != len(set(requested_ids)):
@@ -184,11 +221,54 @@ class CheckoutView(MongoRetryMixin, APIView):
             item_options = {
                 entry['catalog_item']: entry for entry in submitted_items
             }
+
+        requested_id_set = {str(value) for value in requested_ids}
+        for cart_entry in cart_items:
+            cart_entry_id = str(cart_entry.item_id or cart_entry.catalog_item_id or '')
+            if cart_entry_id in requested_id_set and (cart_entry.item is None or cart_entry.seller_account_deleted):
+                return Response(
+                    {
+                        'detail': 'This item is unavailable because the seller’s account was deleted.',
+                        'unavailable_item': {
+                            'catalog_item': cart_entry.catalog_item_id or cart_entry_id,
+                            'name': cart_entry.item_name,
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if submitted_items is not None:
             cart_items = [
                 entry for entry in cart_items
-                if str(entry.item_id) in item_options
+                if str(entry.item_id or entry.catalog_item_id) in requested_id_set
             ]
             if len(cart_items) != len(requested_ids):
+                missing_ids = [
+                    entry_id for entry_id in requested_ids
+                    if str(entry_id) not in {
+                        str(entry.item_id or entry.catalog_item_id) for entry in cart_items
+                    }
+                ]
+                missing_id = missing_ids[0] if missing_ids else None
+                if missing_id:
+                    unavailable_name = next(
+                        (
+                            entry.item_name
+                            for entry in cart.items.filter(catalog_item_id=str(missing_id)).all()
+                            if entry.item is None or entry.seller_account_deleted
+                        ),
+                        'Selected item',
+                    )
+                    return Response(
+                        {
+                            'detail': 'This item is unavailable because the seller’s account was deleted.',
+                            'unavailable_item': {
+                                'catalog_item': str(missing_id),
+                                'name': unavailable_name,
+                            },
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 return Response(
                     {'detail': 'One or more selected products are not in your cart.'},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -198,6 +278,19 @@ class CheckoutView(MongoRetryMixin, APIView):
                 {'detail': 'Cannot checkout with an empty cart.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        for entry in cart_items:
+            if entry.item is None or entry.seller_account_deleted:
+                return Response(
+                    {
+                        'detail': 'This item is unavailable because the seller’s account was deleted.',
+                        'unavailable_item': {
+                            'catalog_item': entry.catalog_item_id or str(entry.item_id or ''),
+                            'name': entry.item_name,
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         total_amount = sum(
             (
                 Decimal(str(entry.item.price or 0)) * int(entry.quantity or 0)

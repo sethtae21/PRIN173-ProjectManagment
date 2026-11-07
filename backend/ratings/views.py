@@ -1,14 +1,19 @@
+import csv
+import json
 import logging
+from datetime import datetime
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Rating
-from .serializers import RatingSerializer, RatingSummarySerializer
+from .models import Rating, UATResponse, UATSession
+from .serializers import RatingSerializer, RatingSummarySerializer, UATResponseSerializer, UATSessionSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +224,402 @@ class RatingDetailView(APIView):
             return Response({'error': 'Rating not found'}, status=status.HTTP_404_NOT_FOUND)
         rating.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UATSessionCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        role = request.data.get('role', request.user.role)
+        if role not in {'shopper', 'seller'}:
+            return Response({'detail': 'Invalid UAT role.'}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role != role:
+            return Response({'detail': 'Role mismatch for this tester session.'}, status=status.HTTP_403_FORBIDDEN)
+
+        session = UATSession.objects.create(user=request.user, role=role, status='active')
+        return Response({'session_id': session.session_id, 'status': session.status, 'role': session.role}, status=status.HTTP_201_CREATED)
+
+
+class UATResponseSubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({'detail': 'session_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session = UATSession.objects.filter(session_id=session_id, user=request.user).first()
+        if session is None:
+            return Response({'detail': 'UAT session not found or not owned by this account.'}, status=status.HTTP_404_NOT_FOUND)
+
+        product_id = str(request.data.get('product_id') or '').strip()
+        question_key = str(request.data.get('question_key') or request.data.get('key') or '').strip()
+        phase = str(request.data.get('phase') or 'before').strip()
+        if not question_key:
+            return Response({'detail': 'question_key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not product_id:
+            return Response({'detail': 'product_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        value = request.data.get('value')
+        if value is None:
+            return Response({'detail': 'value is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            numeric_value = int(value)
+        except (TypeError, ValueError):
+            return Response({'detail': 'value must be a whole number between 0 and 5.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if numeric_value < 0 or numeric_value > 5:
+            return Response({'detail': 'value must be between 0 and 5.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj, created = UATResponse.objects.update_or_create(
+            session=session,
+            product_id=product_id,
+            question_key=question_key,
+            phase=phase,
+            defaults={'value': numeric_value},
+        )
+        session.status = 'completed' if session.responses.count() else 'active'
+        session.save(update_fields=['status'])
+        return Response({
+            'created': created,
+            'response': UATResponseSerializer(obj).data,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+def _json_session_notes(raw_session_notes):
+    if not raw_session_notes:
+        return {}
+    if isinstance(raw_session_notes, dict):
+        return raw_session_notes
+    try:
+        parsed = json.loads(raw_session_notes)
+    except (TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _mean(values):
+    values = [float(value) for value in values if value is not None]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
+def _format_metric(value):
+    if value is None:
+        return ''
+    if isinstance(value, float):
+        return f'{value:.2f}'
+    return str(value)
+
+
+def _metric_status(actual_value, target_type, threshold, allow_blank=False):
+    if actual_value in (None, ''):
+        return 'Not Run' if allow_blank else 'No eligible observations'
+    if target_type == 'min':
+        return 'Met target' if float(actual_value) >= float(threshold) else 'Below target'
+    if target_type == 'max':
+        return 'Met target' if float(actual_value) <= float(threshold) else 'Above target'
+    if target_type == 'rate_min':
+        return 'Met target' if float(actual_value) >= float(threshold) else 'Below target'
+    return 'Not Run'
+
+
+def _paired_question_deltas(question_key, delta_kind='after_minus_before'):
+    before_values = {}
+    after_values = {}
+    observed_count = 0
+
+    for response in UATResponse.objects.filter(
+        question_key=question_key,
+        value__isnull=False,
+    ).values('session_id', 'product_id', 'phase', 'value'):
+        observed_count += 1
+        key = (response['session_id'], str(response['product_id']))
+        if response['phase'] == 'before':
+            before_values[key] = int(response['value'])
+        elif response['phase'] == 'after':
+            after_values[key] = int(response['value'])
+
+    paired = []
+    for key, before_value in before_values.items():
+        if key in after_values:
+            after_value = int(after_values[key])
+            before_value = int(before_value)
+            delta = after_value - before_value if delta_kind == 'after_minus_before' else before_value - after_value
+            paired.append(delta)
+
+    return observed_count, paired
+
+
+def _rating_summary(question_key):
+    values = list(
+        UATResponse.objects.filter(
+            question_key=question_key,
+            value__isnull=False,
+        ).values_list('value', flat=True)
+    )
+    if not values:
+        return {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+    numeric_values = [int(value) for value in values]
+    mean_value = _mean(numeric_values)
+    total = sum(numeric_values)
+    count = len(numeric_values)
+    return {
+        'actual_result': _format_metric(mean_value),
+        'sample_size': count,
+        'numerator': str(total),
+        'denominator': str(count),
+        'status': 'Calculated',
+    }
+
+
+def _yes_no_summary(question_key):
+    records = list(
+        UATResponse.objects.filter(
+            question_key=question_key,
+            value__isnull=False,
+        ).values_list('value', flat=True)
+    )
+    if not records:
+        return {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+
+    yes_count = sum(1 for value in records if int(value) == 1)
+    total_count = len(records)
+    percentage = round((yes_count / total_count) * 100, 2) if total_count else 0.0
+    return {
+        'actual_result': f'{percentage:.2f}%',
+        'sample_size': total_count,
+        'numerator': str(yes_count),
+        'denominator': str(total_count),
+        'status': 'Calculated',
+    }
+
+
+def _checkout_summary():
+    responses = list(
+        UATResponse.objects.filter(
+            question_key='checkout_frustration',
+            value__isnull=False,
+        ).values_list('value', flat=True)
+    )
+    if not responses:
+        return {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+
+    values = [int(value) for value in responses]
+    mean_value = _mean(values)
+    total = sum(values)
+    return {
+        'actual_result': _format_metric(mean_value),
+        'sample_size': len(values),
+        'numerator': str(total),
+        'denominator': str(len(values)),
+        'status': 'Calculated',
+    }
+
+
+def _seller_validation_summary():
+    responses = list(
+        UATResponse.objects.filter(
+            question_key='seller_validation_clarity',
+            value__isnull=False,
+        ).values_list('value', flat=True)
+    )
+    if not responses:
+        return {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+    values = [int(value) for value in responses]
+    mean_value = _mean(values)
+    total = sum(values)
+    return {
+        'actual_result': _format_metric(mean_value),
+        'sample_size': len(values),
+        'numerator': str(total),
+        'denominator': str(len(values)),
+        'status': 'Calculated',
+    }
+
+
+def _session_cart_conversion_summary():
+    eligible_sessions = 0
+    successful_sessions = 0
+
+    for session in UATSession.objects.all():
+        notes = _json_session_notes(session.notes)
+        cart_optional = notes.get('cart_optional')
+        if cart_optional in (True, 'true', 'True', 1, '1'):
+            eligible_sessions += 1
+            if notes.get('cart_added_success') in (True, 'true', 'True', 1, '1'):
+                successful_sessions += 1
+
+    if eligible_sessions == 0:
+        return {
+            'actual_result': 'N/A',
+            'sample_size': 0,
+            'numerator': '0',
+            'denominator': '0',
+            'status': 'No eligible observations',
+        }
+
+    rate = round((successful_sessions / eligible_sessions) * 100, 2)
+    return {
+        'actual_result': f'{rate:.2f}%',
+        'sample_size': eligible_sessions,
+        'numerator': str(successful_sessions),
+        'denominator': str(eligible_sessions),
+        'status': 'Calculated',
+    }
+
+
+def build_uat_workbook_rows():
+    rows = []
+
+    def add_row(kpi, objective, target, metric_summary, label=''):
+        actual = metric_summary.get('actual_result', '')
+        sample_size = metric_summary.get('sample_size', 0)
+        if actual == '' and sample_size == 0 and metric_summary.get('status') == 'Not Run':
+            actual_result = ''
+            status = 'Not Run'
+        elif actual == 'N/A':
+            actual_result = 'N/A'
+            status = metric_summary.get('status', 'No eligible observations')
+        else:
+            actual_result = actual
+            status = metric_summary.get('status', 'Calculated')
+
+        rows.append({
+            'kpi': kpi,
+            'objective': objective,
+            'target': target,
+            'actual_result': actual_result,
+            'sample_size': sample_size,
+            'status': status,
+            'evidence_reference': '',
+            'numerator': metric_summary.get('numerator', ''),
+            'denominator': metric_summary.get('denominator', ''),
+        })
+
+    for question_key, label in {
+        'fit_confidence': 'OBJ-01 | Fit confidence change',
+        'style_confidence': 'OBJ-01 | Style confidence change',
+        'purchase_confidence': 'OBJ-06 | Purchase-decision confidence change',
+    }.items():
+        observed_count, paired_changes = _paired_question_deltas(question_key, 'after_minus_before')
+        if observed_count and paired_changes:
+            average_change = _mean(paired_changes)
+            metric_summary = {
+                'actual_result': _format_metric(average_change),
+                'sample_size': len(paired_changes),
+                'numerator': str(sum(paired_changes)),
+                'denominator': str(len(paired_changes)),
+                'status': 'Calculated',
+            }
+        elif observed_count:
+            metric_summary = {'actual_result': 'N/A', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'No eligible observations'}
+        else:
+            metric_summary = {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+        add_row(
+            label,
+            label.split(' | ')[0],
+            'Mean After − Before ≥ +1.0 point (proposed)',
+            metric_summary,
+        )
+
+    observed_count, paired_changes = _paired_question_deltas('return_intent', 'before_minus_after')
+    if observed_count and paired_changes:
+        reduction = _mean(paired_changes)
+        metric_summary = {
+            'actual_result': _format_metric(reduction),
+            'sample_size': len(paired_changes),
+            'numerator': str(sum(paired_changes)),
+            'denominator': str(len(paired_changes)),
+            'status': 'Calculated',
+        }
+    elif observed_count:
+        metric_summary = {'actual_result': 'N/A', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'No eligible observations'}
+    else:
+        metric_summary = {'actual_result': '', 'sample_size': 0, 'numerator': '', 'denominator': '', 'status': 'Not Run'}
+
+    add_row(
+        'OBJ-06 | Return-intent reduction',
+        'OBJ-06',
+        'Mean Before − After ≥ +1.0 point (proposed)',
+        metric_summary,
+    )
+
+    for key, kpi in {
+        'privacy_comfort': 'OBJ-02 | Privacy comfort',
+        'responsiveness': 'OBJ-03 | Perceived responsiveness',
+        'match_helpfulness': 'OBJ-05 | Match reasons helpfulness',
+    }.items():
+        metric_summary = _rating_summary(key)
+        add_row(
+            kpi,
+            kpi.split(' | ')[0],
+            'Mean ≥ 4/5 (proposed)',
+            metric_summary,
+        )
+
+    style_discovery_summary = _yes_no_summary('style_discovery')
+    add_row(
+        'OBJ-05 | Style discovery',
+        'OBJ-05',
+        'Yes ÷ all Yes/No answers ≥ 60% (proposed)',
+        style_discovery_summary,
+    )
+
+    conversion_summary = _session_cart_conversion_summary()
+    add_row(
+        'OBJ-07 | Try-on-to-cart conversion',
+        'OBJ-07',
+        '≥ 40% (proposed)',
+        conversion_summary,
+    )
+
+    checkout_summary = _checkout_summary()
+    add_row(
+        'OBJ-07 | Checkout frustration',
+        'OBJ-07',
+        'Mean ≤ 2/5 (proposed)',
+        checkout_summary,
+    )
+
+    seller_summary = _seller_validation_summary()
+    add_row(
+        'OBJ-09 | Seller validation clarity',
+        'OBJ-09',
+        'Mean ≥ 4/5 (proposed)',
+        seller_summary,
+    )
+
+    return rows
+
+
+class UATExportCSVView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, 'is_staff', False):
+            return Response({'detail': 'Staff access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="fitfusion_uat_results.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'KPI', 'Charter objective', 'Target', 'Actual result', 'Sample size',
+            'Status', 'Evidence reference', 'Numerator', 'Denominator'
+        ])
+
+        for row in build_uat_workbook_rows():
+            writer.writerow([
+                row['kpi'],
+                row['objective'],
+                row['target'],
+                row['actual_result'],
+                row['sample_size'],
+                row['status'],
+                row['evidence_reference'],
+                row['numerator'],
+                row['denominator'],
+            ])
+        return response

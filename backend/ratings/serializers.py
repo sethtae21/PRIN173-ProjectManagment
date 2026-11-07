@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Rating
+from .models import Rating, UATResponse, UATSession
 
 
 class RatingSerializer(serializers.ModelSerializer):
@@ -41,6 +41,24 @@ class RatingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'detail': 'Provide score (1-5) and/or vote (like/dislike).'})
         return attrs
+
+
+class UATSessionSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(read_only=True, source='user_id')
+
+    class Meta:
+        model = UATSession
+        fields = ['session_id', 'user', 'role', 'product_id', 'status', 'started_at', 'completed_at']
+        read_only_fields = ['session_id', 'user', 'started_at', 'completed_at']
+
+
+class UATResponseSerializer(serializers.ModelSerializer):
+    session_id = serializers.CharField(source='session_id', read_only=True)
+
+    class Meta:
+        model = UATResponse
+        fields = ['session_id', 'product_id', 'question_key', 'phase', 'value', 'created_at', 'updated_at']
+        read_only_fields = ['session_id', 'created_at', 'updated_at']
 
 
 class RatingSummarySerializer(serializers.Serializer):

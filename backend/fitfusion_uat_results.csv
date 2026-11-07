@@ -1,0 +1,12 @@
+KPI,Charter objective,Target,Actual result,Sample size,Status,Evidence reference,Numerator,Denominator
+OBJ-01 | Fit confidence change,OBJ-01,Average After − Before ≥ 0.0 (proposed),,0,Not Run,,,
+OBJ-01 | Style confidence change,OBJ-01,Average After − Before ≥ 0.0 (proposed),,0,Not Run,,,
+OBJ-06 | Purchase-decision confidence change,OBJ-06,Average After − Before ≥ 0.0 (proposed),,0,Not Run,,,
+OBJ-06 | Return-intent reduction,OBJ-06,Average Before − After ≥ 1.0,,0,Not Run,,,
+OBJ-02 | Privacy comfort,OBJ-02,Mean ≥ 4/5,,0,Not Run,,,
+OBJ-03 | Perceived responsiveness,OBJ-03,Mean ≥ 4/5,,0,Not Run,,,
+OBJ-05 | Style discovery,OBJ-05,Yes ÷ all Yes/No ≥ 60%,,0,Not Run,,,
+OBJ-05 | Match reasons clarity,OBJ-05,Mean ≥ 4/5,,0,Not Run,,,
+OBJ-07 | Try-on-to-cart conversion,OBJ-07,≥ 40%,,0,Not Run,,,
+OBJ-07 | Checkout frustration,OBJ-07,Mean ≤ 2/5,,0,Not Run,,,
+OBJ-09 | Seller validation clarity,OBJ-09,Mean ≥ 4/5,,0,Not Run,,,

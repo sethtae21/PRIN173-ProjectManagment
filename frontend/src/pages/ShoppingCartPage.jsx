@@ -28,6 +28,13 @@ function normalizeCartItem(item, index) {
   );
   const size = item.size || item.selectedSize || "M";
   const color = item.color || item.selectedColor || "Default";
+  const unavailableReason =
+    item.unavailable_reason ||
+    item.unavailableReason ||
+    (item.seller_account_deleted || item.sellerAccountDeleted
+      ? "This item is unavailable because the seller’s account was deleted."
+      : "");
+  const isAvailable = item.available !== false && !item.seller_account_deleted && !item.sellerAccountDeleted;
   return {
     id:
       item.id ||
@@ -62,7 +69,10 @@ function normalizeCartItem(item, index) {
       item.colors.length > 0
         ? item.colors
         : [color],
-    selected: item.selected !== false,
+    selected: item.selected !== false && isAvailable,
+    available: isAvailable,
+    sellerAccountDeleted: !!(item.seller_account_deleted || item.sellerAccountDeleted),
+    unavailableReason,
     image: item.imageUrl || item.image || item.frontImageUrl || "",
   };
 }
@@ -156,6 +166,9 @@ function ShoppingCartPage() {
               sellerName: item.store_name,
               price: item.price,
               quantity: item.quantity,
+              available: item.available !== false,
+              seller_account_deleted: Boolean(item.seller_account_deleted),
+              unavailable_reason: item.unavailable_reason || "",
               imageUrl,
             },
             index
@@ -211,10 +224,14 @@ function ShoppingCartPage() {
   }, [notice]);
 
   const cartProductCount = cartItems.length;
+  const availableItems = useMemo(
+    () => cartItems.filter((item) => item.available !== false),
+    [cartItems]
+  );
   const selectedItems = useMemo(
     () =>
       cartItems.filter(
-        (item) => item.selected
+        (item) => item.selected && item.available !== false
       ),
     [cartItems]
   );
@@ -260,8 +277,8 @@ function ShoppingCartPage() {
     );
   const total = subtotal + shippingFee;
   const allSelected =
-    cartItems.length > 0 &&
-    cartItems.every(
+    availableItems.length > 0 &&
+    availableItems.every(
       (item) => item.selected
     );
 
@@ -280,24 +297,30 @@ function ShoppingCartPage() {
 
   function handleToggleItem(itemId) {
     setCartItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              selected: !item.selected,
-            }
-          : item
-      )
+      currentItems.map((item) => {
+        if (item.id !== itemId || item.available === false || item.sellerAccountDeleted) {
+          return item;
+        }
+        return {
+          ...item,
+          selected: !item.selected,
+        };
+      })
     );
   }
 
   function handleSelectAll() {
     const shouldSelect = !allSelected;
     setCartItems((currentItems) =>
-      currentItems.map((item) => ({
-        ...item,
-        selected: shouldSelect,
-      }))
+      currentItems.map((item) => {
+        if (item.available === false || item.sellerAccountDeleted) {
+          return { ...item, selected: false };
+        }
+        return {
+          ...item,
+          selected: shouldSelect,
+        };
+      })
     );
   }
 
@@ -307,6 +330,10 @@ function ShoppingCartPage() {
   ) {
     const item = cartItems.find((cartItem) => cartItem.id === itemId);
     if (!item || isCartBusy) return;
+    if (item.available === false || item.sellerAccountDeleted) {
+      setNotice("This item is unavailable because the seller’s account was deleted.");
+      return;
+    }
 
     // When decreasing from quantity 1, ask for confirmation to remove
     if (change < 0 && item.quantity <= 1) {
@@ -413,15 +440,18 @@ function ShoppingCartPage() {
   }
 
   function handleCheckout() {
-    if (selectedItems.length === 0) {
+    const availableSelectedItems = selectedItems.filter(
+      (item) => item.available !== false && !item.sellerAccountDeleted
+    );
+    if (availableSelectedItems.length === 0) {
       setNotice(
-        "Please select at least one product before checkout."
+        "Please select at least one available product before checkout."
       );
       return;
     }
     localStorage.setItem(
       CHECKOUT_STORAGE_KEY,
-      JSON.stringify(selectedItems)
+      JSON.stringify(availableSelectedItems)
     );
     navigate("/shopper/checkout");
   }
@@ -530,7 +560,7 @@ function ShoppingCartPage() {
                     onChange={handleSelectAll}
                   />
                   <span>
-                    Select all ({cartItems.length})
+                    Select all ({availableItems.length})
                   </span>
                 </label>
                 <button
@@ -545,193 +575,215 @@ function ShoppingCartPage() {
                 </button>
               </div>
               <div className="shopping-cart-product-list">
-                {cartItems.map((item) => (
-                  <article
-                    className="shopping-cart-product"
-                    key={item.id}
-                  >
-                    <input
-                      type="checkbox"
-                      className="shopping-cart-product-checkbox"
-                      checked={item.selected}
-                      onChange={() =>
-                        handleToggleItem(
-                          item.id
-                        )
-                      }
-                      aria-label={`Select ${item.name}`}
-                    />
-                    <button
-                      type="button"
-                      className="shopping-cart-product-image"
-                      onClick={() =>
-                        navigate(
-                          `/shopper/products/${item.productId}`
-                        )
-                      }
-                      aria-label={`View ${item.name}`}
+                {cartItems.map((item) => {
+                  const isUnavailable = item.available === false || item.sellerAccountDeleted;
+                  return (
+                    <article
+                      className="shopping-cart-product"
+                      key={item.id}
                     >
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="cart-item-img"
-                        />
-                      ) : (
-                        <span aria-hidden="true" className="cart-item-placeholder">
-                          {item.name.charAt(0)}
-                        </span>
-                      )}
-                      {item.originalPrice >
-                        item.price && (
-                        <small className="cart-discount-badge">
-                          -
-                          {Math.round(
-                            (1 -
-                              item.price /
-                              item.originalPrice) *
-                              100
-                          )}
-                          %
-                        </small>
-                      )}
-                    </button>
-                    <div className="shopping-cart-product-info">
-                      <Link
-                        to={`/shopper/sellers/${item.sellerId}`}
-                        className="shopping-cart-seller"
-                      >
-                        {item.sellerName} →
-                      </Link>
+                      <input
+                        type="checkbox"
+                        className="shopping-cart-product-checkbox"
+                        checked={item.selected && !isUnavailable}
+                        onChange={() =>
+                          handleToggleItem(
+                            item.id
+                          )
+                        }
+                        aria-label={`Select ${item.name}`}
+                        disabled={isUnavailable}
+                      />
                       <button
                         type="button"
-                        className="shopping-cart-product-name"
+                        className="shopping-cart-product-image"
                         onClick={() =>
                           navigate(
                             `/shopper/products/${item.productId}`
                           )
                         }
+                        aria-label={`View ${item.name}`}
                       >
-                        {item.name}
-                      </button>
-                      <p>{item.category}</p>
-                      <div className="shopping-cart-price">
-                        <strong>
-                          {formatCurrency(
-                            item.price
-                          )}
-                        </strong>
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="cart-item-img"
+                          />
+                        ) : (
+                          <span aria-hidden="true" className="cart-item-placeholder">
+                            {item.name.charAt(0)}
+                          </span>
+                        )}
                         {item.originalPrice >
                           item.price && (
-                          <del>
-                            {formatCurrency(
-                              item.originalPrice
+                          <small className="cart-discount-badge">
+                            -
+                            {Math.round(
+                              (1 -
+                                item.price /
+                                item.originalPrice) *
+                                100
                             )}
-                          </del>
+                            %
+                          </small>
                         )}
-                      </div>
-                      <div className="shopping-cart-product-total">
-                        <span>Item total</span>
-                        <strong>
-                          {formatCurrency(
-                            item.price *
-                              item.quantity
-                          )}
-                        </strong>
-                      </div>
-                    </div>
-                    <div className="shopping-cart-options">
-                      <label>
-                        <span>Size</span>
-                        <select
-                          value={item.size}
-                          onChange={(event) =>
-                            updateItem(
-                              item.id,
-                              {
-                                size:
-                                  event.target
-                                    .value,
-                              }
+                      </button>
+                      <div className="shopping-cart-product-info">
+                        <Link
+                          to={`/shopper/sellers/${item.sellerId}`}
+                          className="shopping-cart-seller"
+                        >
+                          {item.sellerName} →
+                        </Link>
+                        <button
+                          type="button"
+                          className="shopping-cart-product-name"
+                          onClick={() =>
+                            navigate(
+                              `/shopper/products/${item.productId}`
                             )
                           }
                         >
-                          {item.sizes.map(
-                            (size) => (
-                              <option
-                                key={size}
-                                value={size}
-                              >
-                                {size}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </label>
-                      <label>
-                        <span>Color</span>
-                        <select
-                          value={item.color}
-                          onChange={(event) =>
-                            updateItem(
-                              item.id,
-                              {
-                                color:
-                                  event.target
-                                    .value,
-                              }
-                            )
-                          }
-                        >
-                          {item.colors.map(
-                            (color) => (
-                              <option
-                                key={color}
-                                value={color}
-                              >
-                                {color}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </label>
-                      <div className="shopping-cart-quantity-section">
-                        <span>Quantity</span>
-                        <div className="shopping-cart-quantity">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleQuantityChange(
-                                item.id,
-                                -1
-                              )
-                            }
-                            disabled={isCartBusy}
-                            aria-label={`Decrease quantity of ${item.name}`}
-                          >
-                            −
-                          </button>
+                          {item.name}
+                        </button>
+                        {isUnavailable && (
+                          <div className="shopping-cart-unavailable-label">Unavailable</div>
+                        )}
+                        <p>{item.category}</p>
+                        {isUnavailable && item.unavailableReason && (
+                          <p className="shopping-cart-unavailable-message">
+                            {item.unavailableReason}
+                          </p>
+                        )}
+                        <div className="shopping-cart-price">
                           <strong>
-                            {item.quantity}
+                            {formatCurrency(
+                              item.price
+                            )}
                           </strong>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleQuantityChange(
-                                item.id,
-                                1
-                              )
-                            }
-                            disabled={isCartBusy || item.quantity >= MAX_QUANTITY}
-                            aria-label={`Increase quantity of ${item.name}`}
-                          >
-                            +
-                          </button>
+                          {item.originalPrice >
+                            item.price && (
+                            <del>
+                              {formatCurrency(
+                                item.originalPrice
+                              )}
+                            </del>
+                          )}
+                        </div>
+                        <div className="shopping-cart-product-total">
+                          <span>Item total</span>
+                          <strong>
+                            {formatCurrency(
+                              item.price *
+                                item.quantity
+                            )}
+                          </strong>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
+                      <div className="shopping-cart-options">
+                        <label>
+                          <span>Size</span>
+                          <select
+                            value={item.size}
+                            onChange={(event) =>
+                              updateItem(
+                                item.id,
+                                {
+                                  size:
+                                    event.target
+                                      .value,
+                                }
+                              )
+                            }
+                            disabled={isUnavailable}
+                          >
+                            {item.sizes.map(
+                              (size) => (
+                                <option
+                                  key={size}
+                                  value={size}
+                                >
+                                  {size}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Color</span>
+                          <select
+                            value={item.color}
+                            onChange={(event) =>
+                              updateItem(
+                                item.id,
+                                {
+                                  color:
+                                    event.target
+                                      .value,
+                                }
+                              )
+                            }
+                            disabled={isUnavailable}
+                          >
+                            {item.colors.map(
+                              (color) => (
+                                <option
+                                  key={color}
+                                  value={color}
+                                >
+                                  {color}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </label>
+                        <div className="shopping-cart-quantity-section">
+                          <span>Quantity</span>
+                          <div className="shopping-cart-quantity">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleQuantityChange(
+                                  item.id,
+                                  -1
+                                )
+                              }
+                              disabled={isCartBusy || isUnavailable}
+                              aria-label={`Decrease quantity of ${item.name}`}
+                            >
+                              −
+                            </button>
+                            <strong>
+                              {item.quantity}
+                            </strong>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleQuantityChange(
+                                  item.id,
+                                  1
+                                )
+                              }
+                              disabled={isCartBusy || isUnavailable || item.quantity >= MAX_QUANTITY}
+                              aria-label={`Increase quantity of ${item.name}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="shopping-cart-remove-item"
+                          onClick={() => handleRemoveItem(item.id)}
+                          disabled={isCartBusy}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
             <aside className="shopping-cart-summary-card">

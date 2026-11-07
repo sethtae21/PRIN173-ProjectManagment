@@ -54,9 +54,12 @@ class CartItemSerializer(serializers.ModelSerializer):
     getattr so a missing column degrades to null instead of crashing.
     """
     id = serializers.CharField(read_only=True)
-    catalog_item = serializers.CharField(source='item_id', read_only=True)
-    name = serializers.CharField(source='item.name', read_only=True)
-    store_name = serializers.CharField(source='item.store_name', read_only=True)
+    catalog_item = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
+    available = serializers.SerializerMethodField()
+    unavailable_reason = serializers.SerializerMethodField()
+    seller_account_deleted = serializers.BooleanField(read_only=True)
     price = serializers.SerializerMethodField()
     front_image_url = serializers.SerializerMethodField()
     rear_image_url = serializers.SerializerMethodField()
@@ -65,18 +68,34 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = (
             'id', 'catalog_item', 'name', 'store_name', 'price', 'quantity',
+            'available', 'unavailable_reason', 'seller_account_deleted',
             'front_image_url', 'rear_image_url',
         )
         read_only_fields = fields
 
+    def get_catalog_item(self, obj):
+        return obj.catalog_item_id or (str(obj.item_id) if obj.item_id else '')
+
+    def get_name(self, obj):
+        return obj.item_name or getattr(obj.item, 'name', 'Unavailable item')
+
+    def get_store_name(self, obj):
+        return obj.store_name or getattr(obj.item, 'store_name', 'FitFusion Seller')
+
+    def get_available(self, obj):
+        return obj.item is not None and not obj.seller_account_deleted
+
+    def get_unavailable_reason(self, obj):
+        return obj.unavailable_reason if obj.seller_account_deleted else ''
+
     def get_price(self, obj):
-        return str(_safe_decimal(getattr(obj.item, "price", None)))
+        return str(_safe_decimal(getattr(obj.item, "price", None) if obj.item else None))
 
     def get_front_image_url(self, obj):
-        return _image_url(getattr(obj.item, "front_image", None))
+        return _image_url(getattr(obj.item, "front_image", None) if obj.item else None)
 
     def get_rear_image_url(self, obj):
-        return _image_url(getattr(obj.item, "rear_image", None))
+        return _image_url(getattr(obj.item, "rear_image", None) if obj.item else None)
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -93,18 +112,19 @@ class CartSerializer(serializers.ModelSerializer):
 
     def get_total_amount(self, obj):
         # KAN-FIX: defensive arithmetic; None prices/quantities no longer raise.
-        total = sum(
-            (
-                _safe_decimal(getattr(entry.item, "price", None))
-                * _safe_quantity(entry.quantity)
-                for entry in obj.items.all()
-            ),
-            Decimal("0.00"),
-        )
+        total = Decimal("0.00")
+        for entry in obj.items.all():
+            if entry.item is None or entry.seller_account_deleted:
+                continue
+            total += _safe_decimal(getattr(entry.item, "price", None)) * _safe_quantity(entry.quantity)
         return total
 
     def get_item_count(self, obj):
-        return sum(_safe_quantity(entry.quantity) for entry in obj.items.all())
+        return sum(
+            _safe_quantity(entry.quantity)
+            for entry in obj.items.all()
+            if entry.item is not None and not entry.seller_account_deleted
+        )
 
 
 class AddToCartSerializer(serializers.Serializer):
@@ -114,9 +134,12 @@ class AddToCartSerializer(serializers.Serializer):
 
     def validate_catalog_item(self, value):
         try:
-            return CatalogItem.objects.get(pk=value)
+            item = CatalogItem.objects.get(pk=value)
         except (CatalogItem.DoesNotExist, TypeError, ValueError):
             raise serializers.ValidationError('Catalog item does not exist.')
+        if item.status != 'active':
+            raise serializers.ValidationError('This item is no longer available.')
+        return item
 
 
 class UpdateCartItemSerializer(AddToCartSerializer):

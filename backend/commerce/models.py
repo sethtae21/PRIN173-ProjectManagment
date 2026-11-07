@@ -34,7 +34,12 @@ class Cart(models.Model):
 
 class CartItem(models.Model):
     cart = models.ForeignKey('commerce.Cart', on_delete=models.CASCADE, related_name='items')
-    item = models.ForeignKey('catalog.CatalogItem', on_delete=models.CASCADE, related_name='cart_entries')
+    item = models.ForeignKey('catalog.CatalogItem', on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_entries')
+    catalog_item_id = models.CharField(max_length=50, blank=True, default='')
+    item_name = models.CharField(max_length=255, blank=True, default='')
+    store_name = models.CharField(max_length=255, blank=True, default='')
+    unavailable_reason = models.CharField(max_length=255, blank=True, default='')
+    seller_account_deleted = models.BooleanField(default=False)
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
 
@@ -43,7 +48,7 @@ class CartItem(models.Model):
         unique_together = ('cart', 'item')
 
     def __str__(self):
-        return f"{self.quantity} x {self.item.name}"
+        return f"{self.quantity} x {self.item_name or getattr(self.item, 'name', 'Unavailable item')}"
 
 
 class Order(models.Model):

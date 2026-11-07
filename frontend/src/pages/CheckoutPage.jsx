@@ -7,7 +7,7 @@ import {
   Link,
   useNavigate,
 } from "react-router-dom";
-import { API_URL, authAPI, checkoutAPI } from "../services/api";
+import { API_URL, authAPI, checkoutAPI, getCachedCart } from "../services/api";
 import "./css/CheckoutPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
@@ -60,10 +60,12 @@ function readStoredArray(key) {
 }
 
 function loadCheckoutItems() {
-  const checkoutItems = readStoredArray(CHECKOUT_STORAGE_KEY);
+  const checkoutItems = readStoredArray(CHECKOUT_STORAGE_KEY).filter(
+    (item) => item.available !== false && !item.seller_account_deleted && !item.sellerAccountDeleted
+  );
   if (checkoutItems.length > 0) return checkoutItems;
   const selectedCartItems = readStoredArray(CART_STORAGE_KEY).filter(
-    (item) => item.selected !== false
+    (item) => item.selected !== false && item.available !== false && !item.seller_account_deleted && !item.sellerAccountDeleted
   );
   return selectedCartItems;
 }
@@ -264,7 +266,16 @@ function CheckoutPage() {
   }
 
   async function handleConfirmOrder() {
-    if (isSubmitting || checkoutItems.length === 0) return;
+    const availableCheckoutItems = checkoutItems.filter(
+      (item) => item.available !== false && !item.seller_account_deleted && !item.sellerAccountDeleted
+    );
+    if (isSubmitting || availableCheckoutItems.length === 0) {
+      if (checkoutItems.length > 0) {
+        localStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify([]));
+        navigate("/shopper/cart");
+      }
+      return;
+    }
     setIsSubmitting(true);
     setOrderError("");
     try {
@@ -292,7 +303,7 @@ function CheckoutPage() {
         contact_number: form.contactNumber.trim(),
         shipping_address: address,
         payment_method: form.paymentMethod,
-        items: checkoutItems.map((item) => ({
+        items: availableCheckoutItems.map((item) => ({
           catalog_item: String(item.productId ?? item.id),
           size: item.size || item.selectedSize || "",
           color: item.color || item.selectedColor || "",
@@ -372,15 +383,32 @@ function CheckoutPage() {
     } catch (error) {
       console.error("Failed to place order:", error);
       let message = "We couldn't place your order. Please try again.";
-      try {
-        const details = JSON.parse(error.message);
-        message = details.detail || details.error || message;
-      } catch {
-        if (error.message && error.message !== "null") {
-          message = error.message;
-        }
+      const backendData = error?.data || null;
+      const detail = backendData?.detail || error?.message || "";
+      if (backendData?.detail || backendData?.error) {
+        message = backendData.detail || backendData.error;
+      } else if (error.message && error.message !== "null") {
+        message = error.message;
       }
       setOrderError(message);
+      if (backendData?.unavailable_item || /seller.*account.*deleted|unavailable/i.test(detail)) {
+        try {
+          const refreshedCart = await getCachedCart(true);
+          const refreshedItems = (refreshedCart?.items || []).filter(
+            (item) => item.available !== false && !item.seller_account_deleted
+          );
+          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(refreshedItems));
+          localStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(refreshedItems));
+          window.dispatchEvent(new CustomEvent("fitfusion-cart-updated", {
+            detail: { cart: refreshedItems, quantity: refreshedItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) },
+          }));
+          navigate("/shopper/cart", { replace: false });
+        } catch {
+          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
+          localStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify([]));
+          navigate("/shopper/cart");
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }

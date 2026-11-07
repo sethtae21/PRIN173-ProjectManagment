@@ -15,7 +15,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import User
 from accounts.serializers import UserSerializer
 from accounts.utils import blacklist_refresh_token
-from commerce.models import Order
+from catalog.models import CatalogItem
+from commerce.models import CartItem, Order
 
 
 class ProfileView(generics.RetrieveUpdateDestroyAPIView):
@@ -64,6 +65,16 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
                 blacklist_refresh_token(RefreshToken(refresh_raw))
             except TokenError:
                 pass
+
+        for item in CatalogItem.objects.filter(seller=user):
+            CartItem.objects.filter(item=item).update(
+                item=None,
+                catalog_item_id=str(item.pk),
+                item_name=item.name,
+                store_name=item.store_name,
+                unavailable_reason="This item is unavailable because the seller’s account was deleted.",
+                seller_account_deleted=True,
+            )
 
         for order in Order.objects.filter(user=user):
             order.user = None

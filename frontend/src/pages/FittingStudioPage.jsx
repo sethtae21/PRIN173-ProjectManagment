@@ -28,6 +28,60 @@ const ITEMS_PER_PAGE = 10;
 const STUDIO_VIEWS = ["Front", "Rear"];
 const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 const STUDIO_PENDING_PREFIX = "fitfusion-fitting-studio-pending-item-";
+const UAT_QUESTIONS = [
+  {
+    key: "fit_confidence",
+    prompt: "How confident are you that this item would fit you the way you want?",
+    lowLabel: "Not at all confident",
+    highLabel: "Very confident",
+  },
+  {
+    key: "style_confidence",
+    prompt: "How confident are you that this item suits your personal style?",
+    lowLabel: "Not at all confident",
+    highLabel: "Very confident",
+  },
+  {
+    key: "purchase_confidence",
+    prompt: "How confident are you in deciding whether to buy this item?",
+    lowLabel: "Not at all confident",
+    highLabel: "Very confident",
+  },
+  {
+    key: "return_intent",
+    prompt: "If you bought this item, how likely would you be to return it?",
+    lowLabel: "Very unlikely",
+    highLabel: "Very likely",
+  },
+];
+
+const UAT_AFTER_EXTRA_QUESTIONS = [
+  {
+    key: "responsiveness",
+    prompt: "How responsive did the virtual try-on canvas feel when switching items or views?",
+    lowLabel: "Very slow",
+    highLabel: "Very responsive",
+  },
+  {
+    key: "privacy_comfort",
+    prompt: "How comfortable did you feel using the avatar creator without uploading a personal photo?",
+    lowLabel: "Very uncomfortable",
+    highLabel: "Very comfortable",
+  },
+  {
+    key: "style_discovery",
+    prompt: "Did the recommendations introduce you to a color or style you wouldn't normally have considered?",
+    lowLabel: "No",
+    highLabel: "Yes",
+    isBoolean: true,
+  },
+  {
+    key: "match_helpfulness",
+    prompt: "How helpful were the Match Reasons in understanding why an item was recommended?",
+    lowLabel: "Not at all helpful",
+    highLabel: "Very helpful",
+  },
+];
 
 const HEIGHT_RANGE = { min: 120, max: 218 };
 const WEIGHT_RANGE = { min: 30, max: 200 };
@@ -461,6 +515,68 @@ function readStoredGender(isGuest) {
   if (raw === "male") return "Male";
   if (raw === "female") return "Female";
   return "";
+}
+
+function getCurrentUserId() {
+  try {
+    const rawSession = localStorage.getItem("fitfusion.session.v1");
+    const session = rawSession ? JSON.parse(rawSession) : null;
+    const user = session?.user || JSON.parse(localStorage.getItem("fitfusion-current-user") || "null");
+    if (user && typeof user === "object") {
+      return String(user.id ?? user.user_id ?? user.pk ?? user.email ?? "guest");
+    }
+  } catch {
+    // ignore parse issues and fall back to a guest-scoped key
+  }
+  return "guest";
+}
+
+function uatSessionStorageKey() {
+  return `fitfusion-uat-session-${getCurrentUserId()}`;
+}
+
+function uatPhaseStorageKey(productId, phase) {
+  return `fitfusion-uat-${phase}-${getCurrentUserId()}-${productId}`;
+}
+
+function readUatSession() {
+  try {
+    const value = JSON.parse(localStorage.getItem(uatSessionStorageKey()) || "null");
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function readUatPhaseAnswers(productId, phase) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(uatPhaseStorageKey(productId, phase)) || "{}") || {};
+    return typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUatPhaseAnswers(productId, phase, answers) {
+  if (!productId) return;
+  localStorage.setItem(uatPhaseStorageKey(productId, phase), JSON.stringify(answers));
+}
+
+function uatCompletionStorageKey() {
+  return `fitfusion-uat-completed-${getCurrentUserId()}`;
+}
+
+function readUatCompletionMap() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(uatCompletionStorageKey()) || "{}") || {};
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUatCompletionMap(value) {
+  localStorage.setItem(uatCompletionStorageKey(), JSON.stringify(value || {}));
 }
 
 function reconcileAvatarGender(avatar, isGuest) {
@@ -1311,12 +1427,30 @@ function FittingStudioPage({ isGuest = false }) {
   const [outfitName, setOutfitName] = useState("");
   const [outfitNameError, setOutfitNameError] = useState("");
   const [notification, setNotification] = useState("");
+  const [uatSession, setUatSession] = useState(() => readUatSession());
+  const [uatPhase, setUatPhase] = useState("before");
+  const [uatCurrentProductId, setUatCurrentProductId] = useState(() => {
+    const session = readUatSession();
+    return session?.product_id ? String(session.product_id) : "";
+  });
+  const [uatBeforeAnswers, setUatBeforeAnswers] = useState(() => ({}) );
+  const [uatAfterAnswers, setUatAfterAnswers] = useState(() => ({}) );
+  const [uatSurveySubmitting, setUatSurveySubmitting] = useState(false);
+  const [uatSurveyOpen, setUatSurveyOpen] = useState(false);
+  const [uatSurveyPhase, setUatSurveyPhase] = useState("before");
+  const [uatPendingEquipItem, setUatPendingEquipItem] = useState(null);
+  const [uatCompletedProducts, setUatCompletedProducts] = useState(() => readUatCompletionMap());
+  const [uatMatchReasonsOpenedByProduct, setUatMatchReasonsOpenedByProduct] = useState({});
+  const [uatThankYouVisible, setUatThankYouVisible] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
 
   const basePath = isGuest ? "/guest" : "/shopper";
+  const uatEnabled = !isGuest && new URLSearchParams(window.location.search).get("uat") === "1";
   const isFemale = avatar.gender.toLowerCase() === "female";
   const bodyBuild = weightToVisualBuild(avatar.height, avatar.weight);
+  const currentUatAnswers = uatPhase === "before" ? uatBeforeAnswers : uatAfterAnswers;
+  const uatSurveyVisible = uatEnabled && !isGuest && uatCurrentProductId;
 
   const proportion = useMemo(
     () => bodyProportion(avatar.height, bodyBuild),
@@ -1517,6 +1651,12 @@ function FittingStudioPage({ isGuest = false }) {
      recommendation stars pre-fill with what you already rated. Guests skip the
      call entirely (/ratings/mine/ is IsAuthenticated and would 401). */
   useEffect(() => {
+    if (!uatCurrentProductId) return;
+    setUatBeforeAnswers(readUatPhaseAnswers(uatCurrentProductId, "before"));
+    setUatAfterAnswers(readUatPhaseAnswers(uatCurrentProductId, "after"));
+  }, [uatCurrentProductId]);
+
+  useEffect(() => {
     if (isGuest) return undefined;
     let active = true;
 
@@ -1554,6 +1694,23 @@ function FittingStudioPage({ isGuest = false }) {
     const item = normalizeStudioItem(pending);
 
     if (!item) return;
+
+    if (uatEnabled && !isGuest) {
+      const productId = String(item.id);
+      const completed = readUatCompletionMap();
+      setUatCurrentProductId(productId);
+      setUatPhase("before");
+      const session = readUatSession();
+      if (!session || String(session.product_id) !== productId) {
+        void startUatSession(productId);
+      }
+      if (!completed[productId]) {
+        setUatPendingEquipItem(item);
+        setUatSurveyPhase("before");
+        setUatSurveyOpen(true);
+        return;
+      }
+    }
 
     if (!avatarGenderAllowsItem(avatar.gender, item)) {
       displayNotification(
@@ -1871,6 +2028,215 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }
 
+  async function startUatSession(productId) {
+    if (!uatEnabled || isGuest || !productId) return null;
+    const current = readUatSession();
+    if (current && String(current.product_id) === String(productId)) {
+      setUatSession(current);
+      setUatCurrentProductId(String(productId));
+      return current;
+    }
+
+    const token = getAccessToken();
+    if (!token) return null;
+
+    try {
+      const response = await fetch(`${API_URL}/ratings/uat/session/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role: "shopper", product_id: String(productId) }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to start UAT session");
+      }
+
+      const data = await response.json();
+      const session = {
+        session_id: data.session_id,
+        product_id: String(productId),
+        role: data.role || "shopper",
+      };
+      localStorage.setItem(uatSessionStorageKey(), JSON.stringify(session));
+      setUatSession(session);
+      setUatCurrentProductId(String(productId));
+      return session;
+    } catch (error) {
+      console.error("Unable to start UAT session:", error);
+      return null;
+    }
+  }
+
+  async function submitUatResponse(productId, phase, questionKey, value) {
+    const session = readUatSession();
+    if (!session || !productId || !questionKey || !value) return null;
+
+    const token = getAccessToken();
+    if (!token) return null;
+
+    try {
+      setUatSurveySubmitting(true);
+      const response = await fetch(`${API_URL}/ratings/uat/response/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          session_id: session.session_id,
+          product_id: String(productId),
+          phase,
+          question_key: questionKey,
+          value,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Unable to save UAT response");
+      }
+
+      const answers = phase === "before" ? { ...uatBeforeAnswers } : { ...uatAfterAnswers };
+      answers[questionKey] = Number(value);
+      if (phase === "before") {
+        setUatBeforeAnswers(answers);
+        saveUatPhaseAnswers(productId, "before", answers);
+      } else {
+        setUatAfterAnswers(answers);
+        saveUatPhaseAnswers(productId, "after", answers);
+        const completionMap = readUatCompletionMap();
+        completionMap[String(productId)] = true;
+        saveUatCompletionMap(completionMap);
+        setUatCompletedProducts(completionMap);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Unable to save UAT response:", error);
+      return null;
+    } finally {
+      setUatSurveySubmitting(false);
+    }
+  }
+
+  function handleUatAnswer(productId, phase, questionKey, value) {
+    if (!productId || !questionKey || value == null) return;
+    void submitUatResponse(productId, phase, questionKey, value);
+  }
+
+  function applyPendingUatItem(item) {
+    if (!item) return;
+    if (!avatarGenderAllowsItem(avatar.gender, item)) {
+      displayNotification(
+        `${item.name} is not available for your current avatar gender.`
+      );
+      return;
+    }
+
+    const next = { ...equippedItems, [item.category]: item };
+    const nextLimits = combinedFitLimits(next);
+
+    if (nextLimits.incompatible) {
+      displayNotification(
+        "These garment sizes have conflicting fitting limits. Try another size."
+      );
+      return;
+    }
+
+    if (!Object.values(equippedItems).some(Boolean)) {
+      setOriginalDimensions({
+        height: avatar.height,
+        weight: avatar.weight,
+      });
+    }
+
+    setEquippedItems(next);
+    setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
+    setAvatar((current) =>
+      applySizeCaps(
+        applyFitLimits(current, nextLimits),
+        sizeCapsForEquipped(next)
+      )
+    );
+
+    displayNotification(
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
+        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
+    );
+  }
+
+  function handleUatModalSave() {
+    const productId = String(uatCurrentProductId || uatPendingEquipItem?.id || "");
+    if (!productId) return;
+
+    if (uatSurveyPhase === "before") {
+      const answers = { ...uatBeforeAnswers };
+      const requiredQuestions = UAT_QUESTIONS.map((question) => question.key);
+      const answeredCount = requiredQuestions.filter((key) => answers[key] != null).length;
+
+      if (answeredCount === 0) {
+        setUatSurveyOpen(false);
+        setUatSurveyPhase("after");
+        if (uatPendingEquipItem) {
+          applyPendingUatItem(uatPendingEquipItem);
+          setUatPendingEquipItem(null);
+        }
+        return;
+      }
+
+      setUatSurveyOpen(false);
+      if (uatPendingEquipItem) {
+        applyPendingUatItem(uatPendingEquipItem);
+        setUatPendingEquipItem(null);
+      }
+      setUatPhase("after");
+      setUatSurveyPhase("after");
+      setUatSurveyOpen(true);
+      return;
+    }
+
+    const completionMap = readUatCompletionMap();
+    completionMap[String(productId)] = true;
+    saveUatCompletionMap(completionMap);
+    setUatCompletedProducts(completionMap);
+    setUatSurveyOpen(false);
+    setUatThankYouVisible(true);
+  }
+
+  function handleUatModalSkip() {
+    const productId = String(uatCurrentProductId || uatPendingEquipItem?.id || "");
+    if (uatSurveyPhase === "before") {
+      setUatSurveyOpen(false);
+      setUatSurveyPhase("after");
+      if (uatPendingEquipItem) {
+        applyPendingUatItem(uatPendingEquipItem);
+        setUatPendingEquipItem(null);
+      }
+      setUatPhase("after");
+      setUatSurveyOpen(true);
+      return;
+    }
+
+    if (productId) {
+      const completionMap = readUatCompletionMap();
+      completionMap[productId] = true;
+      saveUatCompletionMap(completionMap);
+      setUatCompletedProducts(completionMap);
+    }
+    setUatSurveyOpen(false);
+    setUatThankYouVisible(true);
+  }
+
+  function handleUatFinishTryOn() {
+    const productId = String(uatCurrentProductId || "");
+    if (!productId) return;
+    setUatSurveyPhase("after");
+    setUatSurveyOpen(true);
+  }
+
   function handleRecommendations() {
     setActivePanel("recommendations");
 
@@ -1893,6 +2259,10 @@ function FittingStudioPage({ isGuest = false }) {
     setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setFocusMatchItemId(String(item.id));
     setMatchRequestVersion((version) => version + 1);
+    setUatMatchReasonsOpenedByProduct((current) => ({
+      ...current,
+      [String(item.id)]: true,
+    }));
 
     window.requestAnimationFrame(() => {
       matchPanelRef.current?.focus({ preventScroll: true });
@@ -2024,6 +2394,113 @@ function FittingStudioPage({ isGuest = false }) {
             Change Gender
           </button>
         </section>
+
+        {uatSurveyOpen && uatCurrentProductId && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(24, 18, 14, 0.6)", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+            <div style={{ width: "min(780px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "#fffaf2", borderRadius: "18px", border: "1px solid #d7b777", boxShadow: "0 22px 60px rgba(39, 28, 17, 0.25)", padding: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "18px" }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: "11px", letterSpacing: "0.12em", color: "#7a6957", textTransform: "uppercase" }}>UAT Survey</p>
+                  <h2 style={{ margin: "6px 0 0", fontSize: "1.6rem", color: "#201a16" }}>{uatSurveyPhase === "before" ? "Before try-on" : "After try-on"}</h2>
+                </div>
+                <button type="button" onClick={handleUatModalSkip} style={{ background: "transparent", border: "1px solid #caa96b", borderRadius: "999px", padding: "10px 16px", color: "#4e3e2b", fontWeight: 700, cursor: "pointer" }}>
+                  Skip
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: "18px" }}>
+                {(uatSurveyPhase === "before" ? UAT_QUESTIONS : [
+                  ...UAT_QUESTIONS,
+                  ...UAT_AFTER_EXTRA_QUESTIONS.filter((question) => {
+                    if (question.key === "responsiveness" || question.key === "privacy_comfort") return true;
+                    if (question.key === "style_discovery") return Boolean(uatMatchReasonsOpenedByProduct[String(uatCurrentProductId)]);
+                    if (question.key === "match_helpfulness") return Boolean(uatMatchReasonsOpenedByProduct[String(uatCurrentProductId)]);
+                    return false;
+                  }),
+                ]).map((question) => {
+                  const isBooleanQuestion = question.isBoolean;
+                  const selectedValue = (uatSurveyPhase === "before" ? uatBeforeAnswers : uatAfterAnswers)[question.key];
+
+                  return (
+                    <div key={question.key} style={{ display: "grid", gap: "10px" }}>
+                      <label style={{ fontWeight: 600, color: "#201a16", lineHeight: 1.4 }}>{question.prompt}</label>
+
+                      {isBooleanQuestion ? (
+                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                          {[{ value: 1, label: "Yes" }, { value: 0, label: "No" }].map((option) => (
+                            <button
+                              key={`${question.key}-${option.value}`}
+                              type="button"
+                              onClick={() => handleUatAnswer(uatCurrentProductId, uatSurveyPhase, question.key, option.value)}
+                              style={{
+                                minWidth: "88px",
+                                padding: "10px 16px",
+                                borderRadius: "999px",
+                                border: selectedValue === option.value ? "1px solid #4d3a21" : "1px solid #d0c0a2",
+                                background: selectedValue === option.value ? "#d9a84d" : "#f8f2e8",
+                                color: selectedValue === option.value ? "#1e170f" : "#4a392d",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                            {[1, 2, 3, 4, 5].map((score) => (
+                              <button
+                                key={`${question.key}-${score}`}
+                                type="button"
+                                style={{
+                                  minWidth: "44px",
+                                  padding: "8px 12px",
+                                  borderRadius: "999px",
+                                  border: selectedValue === score ? "1px solid #4d3a21" : "1px solid #d0c0a2",
+                                  background: selectedValue === score ? "#d9a84d" : "#f8f2e8",
+                                  color: selectedValue === score ? "#1e170f" : "#4a392d",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => handleUatAnswer(uatCurrentProductId, uatSurveyPhase, question.key, score)}
+                                aria-label={`${question.prompt} answer ${score}`}
+                              >
+                                {score}
+                              </button>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#7a6957" }}>
+                            <span>{question.lowLabel}</span>
+                            <span>{question.highLabel}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "22px", flexWrap: "wrap" }}>
+                <button type="button" onClick={handleUatModalSkip} style={{ background: "#f3ead8", border: "1px solid #d0c0a2", borderRadius: "999px", padding: "12px 18px", color: "#3e2e22", fontWeight: 700, cursor: "pointer" }}>
+                  {uatSurveyPhase === "before" ? "Skip for now" : "Close"}
+                </button>
+                <button type="button" onClick={handleUatModalSave} style={{ background: "#23201d", border: "none", borderRadius: "999px", padding: "12px 20px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+                  {uatSurveyPhase === "before" ? "Save & continue" : "Submit"}
+                </button>
+              </div>
+
+              {uatSurveySubmitting && <p style={{ margin: "12px 0 0", color: "#675328" }}>Saving UAT response…</p>}
+            </div>
+          </div>
+        )}
+
+        {uatThankYouVisible && (
+          <div style={{ marginBottom: "18px", background: "#f2f7ef", border: "1px solid #84ba85", borderRadius: "12px", padding: "12px 14px", color: "#1d4520", fontWeight: 600 }}>
+            Thank you for helping us validate the shopping experience.
+          </div>
+        )}
 
         <div className="studio-workspace">
           <section

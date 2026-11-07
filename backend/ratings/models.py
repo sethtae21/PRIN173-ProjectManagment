@@ -1,6 +1,12 @@
+import uuid
+
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+
+
+def generate_uat_session_id():
+    return uuid.uuid4().hex
 
 
 class Rating(models.Model):
@@ -70,3 +76,48 @@ class Rating(models.Model):
             f"{self.user} -> {self.target_type}:{self.target_id} "
             f"[{', '.join(bits) or 'empty'}] ({source_label})"
         )
+
+
+class UATSession(models.Model):
+    role = models.CharField(max_length=10, choices=[('shopper', 'Shopper'), ('seller', 'Seller')], default='shopper')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='uat_sessions')
+    session_id = models.CharField(max_length=32, primary_key=True, default=generate_uat_session_id, editable=False)
+    product_id = models.CharField(max_length=50, blank=True, default='')
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=[('active', 'Active'), ('completed', 'Completed')], default='active')
+    notes = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'uat_session'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['product_id']),
+        ]
+
+    def __str__(self):
+        return f"UAT {self.session_id} ({self.role})"
+
+
+class UATResponse(models.Model):
+    PHASE_CHOICES = [('before', 'Before'), ('after', 'After'), ('supplementary', 'Supplementary')]
+    question_key = models.CharField(max_length=80)
+    phase = models.CharField(max_length=20, choices=PHASE_CHOICES, default='before')
+    product_id = models.CharField(max_length=50)
+    value = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(5)])
+    session = models.ForeignKey(UATSession, on_delete=models.CASCADE, related_name='responses')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'uat_response'
+        unique_together = ('session', 'product_id', 'question_key', 'phase')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['session', 'product_id']),
+            models.Index(fields=['question_key', 'phase']),
+        ]
+
+    def __str__(self):
+        return f"{self.session_id} {self.phase}:{self.question_key}={self.value}"

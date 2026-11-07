@@ -18,6 +18,24 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+function getCurrentUserId() {
+  try {
+    const rawSession = localStorage.getItem("fitfusion.session.v1");
+    const session = rawSession ? JSON.parse(rawSession) : null;
+    const user = session?.user || JSON.parse(localStorage.getItem("fitfusion-current-user") || "null");
+    if (user && typeof user === "object") {
+      return String(user.id ?? user.user_id ?? user.pk ?? user.email ?? "guest");
+    }
+  } catch {
+    // ignore parse issues and fall back to a guest-scoped key
+  }
+  return "guest";
+}
+
+function uatSessionStorageKey() {
+  return `fitfusion-uat-session-${getCurrentUserId()}`;
+}
+
 function readCart() {
   try {
     const saved = localStorage.getItem("fitfusion-cart");
@@ -155,8 +173,56 @@ function ProductDetailsPage({ isGuest = false }) {
     console.log("Viewing store for:", product?.store_name);
   }
 
+  async function startUatSession() {
+    if (!product || guestMode) return;
+    const token = getAccessToken();
+    if (!token) {
+      setRestrictedFeature("participate in the UAT survey");
+      setShowRegistrationModal(true);
+      return;
+    }
+
+    try {
+      const payload = {
+        role: "shopper",
+        product_id: String(product.id),
+      };
+
+      const response = await fetch(`${API_URL}/ratings/uat/session/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Unable to start UAT session.");
+      }
+
+      const data = await response.json();
+      const session = {
+        session_id: data.session_id,
+        product_id: String(product.id),
+        role: data.role || "shopper",
+      };
+      localStorage.setItem(uatSessionStorageKey(), JSON.stringify(session));
+      setMessage("UAT session started. Answer the before survey before trying the item on.");
+      setTimeout(() => setMessage(""), 4000);
+    } catch (error) {
+      console.error("Unable to start UAT session:", error);
+      setMessage(error.message || "We could not start the UAT session.");
+      setTimeout(() => setMessage(""), 4000);
+    }
+  }
+
   function handleTryOn() {
     if (!product) return;
+    if (!guestMode && new URLSearchParams(window.location.search).get("uat") === "1") {
+      void startUatSession();
+    }
     setShowTryOnModal(true);
   }
 
@@ -401,6 +467,11 @@ function ProductDetailsPage({ isGuest = false }) {
               </div>
             </section>
             <div className="product-main-actions">
+              {new URLSearchParams(window.location.search).get("uat") === "1" && !guestMode && (
+                <button type="button" className="product-try-button" onClick={startUatSession} style={{ marginBottom: "10px" }}>
+                  Start UAT Session
+                </button>
+              )}
               <button type="button" className="product-try-button" onClick={handleTryOn}>
                 Try in Fitting Studio
               </button>

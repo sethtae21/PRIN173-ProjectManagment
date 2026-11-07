@@ -947,6 +947,14 @@ export const ratingsApi = {
     performJsonRequest('POST', '/ratings/guest-session/clear/', undefined, { auth: false }),
 };
 
+export const uatApi = {
+  startSession: (payload) => performJsonRequest('POST', '/ratings/uat/session/', payload),
+  submitResponse: (payload) => performJsonRequest('POST', '/ratings/uat/response/', payload),
+  exportCsv: () => `${API_BASE}/ratings/uat/export/`,
+};
+
+export const uatAPI = uatApi;
+
 // ----------------------------------------------------------------------------
 // ALIASES — backward compatibility (keep BOTH spellings forever)
 // ----------------------------------------------------------------------------
@@ -979,7 +987,7 @@ export default {
   authApi, authAPI, catalogApi, catalogAPI, presetsApi, presetsAPI,
   outfitsApi, outfitsAPI, cartApi, cartAPI, checkoutApi, checkoutAPI,
   ordersApi, ordersAPI, recommendationsApi, recommendationsAPI,
-  ratingsApi, ratingsAPI,
+  ratingsApi, ratingsAPI, uatApi, uatAPI,
   login, logout, register, registerSeller, registerShopper, refreshTokens,
   getProfile, updateProfile, changePassword, deleteAccount,
   getAccessToken, getRefreshToken, getStoredUser, setSession, clearSession,
