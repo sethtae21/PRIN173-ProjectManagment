@@ -49,7 +49,6 @@ function SellerIcon({ name, size = 21 }) {
     strokeWidth: 1.8,
     strokeLinecap: "round",
     strokeLinejoin: "round",
-    "aria-hidden": true,
   };
 
   switch (name) {
@@ -93,7 +92,7 @@ function SellerIcon({ name, size = 21 }) {
       return (
         <svg {...props}>
           <path d="M3 10h18l-1.5-6h-15z" />
-          <path d="M5 10v10h14V10" />
+          <path d="M5 10v10h14V10z" />
           <path d="M9 20v-7h6v7" />
           <path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
         </svg>
@@ -197,6 +196,7 @@ function SellerLayout() {
     }
 
     // 2. Wipe in-memory mirror + canonical + ALL legacy keys atomically
+    //    (clearSession also erases the history epoch -> back/forward fix)
     clearSession();
 
     sessionStorage.removeItem("userRole");
@@ -207,8 +207,10 @@ function SellerLayout() {
     setLogoutModalOpen(false);
     setSidebarOpen(false);
 
-    // 3. Force a hard reload so no stale React closures or module-level caches survive
-    window.location.href = "/login";
+    // 3. Force a hard reload so no stale React closures or module-level caches
+    //    survive. CHANGED: replace() instead of href= so logout does NOT push
+    //    an extra /login entry on top of the tab's history stack.
+    window.location.replace("/login");
   }
 
   return (

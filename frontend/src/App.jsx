@@ -62,6 +62,9 @@ import { loadMatchReasons } from "./services/api";
 
 import SessionBootGuard from "./components/SessionBootGuard";
 
+/* NEW: post-login Back/Forward policy — public auth pages bounce to dashboard */
+import AuthenticatedBounce from "./components/AuthenticatedBounce";
+
 import "./App.css";
 
 function ScrollToTop() {
@@ -103,48 +106,79 @@ function App() {
       <Routes>
         {/* =====================================
             PUBLIC PAGES
+            CHANGED: each pre-login public page is wrapped in
+            AuthenticatedBounce so a logged-in user can NEVER Back/Forward
+            into landing / login / signup / forgot-password. While logged out
+            the wrapper renders the page untouched.
         ===================================== */}
 
-        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/"
+          element={
+            <AuthenticatedBounce>
+              <LandingPage />
+            </AuthenticatedBounce>
+          }
+        />
 
         <Route
           path="/avatar-c-test"
           element={<FemaleAvatarCanvasTest />}
         />
 
-        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/login"
+          element={
+            <AuthenticatedBounce>
+              <LoginPage />
+            </AuthenticatedBounce>
+          }
+        />
 
         <Route
           path="/signup"
-          element={<ChooseRegistrationRolePage />}
+          element={
+            <AuthenticatedBounce>
+              <ChooseRegistrationRolePage />
+            </AuthenticatedBounce>
+          }
         />
 
         <Route
           path="/signup/shopper"
-          element={<SignupPage />}
+          element={
+            <AuthenticatedBounce>
+              <SignupPage />
+            </AuthenticatedBounce>
+          }
         />
 
         <Route
           path="/signup/seller"
-          element={<SellerSignupPage />}
+          element={
+            <AuthenticatedBounce>
+              <SellerSignupPage />
+            </AuthenticatedBounce>
+          }
         />
 
         <Route
           path="/forgot-password"
           element={
-            <TemporaryPage
-              title="Forgot Password"
-              message="Password recovery will be added next."
-              returnTo="/login"
-              returnLabel="Return to Login"
-            />
+            <AuthenticatedBounce>
+              <TemporaryPage
+                title="Forgot Password"
+                message="Password recovery will be added next."
+                returnTo="/login"
+                returnLabel="Return to Login"
+              />
+            </AuthenticatedBounce>
           }
         />
 
         {/* =====================================
             GUEST ROUTES
         ===================================== */}
-
         <Route path="/guest" element={<GuestLayout />}>
           <Route index element={<GuestPage />} />
 
@@ -193,7 +227,6 @@ function App() {
         {/* =====================================
             REGISTERED SHOPPER ROUTES
         ===================================== */}
-
        <Route
   path="/shopper"
   element={
@@ -329,7 +362,6 @@ function App() {
         {/* =====================================
             SELLER ROUTES
         ===================================== */}
-
         <Route
   path="/seller"
   element={
@@ -459,7 +491,6 @@ function App() {
         {/* =====================================
             UNKNOWN WEBSITE ROUTES
         ===================================== */}
-
         <Route
           path="*"
           element={<Navigate to="/" replace />}

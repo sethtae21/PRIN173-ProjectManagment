@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import fitFusionLogo from "../assets/fitfusion-logo.svg";
 import { authAPI } from "../services/api";
-import { setSession } from "../services/session";
+import { setSession, getSession } from "../services/session";
 import "./css/LoginPage.css";
 
 function LoginPage() {
@@ -11,6 +11,20 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // FIX: Login page history & credential persistence bug.
+  // If a valid session already exists (e.g., user clicked "Back" from dashboard
+  // or the page was restored from bfcache), immediately bounce them to their
+  // dashboard. window.location.replace() SWAPS this history entry so the login
+  // page can never be revisited via Back, and the fresh boot stamps the new
+  // history epoch entry in SessionBootGuard.
+  useEffect(() => {
+    const session = getSession();
+    if (session && session.access) {
+      const role = session.user?.role === "seller" ? "seller" : "shopper";
+      window.location.replace(`/${role}/dashboard`);
+    }
+  }, []);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -36,7 +50,7 @@ function LoginPage() {
       // Determine role and extract user data
       const userData = response.user || {};
       const role = userData.role === "seller" ? "seller" : "shopper";
-      
+
       const currentUser = {
         id: userData.id,
         full_name: userData.full_name || credentials.email,
@@ -45,17 +59,26 @@ function LoginPage() {
         store_name: userData.store_name || "",
       };
 
-      // Persist session atomically via session.js (replaces all manual localStorage writes)
+      // Persist session atomically via session.js (replaces all manual localStorage writes).
+      // setSession() also stamps the new history epoch (back/forward fix).
       setSession({
         access: response.tokens?.access || response.access,
         refresh: response.tokens?.refresh || response.refresh,
         user: currentUser,
       });
 
+      // FIX: Clear the form state immediately so credentials aren't left in memory
+      // or auto-filled if the browser attempts to restore this page.
+      setCredentials({ email: "", password: "" });
+      setShowPassword(false);
+      setErrorMessage("");
+
+      // FIX: hard replace (not SPA navigate) so the login document is discarded,
+      // never enters the bfcache, and the dashboard boots as a clean, stamped entry.
       if (role === "shopper") {
-        navigate("/shopper/dashboard", { replace: true });
+        window.location.replace("/shopper/dashboard");
       } else {
-        navigate("/seller/dashboard", { replace: true });
+        window.location.replace("/seller/dashboard");
       }
     } catch (error) {
       console.error("Login failed:", error);
@@ -112,33 +135,33 @@ function LoginPage() {
             <form className="login-form" onSubmit={handleSubmit} noValidate>
               <div className="login-field">
                 <label htmlFor="login-email">Email Address</label>
-                <input 
-                  id="login-email" 
-                  name="email" 
-                  type="email" 
-                  value={credentials.email} 
-                  onChange={handleChange} 
-                  placeholder="name@example.com" 
-                  autoComplete="email" 
+                <input
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  value={credentials.email}
+                  onChange={handleChange}
+                  placeholder="name@example.com"
+                  autoComplete="email"
                 />
               </div>
 
               <div className="login-field">
                 <label htmlFor="login-password">Password</label>
                 <div className="login-password-control">
-                  <input 
-                    id="login-password" 
-                    name="password" 
-                    type={showPassword ? "text" : "password"} 
-                    value={credentials.password} 
-                    onChange={handleChange} 
-                    placeholder="Enter your password" 
-                    autoComplete="current-password" 
+                  <input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={credentials.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
                   />
-                  <button 
-                    type="button" 
-                    className="login-password-toggle" 
-                    onClick={() => setShowPassword((currentValue) => !currentValue)} 
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((currentValue) => !currentValue)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "Hide" : "Show"}

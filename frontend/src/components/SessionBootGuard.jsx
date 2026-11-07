@@ -1,43 +1,120 @@
 /**
  * frontend/src/components/SessionBootGuard.jsx
- * Defense-in-depth for the "refresh shows the previous user" bug.
+ * Defense-in-depth for session integrity AND the back/forward "random pages" bug.
  *
- * Lives in components/ (not services/) on purpose: it RENDERS (splash,
- * <Navigate>, children) and uses React hooks - services/ stays React-free.
- *
- * On every mount of a protected route it verifies that the persisted token
- * actually belongs to a real, consistent account (GET /profile/ with the
- * stored token; the token's user_id claim must equal the returned profile
- * id) and, when requireRole is given, that the role matches the route family
- * (FR-1.7 mirror in the UI). Any mismatch clears the session and bounces to
- * /login instead of rendering someone else's identity - the exact failure
- * mode seen at /seller/dashboard after a refresh with a shopper token.
- *
- * Self-contained on purpose: it talks to /profile/ with fetch() directly so
- * it never depends on the api client's import path or interceptors.
- *
- * Usage in the router (App.jsx):
- *   <SessionBootGuard requireRole="seller"><SellerDashboardPage /></SessionBootGuard>
- *   <SessionBootGuard><AccountPage /></SessionBootGuard>
+ * RULES (revised after UAT of the first epoch patch):
+ *  1. DEAD TOKEN / IDENTITY MISMATCH (profile 401/403, or user_id != JWT claim):
+ *     clearSession() + bounce to /login. The session is genuinely invalid.
+ *  2. ROLE MISMATCH (valid shopper token on a /seller route, or vice versa —
+ *     the classic Back-into-a-previous-role-history-entry case): DO NOT destroy
+ *     the live session. Replace-navigate to the home of the role the session
+ *     actually belongs to. This kills the "Back reaches history limit and I get
+ *     logged out" failure and guarantees a wrong-role page NEVER mounts, so it
+ *     can never fire role-scoped requests (the /catalog/my_listings/ 403s).
+ *  3. BACKEND UNREACHABLE: fall back to the LOCAL session role for the role
+ *     decision (never render wrong-role children), but do NOT lock the user out.
+ *  4. HISTORY EPOCH: entries created before the current login (Back/Forward
+ *     boots only) are replace-navigated to the role home; in-session entries are
+ *     stamped with history.state.ffEpoch so normal Back/Forward keeps working.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { clearSession, decodeClaims, getSession } from '../services/session.js';
+import {
+  clearSession,
+  decodeClaims,
+  getSession,
+  getHistoryEpoch,
+} from '../services/session.js';
 
 const API_BASE_URL = String(
   import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000',
 ).replace(/\/+$/, '');
 
+const ROLE_HOME = {
+  shopper: '/shopper/dashboard',
+  seller: '/seller/dashboard',
+};
+
+function homeFor(role) {
+  return ROLE_HOME[String(role || '').toLowerCase()] || '/shopper/dashboard';
+}
+
+function readStateEpoch() {
+  try {
+    return (window.history.state && window.history.state.ffEpoch) || null;
+  } catch {
+    return null;
+  }
+}
+
+function stampCurrentEntry(epoch) {
+  try {
+    window.history.replaceState(
+      { ...window.history.state, ffEpoch: epoch },
+      '',
+    );
+  } catch {
+    // history.state unavailable: entry simply stays unstamped
+  }
+}
+
+/** Consume the traverse signal and decide if THIS entry predates the login. */
+function epochIsStale() {
+  const epoch = getHistoryEpoch();
+  const stateEpoch = readStateEpoch();
+  const traverse = window.__FF_TRAVERSE_BOOT__ === true;
+  // Consume for this document: later mounts are in-app navigations.
+  window.__FF_TRAVERSE_BOOT__ = false;
+  if (!epoch || stateEpoch === epoch) return { stale: false, epoch };
+  if (traverse) return { stale: true, epoch };
+  stampCurrentEntry(epoch); // fresh in-app entry: stamp it
+  return { stale: false, epoch };
+}
+
 export default function SessionBootGuard({ children, requireRole = null }) {
   const location = useLocation();
-  const [state, setState] = useState('checking'); // checking | ok | reset
+  const [state, setState] = useState('checking'); // checking | ok | reset | bounce
+  const [bounceTo, setBounceTo] = useState(null);
+  // Avoid re-deciding the same pathname twice (StrictMode double effects).
+  const decidedPathRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     const session = getSession();
+
     if (!session || !session.access) {
+      window.__FF_TRAVERSE_BOOT__ = false;
       setState('reset');
       return () => { cancelled = true; };
+    }
+
+    const localRole =
+      session.user && session.user.role ? String(session.user.role) : null;
+
+    function bounce(target) {
+      if (decidedPathRef.current === location.pathname) return;
+      decidedPathRef.current = location.pathname;
+      setBounceTo(target);
+      setState('bounce');
+    }
+
+    function finishOk() {
+      if (decidedPathRef.current === location.pathname) {
+        setState('ok');
+        return;
+      }
+      const { stale, epoch } = epochIsStale();
+      const target = homeFor(localRole || requireRole);
+      if (stale && location.pathname !== target) {
+        // Entry predates this login: replace it with the role home.
+        decidedPathRef.current = location.pathname;
+        setBounceTo(target);
+        setState('bounce');
+        return;
+      }
+      if (stale) stampCurrentEntry(epoch); // stale but already at home: keep it
+      decidedPathRef.current = location.pathname;
+      setState('ok');
     }
 
     fetch(`${API_BASE_URL}/profile/`, {
@@ -50,7 +127,7 @@ export default function SessionBootGuard({ children, requireRole = null }) {
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) {
-          // 401/403: stored token is dead or lacks the role -> start clean
+          // Dead or blacklisted token: the session is genuinely gone.
           clearSession();
           setState('reset');
           return;
@@ -60,27 +137,41 @@ export default function SessionBootGuard({ children, requireRole = null }) {
         const claims = decodeClaims(session.access);
         const identityConsistent =
           user && claims && String(user.id) === String(claims.user_id);
-        const roleOk = !requireRole || (user && user.role === requireRole);
-        if (!identityConsistent || !roleOk) {
+        if (!identityConsistent) {
           clearSession();
           setState('reset');
-        } else {
-          setState('ok');
+          return;
         }
+        // RULE 2: valid session, wrong role family for this route -> bounce,
+        // NEVER clearSession. The wrong-role page must not mount.
+        if (requireRole && user && user.role !== requireRole) {
+          window.__FF_TRAVERSE_BOOT__ = false;
+          bounce(homeFor(user.role));
+          return;
+        }
+        finishOk();
       })
       .catch(() => {
         if (cancelled) return;
-        // Backend unreachable: do NOT lock the user out; feature pages show
-        // their own "cannot reach the backend" banner.
-        setState('ok');
+        // RULE 3: backend unreachable. Use the LOCAL role so a wrong-role page
+        // can never mount and fire 403s; do not lock the user out otherwise.
+        if (requireRole && localRole && localRole !== requireRole) {
+          window.__FF_TRAVERSE_BOOT__ = false;
+          bounce(homeFor(localRole));
+          return;
+        }
+        finishOk();
       });
 
     return () => { cancelled = true; };
   }, [location.pathname, requireRole]);
 
-  if (state === 'checking') return null; // or your splash spinner
+  if (state === 'checking') return null; // splash
   if (state === 'reset') {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  if (state === 'bounce' && bounceTo) {
+    return <Navigate to={bounceTo} replace />;
   }
   return children;
 }

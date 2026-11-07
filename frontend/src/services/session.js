@@ -10,22 +10,24 @@
  * seller endpoints 403'd with the shopper's JWT (FR-1.7 working correctly).
  *
  * Contract:
- *  - ONE canonical storage key (STORAGE_KEY). setSession()/updateTokens()/
- *    clearSession() write storage AND the in-memory mirror atomically, then
- *    notify subscribers.
- *  - LEGACY ADOPTION: on first read, tokens left behind by older code under
- *    other localStorage keys (access_token, refresh_token, fitfusion-current-user,
- *    sellerAccount, registeredAccount) are adopted into the canonical key, so
- *    the boot guard works immediately without refactoring every page first.
- *    clearSession() erases the legacy keys too, so a logout can never be revived
- *    by an old key.
+ *  - ONE canonical storage key (STORAGE_KEY) kept in **sessionStorage** so the
+ *    session is PER-TAB (NEW: "login page bypass" fix). localStorage is shared
+ *    by every tab of the browser, so a "fresh" tab inherited another tab's
+ *    login and /login bounced straight to the dashboard. sessionStorage gives:
+ *      * new tab / new link  -> logged out (login page always reachable)
+ *      * refresh / back-fwd  -> still logged in (survives reloads)
+ *      * two tabs            -> two independent accounts (shopper + seller UAT)
+ *    setSession()/updateTokens()/clearSession() write storage AND the
+ *    in-memory mirror atomically, then notify subscribers.
+ *  - ONE-TIME MIGRATION: any session still living in localStorage (written by
+ *    older builds) is erased at boot so it can never re-authenticate a tab.
+ *    Legacy alias keys are adopted ONLY from sessionStorage.
  *  - AVATAR-SCOPE PURGE (cross-account leak fix): per-account avatar UI state
  *    (active preset, preset cache, gender, editing target) lives in
  *    localStorage, which is per-BROWSER, not per-USER. Without a purge, the
  *    next shopper to log in on the same browser inherits the previous
- *    shopper's avatar (dein's "axa" on karosu's dashboard/studio).
- *    setSession() and clearSession() therefore erase those keys; guest keys
- *    live in sessionStorage and are untouched.
+ *    shopper's avatar. setSession() and clearSession() erase those keys;
+ *    guest keys live in sessionStorage and are untouched.
  *  - COMMERCE-SCOPE PURGE (cross-account order/cart leak fix): the order
  *    history, last-order, cart and checkout handoff mirrors are written by the
  *    pages as GLOBAL localStorage keys (offline first-paint cache only — the
@@ -34,16 +36,22 @@
  *    browser inherits the previous account's Order History rows and cart badge.
  *    setSession() and clearSession() therefore erase those mirrors too; the
  *    pages rebuild them from the server on their next sync.
+ *  - HISTORY EPOCH (back/forward "random pages" fix): setSession() stamps a
+ *    per-tab epoch; SessionBootGuard stamps each protected history entry with
+ *    it (history.state.ffEpoch). Entries lacking the current epoch were created
+ *    BEFORE this login and are bounced on Back/Forward.
  *  - getAccessToken() is safe to call on every request (read per request,
  *    never captured in a module-level constant at import time).
- *  - Cross-tab safety: a 'storage' event refreshes the mirror in other tabs.
  * Service rule: no React imports, nothing rendered from here.
  * Traceability: RT-01 / FR-1.6 (login/logout session integrity),
  *               FR-6.7 / FR-6.8 (order history must show ONLY the owner's orders).
  */
 const STORAGE_KEY = 'fitfusion.session.v1';
 
-/* Legacy keys your existing code writes to. Read-only adoption; erased on logout. */
+/* NEW: per-tab login boundary used by SessionBootGuard's history-epoch check. */
+const HISTORY_EPOCH_KEY = 'fitfusion.history.epoch';
+
+/* Legacy keys older builds wrote. Read-only adoption (sessionStorage only). */
 const LEGACY_ACCESS_KEYS = ['access_token', 'accessToken', 'access'];
 const LEGACY_REFRESH_KEYS = ['refresh_token', 'refreshToken', 'refresh'];
 const LEGACY_USER_KEYS = [
@@ -54,7 +62,7 @@ const LEGACY_USER_KEYS = [
   'registeredAccount',
 ];
 
-/* NEW: per-account avatar UI state that must NOT survive an account switch. */
+/* Per-account avatar UI state that must NOT survive an account switch. */
 const AVATAR_SCOPE_KEYS = [
   'fitfusion-avatar-preset',
   'fitfusion-avatar-presets',
@@ -62,7 +70,7 @@ const AVATAR_SCOPE_KEYS = [
   'fitfusion-editing-avatar-preset',
 ];
 
-/* NEW: per-account commerce mirrors (offline first-paint caches) that must NOT
+/* Per-account commerce mirrors (offline first-paint caches) that must NOT
    survive an account switch. Product-level image map is intentionally kept
    (it maps catalog ids to images, contains no personal data). */
 const COMMERCE_SCOPE_KEYS = [
@@ -81,9 +89,12 @@ let memory = null;          // in-memory mirror of the stored session
 let hydrated = false;       // whether memory was loaded from storage yet
 const listeners = new Set();
 
+/* ---------------------------------------------------------------------------
+   PER-TAB STORAGE (sessionStorage). All session reads/writes go through here.
+--------------------------------------------------------------------------- */
 function safeGet(key) {
   try {
-    return window.localStorage.getItem(key);
+    return window.sessionStorage.getItem(key);
   } catch {
     return null;
   }
@@ -101,12 +112,29 @@ function safeJson(raw) {
 function writeStorage(session) {
   try {
     if (session) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     } else {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(STORAGE_KEY);
     }
   } catch {
     // private-mode / quota errors: the memory mirror still works this load
+  }
+}
+
+/**
+ * ONE-TIME MIGRATION / "login bypass" kill-switch: erase any session copy still
+ * living in localStorage (written by older builds). localStorage is shared by
+ * every tab, so leaving it behind lets a "fresh" tab inherit another tab's
+ * login and bounce /login straight to the dashboard. Called once at boot.
+ */
+function purgeLocalStorageSession() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+    [...LEGACY_ACCESS_KEYS, ...LEGACY_REFRESH_KEYS, ...LEGACY_USER_KEYS].forEach(
+      (key) => window.localStorage.removeItem(key),
+    );
+  } catch {
+    // ignore storage failures during cleanup
   }
 }
 
@@ -130,6 +158,39 @@ function purgeCommerceScope() {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   HISTORY EPOCH helpers (back/forward "random pages" fix).
+   sessionStorage is per-TAB: exactly the scope of one browsing history stack.
+--------------------------------------------------------------------------- */
+/** Current login epoch for this tab, or null when not logged in. */
+export function getHistoryEpoch() {
+  try {
+    return window.sessionStorage.getItem(HISTORY_EPOCH_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Called by setSession(): start a new epoch for this tab. */
+function stampHistoryEpoch() {
+  const epoch = String(Date.now());
+  try {
+    window.sessionStorage.setItem(HISTORY_EPOCH_KEY, epoch);
+  } catch {
+    // ignore storage failures during cleanup
+  }
+  return epoch;
+}
+
+/** Called by clearSession(): no epoch => guard never bounces a logged-out tab. */
+function clearHistoryEpoch() {
+  try {
+    window.sessionStorage.removeItem(HISTORY_EPOCH_KEY);
+  } catch {
+    // ignore storage failures during cleanup
+  }
+}
+
 function normalize(parsed) {
   if (!parsed || typeof parsed !== 'object') return null;
   const access = parsed.access || parsed.accessToken || parsed.access_token;
@@ -141,7 +202,7 @@ function normalize(parsed) {
   };
 }
 
-/** Adopt tokens left by older code into the canonical key (one-time). */
+/** Adopt tokens left by older code IN THIS TAB (sessionStorage only). */
 function adoptLegacy() {
   const access = LEGACY_ACCESS_KEYS.map(safeGet).find(Boolean);
   if (access) {
@@ -191,13 +252,13 @@ export function getRefreshToken() {
 
 /**
  * Called by login()/register(): persist FIRST, then navigate. Atomic.
- * CHANGED: a new identity also purges the previous account's avatar-scoped
- * AND commerce-scoped localStorage keys so no page can resurrect another
- * shopper's avatar, order history, last order, cart or rating UI memory.
+ * Purges the previous account's avatar-scoped AND commerce-scoped localStorage
+ * keys and stamps a fresh history epoch for the back/forward guard.
  */
 export function setSession({ access, refresh, user }) {
   purgeAvatarScope();
   purgeCommerceScope();
+  stampHistoryEpoch();
   memory = normalize({ access, refresh, user });
   writeStorage(memory);
   emit();
@@ -205,7 +266,8 @@ export function setSession({ access, refresh, user }) {
 }
 
 /** Called by a 401 auto-refresh path: replace tokens atomically.
- *  NOTE: deliberately does NOT purge any scope (same identity). */
+ *  NOTE: deliberately does NOT purge any scope and does NOT re-stamp the
+ *  epoch (same identity, same login). */
 export function updateTokens(access, refresh) {
   const current = getSession();
   if (!current) return null;
@@ -219,19 +281,22 @@ export function updateTokens(access, refresh) {
   return memory;
 }
 
-/** Logout / boot-guard reset: erase canonical AND legacy copies together,
- *  plus every avatar-scoped and commerce-scoped mirror. */
+/** Logout / boot-guard reset: erase the per-tab canonical copy, any sessionStorage
+ *  legacy aliases, the history epoch, and every localStorage scope mirror plus
+ *  localStorage leftovers from older builds. */
 export function clearSession() {
   memory = null;
   hydrated = true;
+  clearHistoryEpoch();
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(STORAGE_KEY);
     [...LEGACY_ACCESS_KEYS, ...LEGACY_REFRESH_KEYS, ...LEGACY_USER_KEYS].forEach(
-      (key) => window.localStorage.removeItem(key)
+      (key) => window.sessionStorage.removeItem(key),
     );
   } catch {
     // ignore storage failures during cleanup
   }
+  purgeLocalStorageSession(); // belt-and-braces: kill any localStorage residue
   purgeAvatarScope();
   purgeCommerceScope();
   emit();
@@ -255,14 +320,10 @@ export function decodeClaims(token) {
   }
 }
 
-// Cross-tab sync: another tab writing/clearing the canonical key updates us.
+// Boot-time migration: drop the cross-tab localStorage session once.
+// (sessionStorage has no cross-tab 'storage' events, so no sync listener needed.)
 if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (event) => {
-    if (event.key !== STORAGE_KEY && event.key !== null) return;
-    memory = readStorage();
-    hydrated = true;
-    emit();
-  });
+  purgeLocalStorageSession();
 }
 
 export default {
@@ -274,4 +335,5 @@ export default {
   clearSession,
   subscribe,
   decodeClaims,
+  getHistoryEpoch,
 };

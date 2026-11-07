@@ -207,14 +207,15 @@ function ShopperLayout() {
   async function handleLogout() {
     try {
       // 1. Blacklist the refresh token on the backend
-      await authAPI.logout(); 
+      await authAPI.logout();
     } catch (e) {
       console.warn("Logout API call failed, clearing local session anyway.", e);
     }
-    
+
     // 2. Wipe in-memory mirror + canonical + ALL legacy keys atomically
-    clearSession(); 
-    
+    //    (clearSession also erases the history epoch -> back/forward fix)
+    clearSession();
+
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("userEmail");
     sessionStorage.removeItem("registeredAccount");
@@ -222,8 +223,10 @@ function ShopperLayout() {
     setShowLogoutModal(false);
     setMobileMenuOpen(false);
 
-    // 3. Force a hard reload so no stale React closures or module-level caches survive
-    window.location.href = "/login"; 
+    // 3. Force a hard reload so no stale React closures or module-level caches
+    //    survive. CHANGED: replace() instead of href= so logout does NOT push
+    //    an extra /login entry on top of the tab's history stack.
+    window.location.replace("/login");
   }
 
   return (
