@@ -1,18 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
-import { presetsApi } from "../services/api";
+import { presetsApi, STYLE_FOCUS_OPTIONS } from "../services/api";
 import "./css/EditAvatarPresetPage.css";
-
-// =====================================================
-// FITFUSION AI — EDIT AVATAR PRESET (DB INTEGRATED)
-// UI-ONLY: the Weight slider is replaced by a Body Build
-// selector (Slim/Balanced/Full/Curve). The numeric weight
-// is derived from build + height and still sent to the API,
-// so models/serializers stay untouched for now.
-// SIZE-POLICY UPDATE: height range aligned with backend
-// knowledge_table HEIGHT_RANGE = 120-218 cm (was 218.4).
-// =====================================================
 
 const ACTIVE_KEY = "fitfusion-avatar-preset";
 const GENDER_KEY = "fitfusion-avatar-gender";
@@ -25,8 +15,7 @@ const HIP_OPTIONS = ["Slim", "Average", "Wide"];
 const THIGH_OPTIONS = ["Slim", "Average", "Thick"];
 const CUP_OPTIONS = ["A", "B", "C", "D"];
 
-const BODY_BUILDS = ["Slim", "Balanced", "Full", "Curve"];
-const BUILD_BMI = { Slim: 17.5, Balanced: 21.7, Full: 27.5, Curve: 32 };
+const BODY_BUILD_RANGE = { min: 86, max: 112 };
 
 const LEGACY_CHOICES = {
   shoulder: { balanced: "average", regular: "average", slim: "narrow", wide: "broad", thick: "broad", curvy: "broad" },
@@ -52,7 +41,8 @@ const DEFAULT_PRESET = {
   hip: "Average",
   thigh: "Average",
   cupSize: "B",
-  bodyType: "Balanced",
+  bodyBuildCm: 99,
+  styleFocus: "Casual",
   builtIn: false,
 };
 
@@ -80,22 +70,20 @@ function toDecimal(value, fallback, range) {
   return Math.min(range.max, Math.max(range.min, number));
 }
 
-function calculateBodyType(height, weight) {
-  const meters = Number(height) / 100;
-  const mass = Number(weight);
-  if (!Number.isFinite(meters) || !Number.isFinite(mass) || meters <= 0 || mass <= 0) return "Balanced";
-  const index = mass / (meters * meters);
-  if (index < 18.5) return "Slim";
-  if (index < 25) return "Balanced";
-  if (index < 30) return "Full";
-  return "Curve";
+function clamp(value, range) {
+  return Math.min(range.max, Math.max(range.min, Number(value) || range.min));
 }
 
-function weightForBuild(build, height) {
-  const meters = Number(height) / 100;
-  if (!Number.isFinite(meters) || meters <= 0) return 58;
-  const bmi = BUILD_BMI[build] ?? 21.7;
-  const raw = bmi * meters * meters;
+// Mirrors FittingStudioPage.jsx: derive kg from the cm build slider.
+function visualBuildToWeight(buildCm, heightCm) {
+  const build = clamp(buildCm, BODY_BUILD_RANGE);
+  const heightMeters = Number(heightCm) / 100;
+  if (!Number.isFinite(heightMeters) || heightMeters <= 0) return 58;
+  const progress =
+    (build - BODY_BUILD_RANGE.min) /
+    (BODY_BUILD_RANGE.max - BODY_BUILD_RANGE.min);
+  const visualRatio = 21 + progress * 11;
+  const raw = visualRatio * heightMeters * heightMeters;
   return Math.min(WEIGHT_RANGE.max, Math.max(WEIGHT_RANGE.min, Math.round(raw * 10) / 10));
 }
 
@@ -109,6 +97,11 @@ function normalizeChoice(value, options, fallback, group) {
 
 function normalizeGender(value) {
   return String(value || "").toLowerCase() === "male" ? "Male" : "Female";
+}
+
+function capitalizeChoice(value, fallback) {
+  const text = String(value || "").trim().toLowerCase();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : fallback;
 }
 
 function normalizePreset(preset, index = 0) {
@@ -141,7 +134,14 @@ function normalizePreset(preset, index = 0) {
         ? String(preset?.cupSize || preset?.cup_size || "B").toUpperCase()
         : null,
 
-    bodyType: calculateBodyType(height, weight),
+    // CHANGED: keep the stored decimal (95.7) instead of coercing to int.
+    bodyBuildCm: toDecimal(
+      preset?.body_build_cm ?? preset?.bodyBuildCm,
+      99,
+      BODY_BUILD_RANGE
+    ),
+    styleFocus: capitalizeChoice(preset?.style_focus || preset?.styleFocus, "Casual"),
+
     builtIn: Boolean(preset?.builtIn),
   };
 }
@@ -161,6 +161,9 @@ function toServerPayload(preset) {
     hip: lower(preset.hip),
     thigh: lower(preset.thigh),
     cup_size: preset.gender === "Female" ? preset.cupSize || "B" : null,
+    // CHANGED: send the exact decimal build (was Math.round -> 96).
+    body_build_cm: round2(preset.bodyBuildCm),
+    style_focus: lower(preset.styleFocus),
   };
 }
 
@@ -333,11 +336,6 @@ export default function EditAvatarPresetPage() {
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  const bodyType = useMemo(
-    () => calculateBodyType(formData.height, formData.weight),
-    [formData.height, formData.weight]
-  );
-
   const skinOptions = useMemo(() => {
     const current = String(formData.skinTone || "").trim().toLowerCase();
     if (!current) return SKIN_TONES;
@@ -349,26 +347,31 @@ export default function EditAvatarPresetPage() {
   const hasChanges = useMemo(() => {
     if (!originalPreset) return false;
 
-    const fields = ["name", "gender", "height", "weight", "skinTone", "undertone", "shoulder", "waist", "hip", "thigh", "cupSize"];
+    const fields = ["name", "gender", "height", "weight", "skinTone", "undertone", "shoulder", "waist", "hip", "thigh", "cupSize", "bodyBuildCm", "styleFocus"];
 
     return fields.some((field) => String(formData[field] ?? "") !== String(originalPreset[field] ?? ""));
   }, [formData, originalPreset]);
 
-  const previewAvatar = useMemo(() => ({ ...formData, bodyType }), [formData, bodyType]);
+  const previewAvatar = useMemo(() => ({ ...formData }), [formData]);
 
   function updateField(field, value) {
-    setFormData((current) => ({
-      ...current,
-      [field]: value,
-      ...(field === "gender" ? { cupSize: value === "Female" ? current.cupSize || "B" : null } : {}),
-    }));
+    setFormData((current) => {
+      const next = {
+        ...current,
+        [field]: value,
+        ...(field === "gender" ? { cupSize: value === "Female" ? current.cupSize || "B" : null } : {}),
+      };
+
+      if (field === "bodyBuildCm" || field === "height") {
+        const h = Number(field === "height" ? value : current.height);
+        const b = Number(field === "bodyBuildCm" ? value : current.bodyBuildCm);
+        next.weight = visualBuildToWeight(b, h);
+      }
+
+      return next;
+    });
 
     setErrors((current) => ({ ...current, [field]: "" }));
-  }
-
-  function selectBodyBuild(build) {
-    setFormData((current) => ({ ...current, weight: weightForBuild(build, current.height) }));
-    setErrors((current) => ({ ...current, weight: "" }));
   }
 
   function validateForm() {
@@ -394,7 +397,12 @@ export default function EditAvatarPresetPage() {
       nextErrors.height = `Height must be between ${HEIGHT_RANGE.min} and ${HEIGHT_RANGE.max} cm.`;
     }
 
-    // Weight is derived from Body Build, so it is always valid — no UI check needed.
+    const build = Number(formData.bodyBuildCm);
+    if (formData.bodyBuildCm === "" || !Number.isFinite(build)) {
+      nextErrors.bodyBuildCm = `Body build is required. Please enter a value between ${BODY_BUILD_RANGE.min} and ${BODY_BUILD_RANGE.max} cm.`;
+    } else if (build < BODY_BUILD_RANGE.min || build > BODY_BUILD_RANGE.max) {
+      nextErrors.bodyBuildCm = `Body build must be between ${BODY_BUILD_RANGE.min} and ${BODY_BUILD_RANGE.max} cm.`;
+    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -408,7 +416,9 @@ export default function EditAvatarPresetPage() {
       weight: toDecimal(formData.weight, 58, WEIGHT_RANGE),
       gender: formData.gender,
       cupSize: formData.gender === "Female" ? formData.cupSize || "B" : null,
-      bodyType,
+      // CHANGED: preserve the decimal build instead of Math.round.
+      bodyBuildCm: toDecimal(formData.bodyBuildCm, 99, BODY_BUILD_RANGE),
+      styleFocus: formData.styleFocus,
       builtIn: false,
     };
   }
@@ -619,19 +629,19 @@ export default function EditAvatarPresetPage() {
                   error={errors.height}
                   onChange={(value) => updateField("height", value)}
                 />
-              </div>
 
-              {/* UI-ONLY: Weight slider replaced by Body Build selector */}
-              <div className="edit-avatar-select-grid">
-                <SelectField label="Body Build" value={bodyType} options={BODY_BUILDS} onChange={selectBodyBuild} />
-              </div>
-
-              <div className="edit-avatar-body-result">
-                <div>
-                  <span>Calculated body type</span>
-                  <small>Based on height and body build</small>
-                </div>
-                <strong>{bodyType}</strong>
+                {/* CHANGED: step 0.1 so the exact decimal build can be set here too */}
+                <RangeField
+                  id="avatar-body-build"
+                  label="Body Build"
+                  value={formData.bodyBuildCm}
+                  min={BODY_BUILD_RANGE.min}
+                  max={BODY_BUILD_RANGE.max}
+                  step={0.1}
+                  unit="cm"
+                  error={errors.bodyBuildCm}
+                  onChange={(value) => updateField("bodyBuildCm", value)}
+                />
               </div>
             </FormSection>
 
@@ -707,6 +717,17 @@ export default function EditAvatarPresetPage() {
               </div>
             </FormSection>
 
+            <FormSection number="06" title="Style Focus" description="Choose the dressing context for your avatar.">
+              <div className="edit-avatar-select-grid">
+                <SelectField
+                  label="Style Focus"
+                  value={formData.styleFocus}
+                  options={STYLE_FOCUS_OPTIONS}
+                  onChange={(value) => updateField("styleFocus", value)}
+                />
+              </div>
+            </FormSection>
+
             <div className="edit-avatar-form-actions">
               <button type="button" className="edit-avatar-cancel-button" onClick={handleCancel}>
                 Cancel
@@ -723,7 +744,7 @@ export default function EditAvatarPresetPage() {
                 <p>LIVE 2D PREVIEW</p>
                 <h2>{formData.name || "Custom Avatar"}</h2>
               </div>
-              <span>{bodyType}</span>
+              <span>{formData.bodyBuildCm} cm</span>
             </div>
 
             <div className="edit-avatar-view-buttons" role="group" aria-label="Avatar preview view">
@@ -750,14 +771,14 @@ export default function EditAvatarPresetPage() {
             <div className="edit-avatar-summary">
               <SummaryItem label="Gender" value={formData.gender} />
               <SummaryItem label="Height" value={`${formData.height} cm`} />
-              {/* UI-ONLY: Weight row replaced by Body Build */}
-              <SummaryItem label="Body Build" value={bodyType} />
+              <SummaryItem label="Body Build" value={`${formData.bodyBuildCm} cm`} />
               <SummaryItem label="Shoulder" value={formData.shoulder} />
               <SummaryItem label="Waist" value={formData.waist} />
               <SummaryItem label="Hip" value={formData.hip} />
               <SummaryItem label="Thigh" value={formData.thigh} />
               {formData.gender === "Female" && <SummaryItem label="Cup size" value={formData.cupSize || "B"} />}
               <SummaryItem label="Undertone" value={formData.undertone} />
+              <SummaryItem label="Style Focus" value={formData.styleFocus} />
             </div>
 
             <button type="button" className="edit-avatar-use-button" onClick={useInFittingStudio}>
@@ -783,7 +804,7 @@ export default function EditAvatarPresetPage() {
             <button type="button" onClick={() => setShowDeleteModal(false)}>
               Keep Preset
             </button>
-            <button type="button" className="danger-button" onClick={confirmDelete()}>
+            <button type="button" className="danger-button" onClick={confirmDelete}>
               Delete Preset
             </button>
           </div>

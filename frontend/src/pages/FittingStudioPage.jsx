@@ -324,10 +324,6 @@ function normalizeStudioItem(item) {
   };
 }
 
-// REMOVED: withUniqueItem() -- the match-reasons panel is now SLOT-KEYED
-// (selectedMatchSlots), so a garment replaces the previous card of its body
-// slot instead of accumulating beside it. No helper needed anymore.
-
 function matchesAvatarSize(item, avatarSize) {
   if (!item) return false;
   if (item.category === "shoes") return true;
@@ -619,25 +615,37 @@ function capitalizeChoice(value, fallback) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// FIX (preset save 400 "A valid integer is required"): the deployed AvatarPreset
-// serializer validates height/weight as integers, while the UI collects decimal
-// cm (step 0.1) and the SRS data dictionary declares float height_cm/weight_kg.
-// Because these values drive a simulation-only 2D silhouette (SRS 3.2) and 0.1 cm
-// is sub-pixel on the canvas, we persist whole centimetres -- visually identical,
-// no migration, no risk to other backend callers. The live slider keeps decimals
-// for the session; only the stored preset snaps to the nearest cm on reload.
-function toWholeCm(value, fallback) {
+// ADDED (exact-size persistence): one-decimal / two-decimal preservers that
+// REPLACE the old toWholeCm() integer snapping. The AvatarPreset model now
+// uses FloatField for height / weight / body_build_cm, so the slider's exact
+// value (e.g. 177.4 cm, 95.7 cm) is stored and displayed un-rounded.
+function round1(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
-  return Math.round(number);
+  return Math.round(number * 10) / 10;
 }
 
+function round2(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.round(number * 100) / 100;
+}
+
+// REMOVED: toWholeCm() -- its only purpose was snapping preset height/weight
+// to whole centimetres for the old IntegerField model. The model is now
+// FloatField and shoppers asked for the exact decimal size, so it is gone.
+
+// CHANGED (preset fidelity + exact decimals): the studio save payload carries
+//   * height        : one decimal (177.4), not rounded to 177
+//   * weight        : two decimals, exact kg derived from the build slider
+//   * body_build_cm : one decimal (95.7), not rounded to 96
+//   * style_focus   : the shopper's dressing-for context
 function toServerPreset(avatar, name, isFemale) {
   return {
     name,
     gender: choiceValue(avatar.gender),
-    height: toWholeCm(avatar.height, 160),
-    weight: toWholeCm(avatar.weight, 55),
+    height: round1(avatar.height, 160),
+    weight: round2(avatar.weight, 55),
     skin_tone: avatar.skinTone || "#dca77d",
     undertone: choiceValue(avatar.undertone),
     shoulder: choiceValue(avatar.shoulder),
@@ -645,9 +653,17 @@ function toServerPreset(avatar, name, isFemale) {
     hip: choiceValue(avatar.hip),
     thigh: choiceValue(avatar.thigh),
     cup_size: isFemale ? avatar.cupSize || "B" : null,
+    body_build_cm: round1(
+      weightToVisualBuild(avatar.height, avatar.weight),
+      99
+    ),
+    style_focus: choiceValue(avatar.styleFocus),
   };
 }
 
+// CHANGED: map the persisted style_focus / body_build_cm back into the local
+// active-preset cache object so loadAvatar() adopts the saved Style Focus and
+// the cache stays consistent with the server record.
 function fromServerPreset(record) {
   const gender = normalizeGender(record?.gender);
 
@@ -667,6 +683,11 @@ function fromServerPreset(record) {
       gender === "Female"
         ? capitalizeChoice(record?.cup_size || record?.cupSize, "B")
         : null,
+    styleFocus: capitalizeChoice(
+      record?.style_focus || record?.styleFocus,
+      "Casual"
+    ),
+    bodyBuildCm: Number(record?.body_build_cm ?? record?.bodyBuildCm) || 99,
     builtIn: false,
   };
 }

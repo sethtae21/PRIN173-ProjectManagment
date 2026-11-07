@@ -13,12 +13,16 @@ const categories = [
   "Footwear",
 ];
 
-// Size filter entries rendered inside the "Filter By" dropdown.
-// KAN-FIX: the store only stocks S, M, L — XS / XL / XXL removed.
+// CHANGED: Added XL, 2XL, 3XL, 4XL to the size filter options to match
+// the backend's updated size policy (S, M, L, XL, 2XL, 3XL, 4XL).
 const SIZE_FILTERS = [
   { value: "S", label: "Size: Small" },
   { value: "M", label: "Size: Medium" },
   { value: "L", label: "Size: Large" },
+  { value: "XL", label: "Size: XL" },
+  { value: "2XL", label: "Size: 2XL" },
+  { value: "3XL", label: "Size: 3XL" },
+  { value: "4XL", label: "Size: 4XL" },
 ];
 
 // === ADD-TO-OUTFIT PICKER HANDSHAKE (FR-5.7 edit / KAN-69-115) =============
