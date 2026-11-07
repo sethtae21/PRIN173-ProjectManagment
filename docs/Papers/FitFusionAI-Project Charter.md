@@ -14,7 +14,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 
 **Instructor:** Ma Christina Florentino
 
-**Target Completion / Submission Date:** November 18, 2026 (Week 14 — Final Defense)
+**Target Completion / Submission Date:** November 21, 2026 (Week 14 — Final Defense)
 
 ## **2\. Document Control & References**
 
@@ -75,7 +75,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 | OBJ-07 | Lost sales from hesitation reduced: ≥70% of created carts complete mock checkout | P4 | UAT commerce scenario (≥70% checkout) |
 | OBJ-08 | Manual-listing burden removed: 10-item CSV processed \<60 s | P5 | Pipeline timing test |
 | OBJ-09 | Inconsistent listings eliminated at source: ≥80% publish without manual correction | P5 | Seller Dashboard validation report audit |
-| OBJ-10 | MVP fully operational on local staging and demonstrable by Week 14 — final defense on November 18, 2026 | Project-level | Milestone audit (Week 14\) |
+| OBJ-10 | MVP fully operational on local staging and demonstrable by Week 14 — final defense on November 21, 2026 | Project-level | Milestone audit (Week 14\) |
 | OBJ-11 | All baselined deliverables accepted: signed UAT form \+ Panel sign-off (§9) by Week 14 | Project-level | Signed UAT form \+ §9 approval record |
 | OBJ-12 | Infrastructure cost maintained at Php0 (free tiers only) through the defense date | Project-level | Zero-billing verification (Php0) |
 
@@ -88,10 +88,10 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 ### **4.1 In-Scope Features**
 
 1. System Authentication & Role-Based Access Control (JWT; Registered User / Guest / Seller; server-side RBAC; ephemeral guest sessions)  
-2. Multi-Angle Avatar System (male/female; height/weight mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions rendered by deforming a single base silhouette per gender; Front/Rear views).  Avatar customization accepts only validated inputs: height 120–220 cm and weight 30–200 kg; the system targets users aged 12 years and older.  
+2. Multi-Angle Avatar System (male/female; height/body build mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions rendered by deforming a single base silhouette per gender; Front/Rear views).  Avatar customization accepts only validated inputs: height 120–220 cm and body build 86-112cm the system targets users aged 12 years and older.  
 3. Seller-Managed Catalog via CSV upload with automated rembg background removal and Pillow-based validation with rejection reports  
 4. Virtual Try-On 2D Overlay Canvas (per-category item switching, instant view toggling, saved outfit CRUD)  
-5. Explainable Rule-Based Styling Engine (Deterministic Expert System) using weighted tag scoring (color \+3, height contrast \+2, proportion shading \+1, style/occasion \+1) with visible match reasons.  
+5. Explainable Rule-Based Styling Engine (Deterministic Expert System) using weighted tag scoring (color \+3, height contrast \+2, proportion shading \+1, style \+1)with visible match reasons; style tags are drawn from the controlled vocabulary (casual, smart, formal, sporty).  
 6. Mock E-Commerce Flow (persistent cart for Registered Users, full checkout UI, standalone mock payment gateway, order history)  
 7. Catalog browsing and filtering (category, size, price, and per-seller Store pages)
 
@@ -107,8 +107,11 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 6. Multi-seller marketplace discovery; external third-party API integrations  
 7. Body tracking, pose detection, fabric simulation  
 8. Cloud-hosted application hosting (application runs on local staging host; only MongoDB Atlas remains cloud-hosted)  
-9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and weight 30–200 kg); inputs outside these ranges are rejected with descriptive validation errors.  
-10. Anthropometric or tailoring accuracy of body-proportion category brackets. The avatar proportions exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.
+9. Children's and infant clothing categories and pediatric body-proportion modeling (the avatar system is calibrated for users aged 12 years and older within the validated ranges of height 120–220 cm and body build 86-112); inputs outside these ranges are rejected with descriptive validation errors.  
+10. Anthropometric or tailoring accuracy of body-proportion category brackets. The avatar proportions exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.  
+11. Seller-side order management and fulfillment: orders placed through the mock checkout are recorded only in the purchasing user's order history and are not reflected in any Seller dashboard (consistent with FR-6.9, no merchant role).  
+12. Inventory/stock tracking, stock-level visibility to shoppers, and all post-purchase logistics (delivery, shipping, packing, returns processing, etc.); the e-commerce flow is a simulation that ends at mock checkout and order history.  
+13. Style tags outside the controlled vocabulary (casual, smart, formal, sporty); non-vocabulary style values are rejected at upload validation.
 
 ### 
 
@@ -195,13 +198,15 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 
 **6.1.8** Constraint: Total infrastructure budget capped at Php0 (free tiers only) (SRS §2.4, Cloud free-tier dependency; Scope Baseline §1.5); application hosted on local staging host(dedicated local staging server); only MongoDB Atlas remains cloud (free tier)
 
-**6.1.9** Constraint: The MVP must be fully demonstrable at the final defense — Week 14, November 18, 2026 (SRS §2.4, Semester timeline).
+**6.1.9** Constraint: The MVP must be fully demonstrable at the final defense — Week 14, November 21, 2026 (SRS §2.4, Semester timeline).
 
 **6.1.10** Constraint: Fixed stack — React (+Vite), Python 3.13+ / Django 6.x, MongoDB Atlas; local staging host minimum 4 GB RAM, x86\_64 (SRS §2.3, Operating Environment).
 
 **6.1.11** Constraint: No Machine Learning or Black-Box AI. The system shall use a deterministic, Heuristic Expert System (Symbolic AI) for recommendations to remain fully explainable, auditable by the panel, and viable within the zero-budget/one-semester constraint (SRS §2.4, AI positioning).
 
 **6.1.12** Constraint: Compliance with the Data Privacy Act of 2012 (RA 10173\) and WCAG 2.1 Level AA target (SRS §2.4, Privacy regulation; SRS §4.4).
+
+**6.1.13** Known limitation: minor overlay misalignment or transient visual artifacts may occur at extreme proportion combinations or during rapid view switching, inherent to photo-based 2D overlay visualization (6.1.3); not treated as a functional defect while the alignment grid and Criterion 2 rendering target are met.
 
 ### 
 
@@ -218,7 +223,7 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 | Risk ID | Description | Impact | Probability | Mitigation Strategy |
 | :---- | :---- | :---- | :---- | :---- |
 | RSK-01 | Scope creep (requests for 3D, real payment, mobile apps) | High | High | Enforce the current Scope Baseline (v1.1); formal Change Request \+ Change Control Board (PM \+ adviser/panel); out-of-scope items deferred to future phases |
-| RSK-02 | Schedule slippage in critical modules ahead of the Week 14 (November 18, 2026\) defense | High | Medium | WBS weekly milestones, sprint planning, bi-weekly adviser reviews, buffer weeks before the Week 14 defense |
+| RSK-02 | Schedule slippage in critical modules ahead of the Week 14 (November 21, 2026\) defense | High | Medium | WBS weekly milestones, sprint planning, bi-weekly adviser reviews, buffer weeks before the Week 14 defense |
 | RSK-03 | Free-tier dependency (Atlas quotas, service limits/discontinuation) | High | Medium | Architecture within free-tier limits; per-Seller upload caps; GridFS storage; weekly manual mongodump backups;local staging host as primary app host; alternative free hosting identified as fallback |
 | RSK-04 | Team availability & knowledge concentration (4 members balancing classes) | High | Medium | Shared repository, written handoff documentation, cross-training, pair reviews, and 50-point accountability system |
 | RSK-05 | Third-party version risk (rembg, django-mongodb-backend) | Medium | Medium | Pinned versions in requirements.txt; standalone architecture; documented Pillow-only validation fallback |
@@ -238,7 +243,7 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 | M2: Requirements & Architecture Baseline | Week 4 | Approved MongoDB ERD/schema, Django REST API specification, Figma prototype, 2D asset pipeline guide (WBS 1.2.1–1.2.4) |
 | M3: Core Implementation & Prototype | Week 8 | Auth/RBAC, avatar management, Seller CSV \+ rembg pipeline, and try-on canvas working; canvas renders \< 1 s (WBS 1.3.1–1.3.4) |
 | M4: Implementation Baseline & Validation | Week 11 | Recommendation engine \+ mock e-commerce complete; outfit management & validation reporting complete; unit/integration tests passing; validation suite 100% pass on defined cases; local staging environment operational (WBS 1.3.5–1.3.8, 1.4.1–1.4.2, 1.5.1) |
-| M5: Final Defense & Delivery | Week 14 — Final Defense: November 18, 2026 | UAT sign-off, MVP operational on local staging (localhost/LAN URL), Seller instruction sheet, panel defense & handover (WBS 1.4.3, 1.5.2, 1.5.3) |
+| M5: Final Defense & Delivery | Week 14 — Final Defense: November 21, 2026 | UAT sign-off, MVP operational on local staging (localhost/LAN URL), Seller instruction sheet, panel defense & handover (WBS 1.4.3, 1.5.2, 1.5.3) |
 
 ### 
 

@@ -46,7 +46,7 @@ This document defines the software testing strategy and execution plan for the F
 
 ### **3.1 Scope & Purpose**
 
-* **Scope:** Individual functions and isolated components: weighted scoring function and knowledge-table lookups (FR-7.1–7.2); validation rules (a) required fields, (b) ≥800×800 px and ≤5 MB, (c) alpha-channel validity, (d) CSV-to-upload filename mapping, (e) image–text color alignment (FR-4.7); color\_palette\_tags derivation (FR-3.2/4.2); preset serializer guards (height 120–220 cm, weight 30–200 kg, female-only cup size — FR-2.3/2.7); cart/order owner scoping and Guest rejection (FR-6.1, FR-1.8); mock payment gateway approve/decline (FR-6.5); GridFS orphan-cleanup hooks (FR-4.5/4.6, KAN-119); recommendation endpoint input hardening (KAN-117).  
+* **Scope:** Individual functions and isolated components: weighted scoring function and knowledge-table lookups (FR-7.1–7.2); validation rules (a) required fields, (b) ≥800×800 px and ≤5 MB, (c) alpha-channel validity, (d) CSV-to-upload filename mapping, (e) image–text color alignment (FR-4.7); color\_palette\_tags derivation (FR-3.2/4.2); preset serializer guards (height 120–220 cm, body build 86 \- 112, female-only cup size — FR-2.3/2.7); cart/order owner scoping and Guest rejection (FR-6.1, FR-1.8); mock payment gateway approve/decline (FR-6.5); GridFS orphan-cleanup hooks (FR-4.5/4.6, KAN-119); recommendation endpoint input hardening (KAN-117).  
 * **Primary Owner:** Software Developers / Engineering Team (Carlos for backend modules; Dein for client-side validation logic).  
 * **Execution Frequency:** Automatically triggered on every code commit and pull request; results reviewed during weekly sprint planning (KAN-77).
 
@@ -76,7 +76,7 @@ This document defines the software testing strategy and execution plan for the F
 | UT-11 | commerce views (RBAC) | Guest POST /cart; User B GET User A order | 401/403 for Guest; 403/404 cross-user; owner-only reads | Security / RBAC | Pass (KAN-118) |
 | UT-12 | commerce mock gateway | Simulated decline response | Checkout error shown; no order record; cart intact | Edge / Defensive | Pass (KAN-118) |
 | UT-13 | catalog storage cleanup | Replace listing image; delete listing | Old GridFS ObjectIds absent from fs.files/fs.chunks | Regression | Planned (KAN-119) |
-| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/weight beyond the size-compatible band | Control stops at the limit and shows the allowed-range message; backend still enforces global 120–220 cm / 30–200 kg (FR-2.3) | Edge/Defensive | Planned |
+| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/body build beyond the size-compatible band | Control stops at the limit and shows the allowed-range message; backend still enforces global 120–220 cm / 30–200 kg (FR-2.3) | Edge/Defensive | Planned |
 
 ## **4\. End-to-End (E2E) Testing Standard**
 
@@ -106,13 +106,13 @@ This document defines the software testing strategy and execution plan for the F
 
 | Case ID | Scenario / Feature | Prerequisites | Execution Steps | Expected Result | Pass/Fail Criteria |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| E2E-01 | Guest first try-on (UC-01, UC-03, UC-04) | Staging seeded; no account | 1\. Continue as Guest. 2\. Create avatar (gender, height/weight, skin tone, undertone, proportions). 3\. Equip a Top. 4\. Toggle Front/Rear. | Canvas layers PNG over avatar; instant updates; session-only data | Completed ≤2 min (Criterion 6); zero guest writes to persistent DB |
+| E2E-01 | Guest first try-on (UC-01, UC-03, UC-04) | Staging seeded; no account | 1\. Continue as Guest. 2\. Create avatar (gender, height/body-build, skin tone, undertone, proportions). 3\. Equip a Top. 4\. Toggle Front/Rear. | Canvas layers PNG over avatar; instant updates; session-only data | Completed ≤2 min (Criterion 6); zero guest writes to persistent DB |
 | E2E-02 | Registration, login, preset persistence (UC-07, UC-08, UC-09) | Clean test user | 1\. Register (role User). 2\. Save avatar preset. 3\. Logout → login. 4\. Open preset list/edit. | Password policy enforced; JWT session; preset reloads (FR-2.5) | HTTP 200 on reload; preset fields identical post-login |
 | E2E-03 | Seller upload happy path (UC-15, UC-16, UC-17, UC-18) | Seller account; 10-item CSV \+ 20 images | 1\. Download template. 2\. Upload CSV \+ Front/Rear images. 3\. Receive batch ticket. 4\. Open validation report. | 202 Accepted; rembg PNGs generated; report lists accepted/rejected with reasons | Pipeline \<60 s (Criterion 4); ≥80% published without correction (Criterion 5\) |
 | E2E-04 | Rejection → fix → republish loop (UC-16, UC-17, UC-19) | Item declared "red" with blue image | 1\. Upload. 2\. Read rejection reason. 3\. Edit listing, replace image. 4\. Re-validate. | Rejected item never published; after fix, status Active; old PNG purged | Report reason matches rule (e); GridFS old ObjectId absent (KAN-119) |
 | E2E-05 | Cart → mock checkout → order history (UC-11, UC-12, UC-13, UC-14) | Registered user; active catalog | 1\. Add 2 items. 2\. Update quantity. 3\. Checkout: address \+ payment. 4\. Mock approval. 5\. Open order history/detail. | Order record with items, store names, address, timestamp; cart cleared | Order fields complete (FR-6.6); ≥70% cart completion across runs (Criterion 8\) |
 | E2E-06 | RBAC negative paths (UC-08, UC-11) | Guest session; non-seller user | 1\. Guest opens cart/checkout. 2\. Non-seller opens Seller upload. | Guest prompted to register; non-seller denied | 401/403 returned server-side; no client-side bypass (Criterion 7\) |
-| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; guest rating not persisted (FR-1.9) |
+| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; guest rating blocked with sign-up prompt |
 | E2E-08 | Canvas performance (UC-03, UC-04) | Mid-range laptop; staged catalog | 1\. Switch item. 2\. Toggle view. 3\. Change proportion.4. Equip a Dress/One-Piece → Top and Bottom slots replaced with confirmation (FR-5.2 v1.1). | Each overlay/deformation renders fluidly | Each render ≤1 s (Criterion 2; KAN-84 run) |
 | E2E-09 | API performance sweep | Staging under normal load | 1\. Script calls to catalog, filtering, recommendation, commerce endpoints. 2\. Compute 95th percentile. | Responses within threshold | 95% \<500 ms (Criterion 1\) |
 | E2E-10 | Account deletion (deactivation \+ archival)/ RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm.3. Query active collections for user data; verify the archived record is access-restricted and pseudonymized. | Account deactivated (login and all role access blocked); personal data removed from active collections and retained only in the restricted archive per the retention policy | Post-delete queries on active collections return nothing; the archive is readable only through the restricted retention path and holds no directly identifying fields (FR-1.4; Criterion 7 checklist) |
@@ -148,6 +148,10 @@ This document defines the software testing strategy and execution plan for the F
 
 ## 
 
+## 
+
+## 
+
 ## **6\. Defect Management & Severity Matrix**
 
 | Severity Level | Definition | Response Window | Resolution Target |
@@ -157,7 +161,17 @@ This document defines the software testing strategy and execution plan for the F
 | P3 – Medium | Minor feature bug or UI misalignment; core functionality unaffected (filter sorting, report wording, asset edge case). | Next planning cycle | Scheduled next sprint |
 | P4 – Low | Cosmetic flaw, typo, minor enhancement suggestion. | Backlog review | Backlog / low priority; fixed only before freeze if capacity allows |
 
-All defects are logged in Jira as sub-tasks under Epic 1.4 (KAN-81) with label *defect* and severity mapped to the Priority field. Defect trends are reported in the weekly sprint report (KAN-79) and reviewed at bi-weekly adviser reviews (KAN-80).
+## 
+
+## 
+
+## 
+
+## 
+
+## 
+
+## 
 
 ## **7\. Quality Metrics & Reporting**
 
@@ -217,6 +231,4 @@ All defects are logged in Jira as sub-tasks under Epic 1.4 (KAN-81) with label *
 | UC-17 Validate Catalog Items | UT-04–UT-08, E2E-04 |
 | UC-18 View Validation Report | E2E-03, E2E-04 |
 | UC-19 Manage Listings | E2E-04, UT-13 |
-
-End of document — FitFusion AI Software Testing & Quality Assurance Plan v1.0 (2026-10-24). Maintained under WBS 1.4 and Epic KAN-81; changes to this plan follow the Scope Baseline Change Management Plan when they affect baselined criteria.
 
