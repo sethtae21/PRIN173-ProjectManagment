@@ -22,6 +22,11 @@ from commerce.serializers import (
     UpdateCartItemSerializer,
 )
 from commerce.services import MockPaymentGateway
+from ratings.uat_kpis import (
+    EVENT_CART_CREATED,
+    EVENT_CHECKOUT_COMPLETED,
+    record_uat_commerce_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,10 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
         cart_item.seller_account_deleted = False
         cart_item.catalog_item_id = str(item.pk)
         cart_item.save(update_fields=('item_name', 'store_name', 'unavailable_reason', 'seller_account_deleted', 'catalog_item_id'))
+        # OBJ-07 / Criterion 8: record cart creation on the tester's active UAT
+        # session (if any). The hook is idempotent, owner-scoped, and never
+        # raises — UAT bookkeeping must not break commerce.
+        record_uat_commerce_event(request.user, EVENT_CART_CREATED)
         return self.cart_response()
 
     @extend_schema(request=UpdateCartItemSerializer, responses=CartSerializer)
@@ -131,8 +140,11 @@ class CartViewSet(MongoRetryMixin, viewsets.GenericViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
         if cart_item.item is None or cart_item.seller_account_deleted:
+            # FIX (syntax): double-quoted literal so the apostrophe in
+            # "seller's" cannot terminate the string (the original Unicode
+            # right-quote was normalized to a straight quote and broke parsing).
             return Response(
-                {'detail': 'This item is unavailable because the seller’s account was deleted.'},
+                {"detail": "This item is unavailable because the seller's account was deleted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         cart_item.quantity = input_serializer.validated_data['quantity']
@@ -228,7 +240,8 @@ class CheckoutView(MongoRetryMixin, APIView):
             if cart_entry_id in requested_id_set and (cart_entry.item is None or cart_entry.seller_account_deleted):
                 return Response(
                     {
-                        'detail': 'This item is unavailable because the seller’s account was deleted.',
+                        # FIX (syntax): double-quoted literal (apostrophe-safe).
+                        "detail": "This item is unavailable because the seller's account was deleted.",
                         'unavailable_item': {
                             'catalog_item': cart_entry.catalog_item_id or cart_entry_id,
                             'name': cart_entry.item_name,
@@ -261,7 +274,8 @@ class CheckoutView(MongoRetryMixin, APIView):
                     )
                     return Response(
                         {
-                            'detail': 'This item is unavailable because the seller’s account was deleted.',
+                            # FIX (syntax): double-quoted literal (apostrophe-safe).
+                            "detail": "This item is unavailable because the seller's account was deleted.",
                             'unavailable_item': {
                                 'catalog_item': str(missing_id),
                                 'name': unavailable_name,
@@ -283,7 +297,8 @@ class CheckoutView(MongoRetryMixin, APIView):
             if entry.item is None or entry.seller_account_deleted:
                 return Response(
                     {
-                        'detail': 'This item is unavailable because the seller’s account was deleted.',
+                        # FIX (syntax): double-quoted literal (apostrophe-safe).
+                        "detail": "This item is unavailable because the seller's account was deleted.",
                         'unavailable_item': {
                             'catalog_item': entry.catalog_item_id or str(entry.item_id or ''),
                             'name': entry.item_name,
@@ -342,6 +357,10 @@ class CheckoutView(MongoRetryMixin, APIView):
             order.delete()
             raise
         cart.items.filter(pk__in=[entry.pk for entry in cart_items]).delete()
+        # OBJ-07 / Criterion 8: record checkout completion on the tester's
+        # active UAT session (if any). Only fires on the SUCCESS path — a
+        # simulated decline must not count (UT-12).
+        record_uat_commerce_event(request.user, EVENT_CHECKOUT_COMPLETED)
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 

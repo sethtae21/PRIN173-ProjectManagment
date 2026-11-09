@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { API_URL, cartAPI, ratingsApi, invalidateCache } from "../services/api";
+import { RATING_SOURCES } from "../services/uat";
 import { getAccessToken } from "../services/session";
 import "./css/ProductDetailsPage.css";
 
@@ -314,10 +315,13 @@ function ProductDetailsPage({ isGuest = false }) {
       return;
     }
     try {
+      // CHANGED (charter-aligned UAT): tag product-page ratings so they
+      // never leak into OBJ-05 (recommendation approval).
       await ratingsApi.submit({
         target_type: "item",
         target_id: productId,
         score: stars,
+        source: RATING_SOURCES.PRODUCT_PAGE,
       });
       setUserRating(stars);
       invalidateCache(ratingCacheKey(productId));

@@ -53,7 +53,10 @@ class UATSessionSerializer(serializers.ModelSerializer):
 
 
 class UATResponseSerializer(serializers.ModelSerializer):
-    session_id = serializers.CharField(source='session_id', read_only=True)
+    # FIX: removed redundant `source='session_id'` which caused DRF to raise
+    # an AssertionError during binding. The model's FK auto-creates a 
+    # `session_id` attribute that holds the UATSession's PK (a 32-char hex string).
+    session_id = serializers.CharField(read_only=True)
 
     class Meta:
         model = UATResponse

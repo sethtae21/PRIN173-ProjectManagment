@@ -65,6 +65,11 @@
 // (casual, smart, formal, sporty) — and is sent on every recommendation +
 // match-reasons request. No weights / knowledge tables changed, so the
 // KAN-103 freeze and co-change rule are untouched.
+//
+// UAT (Charter §3.2 / KAN-89): OBJ-07 commerce events (cart_created /
+// checkout_completed) are recorded SERVER-SIDE by commerce/views.py on the
+// tester's active UAT session. There is deliberately NO client event endpoint
+// or helper here — client-submitted commerce events could falsify evidence.
 // ============================================================================
 
 import { 
@@ -947,6 +952,12 @@ export const ratingsApi = {
     performJsonRequest('POST', '/ratings/guest-session/clear/', undefined, { auth: false }),
 };
 
+// ----------------------------------------------------------------------------
+// UAT — mirrors Backend/ratings/urls.py (KAN-89 survey/KPI logging).
+// CHANGED (audit fix): the manual commerce-event endpoint was REMOVED from the
+// backend so OBJ-07 evidence can only be produced by the trusted server-side
+// hook in commerce/views.py. recordEvent is therefore gone from this client.
+// ----------------------------------------------------------------------------
 export const uatApi = {
   startSession: (payload) => performJsonRequest('POST', '/ratings/uat/session/', payload),
   submitResponse: (payload) => performJsonRequest('POST', '/ratings/uat/response/', payload),

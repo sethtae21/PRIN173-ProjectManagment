@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../services/api";
+import { RATING_TARGET_TYPES } from "../services/uat";
 import "./RatingControl.css";
 
 /* Star rating control (FR-7.5 / OBJ-05) — REGISTERED USERS ONLY.
@@ -9,6 +10,7 @@ import "./RatingControl.css";
    - Registered users: POST /ratings/ persists (upsert per user+target+source).
    Props:
      itemId        catalog item id (null hides the control)
+     targetType    "item" (recommendation/product) or "fit" (fit visualization)
      isEquipped    legacy gate used by the equipped-items list
      alwaysVisible render even when not equipped (recommendation rows)
      allowUpdate   keep stars clickable after rating (backend upserts)
@@ -21,6 +23,7 @@ import "./RatingControl.css";
      onGuestRate   callback that opens the registration prompt */
 function RatingControl({
   itemId,
+  targetType = RATING_TARGET_TYPES.ITEM,
   isEquipped,
   alwaysVisible = false,
   allowUpdate = false,
@@ -64,14 +67,18 @@ function RatingControl({
     setError("");
     setNotice("");
     try {
+      // CHANGED (charter-aligned UAT): send target_type AND source so the
+      // backend KPI export can join ratings to the correct charter objective.
+      // Untagged ratings can no longer leak across objectives.
+      const payload = {
+        target_type: targetType,
+        target_id: String(itemId),
+        score,
+        source,
+      };
       const data = await apiFetch("/ratings/", {
         method: "POST",
-        body: JSON.stringify({
-          target_type: "item",
-          target_id: String(itemId),
-          score,
-          source,
-        }),
+        body: JSON.stringify(payload),
       });
       // Defensive: if the server ever answers "not persisted", treat it as a
       // guest/permission refusal and prompt instead of faking success.

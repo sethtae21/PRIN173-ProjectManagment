@@ -9,6 +9,14 @@ def generate_uat_session_id():
     return uuid.uuid4().hex
 
 
+# ---------------------------------------------------------------------------
+# UAT survey value envelope. "No" on a Yes/No question encodes as 0, so the
+# lower bound MUST be 0 (not 1). Locked by CharterThresholdLockTests.
+# ---------------------------------------------------------------------------
+UAT_VALUE_MIN = 0
+UAT_VALUE_MAX = 5
+
+
 class Rating(models.Model):
     """
     In-app rating for recommended items & fit visualizations (SRS FR-7.5).
@@ -105,7 +113,9 @@ class UATResponse(models.Model):
     question_key = models.CharField(max_length=80)
     phase = models.CharField(max_length=20, choices=PHASE_CHOICES, default='before')
     product_id = models.CharField(max_length=50)
-    value = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(5)])
+    value = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(UAT_VALUE_MIN), MaxValueValidator(UAT_VALUE_MAX)])
     session = models.ForeignKey(UATSession, on_delete=models.CASCADE, related_name='responses')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -11,7 +11,16 @@ import {
   getAccessToken,
   STYLE_FOCUS_OPTIONS,
   ratingsApi,
+  API_URL,
 } from "../services/api";
+import {
+  UAT_PAIRED_QUESTIONS,
+  UAT_PHASES,
+  RATING_SOURCES,
+  RATING_TARGET_TYPES,
+  isUATAnswer,
+  uatSessionStorageKey,
+} from "../services/uat";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/FittingStudioPage.css";
@@ -28,32 +37,11 @@ const ITEMS_PER_PAGE = 10;
 const STUDIO_VIEWS = ["Front", "Rear"];
 const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 const STUDIO_PENDING_PREFIX = "fitfusion-fitting-studio-pending-item-";
-const UAT_QUESTIONS = [
-  {
-    key: "fit_confidence",
-    prompt: "How confident are you that this item would fit you the way you want?",
-    lowLabel: "Not at all confident",
-    highLabel: "Very confident",
-  },
-  {
-    key: "style_confidence",
-    prompt: "How confident are you that this item suits your personal style?",
-    lowLabel: "Not at all confident",
-    highLabel: "Very confident",
-  },
-  {
-    key: "purchase_confidence",
-    prompt: "How confident are you in deciding whether to buy this item?",
-    lowLabel: "Not at all confident",
-    highLabel: "Very confident",
-  },
-  {
-    key: "return_intent",
-    prompt: "If you bought this item, how likely would you be to return it?",
-    lowLabel: "Very unlikely",
-    highLabel: "Very likely",
-  },
-];
+
+// CHANGED (charter-aligned UAT): questionnaire now comes from the shared
+// contract in services/uat.js — keys are the backend contract, prompts stay
+// here for UI wording only.
+const UAT_QUESTIONS = UAT_PAIRED_QUESTIONS;
 
 const UAT_AFTER_EXTRA_QUESTIONS = [
   {
@@ -527,17 +515,13 @@ function getCurrentUserId() {
   return "guest";
 }
 
-function uatSessionStorageKey() {
-  return `fitfusion-uat-session-${getCurrentUserId()}`;
-}
-
 function uatPhaseStorageKey(productId, phase) {
   return `fitfusion-uat-${phase}-${getCurrentUserId()}-${productId}`;
 }
 
 function readUatSession() {
   try {
-    const value = JSON.parse(localStorage.getItem(uatSessionStorageKey()) || "null");
+    const value = JSON.parse(localStorage.getItem(uatSessionStorageKey(getCurrentUserId())) || "null");
     return value && typeof value === "object" ? value : null;
   } catch {
     return null;
@@ -1454,8 +1438,8 @@ function FittingStudioPage({ isGuest = false }) {
     const session = readUatSession();
     return session?.product_id ? String(session.product_id) : "";
   });
-  const [uatBeforeAnswers, setUatBeforeAnswers] = useState(() => ({}) );
-  const [uatAfterAnswers, setUatAfterAnswers] = useState(() => ({}) );
+  const [uatBeforeAnswers, setUatBeforeAnswers] = useState(() => ({}));
+  const [uatAfterAnswers, setUatAfterAnswers] = useState(() => ({}));
   const [uatSurveySubmitting, setUatSurveySubmitting] = useState(false);
   const [uatSurveyOpen, setUatSurveyOpen] = useState(false);
   const [uatSurveyPhase, setUatSurveyPhase] = useState("before");
@@ -1668,15 +1652,19 @@ function FittingStudioPage({ isGuest = false }) {
     setAvatar((current) => applySizeCaps(current, sizeCaps));
   }, [sizeCaps]);
 
-  /* NEW (OBJ-05 / FR-7.5): load the shopper's persisted item ratings once so
-     recommendation stars pre-fill with what you already rated. Guests skip the
-     call entirely (/ratings/mine/ is IsAuthenticated and would 401). */
   useEffect(() => {
     if (!uatCurrentProductId) return;
     setUatBeforeAnswers(readUatPhaseAnswers(uatCurrentProductId, "before"));
     setUatAfterAnswers(readUatPhaseAnswers(uatCurrentProductId, "after"));
   }, [uatCurrentProductId]);
 
+  /* NEW (OBJ-05 / FR-7.5): load the shopper's persisted item ratings once so
+     recommendation stars pre-fill with what you already rated. Guests skip the
+     call entirely (/ratings/mine/ is IsAuthenticated and would 401).
+     FIX (audit): prefill ONLY from ratings actually cast on the
+     recommendation panel. Fit-visualization and product-page ratings share
+     the same catalog target_id and would otherwise masquerade as
+     recommendation approvals in the UI (OBJ-05 evidence integrity). */
   useEffect(() => {
     if (isGuest) return undefined;
     let active = true;
@@ -1687,7 +1675,12 @@ function FittingStudioPage({ isGuest = false }) {
         if (!active) return;
         const map = {};
         (Array.isArray(list) ? list : []).forEach((entry) => {
-          if (entry && entry.score != null) {
+          if (
+            entry &&
+            entry.score != null &&
+            entry.target_type === RATING_TARGET_TYPES.ITEM &&
+            entry.source === RATING_SOURCES.RECOMMENDATION_PANEL
+          ) {
             map[String(entry.target_id)] = Number(entry.score);
           }
         });
@@ -2081,7 +2074,7 @@ function FittingStudioPage({ isGuest = false }) {
         product_id: String(productId),
         role: data.role || "shopper",
       };
-      localStorage.setItem(uatSessionStorageKey(), JSON.stringify(session));
+      localStorage.setItem(uatSessionStorageKey(getCurrentUserId()), JSON.stringify(session));
       setUatSession(session);
       setUatCurrentProductId(String(productId));
       return session;
@@ -2093,7 +2086,10 @@ function FittingStudioPage({ isGuest = false }) {
 
   async function submitUatResponse(productId, phase, questionKey, value) {
     const session = readUatSession();
-    if (!session || !productId || !questionKey || !value) return null;
+    // FIX (charter-aligned UAT): `0` is a valid answer (style_discovery "No").
+    // The old falsy guard (`!value`) dropped every zero-valued response before
+    // it reached the API. Only null/undefined/empty is skipped now.
+    if (!session || !productId || !questionKey || !isUATAnswer(value)) return null;
 
     const token = getAccessToken();
     if (!token) return null;
@@ -2807,6 +2803,8 @@ function FittingStudioPage({ isGuest = false }) {
                       <RatingControl
                         key={`rec-rating-${item.id}`}
                         itemId={item.id}
+                        targetType={RATING_TARGET_TYPES.ITEM}
+                        source={RATING_SOURCES.RECOMMENDATION_PANEL}
                         alwaysVisible
                         allowUpdate
                         label="Rate recommendation"
@@ -3032,9 +3030,14 @@ function FittingStudioPage({ isGuest = false }) {
                           <small>
                             Size {item.size} • {item.color}
                           </small>
+                          {/* CHANGED (OBJ-01 / Criterion 9): tag the equipped-item
+                              rating as fit-visualization evidence so the KPI
+                              export can join it to the correct charter objective. */}
                           <RatingControl
                             key={`${category}-${item.id}`}
                             itemId={item.id}
+                            targetType={RATING_TARGET_TYPES.FIT}
+                            source={RATING_SOURCES.FIT_VISUALIZATION}
                             isEquipped={Boolean(item)}
                             authState={isGuest ? null : readAuthState()}
                             onGuestRate={openRegistrationPopup}
