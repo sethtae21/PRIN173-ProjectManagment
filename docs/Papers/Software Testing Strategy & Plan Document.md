@@ -76,7 +76,7 @@ This document defines the software testing strategy and execution plan for the F
 | UT-11 | commerce views (RBAC) | Guest POST /cart; User B GET User A order | 401/403 for Guest; 403/404 cross-user; owner-only reads | Security / RBAC | Pass (KAN-118) |
 | UT-12 | commerce mock gateway | Simulated decline response | Checkout error shown; no order record; cart intact | Edge / Defensive | Pass (KAN-118) |
 | UT-13 | catalog storage cleanup | Replace listing image; delete listing | Old GridFS ObjectIds absent from fs.files/fs.chunks | Regression | Planned (KAN-119) |
-| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/body build beyond the size-compatible band | Control stops at the limit and shows the allowed-range message; backend still enforces global 120–220 cm / 30–200 kg (FR-2.3) | Edge/Defensive | Planned |
+| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/body build beyond the size-compatible band | Control stops at the limit and shows the allowed-range message;backend still enforces global 120–220 cm / 86–112 cm (FR-2.3) | Edge/Defensive | In Progress |
 
 ## **4\. End-to-End (E2E) Testing Standard**
 
@@ -112,12 +112,12 @@ This document defines the software testing strategy and execution plan for the F
 | E2E-04 | Rejection → fix → republish loop (UC-16, UC-17, UC-19) | Item declared "red" with blue image | 1\. Upload. 2\. Read rejection reason. 3\. Edit listing, replace image. 4\. Re-validate. | Rejected item never published; after fix, status Active; old PNG purged | Report reason matches rule (e); GridFS old ObjectId absent (KAN-119) |
 | E2E-05 | Cart → mock checkout → order history (UC-11, UC-12, UC-13, UC-14) | Registered user; active catalog | 1\. Add 2 items. 2\. Update quantity. 3\. Checkout: address \+ payment. 4\. Mock approval. 5\. Open order history/detail. | Order record with items, store names, address, timestamp; cart cleared | Order fields complete (FR-6.6); ≥70% cart completion across runs (Criterion 8\) |
 | E2E-06 | RBAC negative paths (UC-08, UC-11) | Guest session; non-seller user | 1\. Guest opens cart/checkout. 2\. Non-seller opens Seller upload. | Guest prompted to register; non-seller denied | 401/403 returned server-side; no client-side bypass (Criterion 7\) |
-| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; guest rating blocked with sign-up prompt |
+| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; sign-up/login prompt shown on Guest click; Guest ratings never persisted to the DB (session-only per FR-1.9/FR-7.5) |
 | E2E-08 | Canvas performance (UC-03, UC-04) | Mid-range laptop; staged catalog | 1\. Switch item. 2\. Toggle view. 3\. Change proportion.4. Equip a Dress/One-Piece → Top and Bottom slots replaced with confirmation (FR-5.2 v1.1). | Each overlay/deformation renders fluidly | Each render ≤1 s (Criterion 2; KAN-84 run) |
 | E2E-09 | API performance sweep | Staging under normal load | 1\. Script calls to catalog, filtering, recommendation, commerce endpoints. 2\. Compute 95th percentile. | Responses within threshold | 95% \<500 ms (Criterion 1\) |
 | E2E-10 | Account deletion (deactivation \+ archival)/ RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm.3. Query active collections for user data; verify the archived record is access-restricted and pseudonymized. | Account deactivated (login and all role access blocked); personal data removed from active collections and retained only in the restricted archive per the retention policy | Post-delete queries on active collections return nothing; the archive is readable only through the restricted retention path and holds no directly identifying fields (FR-1.4; Criterion 7 checklist) |
 | E2E-11 | Saved outfit CRUD (UC-10) | Registered user with equipped items | 1\. Save outfit. 2\. List. 3\. Load. 4\. Edit. 5\. Delete. 6\. Load outfit containing a deleted catalog item. | Outfit persists across sessions; missing item warned and skipped | CRUD round-trip passes; warning shown per UC-10 extension |
-| E2E-12 | Catalog browsing, filters, per-seller Store page (UC-02) | Seeded catalog with ≥2 Sellers; Guest session | 1\. Open Catalog Browser. 2\. Apply category filter, then size filter, then price filter/sort. 3\. Open an item detail. 4\. Click the store name to open the Store page. 5\. Confirm only that Seller's active items are listed. | Filtered subsets match seeded data per FR-3.3; Store page lists only that Seller's active items; read-only for Guests | Filter results exact; Store page count \== Seller's active item count (KAN-104/105) |
+| E2E-12 | Catalog browsing, filters, per-seller Store page (UC-02) | Seeded catalog with ≥2 Sellers; Guest session; KAN-120 (price filter) merged | 1\. Open Catalog Browser. 2\. Apply category filter, then size filter, then price filter/sort. 3\. Open an item detail. 4\. Click the store name to open the Store page. 5\. Confirm only that Seller's active items are listed. | Filtered subsets match seeded data per FR-3.3; Store page lists only that Seller's active items; read-only for Guests | Filter results exact; Store page count \== Seller's active item count (KAN-104/105) |
 
 ## **5\. User Acceptance Testing (UAT) Standard**
 
@@ -204,7 +204,7 @@ This document defines the software testing strategy and execution plan for the F
 | UT-11, UT-12; E2E-05, E2E-06, E2E-10 | FR-1.1–1.9, FR-6.1–6.9 | RT-01, RT-07, RT-09 | KAN-45, KAN-56, KAN-118 |
 | E2E-09; E2E-08 | SRS §4.1 | RT-08 | KAN-90 |
 | UAT-01…UAT-07 | SRS §4.4, FR-7.5 | RT-01, RT-02, RT-04, RT-05, RT-06, RT-07, RT-09 | FR-1.4–1.9, FR-2.1–2.10, FR-4.1–4.8, FR-5.1–5.8, FR-6.1–6.9, FR-7.5, §4.4 |
-| E2E-12 | FR-3.1–3.4 | RT-03 | KAN-104, KAN-105 |
+| E2E-12 | FR-3.1–3.4 | RT-03 | KAN-104, KAN-105, KAN-120 |
 
 ## 
 
