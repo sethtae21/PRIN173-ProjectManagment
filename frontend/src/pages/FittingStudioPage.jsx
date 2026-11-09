@@ -12,6 +12,7 @@ import {
   STYLE_FOCUS_OPTIONS,
   ratingsApi,
   API_URL,
+  authApi, // embedded accounts_user survey submission
 } from "../services/api";
 import {
   UAT_PAIRED_QUESTIONS,
@@ -20,6 +21,8 @@ import {
   RATING_TARGET_TYPES,
   isUATAnswer,
   uatSessionStorageKey,
+  STUDIO_SURVEY_QUESTIONS,
+  STUDIO_GUEST_CTA,
 } from "../services/uat";
 import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -37,6 +40,11 @@ const ITEMS_PER_PAGE = 10;
 const STUDIO_VIEWS = ["Front", "Rear"];
 const STUDIO_SESSION_PREFIX = "fitfusion-fitting-studio-session-";
 const STUDIO_PENDING_PREFIX = "fitfusion-fitting-studio-pending-item-";
+
+// NEW (popup redesign): 3 minutes of idle time triggers the post-session
+// popup so the pre/post delta is captured even when the shopper neither
+// saves an outfit nor leaves the page.
+const POST_SURVEY_IDLE_MS = 180000;
 
 // CHANGED (charter-aligned UAT): questionnaire now comes from the shared
 // contract in services/uat.js — keys are the backend contract, prompts stay
@@ -614,10 +622,6 @@ function round2(value, fallback) {
   if (!Number.isFinite(number)) return fallback;
   return Math.round(number * 100) / 100;
 }
-
-// REMOVED: toWholeCm() -- its only purpose was snapping preset height/weight
-// to whole centimetres for the old IntegerField model. The model is now
-// FloatField and shoppers asked for the exact decimal size, so it is gone.
 
 // CHANGED (preset fidelity + exact decimals): the studio save payload carries
 //   * height        : one decimal (177.4), not rounded to 177
@@ -1448,6 +1452,37 @@ function FittingStudioPage({ isGuest = false }) {
   const [uatMatchReasonsOpenedByProduct, setUatMatchReasonsOpenedByProduct] = useState({});
   const [uatThankYouVisible, setUatThankYouVisible] = useState(false);
 
+  // ------------------------------------------------------------------
+  // NEW (popup redesign): pre/post session rating popups.
+  // pre  -> opens on FIRST EQUIP or opening the Recommendations panel.
+  // post -> opens on Save Outfit, leaving the studio, or 3 min idle.
+  // Answers are staged in sessionStorage until the post popup submits so the
+  // whole visit lands in accounts_user as ONE embedded survey document.
+  // CHANGED (storage fix): popup data — including the 👍/ — is stored ONLY
+  // in accounts_user.fitting_studio_surveys; it never writes Rating rows, so
+  // accounts_rating stays exclusive to the FR-7.5 rating surfaces.
+  // ------------------------------------------------------------------
+  const [studioSessionId] = useState(
+    () =>
+      `studio-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`
+  );
+  const [preSurveyOpen, setPreSurveyOpen] = useState(false);
+  const [preAnswers, setPreAnswers] = useState({});
+  const [postSurveyOpen, setPostSurveyOpen] = useState(false);
+  const [postAnswers, setPostAnswers] = useState({});
+  const [postVote, setPostVote] = useState("");
+  const [surveySaving, setSurveySaving] = useState(false);
+
+  const pendingNavigationRef = useRef(null);
+  const pendingActionRef = useRef(null);
+  const preSurveyShownRef = useRef(false);
+  const preSurveyDoneRef = useRef(false);
+  const postSurveyDoneRef = useRef(false);
+  const postSurveyOpenRef = useRef(false);
+  const anyModalOpenRef = useRef(false);
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const basePath = isGuest ? "/guest" : "/shopper";
@@ -1766,8 +1801,93 @@ function FittingStudioPage({ isGuest = false }) {
         : `${item.name} equipped. Preview adjusted to its available fitting limits.`
     );
 
+    // NEW (popup redesign): equipping the first item opens the pre-session
+    // rating popup before the shopper starts interacting with the canvas.
+    maybeOpenPreSurvey();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // NEW (popup redesign): POST-SESSION trigger #2 — any in-app anchor click
+  // (sidebar links, sidebar logo) that would leave this page is captured in
+  // the CAPTURE phase and paused; React Router's Link honors
+  // defaultPrevented, so preventing here is enough to hold the navigation
+  // until the shopper submits or skips the post-session rating.
+  useEffect(() => {
+    function handleCaptureClick(event) {
+      const target = event.target;
+      const anchor =
+        target && typeof target.closest === "function"
+          ? target.closest("a[href]")
+          : null;
+
+      if (!anchor) return;
+
+      const href = anchor.getAttribute("href") || "";
+      if (!href.startsWith("/") || href.startsWith("//")) return;
+      if (href === window.location.pathname) return;
+
+      const intercepted = openPostSurvey({ navigation: { path: href } });
+      if (intercepted) event.preventDefault();
+    }
+
+    document.addEventListener("click", handleCaptureClick, true);
+    return () => document.removeEventListener("click", handleCaptureClick, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // NEW (popup redesign): POST-SESSION trigger #3 — 3 minutes of idle time.
+  // The timer re-arms on any pointer/key/scroll activity and never fires
+  // while another modal is open or before the pre-session popup has shown.
+  useEffect(() => {
+    if (uatEnabled) return undefined;
+
+    let timer = null;
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
+
+    function arm() {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (
+          preSurveyShownRef.current &&
+          !postSurveyDoneRef.current &&
+          !postSurveyOpenRef.current &&
+          !anyModalOpenRef.current
+        ) {
+          openPostSurvey({});
+        }
+      }, POST_SURVEY_IDLE_MS);
+    }
+
+    events.forEach((name) =>
+      window.addEventListener(name, arm, { passive: true })
+    );
+    arm();
+
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, arm));
+      if (timer) window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the idle trigger aware of every blocking overlay.
+  useEffect(() => {
+    anyModalOpenRef.current =
+      preSurveyOpen ||
+      postSurveyOpen ||
+      showSaveOutfitModal ||
+      showSaveAvatarModal ||
+      showRegistrationModal ||
+      uatSurveyOpen;
+  }, [
+    preSurveyOpen,
+    postSurveyOpen,
+    showSaveOutfitModal,
+    showSaveAvatarModal,
+    showRegistrationModal,
+    uatSurveyOpen,
+  ]);
 
   useEffect(() => {
     if (isGuest) {
@@ -1783,7 +1903,178 @@ function FittingStudioPage({ isGuest = false }) {
     window.setTimeout(() => setNotification(""), 2500);
   }
 
+  // NEW (popup redesign): PRE-SESSION trigger — first equip OR opening the
+  // Recommendations panel. Fires at most once per studio visit. Tester mode
+  // (?uat=1) keeps ownership of the charter UAT survey, so no double popup.
+  function maybeOpenPreSurvey() {
+    if (uatEnabled || preSurveyShownRef.current) return;
+    preSurveyShownRef.current = true;
+    setPreSurveyOpen(true);
+  }
+
+  // NEW (popup redesign): central post-session opener. Returns true when the
+  // popup actually took over (caller must pause its own flow).
+  function openPostSurvey(pending = {}) {
+    if (uatEnabled || postSurveyDoneRef.current || postSurveyOpenRef.current) {
+      return false;
+    }
+    pendingNavigationRef.current = pending.navigation || null;
+    pendingActionRef.current = pending.action || null;
+    postSurveyOpenRef.current = true;
+    setPostSurveyOpen(true);
+    return true;
+  }
+
+  // Resume whatever the post-session popup paused (navigation or Save Outfit).
+  function proceedWithPending() {
+    const nav = pendingNavigationRef.current;
+    const action = pendingActionRef.current;
+    pendingNavigationRef.current = null;
+    pendingActionRef.current = null;
+    if (nav) {
+      navigate(nav.path, nav.state ? { state: nav.state } : undefined);
+      return;
+    }
+    if (action === "save-outfit") openSaveOutfitModalNow();
+  }
+
+  // In-page navigation guard. Buttons that call navigate() directly (product
+  // links, Change Gender, Select Items for Cart) go through here so the
+  // post-session popup fires for them too.
+  function requestNavigation(path, state) {
+    if (!openPostSurvey({ navigation: { path, state } })) {
+      navigate(path, state ? { state } : undefined);
+    }
+  }
+
+  function getPreSurveyKey() {
+    return `fitfusion-studio-pre-survey-${getCurrentUserId()}`;
+  }
+
+  function readStagedPreAnswers() {
+    try {
+      const raw = sessionStorage.getItem(getPreSurveyKey());
+      sessionStorage.removeItem(getPreSurveyKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function numOrNull(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  // KAN-89 log shape, stored ONLY in accounts_user.fitting_studio_surveys:
+  //   { session_id, user_type, pre_confidence, pre_return_intent,
+  //     post_confidence, post_return_intent, fit_like_dislike, timestamp }
+  // CHANGED (storage fix): the 👍/ reaction is NO LONGER mirrored into
+  // POST /ratings/ — it lives exclusively in the embedded survey document so
+  // accounts_rating never receives popup artifacts (e.g. the old
+  // "fitting-studio-look" rows). The FR-7.5 fit-visualization Rating rows are
+  // still created by the RatingControl on equipped items, which is the
+  // surface the OBJ-01 KPI join reads.
+  async function persistPopupSurvey(pre, post, vote) {
+    if (isGuest) return;
+
+    const payload = {
+      session_id: studioSessionId,
+      user_type: "registered",
+      pre_confidence: numOrNull(pre?.confidence),
+      pre_return_intent: numOrNull(pre?.return_intent),
+      post_confidence: numOrNull(post?.confidence),
+      post_return_intent: numOrNull(post?.return_intent),
+      fit_like_dislike: vote || null,
+      equipped_item_ids: equippedItemsArray.map((item) => String(item.id)),
+      avatar_context: {
+        gender: avatar.gender,
+        height: avatar.height,
+        weight: avatar.weight,
+        body_build_cm: bodyBuild,
+      },
+    };
+
+    setSurveySaving(true);
+    try {
+      await authApi.submitFittingStudioSurvey(payload);
+      window.dispatchEvent(new Event("fitfusion-account-updated"));
+      displayNotification("Thanks! Your session feedback was saved to your account.");
+        } catch (error) {
+      console.warn("Unable to save fitting studio survey:", error?.message || error);
+      displayNotification(
+        `Rating not saved: ${error?.message || "survey endpoint unavailable."}`
+      );
+    } finally {
+      setSurveySaving(false);
+    }
+  }
+
+  // PRE popup actions ------------------------------------------------------
+  function submitPreSurvey() {
+    const answers = { ...preAnswers };
+    setPreSurveyOpen(false);
+    preSurveyDoneRef.current = true;
+    if (isGuest) return; // guests only ever see the signup CTA button
+    sessionStorage.setItem(getPreSurveyKey(), JSON.stringify(answers));
+  }
+
+  function skipPreSurvey() {
+    setPreSurveyOpen(false);
+    preSurveyDoneRef.current = true;
+    if (!isGuest) {
+      sessionStorage.setItem(getPreSurveyKey(), JSON.stringify({}));
+    }
+  }
+
+  // POST popup actions -----------------------------------------------------
+  async function submitPostSurvey() {
+    const post = { ...postAnswers };
+    const vote = postVote;
+    const pre = readStagedPreAnswers();
+
+    postSurveyDoneRef.current = true;
+    postSurveyOpenRef.current = false;
+    setPostSurveyOpen(false);
+
+    if (isGuest) {
+      proceedWithPending();
+      return;
+    }
+
+    await persistPopupSurvey(pre, post, vote);
+    proceedWithPending();
+  }
+
+  function skipPostSurvey() {
+    const pre = readStagedPreAnswers();
+
+    postSurveyDoneRef.current = true;
+    postSurveyOpenRef.current = false;
+    setPostSurveyOpen(false);
+
+    // FR-7.5: skipping never loses already-given pre-session answers.
+    if (!isGuest && (pre.confidence != null || pre.return_intent != null)) {
+      void persistPopupSurvey(pre, {}, "");
+    }
+    proceedWithPending();
+  }
+
+  // Guest call-to-action replaces the submit button on BOTH popups (FR-7.5).
+  function handleGuestSurveyCta() {
+    preSurveyDoneRef.current = true;
+    postSurveyDoneRef.current = true;
+    preSurveyShownRef.current = true;
+    postSurveyOpenRef.current = false;
+    setPreSurveyOpen(false);
+    setPostSurveyOpen(false);
+    navigate("/signup");
+  }
+
   // CHANGED: snapshot carries the preset-id stamp as well.
+  // CHANGED (post-session popup): leaving to a product page now goes through
+  // requestNavigation so the post popup fires first.
   function openProductDetails(item) {
     sessionStorage.setItem(
       sessionKey(isGuest),
@@ -1795,8 +2086,8 @@ function FittingStudioPage({ isGuest = false }) {
       })
     );
 
-    navigate(`${basePath}/products/${encodeURIComponent(item.id)}`, {
-      state: { fromFittingStudio: true },
+    requestNavigation(`${basePath}/products/${encodeURIComponent(item.id)}`, {
+      fromFittingStudio: true,
     });
   }
 
@@ -2006,6 +2297,9 @@ function FittingStudioPage({ isGuest = false }) {
         ? `${item.name} equipped. No verified height/weight limits were supplied for this size.`
         : `${item.name} equipped. Avatar preview adjusted within the garment limits.`
     );
+
+    // NEW (popup redesign): first equip opens the pre-session rating popup.
+    maybeOpenPreSurvey();
   }
 
   function removeEquippedItem(category) {
@@ -2254,8 +2548,11 @@ function FittingStudioPage({ isGuest = false }) {
     setUatSurveyOpen(true);
   }
 
+  // CHANGED (popup redesign): opening the Recommendations panel is a
+  // pre-session trigger, so it also arms the pre popup.
   function handleRecommendations() {
     setActivePanel("recommendations");
+    maybeOpenPreSurvey();
 
     window.requestAnimationFrame(() => {
       recommendationsRef.current?.focus({ preventScroll: true });
@@ -2290,6 +2587,14 @@ function FittingStudioPage({ isGuest = false }) {
     });
   }
 
+  function openSaveOutfitModalNow() {
+    setOutfitName("");
+    setOutfitNameError("");
+    setShowSaveOutfitModal(true);
+  }
+
+  // CHANGED (popup redesign): Save Outfit is a post-session trigger. The save
+  // modal only opens after the shopper submits or skips the rating.
   function saveOutfit() {
     if (isGuest) {
       openRegistrationPopup();
@@ -2301,9 +2606,9 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    setOutfitName("");
-    setOutfitNameError("");
-    setShowSaveOutfitModal(true);
+    if (!openPostSurvey({ action: "save-outfit" })) {
+      openSaveOutfitModalNow();
+    }
   }
 
   function closeSaveOutfitModal() {
@@ -2365,6 +2670,8 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }
 
+  // CHANGED (post-session popup): the cart hand-off is a page change, so it
+  // now routes through requestNavigation.
   function continueToCart() {
     if (isGuest) {
       openRegistrationPopup();
@@ -2383,7 +2690,7 @@ function FittingStudioPage({ isGuest = false }) {
       )
     );
 
-    navigate("/shopper/fitting-studio/select-items");
+    requestNavigation("/shopper/fitting-studio/select-items");
   }
 
   return (
@@ -2400,12 +2707,14 @@ function FittingStudioPage({ isGuest = false }) {
             </span>
           </div>
 
+          {/* CHANGED (post-session popup): Change Gender leaves the studio, so
+              it now routes through requestNavigation. */}
           <button
             type="button"
             className="studio-change-gender"
             onClick={() => {
               sessionStorage.removeItem(sessionKey(isGuest));
-              navigate(`${basePath}/fitting-studio`);
+              requestNavigation(`${basePath}/fitting-studio`);
             }}
           >
             Change Gender
@@ -2535,11 +2844,16 @@ function FittingStudioPage({ isGuest = false }) {
               >
                 Customize
               </button>
+              {/* CHANGED (popup redesign): switching to Recommendations is a
+                  pre-session popup trigger. */}
               <button
                 type="button"
                 className={activePanel === "recommendations" ? "active" : ""}
                 aria-pressed={activePanel === "recommendations"}
-                onClick={() => setActivePanel("recommendations")}
+                onClick={() => {
+                  setActivePanel("recommendations");
+                  maybeOpenPreSurvey();
+                }}
               >
                 Recommendations
               </button>
@@ -3097,6 +3411,226 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       </div>
 
+      {/* ==========================================
+          PRE-SESSION RATING POPUP (Criterion 9 / 11)
+          Opens on first equip or opening Recommendations. Two 1-5 star
+          questions, same direction as post so the gain math stays valid.
+          Guests get the signup CTA instead of a submit button (FR-7.5).
+      ========================================== */}
+      {preSurveyOpen && (
+        <div className="studio-modal-backdrop" role="presentation">
+          <section
+            className="studio-save-outfit-modal studio-survey-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-pre-survey-title"
+          >
+            <p className="studio-modal-label">BEFORE YOU START STYLING</p>
+            <h2 id="studio-pre-survey-title">
+              Help us improve your experience!
+            </h2>
+            <p className="studio-modal-description">
+              Before you start styling, how confident are you right now?
+              Ratings are optional and never block your session (FR-7.5).
+              {isGuest &&
+                " As a guest your answers stay on this device unless you create an account."}
+            </p>
+
+            {STUDIO_SURVEY_QUESTIONS.map((question, index) => (
+              <div key={question.key} className="studio-survey-question">
+                <span>
+                  {index + 1}. {question.prePrompt}
+                </span>
+                <div
+                  className="studio-survey-scale"
+                  role="group"
+                  aria-label={`${question.prePrompt} (1 to 5)`}
+                >
+                  {[1, 2, 3, 4, 5].map((score) => (
+                    <button
+                      key={`${question.key}-${score}`}
+                      type="button"
+                      className={
+                        preAnswers[question.key] === score ? "active" : ""
+                      }
+                      aria-pressed={preAnswers[question.key] === score}
+                      aria-label={`${score} out of 5`}
+                      onClick={() =>
+                        setPreAnswers((current) => ({
+                          ...current,
+                          [question.key]: score,
+                        }))
+                      }
+                    >
+                      ★ {score}
+                    </button>
+                  ))}
+                </div>
+                <div className="studio-survey-scale-labels">
+                  <span>1 = {question.preLowLabel}</span>
+                  <span>5 = {question.preHighLabel}</span>
+                </div>
+              </div>
+            ))}
+
+            <div className="studio-save-outfit-actions">
+              <button
+                type="button"
+                className="studio-save-cancel-button"
+                onClick={skipPreSurvey}
+              >
+                Skip for now
+              </button>
+              {isGuest ? (
+                <button
+                  type="button"
+                  className="studio-save-confirm-button"
+                  onClick={handleGuestSurveyCta}
+                >
+                  {STUDIO_GUEST_CTA}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="studio-save-confirm-button"
+                  onClick={submitPreSurvey}
+                >
+                  Start Styling
+                </button>
+              )}
+            </div>
+            {surveySaving && (
+              <p className="studio-survey-saving" role="status">
+                Saving your ratings…
+              </p>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* ==========================================
+          POST-SESSION RATING POPUP (Criterion 9 / 11)
+          Opens on Save Outfit, leaving the studio, or 3 minutes idle.
+          Captures the pre/post delta + the fit like/dislike, then resumes
+          the paused navigation or Save-Outfit modal.
+      ========================================== */}
+      {postSurveyOpen && (
+        <div className="studio-modal-backdrop" role="presentation">
+          <section
+            className="studio-save-outfit-modal studio-survey-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-post-survey-title"
+          >
+            <p className="studio-modal-label">AFTER YOUR TRY-ON SESSION</p>
+            <h2 id="studio-post-survey-title">How was your virtual try-on?</h2>
+            <p className="studio-modal-description">
+              You've explored some great looks! Quick check-in — skipping
+              never blocks your session (FR-7.5).
+              {isGuest &&
+                " As a guest your answers stay on this device unless you create an account."}
+            </p>
+
+            {STUDIO_SURVEY_QUESTIONS.map((question, index) => (
+              <div key={question.key} className="studio-survey-question">
+                <span>
+                  {index + 1}. {question.postPrompt}
+                </span>
+                <div
+                  className="studio-survey-scale"
+                  role="group"
+                  aria-label={`${question.postPrompt} (1 to 5)`}
+                >
+                  {[1, 2, 3, 4, 5].map((score) => (
+                    <button
+                      key={`${question.key}-${score}`}
+                      type="button"
+                      className={
+                        postAnswers[question.key] === score ? "active" : ""
+                      }
+                      aria-pressed={postAnswers[question.key] === score}
+                      aria-label={`${score} out of 5`}
+                      onClick={() =>
+                        setPostAnswers((current) => ({
+                          ...current,
+                          [question.key]: score,
+                        }))
+                      }
+                    >
+                      ★ {score}
+                    </button>
+                  ))}
+                </div>
+                <div className="studio-survey-scale-labels">
+                  <span>1 = {question.postLowLabel}</span>
+                  <span>5 = {question.postHighLabel}</span>
+                </div>
+              </div>
+            ))}
+
+            <div className="studio-survey-question">
+              <span>3. Did the fit visualization help you make better styling decisions?</span>
+              <div className="studio-survey-vote">
+                <button
+                  type="button"
+                  className={postVote === "like" ? "active" : ""}
+                  aria-pressed={postVote === "like"}
+                  onClick={() =>
+                    setPostVote((current) => (current === "like" ? "" : "like"))
+                  }
+                >
+                  👍 Like
+                </button>
+                <button
+                  type="button"
+                  className={postVote === "dislike" ? "active" : ""}
+                  aria-pressed={postVote === "dislike"}
+                  onClick={() =>
+                    setPostVote((current) =>
+                      current === "dislike" ? "" : "dislike"
+                    )
+                  }
+                >
+                  👎 Dislike
+                </button>
+              </div>
+            </div>
+
+            <div className="studio-save-outfit-actions">
+              <button
+                type="button"
+                className="studio-save-cancel-button"
+                onClick={skipPostSurvey}
+              >
+                Skip
+              </button>
+              {isGuest ? (
+                <button
+                  type="button"
+                  className="studio-save-confirm-button"
+                  onClick={handleGuestSurveyCta}
+                >
+                  {STUDIO_GUEST_CTA}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="studio-save-confirm-button"
+                  onClick={submitPostSurvey}
+                >
+                  Submit & Continue
+                </button>
+              )}
+            </div>
+            {surveySaving && (
+              <p className="studio-survey-saving" role="status">
+                Saving your ratings…
+              </p>
+            )}
+          </section>
+        </div>
+      )}
+
       {notification && (
         <div className="studio-notification" role="status">
           {notification}
@@ -3274,10 +3808,7 @@ function FittingStudioPage({ isGuest = false }) {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="studio-save-confirm-button"
-                >
+                <button type="submit" className="studio-save-confirm-button">
                   Save Outfit
                 </button>
               </div>

@@ -559,6 +559,11 @@ export const authApi = {
     return performJsonRequest('DELETE', '/profile/', { refresh })
       .finally(() => clearSession());
   },
+  // NEW (OBJ-01 / FR-7.5): Fitting Studio pre/post popup surveys embedded
+  // directly in the accounts_user document via FittingStudioSurveyView.
+  submitFittingStudioSurvey(survey) {
+    return performJsonRequest('POST', '/profile/fitting-studio-survey/', { survey });
+  },
 };
 
 // Standalone function aliases (pages may import these directly)

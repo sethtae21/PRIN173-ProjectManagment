@@ -8,6 +8,12 @@ class RatingSerializer(serializers.ModelSerializer):
     Accepts score (1-5) and/or vote (like/dislike) independently.
     At least one must be present on CREATE. Neither is folded into the other.
     Accepts optional `source` to tag the UI surface that produced the rating.
+
+    CHANGED (Fitting Studio pre/post popups — OBJ-01 / FR-7.5): the source
+    vocabulary gains 'fitting_studio_popup'. The page-level confidence popups
+    persist through this serializer; the dedicated tag keeps those rows out of
+    every charter KPI join (OBJ-01/05 filter on fit_visualization /
+    recommendation_panel explicitly), preserving evidence integrity.
     """
     id = serializers.CharField(read_only=True)
     user = serializers.CharField(read_only=True, source='user_id')
@@ -18,7 +24,7 @@ class RatingSerializer(serializers.ModelSerializer):
                                    required=False, allow_null=True, allow_blank=True)
     source = serializers.ChoiceField(
         choices=['', 'recommendation_panel', 'fit_visualization',
-                 'product_page', 'order_history'],
+                 'product_page', 'order_history', 'fitting_studio_popup'],
         required=False, allow_blank=True, default='',
     )
 

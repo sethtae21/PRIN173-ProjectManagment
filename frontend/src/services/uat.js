@@ -72,3 +72,51 @@ export const UAT_ENDPOINTS = Object.freeze({
 export function isUATAnswer(value) {
   return value !== null && value !== undefined && value !== "";
 }
+
+// ============================================================================
+// FITTING STUDIO PRE/POST SESSION POPUPS (Criterion 9 / Criterion 11 / OBJ-01)
+// CHANGED (popup redesign): the page-level popups now use a TWO-QUESTION
+// contract with shopper-friendly wording. Both phases use the SAME 1-5
+// direction (higher = better) so the ≥+1 point gain calculation stays valid.
+//   * confidence    -> pre/post fit+style confidence (Criterion 9)
+//   * return_intent -> pre/post keep-vs-return intent, 5 = keep (Criterion 11)
+// The like/dislike on the fit visualization is a SEPARATE binary toggle
+// (fit_like_dislike) so it never conflates with the confidence stars.
+// Payload names mirror the KAN-89 survey log:
+//   { session_id, user_type, pre_confidence, pre_return_intent,
+//     post_confidence, post_return_intent, fit_like_dislike, timestamp }
+// ============================================================================
+export const STUDIO_SURVEY_QUESTIONS = Object.freeze([
+  {
+    key: "confidence",
+    prePrompt:
+      "How confident do you feel that you can find an outfit that fits your body type and personal style today?",
+    preLowLabel: "Not at all confident",
+    preHighLabel: "Very confident",
+    postPrompt:
+      "After seeing these outfits on your avatar, how confident do you feel about your fit and style choices now?",
+    postLowLabel: "Less confident than before",
+    postHighLabel: "Much more confident",
+  },
+  {
+    key: "return_intent",
+    prePrompt:
+      "If you were to buy the items you're about to try on without seeing them first, how likely would you be to return them?",
+    preLowLabel: "Definitely would return",
+    preHighLabel: "Definitely would keep",
+    postPrompt:
+      "Based on what you just saw, how likely are you to keep (not return) the items you tried on?",
+    postLowLabel: "Definitely would return",
+    postHighLabel: "Definitely would keep",
+  },
+]);
+
+// Guest-facing call-to-action that REPLACES the submit button on both popups
+// (FR-7.5: guests see the prompt, nothing is persisted).
+export const STUDIO_GUEST_CTA =
+  "Sign up to save your ratings & get personalized recommendations";
+
+// RESERVED: popup confidence answers no longer travel through /ratings/;
+// only the fit-visualization like/dislike does (source fit_visualization).
+// Kept exported so the backend source vocabulary stays stable.
+export const POPUP_RATING_SOURCE = "fitting_studio_popup";

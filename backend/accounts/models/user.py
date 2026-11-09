@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -74,6 +75,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     province = models.CharField(max_length=255, blank=True, null=True)
     postal_code = models.CharField(max_length=10, blank=True, null=True)
 
+    # NEW (readable on-account mirror): a SINGLE FLAT object with the user's
+    # most recent fitting-studio popup survey, embedded directly on the
+    # accounts_user document so Compass shows the latest pre/post ratings and
+    # like/dislike at a glance (no array nesting). The full per-visit history
+    # lives in accounts_fittingstudiosurvey (FittingStudioSurvey below).
+    latest_fitting_studio_survey = models.JSONField(default=dict, blank=True)
+
     # NOTE (avatar refactor): the legacy body attributes
     #   skin_tone / height / weight / body_proportions
     # were REMOVED from this model. They are owned exclusively by
@@ -122,3 +130,68 @@ class User(AbstractBaseUser, PermissionsMixin):
         from datetime import timedelta
         from accounts.archive import ARCHIVE_GRACE_DAYS
         return self.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
+
+
+# ---------------------------------------------------------------------------
+# ONE FLAT DOCUMENT PER FITTING-STUDIO VISIT (Criterion 9 / 11, OBJ-01 / KAN-89).
+# In MongoDB Compass each visit is a standalone, human-readable document with
+# scalar columns (pre/post confidence, keep-intent, computed gain, like/dislike)
+# plus the owner's email denormalized in (no join needed to read it).
+# The newest visit is ALSO mirrored as User.latest_fitting_studio_survey so the
+# rating is visible directly on the accounts_user document.
+# ---------------------------------------------------------------------------
+class FittingStudioSurvey(models.Model):
+    VOTE_CHOICES = (
+        ('like', 'Like'),
+        ('dislike', 'Dislike'),
+    )
+
+    # Owner FK; related_name keeps a natural accessor:
+    # user.fitting_studio_surveys.all()
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='fitting_studio_surveys',
+    )
+    # Denormalized for readability in Compass.
+    user_email = models.EmailField(blank=True, default='', max_length=254)
+
+    # Client-generated studio-visit id (bounded by the view's sanitizer).
+    session_id = models.CharField(max_length=64, blank=True, default='')
+    user_type = models.CharField(max_length=16, default='registered')
+
+    # The four 1-5 star answers (same direction pre & post so the ≥+1 gain
+    # calculation for Criterion 9 stays valid). NULL = skipped / not asked.
+    pre_confidence = models.IntegerField(blank=True, null=True)
+    pre_return_intent = models.IntegerField(blank=True, null=True)
+    post_confidence = models.IntegerField(blank=True, null=True)
+    post_return_intent = models.IntegerField(blank=True, null=True)
+
+    # Server-computed delta (post_confidence - pre_confidence); NULL when
+    # either side is missing. Makes the OBJ-01 gain visible at a glance.
+    confidence_gain = models.IntegerField(blank=True, null=True)
+
+    # Binary fit-visualization reaction (Criterion 9 "like" evidence).
+    fit_like_dislike = models.CharField(
+        max_length=8, choices=VOTE_CHOICES, blank=True, null=True
+    )
+
+    # Context snapshots (tried-on catalog ids + avatar state at submit time).
+    equipped_item_ids = models.JSONField(default=list, blank=True)
+    avatar_context = models.JSONField(default=dict, blank=True)
+
+    # default (not auto_now_add) so future data ports can preserve timestamps.
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'accounts_fittingstudiosurvey'
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['user', 'submitted_at'], name='acct_fss_user_time'),
+        ]
+
+    def __str__(self):
+        return (
+            f"FittingStudioSurvey {self.session_id or self.pk} "
+            f"({self.user_email}) gain={self.confidence_gain}"
+        )

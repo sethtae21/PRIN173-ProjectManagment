@@ -25,9 +25,14 @@ logger = logging.getLogger(__name__)
 
 GUEST_TTL = getattr(settings, 'GUEST_SESSION_TTL', 3600)
 
+# CHANGED (Fitting Studio pre/post popups — OBJ-01 / FR-7.5): the page-level
+# confidence popups persist through POST /ratings/ with the dedicated
+# 'fitting_studio_popup' source tag. Keeping the tag inside VALID_SOURCES lets
+# the submit + summary endpoints accept it while every charter KPI join (which
+# filters on fit_visualization / recommendation_panel) stays untouched.
 VALID_SOURCES = {
     '', 'recommendation_panel', 'fit_visualization',
-    'product_page', 'order_history',
+    'product_page', 'order_history', 'fitting_studio_popup',
 }
 
 
@@ -38,10 +43,11 @@ def _guest_index_key(session_key):
 def _guest_key(request, target_type, target_id, create=True):
     key = request.session.session_key
     if not key:
-        if not create:
+        if create:
+            request.session.create()
+            key = request.session.session_key
+        else:
             return None
-        request.session.create()
-        key = request.session.session_key
     return f"guest_rating:{key}:{target_type}:{target_id}"
 
 
@@ -52,7 +58,9 @@ class RatingSubmitView(APIView):
     payload (FR-7.5). Nothing is cached or persisted for guests (FR-1.9).
 
     Registered user -> upsert the (user, target, source) row, updating ONLY the
-    dimensions present in the payload (stars never overwrite a like, etc.).
+    dimensions present in the payload (stars never overwrite a like, etc).
+    The row's `user` FK points at the account document in the accounts_user
+    collection, so every popup rating is stored per registered user.
 
     NOTE: permission_classes stays AllowAny on purpose so we can answer a clean
     403; DRF's IsAuthenticated would answer 401, which the frontend's token
@@ -155,7 +163,7 @@ class RatingSummaryView(APIView):
             agg = cache.get(key) if key else None
             if agg:
                 g_score_count = agg.get('score_count', 0)
-                g_avg = round(agg.get('score_sum', 0) / g_score_count, 2) if g_score_count else 0.0
+                g_avg = round(agg.get('score_sum', 0) / score_count, 2) if g_score_count else 0.0
                 g_like = agg.get('like_count', 0)
                 g_dislike = agg.get('dislike_count', 0)
 

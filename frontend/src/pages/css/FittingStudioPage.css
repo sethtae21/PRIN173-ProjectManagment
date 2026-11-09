@@ -1224,7 +1224,7 @@
 }
 
 .studio-save-outfit-field span {
-  color: #9a4c35;
+  color: #994c35;
 }
 
 .studio-save-outfit-input {
@@ -1307,6 +1307,120 @@
 .studio-save-confirm-button:hover {
   box-shadow:
     0 8px 20px rgba(142, 100, 31, 0.2);
+}
+
+/* ==========================================
+   NEW: PRE / POST SESSION SURVEY POPUPS
+   (OBJ-01 / FR-7.5 — rate based on the avatar image)
+========================================== */
+
+.studio-survey-modal {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.studio-survey-image {
+  display: block;
+  width: min(230px, 62%);
+  margin: 0 auto 20px;
+  border: 1px solid #e2d8c7;
+  border-radius: 12px;
+  background: #f8f5ef;
+}
+
+.studio-survey-image-fallback {
+  display: block;
+  margin: 0 auto 20px;
+  padding: 26px 14px;
+  border: 1px dashed #d2be91;
+  border-radius: 12px;
+  color: #81766a;
+  font-size: 11px;
+  text-align: center;
+}
+
+.studio-survey-question {
+  margin-bottom: 18px;
+}
+
+.studio-survey-question > span {
+  display: block;
+  margin-bottom: 10px;
+  color: #29251f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.studio-survey-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-survey-scale button {
+  min-width: 44px;
+  min-height: 40px;
+  border: 1px solid #d2be91;
+  border-radius: 999px;
+  background: #f8f5ef;
+  color: #4a392d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.studio-survey-scale button:hover {
+  background: #fff8e6;
+}
+
+.studio-survey-scale button.active {
+  border-color: #4d3a21;
+  background: #d9a84d;
+  color: #1e170f;
+}
+
+.studio-survey-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  color: #7a6957;
+  font-size: 10px;
+}
+
+.studio-survey-vote {
+  display: flex;
+  gap: 10px;
+}
+
+.studio-survey-vote button {
+  flex: 1;
+  min-height: 42px;
+  border: 1px solid #d2be91;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: #4a392d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.studio-survey-vote button.active {
+  border-color: #4d3a21;
+  background: #d9a84d;
+  color: #1e170f;
+}
+
+.studio-survey-saving {
+  margin: 12px 0 0;
+  color: #675328;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ==========================================
