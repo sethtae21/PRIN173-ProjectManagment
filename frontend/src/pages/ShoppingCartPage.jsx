@@ -462,17 +462,18 @@ function ShoppingCartPage() {
 
   return (
     <main className="shopping-cart-page">
-      {notice && (
-        <div
-          className="shopping-cart-toast"
-          role="status"
-        >
-          {notice}
-        </div>
-      )}
-      {cartLoadError && (
-        <div className="shopping-cart-toast" role="alert">
-          {cartLoadError}
+      {(notice || cartLoadError) && (
+        <div className="shopping-cart-toast-region" aria-live="polite">
+          {notice && (
+            <div className="shopping-cart-toast" role="status">
+              {notice}
+            </div>
+          )}
+          {cartLoadError && (
+            <div className="shopping-cart-toast" role="alert">
+              {cartLoadError}
+            </div>
+          )}
         </div>
       )}
       <div className="shopping-cart-toolbar">

@@ -1280,11 +1280,12 @@
   position: fixed;
   z-index: 1100;
 
-  right: 24px;
-  bottom: 24px;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
 
   width: max-content;
-  max-width: min(340px, calc(100vw - 48px));
+  max-width: min(400px, calc(100vw - 32px));
 
   padding: 15px 19px;
 
@@ -1300,6 +1301,20 @@
 
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+
+  animation: editAvatarToastIn 0.25s ease-out;
+}
+
+@keyframes editAvatarToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ===================== LOADING ===================== */
@@ -1556,6 +1571,7 @@
       minmax(0, 1fr);
   }
 }
+
 /* ==========================================
    SCROLLABLE RECOMMENDATIONS
 ========================================== */

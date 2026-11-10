@@ -26,24 +26,37 @@ FITFUSION AI - SHOPPING CART PAGE
 /* ==========================================
 TOAST NOTIFICATION
 ========================================== */
-.shopping-cart-toast {
+.shopping-cart-toast-region {
   position: fixed;
   top: 24px;
-  right: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
-  padding: 14px 20px;
-  background: #edf4e8;
-  border: 1px solid #9bad8a;
-  border-radius: 8px;
-  color: #425538;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  animation: slideIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
 }
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+.shopping-cart-toast {
+  max-width: 400px;
+  padding: 15px 20px;
+  background: #17130f;
+  border: 1px solid #d7af4b;
+  border-radius: 10px;
+  color: #fffdf9;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-shadow: 0 15px 40px rgba(23, 19, 15, 0.25);
+  pointer-events: auto;
+  animation: cartToastIn 0.3s ease-out;
+}
+@keyframes cartToastIn {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 /* ==========================================
 TOOLBAR

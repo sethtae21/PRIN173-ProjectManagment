@@ -1039,9 +1039,10 @@
 .studio-notification {
   position: fixed;
   z-index: 2500;
-  right: 24px;
-  bottom: 24px;
-  max-width: min(380px, calc(100% - 48px));
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(420px, calc(100vw - 32px));
   padding: 16px 22px;
   border: 1px solid #d7af4b;
   border-radius: 10px;
@@ -1051,6 +1052,20 @@
     0 15px 40px rgba(0, 0, 0, 0.2);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  animation: studioNotificationIn 0.25s ease-out;
+}
+
+@keyframes studioNotificationIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ==========================================
@@ -1525,9 +1540,8 @@
   }
 
   .studio-notification {
-    right: 12px;
-    bottom: 12px;
-    max-width: calc(100% - 24px);
+    top: 12px;
+    max-width: calc(100vw - 24px);
   }
 }
 

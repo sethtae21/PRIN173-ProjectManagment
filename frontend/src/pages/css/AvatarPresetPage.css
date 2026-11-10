@@ -773,9 +773,10 @@
 .avatar-preset-toast {
   position: fixed;
   z-index: 1100;
-  right: 24px;
-  bottom: 24px;
-  max-width: min(340px, calc(100vw - 48px));
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(400px, calc(100vw - 32px));
   padding: 15px 19px;
   color: #f6e7b7;
   background: #17130f;
@@ -784,7 +785,20 @@
   box-shadow: 0 14px 35px rgba(0, 0, 0, 0.23);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
   overflow-wrap: anywhere;
+  animation: avatarPresetToastIn 0.25s ease-out;
+}
+
+@keyframes avatarPresetToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .avatar-presets-page-content button:focus-visible,

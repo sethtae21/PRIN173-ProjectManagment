@@ -16,12 +16,22 @@
   color: #17130f;
 }
 
-.order-history-toast {
+.order-history-toast-region {
   position: fixed;
   top: 24px;
-  right: 28px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 100;
-  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.order-history-toast {
+  max-width: 400px;
   padding: 15px 20px;
   background: #17130f;
   border: 1px solid #d7af4b;
@@ -29,8 +39,44 @@
   color: #fffdf9;
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
   box-shadow: 0 15px 40px
     rgba(23, 19, 15, 0.25);
+  pointer-events: auto;
+  animation: orderHistoryToastIn 0.25s ease-out;
+}
+
+.order-history-toast--sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.order-history-toast--sync button {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: #fffdf9;
+  border: 1px solid #b57e20;
+  border-radius: 6px;
+  color: #17130f;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes orderHistoryToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .order-history-toolbar {

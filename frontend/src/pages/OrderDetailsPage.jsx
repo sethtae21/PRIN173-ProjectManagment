@@ -266,7 +266,7 @@ function OrderDetailsPage() {
 
   /* Instant first paint from the durable local order record.
      FIX (cancelled order reverted to Processing): the previous initializer
-     read getCachedOrder() SYNCHRONOUSLY, but that helper is async and returns
+     read getCacheOrder() SYNCHRONOUSLY, but that helper is async and returns
      a Promise (always truthy), so it produced a garbage first paint and never
      saw the locally-cancelled status. localStorage is now the synchronous
      source of truth; the server sync below refreshes everything else. */
@@ -559,32 +559,20 @@ function OrderDetailsPage() {
 
   return (
     <main className="order-details-page">
-      {notice && (
-        <div className="order-details-toast" role="status">
-          {notice}
-        </div>
-      )}
-      {syncNotice && (
-        <div
-          className="order-details-toast"
-          role="status"
-          style={{ display: "flex", alignItems: "center", gap: 12, top: 70 }}
-        >
-          <span>{syncNotice}</span>
-          <button
-            type="button"
-            onClick={() => setRetryAttempt((value) => value + 1)}
-            style={{
-              background: "#fffdf9",
-              border: "1px solid #b57e20",
-              borderRadius: 6,
-              padding: "4px 10px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Retry
-          </button>
+      {(notice || syncNotice) && (
+        <div className="order-details-toast-region" role="status" aria-live="polite">
+          {notice && <div className="order-details-toast">{notice}</div>}
+          {syncNotice && (
+            <div className="order-details-toast order-details-toast--sync">
+              <span>{syncNotice}</span>
+              <button
+                type="button"
+                onClick={() => setRetryAttempt((value) => value + 1)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       )}
       <div className="order-details-container">

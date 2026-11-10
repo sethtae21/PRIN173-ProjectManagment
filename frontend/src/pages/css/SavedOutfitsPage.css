@@ -576,12 +576,13 @@
 
 .saved-outfits-toast {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
   max-width: min(
-    360px,
-    calc(100vw - 48px)
+    400px,
+    calc(100vw - 32px)
   );
   padding: 15px 19px;
   color: #f6e7b7;
@@ -592,6 +593,20 @@
     0 14px 35px rgba(0, 0, 0, 0.23);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  animation: savedOutfitsToastIn 0.25s ease-out;
+}
+
+@keyframes savedOutfitsToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* DELETE CONFIRMATION */

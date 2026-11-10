@@ -39,10 +39,11 @@
 
 .seller-store-toast {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
-  max-width: min(360px, calc(100vw - 48px));
+  max-width: min(400px, calc(100vw - 32px));
   padding: 15px 19px;
   color: #f6e7b7;
   background: #17130f;
@@ -51,17 +52,19 @@
   box-shadow: 0 14px 35px rgba(0, 0, 0, 0.23);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
   animation: sellerToastIn 0.25s ease-out;
 }
 
 @keyframes sellerToastIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translate(-50%, -12px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 }
 
@@ -542,8 +545,7 @@
   }
 
   .seller-store-toast {
-    right: 12px;
-    bottom: 12px;
+    top: 12px;
     max-width: calc(100vw - 24px);
   }
 }

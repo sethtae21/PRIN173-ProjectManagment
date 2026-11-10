@@ -4,6 +4,25 @@ import { catalogAPI } from "../../services/api";
 
 import "../css/SellerValidationReportPage.css";
 
+/* Remove a dead batch id from the local upload mirror so future visits
+   never re-request a batch that no longer exists (self-healing). */
+function purgeStaleUploadRecord(batchId) {
+  try {
+    const uploads = JSON.parse(
+      localStorage.getItem("fitfusion-seller-uploads") || "[]"
+    );
+    if (!Array.isArray(uploads)) return;
+    const next = uploads.filter(
+      (entry) => String(entry?.batchId) !== String(batchId)
+    );
+    if (next.length !== uploads.length) {
+      localStorage.setItem("fitfusion-seller-uploads", JSON.stringify(next));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function SellerValidationReportPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -13,6 +32,7 @@ function SellerValidationReportPage() {
   const [listings, setListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reportMissing, setReportMissing] = useState(false);
 
   /* ---------- Fetch batch report + live listings ---------- */
   useEffect(() => {
@@ -21,13 +41,14 @@ function SellerValidationReportPage() {
     async function fetchData() {
       setIsLoading(true);
       setError("");
+      setReportMissing(false);
+
+      let targetBatchId = batchIdFromUrl;
 
       try {
         const listingsData = await catalogAPI.myListings();
         if (cancelled) return;
         setListings(Array.isArray(listingsData) ? listingsData : []);
-
-        let targetBatchId = batchIdFromUrl;
 
         if (!targetBatchId) {
           try {
@@ -51,21 +72,45 @@ function SellerValidationReportPage() {
           if (!cancelled) setBatchReport(report);
         }
       } catch (err) {
-        console.error("Failed to load validation report:", err);
-        if (!cancelled) {
-          let isAuthError = false;
-          try {
-            const errData = JSON.parse(err.message);
-            if (errData.detail && (errData.detail.includes("permission") || errData.detail.includes("Authentication"))) {
-              isAuthError = true;
-            }
-          } catch (e) {}
+        const message = String(err?.message || "");
+        const isBatchNotFound =
+          message.includes("Batch not found") || message.includes("404");
 
-          if (isAuthError) {
-            setError("Access denied. Please log out and log back in with a Seller account.");
-          } else {
-            // If it's just a missing batch or generic error, treat it as "No batches yet"
-            setError("No batches uploaded yet. Upload a catalog to see validation results here.");
+        let isAuthError = false;
+        try {
+          const errData = JSON.parse(message);
+          if (
+            errData.detail &&
+            (errData.detail.includes("permission") ||
+              errData.detail.includes("Authentication"))
+          ) {
+            isAuthError = true;
+          }
+        } catch (e) {}
+
+        if (isBatchNotFound && targetBatchId) {
+          /* Expected when the stored upload mirror points at a batch whose
+             record no longer exists (DB reset / cleanup sweep / other
+             seller account). Not a crash: fall back to listings and
+             self-heal the stale local record. */
+          console.warn(
+            `Validation report: batch ${targetBatchId} not found; stale local upload record cleared.`
+          );
+          if (!batchIdFromUrl) purgeStaleUploadRecord(targetBatchId);
+          if (!cancelled) setReportMissing(true);
+        } else if (isAuthError) {
+          console.error("Failed to load validation report:", err);
+          if (!cancelled) {
+            setError(
+              "Access denied. Please log out and log back in with a Seller account."
+            );
+          }
+        } else {
+          console.error("Failed to load validation report:", err);
+          if (!cancelled) {
+            setError(
+              "No batches uploaded yet. Upload a catalog to see validation results here."
+            );
           }
         }
       } finally {
@@ -80,12 +125,16 @@ function SellerValidationReportPage() {
     };
   }, [batchIdFromUrl]);
 
-  /* ---------- FIXED: only items that belong to THIS batch ---------- */
+  /* ---------- Items for this batch; FALLBACK: all live listings ---------- */
   const batchItems = useMemo(() => {
-    if (!batchReport) return [];
-    return listings.filter(
-      (item) => String(item.batch || "") === String(batchReport.id)
-    );
+    if (batchReport) {
+      return listings.filter(
+        (item) => String(item.batch || "") === String(batchReport.id)
+      );
+    }
+    /* Report record gone (cleaned up) but the seller is NOT new:
+       derive the summary from their current live listings. */
+    return listings;
   }, [listings, batchReport]);
 
   const acceptedItems = useMemo(
@@ -141,7 +190,7 @@ function SellerValidationReportPage() {
     [batchItems]
   );
 
-  /* ---------- FIXED: counts derived from LIVE items, not stored counters ---------- */
+  /* ---------- Counts derived from LIVE items, not stored counters ---------- */
   const totalItems = batchItems.length;
   const acceptedCount = acceptedItems.length;
   const rejectedCount = rejectedItems.length;
@@ -150,6 +199,8 @@ function SellerValidationReportPage() {
 
   const batchDisplayId = batchReport
     ? `Batch ${String(batchReport.id).slice(-6).toUpperCase()}`
+    : listings.length > 0
+    ? "Current Listings Summary"
     : "Validation Report";
 
   /* ---------- States ---------- */
@@ -172,15 +223,54 @@ function SellerValidationReportPage() {
           <div className="seller-validation-introduction">
             <div>
               <p className="seller-validation-label">VALIDATION REPORT</p>
-              <h1>{error.includes("Access denied") ? "Access Denied" : "No Batches Yet"}</h1>
+              <h1>
+                {error.includes("Access denied")
+                  ? "Access Denied"
+                  : "No Batches Yet"}
+              </h1>
               <p>{error}</p>
             </div>
             <button
               type="button"
               className="seller-validation-upload-button"
-              onClick={() => navigate(error.includes("Access denied") ? "/login" : "/seller/upload-catalog")}
+              onClick={() =>
+                navigate(
+                  error.includes("Access denied")
+                    ? "/login"
+                    : "/seller/upload-catalog"
+                )
+              }
             >
-              {error.includes("Access denied") ? "Go to Login" : "Upload Catalog"}
+              {error.includes("Access denied")
+                ? "Go to Login"
+                : "Upload Catalog"}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  /* Truly empty: no report AND no listings -> the only real "new seller" case */
+  if (!batchReport && listings.length === 0) {
+    return (
+      <section className="seller-validation-page">
+        <div className="seller-validation-body">
+          <div className="seller-validation-introduction">
+            <div>
+              <p className="seller-validation-label">VALIDATION REPORT</p>
+              <h1>No Batches Yet</h1>
+              <p>
+                No batches uploaded yet. Upload a catalog to see validation
+                results here.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="seller-validation-upload-button"
+              onClick={() => navigate("/seller/upload-catalog")}
+            >
+              Upload Catalog
             </button>
           </div>
         </div>
@@ -208,6 +298,14 @@ function SellerValidationReportPage() {
             Upload Another File
           </button>
         </section>
+
+        {reportMissing && !batchReport && listings.length > 0 && (
+          <p className="seller-validation-pending-note" role="status">
+            The saved report for your last upload is no longer available (its
+            batch record was cleaned up or belongs to another session). The
+            results below are derived from your current live listings.
+          </p>
+        )}
 
         <section className="seller-validation-summary">
           <article>
@@ -303,10 +401,7 @@ function SellerValidationReportPage() {
                 </p>
               ) : (
                 rejectedItems.map((item) => (
-                  <div
-                    className="seller-validation-item rejected"
-                    key={item.id}
-                  >
+                  <div className="seller-validation-item rejected" key={item.id}>
                     <span
                       className="seller-validation-icon rejected"
                       aria-hidden="true"

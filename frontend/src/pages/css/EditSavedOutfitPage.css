@@ -128,14 +128,35 @@
 }
 
 .edit-outfit-notice {
-  margin: 0 0 22px;
-  padding: 14px 18px;
-  background: #f6e7b7;
+  position: fixed;
+  z-index: 1100;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(400px, calc(100vw - 32px));
+  padding: 15px 19px;
+  color: #f6e7b7;
+  background: #17130f;
   border: 1px solid #d7af4b;
   border-radius: 9px;
-  color: #6e4b15;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.23);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  animation: editOutfitToastIn 0.25s ease-out;
+}
+
+@keyframes editOutfitToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ==========================================
