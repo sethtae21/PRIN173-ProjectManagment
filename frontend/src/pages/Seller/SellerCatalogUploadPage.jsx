@@ -269,6 +269,19 @@ function extractHexFromReason(reason) {
   return match ? match[0] : null;
 }
 
+/* NEW: parse the backend's embedded fix. validate_color_alignment now ends a
+   mismatch message with `Correct color to declare: "X" (color family: y).`
+   (see catalog/color_rules.py). Returning the structured pair lets the panel
+   show the exact passing color and autofill it in one click, instead of
+   guessing from the hex with the rough client heuristic below. */
+function extractSuggestionFromReason(reason) {
+  const match = String(reason || "").match(
+    /Correct color to declare:\s*"([^"]+)"\s*\(color family:\s*([^)]+)\)/i
+  );
+  if (!match) return null;
+  return { name: match[1].trim(), family: match[2].trim().toLowerCase() };
+}
+
 function hexToColorFamily(hex) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -884,15 +897,23 @@ function SellerCatalogUploadPage() {
     }));
   }
 
-  function applyDetectedColor(itemName, hex) {
-    const family = hexToColorFamily(hex);
+  /* MODIFIED: autofill the color that actually PASSES the validator. When the
+     backend message carries the embedded suggestion (extractSuggestionFromReason),
+     use its name/family — guaranteed to satisfy validate_color_alignment. Only
+     when no suggestion is present (legacy cached report, or the "Invalid dominant
+     color value" branch) do we fall back to the rough hexToColorFamily guess.
+     This is what closes the old "#6e8391 → Blue" loop where the suggested value
+     itself got rejected again. */
+  function applyDetectedColor(itemName, hex, suggestion) {
+    const colorName = suggestion?.name ?? hexToColorFamily(hex);
+    const colorFamily = suggestion?.family ?? colorName.toLowerCase();
     setCorrections((prev) => ({
       ...prev,
       [itemName]: {
         ...(prev[itemName] || {}),
-        color: family,
-        color_description: `${family} (${hex}) as photographed`,
-        color_family: family,
+        color: colorName,
+        color_description: `${colorName} (${hex}) as photographed`,
+        color_family: colorFamily,
       },
     }));
   }
@@ -1127,16 +1148,45 @@ function SellerCatalogUploadPage() {
                               <div className="seller-correction-controls" style={{ marginTop: "12px", padding: "12px", background: "#f9f9f9", borderRadius: "6px" }}>
                                 {(() => {
                                   const hex = extractHexFromReason(entry.reasons.join(" "));
-                                  const family = hexToColorFamily(hex);
+                                  // NEW: prefer the backend's guaranteed-passing
+                                  // suggestion; fall back to the client guess only
+                                  // when the message carries none.
+                                  const suggestion = extractSuggestionFromReason(
+                                    entry.reasons.join(" ")
+                                  );
+                                  const suggestedName =
+                                    suggestion?.name ?? hexToColorFamily(hex);
+                                  const suggestedFamily =
+                                    suggestion?.family ??
+                                    suggestedName.toLowerCase();
                                   const currentCorrections = corrections[entry.name] || {};
                                   const originalRow = csvData?.rows.find((r) => r.name === entry.name);
 
                                   return (
                                     <>
+                                      {/* NEW: surface the correct color prominently,
+                                          not buried in the joined reason text. */}
+                                      <p
+                                        style={{
+                                          margin: "0 0 10px",
+                                          fontSize: "12px",
+                                          fontWeight: 700,
+                                          color: "#654411",
+                                        }}
+                                      >
+                                        Correct color to declare:{" "}
+                                        <span style={{ color: "#8e641f" }}>
+                                          {suggestedName}
+                                        </span>{" "}
+                                        (color family: {suggestedFamily})
+                                      </p>
+
                                       <button
                                         type="button"
                                         className="seller-correction-apply"
-                                        onClick={() => applyDetectedColor(entry.name, hex)}
+                                        onClick={() =>
+                                          applyDetectedColor(entry.name, hex, suggestion)
+                                        }
                                         style={{
                                           marginBottom: "12px",
                                           padding: "8px 14px",
@@ -1148,7 +1198,7 @@ function SellerCatalogUploadPage() {
                                           cursor: "pointer",
                                         }}
                                       >
-                                        Use detected color {hex} → {family}
+                                        Use detected color {hex} → {suggestedName}
                                       </button>
 
                                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>

@@ -23,6 +23,35 @@ class CatalogColorAlignmentTests(SimpleTestCase):
         self.assertFalse(is_valid)
         self.assertIn('Color mismatch', message)
 
+    # FIX regression (the "#6e8391 declared Blue" false rejection): muted but
+    # clearly-hued garments used to fall in the saturation dead zone between
+    # the achromatic ceiling (s <= 0.2) and the chromatic floors (blue 0.3,
+    # red 0.35, green/brown 0.25), so NO mapped declaration passed. With
+    # contiguous thresholds the light-wash denim resolves to Blue.
+    def test_muted_blue_gray_denim_now_passes_as_blue(self):
+        is_valid, _ = CatalogValidator().validate_color_alignment('Blue', '#6e8391')
+        self.assertTrue(is_valid)
+
+    def test_suggestion_names_the_passing_color_for_denim(self):
+        suggestion = CatalogValidator().suggest_declared_color('#6e8391')
+        self.assertEqual(suggestion['name'], 'Blue')
+        self.assertEqual(suggestion['family'], 'blue')
+
+    def test_mismatch_message_carries_the_correct_color_to_declare(self):
+        is_valid, message = CatalogValidator().validate_color_alignment('Red', '#1e4fd8')
+        self.assertFalse(is_valid)
+        self.assertIn('Color mismatch', message)
+        self.assertIn('Correct color to declare: "Blue"', message)
+
+    def test_unmapped_hue_suggests_nearest_family_and_passes_when_declared(self):
+        # Purple hue sits outside the seven strict bands; the classifier returns
+        # the truthful fallback, which the validator trusts (unmapped name), so
+        # re-uploading with the suggested color succeeds.
+        suggestion = CatalogValidator().suggest_declared_color('#9000ff')
+        self.assertEqual(suggestion['name'], 'Purple')
+        is_valid, _ = CatalogValidator().validate_color_alignment('Purple', '#9000ff')
+        self.assertTrue(is_valid)
+
 
 class CatalogTagValidationTests(SimpleTestCase):
     def setUp(self):

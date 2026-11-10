@@ -1,12 +1,20 @@
 """
 catalog/validators.py
 Validation algorithm for Seller-uploaded catalog items (SRS FR-4.7)
+
+NOTE: catalog/views/core.py defines the CatalogValidator that is actually wired
+into the upload/edit views and the test suite. This module is kept for
+backward compatibility; its COLOR ALIGNMENT logic now delegates to
+catalog.color_rules so the two validators can never disagree about which color
+a seller should declare (see color_rules.py for the dead-zone fix).
 """
 from PIL import Image
 import io
 from rembg import remove
 import colorsys
 from collections import Counter
+
+from catalog.color_rules import alignment_result, suggest_declared_color
 
 
 class CatalogValidator:
@@ -145,30 +153,17 @@ class CatalogValidator:
 
     def validate_color_alignment(self, declared_color, dominant_hex):
         """
-        Basic image-text alignment check
-        Compares declared color with dominant color from image
+        Image-text alignment check (FR-4.7). Delegates to catalog.color_rules
+        so the rule set and the "correct color to declare" suggestion stay in
+        sync with the authoritative validator in catalog/views/core.py.
         Returns: (is_valid, message)
         """
-        # Simple color name to hex mapping
-        color_map = {
-            'red': ['#ff', '#dc', '#e0'],
-            'blue': ['#00', '#1e', '#41'],
-            'green': ['#00', '#22', '#2e'],
-            'black': ['#00', '#1a', '#2f'],
-            'white': ['#ff', '#fa', '#f0'],
-            'gray': ['#80', '#a9', '#c0'],
-            'brown': ['#65', '#8b', '#a0'],
-        }
+        return alignment_result(declared_color, dominant_hex)
 
-        declared_lower = declared_color.lower()
-
-        # Check if declared color matches dominant color
-        for color_name, hex_prefixes in color_map.items():
-            if color_name in declared_lower:
-                if not any(dominant_hex.startswith(prefix) for prefix in hex_prefixes):
-                    return False, f"Color mismatch: declared '{declared_color}' but image appears to be different color ({dominant_hex})"
-
-        return True, "Color alignment OK"
+    def suggest_declared_color(self, dominant_hex):
+        """Return the color name/family a seller should declare for this hex
+        (the value that will pass validate_color_alignment). See color_rules."""
+        return suggest_declared_color(dominant_hex)
 
     def generate_color_palette_tags(self, dominant_hex, color_family):
         """

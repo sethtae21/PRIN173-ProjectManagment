@@ -30,6 +30,10 @@ from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
 # Size-label format rule (S/M/L only; footwear regional prefixes; cm rejected).
 from recommendations.knowledge_table import validate_size_label
+# FR-4.7 color alignment: single source of truth shared with the legacy
+# catalog/validators.py and the upload/edit UIs (the mismatch message now
+# embeds the exact "correct color to declare", and the UIs autofill it).
+from catalog.color_rules import alignment_result, suggest_declared_color
 
 logger = logging.getLogger(__name__)
 
@@ -393,36 +397,22 @@ class CatalogValidator:
             return "#000000"
 
     def validate_color_alignment(self, declared_color, dominant_hex):
-        color_map = {
-            'red': lambda h, s, v: (h <= 0.06 or h >= 0.94) and s >= 0.35,
-            'blue': lambda h, s, v: 0.54 <= h <= 0.75 and s >= 0.3,
-            'green': lambda h, s, v: 0.2 <= h <= 0.46 and s >= 0.25,
-            'black': lambda h, s, v: v <= 0.22,
-            'white': lambda h, s, v: v >= 0.78 and s <= 0.2,
-            'gray': lambda h, s, v: s <= 0.2 and 0.2 < v < 0.85,
-            'brown': lambda h, s, v: 0.035 <= h <= 0.13 and s >= 0.25 and 0.12 < v < 0.62,
-        }
-        declared_lower = str(declared_color).lower()
-        declared_colors = [name for name in color_map if name in declared_lower]
-        if not declared_colors:
-            return True, 'Color alignment OK'
-        try:
-            # FIX: dominant_hex arrives as '#rrggbb' — strip '#' before slicing,
-            # otherwise int('#f', 16) raises and every aligned color is rejected
-            # with "Invalid dominant color value".
-            digits = str(dominant_hex or '').lstrip('#')
-            if len(digits) < 6:
-                raise ValueError(f"short hex: {dominant_hex}")
-            red, green, blue = (
-                int(digits[index:index + 2], 16) / 255
-                for index in (0, 2, 4)
-            )
-            hsv = colorsys.rgb_to_hsv(red, green, blue)
-        except (ValueError, TypeError):
-            return False, f"Invalid dominant color value: {dominant_hex}"
-        if not any(color_map[name](*hsv) for name in declared_colors):
-            return False, f"Color mismatch: declared '{declared_color}' but image appears to be different color ({dominant_hex})"
-        return True, "Color alignment OK"
+        """Image-text color alignment (FR-4.7). Delegates to catalog.color_rules
+        so the rule set and the built-in "correct color to declare" suggestion
+        stay identical across the upload path, the edit path, and the legacy
+        catalog/validators.py module. The mismatch message now ends with the
+        exact color the seller should use (see color_rules.alignment_result),
+        which closes the former saturation dead zone where muted-but-hued
+        garments (e.g. light-wash denim #6e8391) matched NO rule and every
+        mapped declaration was wrongly rejected."""
+        return alignment_result(declared_color, dominant_hex)
+
+    def suggest_declared_color(self, dominant_hex):
+        """Return {"name","family","hex","description"} for the color a seller
+        should declare so validate_color_alignment passes, or None if the hex
+        cannot be parsed. Used by the upload/edit UIs to autofill the fix in
+        one click (the returned name is guaranteed to pass the validator)."""
+        return suggest_declared_color(dominant_hex)
 
     def generate_color_palette_tags(self, dominant_hex, color_family):
         return get_palette_tags(color_family)
