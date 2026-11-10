@@ -20,9 +20,21 @@ This document defines the software testing strategy and execution plan for the F
 * Achieve a **100% pass rate** on the defined validation-algorithm test cases (Scope Criterion 4/5 suite; KAN-83/KAN-85).  
 * Detect and resolve **100% of Critical/Blocker (P1/P2) defects** prior to the local staging demonstration and the Week 14 final defense (November 21, 2026).  
 * Meet all performance NFRs: 95% of catalog/filtering/recommendation/commerce API requests \<500 ms; canvas overlay, view-angle, and proportion-deformation renders \<1 s; initial load \<3 s; 10-item CSV pipeline \<60 s (Criteria 1–4).  
-* Meet UAT gates: first-time Guest try-on ≤2 minutes (Criterion 6); ≥80% fit/style confidence improvement and fit-visualization "rating" ≥4/5 (Criterion 9); ≥80% recommendation approval (Criterion 10); ≥80% purchase-decision confidence improvement with lower return-intent (Criterion 11); ≥70% cart-to-mock-checkout completion (Criterion 8).  
+* Meet UAT gates: first-time Guest try-on ≤2 minutes (Criterion 6); ≥80% fit/style confidence improvement and fit-visualization "like" (≥4/5) (Criterion 9); ≥80% recommendation approval (Criterion 10). Definition of Approval: "Approval" strictly means either selecting the "like" vote or giving a 4 or 5-star rating. A "dislike" vote or a 1–3 star rating does not count as approval.; ≥80% purchase-decision confidence improvement with lower return-intent (Criterion 11); ≥70% cart-to-mock-checkout completion (Criterion 8).  
 * Pass 100% of the Security & Privacy checklist — TLS 1.2+, Argon2id/PBKDF2 hashing, server-side RBAC, ephemeral guests, no user photo upload,RA 10173-compliant account deletion via deactivation and restricted archival (Criterion 7/ RT-09).  
 * Maintain a predictable **Cost of Quality (CoQ)** by shifting defect detection left: weights  regression \+ ±1 sensitivity tests run at commit time (KAN-103), and API input-hardening tests (KAN-117) precede integration testing.
+
+## 
+
+## 
+
+## 
+
+## 
+
+## 
+
+## 
 
 ## **2\. Test Execution Levels & Framework**
 
@@ -36,17 +48,23 @@ This document defines the software testing strategy and execution plan for the F
      /                 \\  Unit Testing  (Scoring, validation rules a–e, serializers,  
     /----------------\\               RBAC scoping, mock gateway; every commit/PR)
 
+Note: The panel will conduct the User Acceptance Testing.
+
 | Level | Coverage | Primary Owner | Execution Frequency | Jira / WBS |
 | :---- | :---- | :---- | :---- | :---- |
 | Unit | Django models, serializers, views, scoring.py, knowledge table, Pillow/rembg validation rules, defensive input guards | Developers (Carlos – backend, Dein – frontend logic) | Every code commit and pull request (Django test runner \+ React unit tests) | KAN-82 / WBS 1.4.1; KAN-103; KAN-117 |
 | End-to-End (E2E) | Complete workflows spanning React frontend, Django REST API, MongoDB Atlas, and GridFS storage on the local staging host | Seth with Dein and Carlos | End of every sprint; mandatory gates before M3 (Week 8), M4 (Week 11), M5 (Week 14\) | KAN-83, KAN-84, KAN-85, KAN-86 / WBS 1.4.2 |
 | Acceptance / UAT | Role-based walkthroughs (Guest, Registered User, Seller), UAT survey instrument, in-app like/dislike ratings (FR-7.5) | PM (Seth) \+ Frontend/QA Coord. (Dein); end-user representatives from other sections | Week 12 phase gate prior to defense sign-off | KAN-87, KAN-88, KAN-89, KAN-90 / WBS 1.4.3 |
 
+## 
+
+## 
+
 ## **3\. Unit Testing Standard**
 
 ### **3.1 Scope & Purpose**
 
-* **Scope:** Individual functions and isolated components: weighted scoring function and knowledge-table lookups (FR-7.1–7.2); validation rules (a) required fields, (b) ≥800×800 px and ≤5 MB, (c) alpha-channel validity, (d) CSV-to-upload filename mapping, (e) image–text color alignment (FR-4.7); color\_palette\_tags derivation (FR-3.2/4.2); preset serializer guards (height 120–220 cm, body build 86 \- 112, female-only cup size — FR-2.3/2.7); cart/order owner scoping and Guest rejection (FR-6.1, FR-1.8); mock payment gateway approve/decline (FR-6.5); GridFS orphan-cleanup hooks (FR-4.5/4.6, KAN-119); recommendation endpoint input hardening (KAN-117).  
+* **Scope:** Individual functions and isolated components: weighted scoring function and knowledge-table lookups (FR-7.1–7.2); validation rules (a) required fields, (b) ≥800×800 px and ≤5 MB, (c) alpha-channel validity, (d) CSV-to-upload filename mapping, (e) image–text color alignment (FR-4.7); color\_palette\_tags derivation (FR-3.2/4.2);preset serializer guards (height 120–220 cm, Body Build 86–112 cm, female-only cup size — FR-2.3/2.7); size-compatibility guardrails constraining the height/Body Build controls to the size-compatible sub-range with the global supported ranges as outer bounds (FR-2.3 v1.1); validation rule (a) controlled-vocabulary conformance (categories per FR-3.1; style tags casual/smart/formal/sporty per FR-3.2); size-compatibility guardrails constraining the height/Body Build controls to the size-compatible sub-range with the global supported ranges as outer bounds (FR-2.3 v1.1); validation rule (a) controlled-vocabulary conformance (categories per FR-3.1; style tags casual/smart/formal/sporty per FR-3.2); cart/order owner scoping and Guest rejection (FR-6.1, FR-1.8); mock payment gateway approve/decline (FR-6.5); GridFS orphan-cleanup hooks (FR-4.5/4.6, KAN-119); recommendation endpoint input hardening (KAN-117).  
 * **Primary Owner:** Software Developers / Engineering Team (Carlos for backend modules; Dein for client-side validation logic).  
 * **Execution Frequency:** Automatically triggered on every code commit and pull request; results reviewed during weekly sprint planning (KAN-77).
 
@@ -58,6 +76,18 @@ This document defines the software testing strategy and execution plan for the F
 2. **Defensive Validation:** Every function handling input must test edge cases (null inputs, invalid types, boundary limits such as 119/120/220/221 cm and 87/88/112/113 cm, unexpected exceptions).  
 3. **Execution Speed:** Full unit suite must execute in under 2 minutes so it remains a per-commit gate.  
 4. **Determinism:** Scoring and validation tests use fixed tag combinations and fixed image fixtures so results are reproducible for panel audit (Charter §6.1.11 explainability).
+
+### 
+
+### 
+
+### 
+
+### 
+
+### 
+
+### 
 
 ### **3.3 Unit Test Case** 
 
@@ -76,7 +106,11 @@ This document defines the software testing strategy and execution plan for the F
 | UT-11 | commerce views (RBAC) | Guest POST /cart; User B GET User A order | 401/403 for Guest; 403/404 cross-user; owner-only reads | Security / RBAC | Pass (KAN-118) |
 | UT-12 | commerce mock gateway | Simulated decline response | Checkout error shown; no order record; cart intact | Edge / Defensive | Pass (KAN-118) |
 | UT-13 | catalog storage cleanup | Replace listing image; delete listing | Old GridFS ObjectIds absent from fs.files/fs.chunks | Regression | Planned (KAN-119) |
-| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/body build beyond the size-compatible band | Control stops at the limit and shows the allowed-range message;backend still enforces global 120–220 cm / 86–112 cm (FR-2.3) | Edge/Defensive | In Progress |
+| UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/Body Build beyond the size-compatible sub-range | Control stops at the limit and shows the allowed-range message; backend still enforces global 120–220 cm / 86–112 cm (FR-2.3) | Edge/Defensive | In Progress |
+
+## 
+
+## 
 
 ## **4\. End-to-End (E2E) Testing Standard**
 
@@ -112,7 +146,7 @@ This document defines the software testing strategy and execution plan for the F
 | E2E-04 | Rejection → fix → republish loop (UC-16, UC-17, UC-19) | Item declared "red" with blue image | 1\. Upload. 2\. Read rejection reason. 3\. Edit listing, replace image. 4\. Re-validate. | Rejected item never published; after fix, status Active; old PNG purged | Report reason matches rule (e); GridFS old ObjectId absent (KAN-119) |
 | E2E-05 | Cart → mock checkout → order history (UC-11, UC-12, UC-13, UC-14) | Registered user; active catalog | 1\. Add 2 items. 2\. Update quantity. 3\. Checkout: address \+ payment. 4\. Mock approval. 5\. Open order history/detail. | Order record with items, store names, address, timestamp; cart cleared | Order fields complete (FR-6.6); ≥70% cart completion across runs (Criterion 8\) |
 | E2E-06 | RBAC negative paths (UC-08, UC-11) | Guest session; non-seller user | 1\. Guest opens cart/checkout. 2\. Non-seller opens Seller upload. | Guest prompted to register; non-seller denied | 401/403 returned server-side; no client-side bypass (Criterion 7\) |
-| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; sign-up/login prompt shown on Guest click; Guest ratings never persisted to the DB (session-only per FR-1.9/FR-7.5) |
+| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; sign-up/login prompt shown on Guest click; Guest ratings never persisted to the DB (blocked per FR-7.5) |
 | E2E-08 | Canvas performance (UC-03, UC-04) | Mid-range laptop; staged catalog | 1\. Switch item. 2\. Toggle view. 3\. Change proportion.4. Equip a Dress/One-Piece → Top and Bottom slots replaced with confirmation (FR-5.2 v1.1). | Each overlay/deformation renders fluidly | Each render ≤1 s (Criterion 2; KAN-84 run) |
 | E2E-09 | API performance sweep | Staging under normal load | 1\. Script calls to catalog, filtering, recommendation, commerce endpoints. 2\. Compute 95th percentile. | Responses within threshold | 95% \<500 ms (Criterion 1\) |
 | E2E-10 | Account deletion (deactivation \+ archival)/ RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm.3. Query active collections for user data; verify the archived record is access-restricted and pseudonymized. | Account deactivated (login and all role access blocked); personal data removed from active collections and retained only in the restricted archive per the retention policy | Post-delete queries on active collections return nothing; the archive is readable only through the restricted retention path and holds no directly identifying fields (FR-1.4; Criterion 7 checklist) |
@@ -123,7 +157,7 @@ This document defines the software testing strategy and execution plan for the F
 
 ### **5.1 Scope & Purpose**
 
-* **Scope:** High-level validation of business objectives, user satisfaction, functional requirements, and usability with end-user representatives for all three roles: Guest, Registered User, Seller. Captures pre/post confidence, return intent, and in-app like/dislike ratings per FR-7.5 to evidence Criteria 6 and 9–11 and Charter OBJ-01, OBJ-02, OBJ-05, OBJ-06, OBJ-07, OBJ-09.  
+* **Scope:** High-level validation of business objectives, user satisfaction, functional requirements, and usability with end-user representatives for all three roles: Guest, Registered User, Seller. Captures pre/post confidence, return intent, and in-app like/dislike ratings per FR-7.5 to evidence Criteria 6 and 9–11 and Charter OBJ-01, OBJ-02, OBJ-05, OBJ-06, OBJ-07, OBJ-09. Definition of Approval: For Criteria 9 and 10, "Approval" strictly means either selecting the "like" vote or giving a 4 or 5-star rating. A "dislike" vote or a 1–3 star rating does not count as approval.  
 * **Primary Owner:** Product Manager (Seth) and Frontend/QA Coordinator (Dein) as end-user representatives' facilitators; Kahlil archives survey instruments.  
 * **Execution Frequency:** Week 12 phase-gate sign-off prior to the Week 14 defense (KAN-87, KAN-88).
 
@@ -152,6 +186,10 @@ This document defines the software testing strategy and execution plan for the F
 
 ## 
 
+## 
+
+## 
+
 ## **6\. Defect Management & Severity Matrix**
 
 | Severity Level | Definition | Response Window | Resolution Target |
@@ -160,16 +198,6 @@ This document defines the software testing strategy and execution plan for the F
 | P2 – High | Major feature broken but partial workaround exists (e.g., canvas misalignment on one proportion, checkout failing on one path). | \<4 hours | Within current sprint (weekly cycle) |
 | P3 – Medium | Minor feature bug or UI misalignment; core functionality unaffected (filter sorting, report wording, asset edge case). | Next planning cycle | Scheduled next sprint |
 | P4 – Low | Cosmetic flaw, typo, minor enhancement suggestion. | Backlog review | Backlog / low priority; fixed only before freeze if capacity allows |
-
-## 
-
-## 
-
-## 
-
-## 
-
-## 
 
 ## 
 

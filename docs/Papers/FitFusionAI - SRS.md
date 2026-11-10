@@ -44,7 +44,7 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 | RPO / RTO | Recovery Point Objective / Recovery Time Objective – data-loss and downtime targets |
 | Atlas | MongoDB Atlas – the cloud-hosted database service used by the system |
 | rembg | An off-the-shelf Python library used to automatically remove image backgrounds and generate transparent PNGs without requiring custom-trained models. |
-| Body Build | A single circumference-based girth scale in centimeters (validated range 86–112 cm) that replaces body weight as the avatar size input; used solely to deform the base silhouette for visual simulation, never for health, tailoring, or size assessment. |
+| Body Build | A visual torso girth parameter (validated range 86–112 cm) used solely to deform the 2D base silhouette. To align user inputs with the UI/UX slider, the frontend employs a **BMI-Derived Silhouette Mapping:** it calculates a visual ratio (weight\_kg / height\_m^2) and maps a standard BMI range of 21 (Normal baseline) to 32 (Obese Class I baseline) directly onto the 86–112 cm spectrum. This ensures the avatar reacts realistically to height/body build inputs while remaining strictly clamped within the safe mathematical limits of the 2D asset mesh. It is never used for health, tailoring, or medical assessment. |
 
 ### **1.4 References**
 
@@ -54,6 +54,10 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 * ISO/IEC/IEEE 29148:2018, Systems and software engineering — Life cycle processes — Requirements engineering.  
 * MongoDB Atlas Documentation ([https\://www\.mongodb.com/docs/atlas](https://www.mongodb.com/docs/atlas)).  
 * Django Documentation ([https\://docs.djangoproject.com](https://docs.djangoproject.com)) and React Documentation ([https\://react.dev](https://react.dev)).
+
+## 
+
+## 
 
 ## **2\. Overall Description**
 
@@ -87,10 +91,24 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 * **Avatar-only visualization:** No user photo upload, body tracking, pose detection, or AI image generation is included, keeping the MVP deterministic and avoiding the privacy and compute costs associated with processing user photos.  
 * **AI positioning:** The MVP contains no custom-trained machine-learning, deep-learning, or generative-AI models and no black-box AI component for recommendation, fit prediction, user profiling, or decision-making. The recommendation component is a deterministic, rule-based Heuristic Expert System (symbolic/heuristic AI) that encodes color theory and style rules into explicit rules and weighted tag scoring, so every recommendation is fully auditable and explainable to users and the panel. Off-the-shelf image utilities (rembg for background removal, Pillow for validation) are permitted as fixed preprocessing/image-processing components; they are not used for recommendation ranking, fit prediction, user profiling, or decision-making. Terminology alignment: when the team states "AI is not part of the MVP", it refers to ML/black-box AI; the deterministic Heuristic Expert System is an in-scope, non-ML component (Charter §4.1, §4.2, §6.1.11).  
 * **No 3D in any scope:** Fully 3D rotatable avatars, dynamic cloth physics, and WebGL rendering are out of scope; the system uses photo-based 2D visualization only, since 3D rendering demands GPU resources and specialized asset pipelines that exceed a single-semester undergraduate build.  
-* **Body-data limitation:** Height, body build, and body proportion inputs are used solely for avatar layer selection and shall not be used for medical, health, or body assessment purposes, preventing accidental medical claims and associated regulatory exposure.Supported input ranges are height 120–220 cm and Body Build 86–112 cm; values outside these ranges are rejected at validation. Body-proportion category brackets are expert-encoded simulation ranges for silhouette deformation only and carry no anthropometric, tailoring, or medical claim.  
+* **Body-data limitation:** Height and Body Build inputs are used solely for avatar layer selection and silhouette deformation; they shall not be used for medical, health, or body assessment purposes. The supported ranges are design bounds informed by local anthropometric averages and retail assumptions:  
+  * **Height (120–220 cm):** Informed by DOST-FNRI National Nutrition Survey data (average adult heights of \~163 cm for males and \~151.4 cm for females). The 120 cm floor is a permissive lower design bound accommodating very short adults and adolescents, while the 220 cm ceiling covers the realistic adult range with a safety margin.  
+  * **Body Build (86–112 cm) & BMI Design Mapping:** The UI sliders utilize a deterministic algorithm that maps a BMI proxy (21–32, based on WHO international cutoffs, noting that Asia-Pacific clinical cutoffs define obesity at a lower threshold of ≥25) to a visual torso girth scale (86–112 cm). This is a design mapping chosen for visual simulation, not a physiological correlation.  
+  * **Apparel Sizing (S to 4XL):** The 4-cm increments per size (e.g., S: 86-90, M: 90-94) are a design assumption consistent with common Asian size grading. Note: The final size tier (4XL) spans 110–112 cm (a 2 cm span) to cap the maximum supported Body Build, and boundary logic in the code must use strict inequalities to prevent overlap.   
+    Body-proportion category brackets are expert-encoded simulation ranges for silhouette deformation only and carry no anthropometric, tailoring, or medical claim.  
 * **Cloud free-tier dependency:** The database runs on MongoDB Atlas free tier, limiting storage and connection counts; this is acceptable for MVP-scale load and eliminates infrastructure cost during development. The application itself runs on the local staging host (dedicated local staging server); only the database remains cloud-hosted (Charter §6.1.8).  
 * **Privacy regulation:** The system shall comply with the Data Privacy Act of 2012 (RA 10173\) for all stored user and seller data, a non-negotiable legal baseline for any production-deployable academic project.  
 * **Known limitation (2D overlay alignment):** Because clothing overlays are pre-processed 2D PNGs layered over a procedurally deformed base silhouette, minor alignment deviation or transient visual artifacts may appear at extreme body-proportion combinations or during rapid view switching. This is inherent to photo-based 2D overlay visualization (Charter §6.1.3) and is not treated as a functional defect provided the alignment grid registration and the Criterion 2 rendering target (\<1 s) are met.
+
+## 
+
+## 
+
+## 
+
+## 
+
+## 
 
 ## **3\. Functional Requirements**
 
@@ -99,7 +117,7 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 * **FR-1.1 (Registration with Role Assignment):** The system shall allow users to create an account using a username, email address, and password. During the registration process, the system shall capture the role selection (User or Seller) from the end device. If the Seller role is selected, the system shall require the user to provide a Store Name to identify their business. The backend shall determine and assign the appropriate user role based on this selection, which shall be reflected in the database to establish entity membership and govern access permissions throughout the session.  
 * **FR-1.2 (Account Information):** The system shall allow registered users and Sellers to read and view their account information including email address, username, assigned role, and Store Name (for Sellers).  
 * **FR-1.3 (Account Updates):** The system shall allow registered users and Sellers to update their account information including password and profile details.  
-* **FR-1.4 (Account Deletion):** he system shall allow registered users and Sellers to request deletion of their accounts. Upon confirmed request, the system shall (a) deactivate the account so that login and all role-based access are blocked; (b) remove the account's personal data from all active collections so that post-deletion queries on active collections return no personal data for that account; and (c) retain the removed data only in a restricted archive whose direct identifiers are pseudonymized, readable solely through a defined retention path, and limited to records required for legitimate business or legal purposes (e.g., transaction records) — satisfying the user's rights under RA 10173\.  
+* **FR-1.4 (Account Deletion):** The system shall allow registered users and Sellers to request deletion of their accounts. Upon confirmed request, the system shall (a) deactivate the account so that login and all role-based access are blocked; (b) remove the account's personal data from all active collections so that post-deletion queries on active collections return no personal data for that account; and (c) retain the removed data only in a restricted archive whose direct identifiers are pseudonymized, readable solely through a defined retention path, and limited to records required for legitimate business or legal purposes (e.g., transaction records) — satisfying the user's rights under RA 10173\.  
 * **FR-1.5 (Password Enforcement):** The system shall enforce passwords of at least 8 characters including one uppercase letter, one lowercase letter, one number, and one special character.  
 * **FR-1.6 (Login / Logout):** The system shall authenticate registered users and Sellers, maintain secure sessions, and allow logout.  
 * **FR-1.7 (RBAC):** The system shall enforce Role-Based Access Control separating Registered User, Guest, and Seller permissions, with the backend verifying the assigned user role on every protected request so that the frontend cannot bypass restrictions.  
@@ -110,7 +128,7 @@ The avatar system is calibrated for adolescent and adult body proportions; the r
 
 * **FR-2.1 (Gender Selection):** The system shall allow users to create an avatar by selecting the avatar gender (Male or Female), which determines the available body-proportion options.  
 * **FR-2.2 (Preset Avatars):** The system shall allow users to read and select from pre-set 2D body avatars.  
-* **FR-2.3 (Custom Avatar):** The system shall allow users to create a custom avatar preset by entering height and Body Build (both in centimeters), which shall be mapped to suitable body-type parameters that deform the single base silhouette of the selected gender. Height and Body Build inputs shall be validated against the supported ranges of 120–220 cm and 86–112 cm respectively; values outside these ranges shall be rejected with a descriptive error message and shall not update the avatar body type. When a garment size is selected or equipped, the height and Body Build controls are constrained to the size-compatible sub-range with a descriptive message; the global validated ranges (120–220 cm and 86–112 cm) remain the outer bounds.  
+* **FR-2.3 (Custom Avatar):** The system shall allow users to create a custom avatar preset using UI sliders for Height and Body Build (both in centimeters), which shall be mapped to suitable body-type parameters that deform the single base silhouette of the selected gender. Height and Body Build inputs shall be validated against the supported ranges of 120–220 cm and 86–112 cm respectively. When a garment size is selected or equipped, the height and Body Build controls shall be constrained to the size-compatible sub-range with a descriptive message; the global supported ranges (120–220 cm and 86–112 cm) shall remain the outer bounds. Rationale: The supported ranges are design bounds informed by DOST-FNRI anthropometric averages for the Filipino demographic. The Body Build slider is driven by a deterministic BMI-to-girth design mapping (BMI 21–32 mapped to 86–112 cm) calibrated for visual simulation on the 2D canvas. The size-compatible sub-ranges align with a 4-cm grading assumption common in Asian retail sizing.  
 * **FR-2.4 (Skin Tone and Undertone):** The system shall allow users to select and update a skin-tone shade for their avatar, with an undertone category (warm, cool, or neutral) that is either selected by the user or derived deterministically from the selected shade.  
 * **FR-2.5 (Persistent Preset):** The system shall read and reload the registered user's avatar preset across sessions.  
 * **FR-2.6 (View Switching):** The system shall allow users to update the avatar visualization by toggling between Front and Rear views, instantly updating the avatar and all equipped clothing to the corresponding 2D assets.  

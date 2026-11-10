@@ -44,7 +44,8 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 * **\[R15\]** McKinsey & Company, *The value of getting personalization right — or wrong* (2021).  
 * **\[R16\]** DOLE / NWPC — Regional Tripartite Wages and Productivity Board, NCR Wage Order (daily minimum wage basis for the labor benchmark in §7.2).  
 * **\[R17\]** Shopee Seller Centre & Lazada Seller Center — manual listing and image guidelines without automated garment-image validation.  
-* **\[R18\]** Color theory and seasonal color-analysis practice (e.g., Itten's color wheel; seasonal color-analysis practice) — basis of the color-family compatibility knowledge table and recommendation weights
+* **\[R18\]** Color theory and seasonal color-analysis practice (e.g., Itten's color wheel; seasonal color-analysis practice) — basis of the color-family compatibility knowledge table and recommendation weights  
+* **\[R19\]** DOST-FNRI (Food and Nutrition Research Institute) National Nutrition Survey / Expanded National Nutrition Survey — Philippine adult anthropometric averages (≈163 cm male, ≈151.4 cm female) informing the avatar input design bounds (SRS §2.4).
 
 ## **3\. Project Overview & Business Case**
 
@@ -88,7 +89,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 ### **4.1 In-Scope Features**
 
 1. System Authentication & Role-Based Access Control (JWT; Registered User / Guest / Seller; server-side RBAC; ephemeral guest sessions)  
-2. Multi-Angle Avatar System (male/female; height/body build mapping; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions rendered by deforming a single base silhouette per gender; Front/Rear views).  Avatar customization accepts only validated inputs: height 120–220 cm and body build 86-112cm the system targets users aged 12 years and older.  
+2. Multi-Angle Avatar System (male/female; height/Body Build slider mapping with a deterministic BMI-derived silhouette mapping for Body Build; skin tone and undertone; shoulder, waist, hip, thigh, cup-size proportions rendered by deforming a single base silhouette per gender; Front/Rear views). Avatar customization accepts only validated inputs: height 120–220 cm and Body Build 86–112 cm — design bounds informed by DOST-FNRI anthropometric averages for the Filipino demographic \[R19\]; the system targets users aged 12 years and older.  
 3. Seller-Managed Catalog via CSV upload with automated rembg background removal and Pillow-based validation with rejection reports  
 4. Virtual Try-On 2D Overlay Canvas (per-category item switching, instant view toggling, saved outfit CRUD)  
 5. Explainable Rule-Based Styling Engine (Deterministic Expert System) using weighted tag scoring (color \+3, height contrast \+2, proportion shading \+1, style \+1)with visible match reasons; style tags are drawn from the controlled vocabulary (casual, smart, formal, sporty).  
@@ -207,6 +208,8 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 **6.1.12** Constraint: Compliance with the Data Privacy Act of 2012 (RA 10173\) and WCAG 2.1 Level AA target (SRS §2.4, Privacy regulation; SRS §4.4).
 
 **6.1.13** Known limitation: minor overlay misalignment or transient visual artifacts may occur at extreme proportion combinations or during rapid view switching, inherent to photo-based 2D overlay visualization (6.1.3); not treated as a functional defect while the alignment grid and Criterion 2 rendering target are met.
+
+**6.1.14** Design-bounds assumption: the supported avatar input ranges (height 120–220 cm; Body Build 86–112 cm) and the S–4XL apparel size grading (4-cm steps; 4XL tier capped at a 110–112 cm span) are design bounds informed by DOST-FNRI anthropometric averages \[R19\] and common Asian retail size-grading assumptions, not certified anthropometric or tailoring standards; the BMI-to-girth mapping (BMI proxy 21–32, WHO international cutoffs with Asia-Pacific cutoffs noted, mapped onto 86–112 cm) is a deterministic design mapping for visual simulation only and carries no medical, health, or physiological assessment claim (SRS §2.4).
 
 ### 
 
