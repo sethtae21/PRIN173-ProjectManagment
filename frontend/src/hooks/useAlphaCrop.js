@@ -19,13 +19,29 @@ import { useEffect, useState } from "react";
       SINGLE LARGEST cluster drops a second garment that shares the frame
       (e.g. trousers photographed under a jacket) without losing an adjacent
       hood -- which plain "largest component" and plain "union" both got wrong.
-   The old high-first threshold ladder (128 -> 64 -> 24) was itself the bug:
-   the garment body always cleared 128, so the lower rungs (where the soft
-   hood lives) were never reached. Hence a single low connect threshold now.
+   3. TIGHT-CROP v2 — the clustered box can still carry a band of EMPTY
+      transparent rows/columns (a faint hanger rod the low-alpha grow leaked
+      up, or soft fringe). For tall garments (dresses / pants) that loose box
+      made `object-fit: contain` shrink the real garment to a near-invisible
+      sliver in the small listing tile, and pinned the dress to the BOTTOM of
+      the large detail stage instead of centring it. We now re-scan the chosen
+      box at the solid alpha threshold (96, matching the avatar crop) and
+      shrink it to the first/last row & column that actually hold opaque
+      garment pixels. If the garment is FAINT (max alpha below 96 — e.g. a
+      pale multicolor camisole rembg nearly ate) the 96/40 scans find nothing,
+      so we fall back to the CORE cluster box: the tight bounding box of the
+      connected component, built BEFORE the low-alpha grow, which by
+      construction contains no empty band. Only when even the core is
+      degenerate (no coherent garment at the lowest connect threshold) do we
+      signal "empty" so the caller can show a legible placeholder instead of
+      misleading blank gold. Wide garments are already tight -> unchanged.
 
-   RESULT: the uneven transparent margins around the garment are trimmed, so
-   whatever container centers the returned data-URL is centering the GARMENT,
-   not the empty canvas padding -- with nothing clipped and no stray garment.
+   RESULT: the uneven transparent margins around the garment are trimmed AND
+   the box is tightened to the silhouette, so whatever container centers the
+   returned data-URL is centering the GARMENT, not the empty canvas padding --
+   with nothing clipped and no stray garment. The crop's own aspect ratio now
+   equals the garment's true length, which the listing tile uses to size
+   itself per garment.
 ========================================== */
 
 /* Two-threshold clustered crop tuning. */
@@ -33,6 +49,14 @@ const CONNECT_STEPS = [24, 12];   // connectivity / component labelling (NOT the
 const LOW_ALPHA = 8;              // box grow-through threshold (recovers soft fringe)
 const LINK_RATIO = 0.05;          // hood-fold gap merges; trousers gap does not
 const MIN_COMPONENT_AREA_RATIO = 0.0008; // seed threshold; adjacency rescues thinner hoods
+
+/* TIGHT-CROP v2: solid-alpha thresholds used to shrink the final box to the
+   opaque garment. 96 matches the avatar's crop and analyzeTShape so the
+   tighten sees exactly the pixels the rest of the pipeline treats as garment;
+   40 is the faint-garment rescue (a pale cami whose body sits between the
+   connect floor and 96). Below both, we trust the CORE box (>= connect). */
+const TIGHTEN_ALPHA = 96;
+const TIGHTEN_FALLBACK_ALPHA = 40;
 
 /* Module-level cache: catalog grids re-render often; never reprocess the
    same source URL twice per session. Bounded to keep memory sane. */
@@ -165,6 +189,11 @@ function fillTransparentHoles(imageData) {
 //                        the body box because it TOUCHES it.
 //  • largest cluster  -> a second garment far below (trousers) stays a separate
 //                        smaller cluster and is discarded.
+// TIGHT-CROP v2: the returned object carries BOTH the grown box (minX..maxY,
+// fringe-inclusive) AND the core cluster box (coreMinX..coreMaxY, the tight
+// bounding box of the connected component BEFORE the low-alpha grow, so it has
+// no empty hanger band). The hook prefers a solid-alpha tightening of the grown
+// box, then falls back to the core box for faint garments.
 function scanClusteredComponentBox(data, sw, sh, connectThreshold, lowThreshold, minRatio, linkRatio) {
   const total = sw * sh;
   const visited = new Uint8Array(total);
@@ -305,18 +334,66 @@ function scanClusteredComponentBox(data, sw, sh, connectThreshold, lowThreshold,
     }
   }
 
+  // TIGHT-CROP v2: emit the grown box AND the core box so the hook can choose.
   if (outMaxX < outMinX) {
-    return { minX: core.minX, minY: core.minY, maxX: core.maxX, maxY: core.maxY, area: core.area };
+    return {
+      minX: core.minX, minY: core.minY, maxX: core.maxX, maxY: core.maxY,
+      coreMinX: core.minX, coreMinY: core.minY, coreMaxX: core.maxX, coreMaxY: core.maxY,
+      area: core.area,
+    };
   }
-  return { minX: outMinX, minY: outMinY, maxX: outMaxX, maxY: outMaxY, area: core.area };
+  return {
+    minX: outMinX, minY: outMinY, maxX: outMaxX, maxY: outMaxY,
+    coreMinX: core.minX, coreMinY: core.minY, coreMaxX: core.maxX, coreMaxY: core.maxY,
+    area: core.area,
+  };
+}
+
+/* TIGHT-CROP v2: shrink a candidate box to the rows/columns that actually hold
+   opaque (> alpha) pixels, removing the empty transparent band that the
+   clustered grow can leave above/beside a tall garment. `alpha` lets the hook
+   try a solid pass (96) then a faint pass (40). Returns null when the box has
+   no pixels above `alpha` (caller then falls back to the core box, so a
+   genuinely faint garment is never over-cropped away). Runs in SCAN space on
+   the same `data` the cluster used. */
+function tightenBoxToOpaque(data, sw, sh, box, alpha = TIGHTEN_ALPHA) {
+  if (!box) return null;
+  const { minX, minY, maxX, maxY } = box;
+
+  let tMinX = sw, tMinY = sh, tMaxX = -1, tMaxY = -1;
+
+  for (let y = minY; y <= maxY; y += 1) {
+    const rowOff = y * sw;
+    for (let x = minX; x <= maxX; x += 1) {
+      if (data[(rowOff + x) * 4 + 3] > alpha) {
+        if (x < tMinX) tMinX = x;
+        if (x > tMaxX) tMaxX = x;
+        if (y < tMinY) tMinY = y;
+        if (y > tMaxY) tMaxY = y;
+      }
+    }
+  }
+
+  // No pixel above `alpha` inside the box: caller decides the fallback.
+  if (tMaxX < tMinX || tMaxY < tMinY) return null;
+
+  // Require a meaningful area before trusting the tightened box; otherwise the
+  // garment was mostly faint and a wider box is safer.
+  const tightenedArea = (tMaxX - tMinX + 1) * (tMaxY - tMinY + 1);
+  if (tightenedArea < 16) return null;
+
+  return { minX: tMinX, minY: tMinY, maxX: tMaxX, maxY: tMaxY, area: box.area };
 }
 
 /**
  * Trims the transparent margins around a rembg cutout, repairs enclosed
- * holes, and returns a tightly cropped PNG data-URL so the garment (not the
- * canvas) is what gets centered and scaled inside its frame.
- * If the canvas is tainted (CORS) or anything else fails, returns null and
- * the caller keeps the original image — never broken.
+ * holes, tightens the box to the opaque garment (with a faint-garment core
+ * fallback), and returns a tightly cropped PNG data-URL so the garment (not
+ * the canvas) is what gets centered and scaled inside its frame. Returns null
+ * when there is no coherent garment at all, so the caller can show a legible
+ * placeholder instead of misleading blank gold. If the canvas is tainted
+ * (CORS) or anything else fails, returns null and the caller keeps the
+ * original image — never broken.
  */
 export function useAlphaCrop(src) {
   const [cropped, setCropped] = useState(() =>
@@ -383,6 +460,30 @@ export function useAlphaCrop(src) {
           console.info("[alpha-crop] fully transparent canvas, keeping original:", src);
           return;
         }
+
+        /* TIGHT-CROP v2 selection: solid tighten (96) -> faint tighten (40) ->
+           CORE cluster box (tight to the >=connect component, no empty hanger
+           band) -> empty signal. This is what centres every garment on its own
+           true extent (so the listing tile can size itself by garment length)
+           and rescues faint garments like a pale multicolor camisole that the
+           96-only pass used to drop back to the loose grown box. */
+        const grownWindow = { minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY };
+        let finalBox =
+          tightenBoxToOpaque(data, sw, sh, grownWindow, TIGHTEN_ALPHA) ||
+          tightenBoxToOpaque(data, sw, sh, grownWindow, TIGHTEN_FALLBACK_ALPHA);
+        if (!finalBox && box.coreMaxX >= box.coreMinX && box.coreMaxY >= box.coreMinY) {
+          finalBox = {
+            minX: box.coreMinX, minY: box.coreMinY, maxX: box.coreMaxX, maxY: box.coreMaxY,
+            area: box.area,
+          };
+        }
+        if (!finalBox) {
+          // No coherent garment even at the lowest connect threshold: signal
+          // empty so the caller shows a placeholder, not misleading blank gold.
+          console.info("[alpha-crop] no opaque garment, keeping original:", src);
+          return;
+        }
+        box = finalBox;
 
         const { minX, minY, maxX, maxY } = box;
 

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_URL, catalogAPI } from "../../services/api";
+// PARITY FIX: the catalog cards (CatalogPage) and the seller detail page
+// (SellerItemDetailsPage) both trim the rembg transparent margins through this
+// shared hook. The listings table was the only surface still showing the RAW
+// cutout, so tall/narrow garments collapsed inside the tile. Same crop here,
+// now with the TIGHT-CROP v2 core fallback for faint garments (e.g. a pale
+// multicolor camisole rembg nearly ate).
+import { useAlphaCrop } from "../../hooks/useAlphaCrop";
 import "../css/SellerProductListingsPage.css";
 
 // Map backend status to UI status
@@ -33,15 +40,77 @@ function mediaUrl(path) {
   return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
 }
 
-/* FIX: renders the REAL rembg-processed front-view PNG inside the gold tile.
-   The old initial-letter placeholder is kept only as a fallback for items
-   that have no processed asset yet, or if the image request fails. */
+/* LENGTH-ADAPTIVE TILE + EMPTY-ASSET GUARD.
+   (1) The tile's aspect-ratio is taken from the cropped garment's own
+       dimensions on load (clamped 0.4..1.6), so a maxi dress / long pant gets
+       a tall tile and shorts / a cami get a compact one — each garment fills
+       its box and is centred by construction (object-fit: contain on a
+       matching ratio = no gold bands). This is the "adjust the box depending
+       on its length" behaviour, done deterministically from pixels, not a
+       guessed per-category constant.
+   (2) On load we sample the alpha channel at the connect floor (24, the same
+       threshold the crop pipeline uses to decide "is there a garment"). A
+       truly empty asset (rembg ate it / bad seed) would otherwise render as
+       misleading blank gold that looks like a centring bug; we flip it to the
+       initial letter so the failure is legible AND doubles as a diagnosis
+       (letter => the asset is empty => re-upload / repair the seed on the
+       backend; garment => the crop is fine). A cross-origin read that throws
+       (tainted canvas) is treated as "unknown -> keep the image" so we never
+       hide a real garment we simply can't sample. */
+const TILE_ASPECT_MIN = 0.4;
+const TILE_ASPECT_MAX = 1.6;
+const GUARD_ALPHA = 24;
+
+function sampleHasVisiblePixels(img) {
+  try {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return false;
+
+    const probe = document.createElement("canvas");
+    const maxSide = 48;
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    probe.width = Math.max(1, Math.round(w * scale));
+    probe.height = Math.max(1, Math.round(h * scale));
+
+    const ctx = probe.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return true; // can't read -> assume visible, don't hide a garment
+
+    ctx.drawImage(img, 0, 0, probe.width, probe.height);
+    const { data } = ctx.getImageData(0, 0, probe.width, probe.height);
+
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > GUARD_ALPHA) return true;
+    }
+    return false; // every sampled pixel transparent => empty asset
+  } catch {
+    return true; // tainted / unreadable: keep the image rather than hide it
+  }
+}
+
 function ProductThumb({ product }) {
   const [failed, setFailed] = useState(false);
-  const source = product.front_image ? mediaUrl(product.front_image) : "";
+  const [emptyAsset, setEmptyAsset] = useState(false);
+  const [tileAspect, setTileAspect] = useState(null);
+  const rawSource = product.front_image ? mediaUrl(product.front_image) : "";
+  const cropped = useAlphaCrop(failed || emptyAsset ? null : rawSource);
+  const source = cropped || rawSource;
   const initial = (product.name || "P").charAt(0).toUpperCase();
 
-  if (!source || failed) {
+  function handleLoad(event) {
+    const img = event.currentTarget;
+    const nw = img.naturalWidth || img.width;
+    const nh = img.naturalHeight || img.height;
+    if (nw && nh) {
+      const ar = nw / nh;
+      setTileAspect(Math.min(TILE_ASPECT_MAX, Math.max(TILE_ASPECT_MIN, ar)));
+    }
+    if (!sampleHasVisiblePixels(img)) {
+      setEmptyAsset(true);
+    }
+  }
+
+  if (!rawSource || failed || emptyAsset) {
     return (
       <div className="spl-product-image" aria-hidden="true">
         {initial}
@@ -50,11 +119,16 @@ function ProductThumb({ product }) {
   }
 
   return (
-    <div className="spl-product-image">
+    <div
+      className="spl-product-image"
+      style={{ aspectRatio: tileAspect != null ? String(tileAspect) : "3 / 4" }}
+    >
       <img
         src={source}
         alt={product.name || "Product"}
         loading="lazy"
+        crossOrigin="anonymous"
+        onLoad={handleLoad}
         onError={() => setFailed(true)}
       />
     </div>
@@ -301,7 +375,8 @@ function SellerProductListingsPage() {
                       <tr key={product.id}>
                         <td>
                           <div className="spl-product">
-                            {/* FIX: real processed front PNG instead of the letter tile */}
+                            {/* Length-adaptive, alpha-cropped tile with an
+                                empty-asset guard (see ProductThumb). */}
                             <ProductThumb product={product} />
                             <div className="spl-product-information">
                               <strong>{product.name || "Unnamed Product"}</strong>

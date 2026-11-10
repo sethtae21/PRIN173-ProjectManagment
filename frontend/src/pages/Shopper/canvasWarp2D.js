@@ -3,8 +3,9 @@
  * Weight-responsive 2D Avatar Engine
  *
  * BUILD MARKER: DRESS-LENGTH-FIX v2 + SLEEVE-ASPECT v3 + TOPS-LAYER-FIT v12 + HOOD-UNION-CROP v2
- * (grep for DRESS_HEM_MIN_T, MIN_SLEEVE_ASPECT, TOPS_HEM_MIN_T, TOPS_LAYER_SHRINK and HOOD-UNION-CROP
- * to confirm this exact file is the one Vite is serving.)
+ *               + LOWER-ANCHOR-FIX v1
+ * (grep for DRESS_HEM_MIN_T, MIN_SLEEVE_ASPECT, TOPS_HEM_MIN_T, TOPS_LAYER_SHRINK, HOOD-UNION-CROP
+ *  and alphaCentroidX to confirm this exact file is the one Vite is serving.)
  *
  * Supports:
  * - Female and Male Standard avatars
@@ -50,6 +51,18 @@
  * get their own below-knee..above-ankle region, keep the garment photo's own
  * length (aspect-driven hem), and skip the body-silhouette clip so the
  * inter-leg gap cannot punch a hole through the hem.
+ *
+ * LOWER-ANCHOR-FIX v1: bottoms / skirt / dresses were centred by the crop's
+ * BOUNDING BOX, not its alpha MASS, so asymmetric flat-lays (trouser fly,
+ * one-sided pocket/tag, biased dress hem or single strap) sat off the body
+ * midline; and shorts were vertically CENTRED inside the leg region, so a
+ * short crop floated to mid-thigh instead of resting on the waistline. Now
+ * lower garments use the same mass-centroid horizontal centring the
+ * long-sleeve top path already guarantees (alphaCentroidX), and bottoms /
+ * skirt are waistline-anchored (top of region) exactly as dresses are
+ * shoulder-anchored. Outerwear, footwear, plain tees and long-sleeve knits
+ * are untouched: their crops are symmetric, so centroid == 0.5 and the
+ * rendered pixels are byte-for-byte identical to before.
  */
 
 export const GRID_COLS = 37;
@@ -1452,6 +1465,70 @@ function alphaBBox(data, w, h, threshold) {
   return { minX, minY, maxX, maxY };
 }
 
+// LOWER-ANCHOR-FIX v1: alpha-weighted horizontal centroid of a cropped
+// garment, normalised to [0,1] in crop space. The long-sleeve top path
+// already re-anchors on the torso mass (analyzeTShape cx); this gives the
+// same mass-centring to the bbox-centred branches (bottoms / skirt /
+// dresses) so asymmetric flat-lays (trouser fly, one-sided pocket or tag,
+// biased dress hem / single strap) sit on the body midline instead of the
+// crop-box midline. Cached per crop canvas (WeakMap) because a garment is
+// re-layered on every render / view switch. Threshold 96 matches the crop
+// and analyzeTShape so the measure sees exactly the pixels that were kept.
+// A symmetric crop yields 0.5, so the previously-correct garments render
+// byte-for-byte unchanged.
+const centroidCache = new WeakMap();
+
+function alphaCentroidX(cropped) {
+  if (!cropped || !cropped.width || !cropped.height) {
+    return 0.5;
+  }
+
+  const cached = centroidCache.get(cropped);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  let cx = 0.5;
+
+  try {
+    const cctx = cropped.getContext("2d", {
+      willReadFrequently: true,
+    });
+
+    const data = cctx.getImageData(
+      0,
+      0,
+      cropped.width,
+      cropped.height
+    ).data;
+
+    const ALPHA = 96;
+    let mass = 0;
+    let moment = 0;
+
+    for (let y = 0; y < cropped.height; y += 1) {
+      const rowOffset = y * cropped.width;
+      for (let x = 0; x < cropped.width; x += 1) {
+        const a = data[(rowOffset + x) * 4 + 3];
+        if (a > ALPHA) {
+          mass += a;
+          moment += a * x;
+        }
+      }
+    }
+
+    if (mass > 0) {
+      cx = moment / mass / cropped.width;
+    }
+  } catch {
+    cx = 0.5;
+  }
+
+  centroidCache.set(cropped, cx);
+
+  return cx;
+}
+
 export function preloadGarmentImage(src) {
   if (!src) return Promise.resolve(null);
 
@@ -1799,8 +1876,7 @@ export function garmentImageLayer(
         ctx.drawImage(cropped, rightX, ry, rightW, rh);
       }
     } else if (regionKey === "dresses") {
-      const rx = X(region.x0);
-      const rw = X(region.x1) - rx;
+      const rw = X(region.x1) - X(region.x0);
 
       if (rw <= 0) return null;
 
@@ -1812,7 +1888,45 @@ export function garmentImageLayer(
       const maxH = Math.max(minH, rh);
       const dressH = Math.min(Math.max(naturalH, minH), maxH);
 
-      ctx.drawImage(cropped, rx, ry, rw, dressH);
+      // LOWER-ANCHOR-FIX v1: centre the dress by its alpha MASS on the body
+      // midline (was bbox-centred), so a biased hem / single strap no longer
+      // pulls the dress off-centre. Vertical stays shoulder-anchored at ry.
+      const cxNorm = alphaCentroidX(cropped);
+      const drawX = bounds.cx - cxNorm * rw;
+
+      ctx.drawImage(cropped, drawX, ry, rw, dressH);
+    } else if (regionKey === "bottoms" || regionKey === "skirt") {
+      // LOWER-ANCHOR-FIX v1: lower garments previously shared the outerwear
+      // `else` branch, which (a) centred them by bounding box and (b)
+      // vertically CENTRED the crop inside the leg region -- so a short
+      // shorts crop floated to mid-thigh and an asymmetric trouser crop sat
+      // off the midline. Now they are waistline-anchored (top of region,
+      // exactly as dresses are shoulder-anchored) and mass-centred
+      // horizontally. Aspect-preserving width like outerwear; the body
+      // silhouette clip still applies (skipClip stays false) so cloth hugs
+      // the legs. Symmetric crops give cxNorm 0.5 -> unchanged pixels.
+      const rw = X(region.x1) - X(region.x0);
+
+      if (rw <= 0) return null;
+
+      const aspect =
+        cropped.width / Math.max(1, cropped.height);
+
+      let drawW = rw;
+      let drawH = drawW / Math.max(0.2, aspect);
+
+      // A tall pant/long-skirt crop is capped to the region height; a short
+      // shorts crop keeps its natural height and rests on the waistline.
+      if (drawH > rh) {
+        drawH = rh;
+        drawW = drawH * aspect;
+      }
+
+      const cxNorm = alphaCentroidX(cropped);
+      const drawX = bounds.cx - cxNorm * drawW;
+      const drawY = ry;
+
+      ctx.drawImage(cropped, drawX, drawY, drawW, drawH);
     } else if (DRAPEABLE.has(regionKey)) {
       const shape = analyzeTShape(cropped);
 
@@ -1919,6 +2033,8 @@ export function garmentImageLayer(
     } else {
       // HOOD-UNION-CROP v2: Aspect-ratio preserving draw for outerwear.
       // Prevents the tall hood+jacket crop from being squashed into the torso region.
+      // (LOWER-ANCHOR-FIX v1: bottoms / skirt now have their own branch above,
+      // so this `else` is outerwear-only and is left byte-for-byte unchanged.)
       const rx = X(region.x0);
       const rw = X(region.x1) - rx;
       if (rw <= 0) return null;
