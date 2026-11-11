@@ -26,9 +26,13 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 * **Criterion 6 (Usability):** A first-time Guest user completes one virtual try-on within 2 minutes without training.  
 * **Criterion 7 (Security):** All passwords are hashed (Argon2id or PBKDF2), all traffic uses TLS 1.2+ (local staging uses TLS via a local CA for the demonstration URL; loopback plain HTTP is allowed only for local development/testing per SRS §5.3), RBAC is enforced server-side on every protected endpoint, and no guest data is written to the persistent database.  
 * **Criterion 8 (Commerce Flow):** At least 70% of created carts complete the simulated mock checkout during evaluation testing.  
-* **Criterion 9 (Fit/Style Confidence):** At least 80% of try-on sessions show improved self-reported fit/style confidence (pre/post within-session 1–5 scale: ≥ \+1 point gain or post ≥ 4/5) and rate the fit visualization "like" (≥ 4/5), measured via pre/post session confidence rating plus the in-app like/dislike rating captured during UAT. (Charter OBJ-01)  
-* **Criterion 10 (Recommendation Approval):** At least 80% approval ("like" ≥ 4/5) of color/style recommendations, measured via the post-session in-app recommendation rating. (Charter OBJ-05)  
-* **Criterion 11 (Purchase-Decision Confidence):** At least 80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item versus the pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per Charter assumption 6.1.7), measured via pre/post UAT confidence and return-intent ratings. (Charter OBJ-06) 
+* **Criterion 9 (Fit/Style Confidence):** At least 80% of try-on sessions show improved self-reported fit/style confidence (pre/post within-session 1–5 scale: ≥ \+1 point gain or post ≥ 4/5) and rate the fit visualization favorably (≥ 4/5), measured via panel observation of functional delivery and explainable match reasons (in-app ratings and UAT surveys deferred to post-MVP). (Charter OBJ-01)  
+* **Criterion 10 (Recommendation Approval):** At least 80% approval ("like" ≥ 4/5) of color/style recommendations, measured via panel observation of explainable match reasons (in-app ratings and UAT surveys deferred to post-MVP). (Note: The automated in-app rating hook is deferred to post-MVP; measurement relies on the manual UAT survey instrument.) (Charter OBJ-05)  
+* **Criterion 11 (Purchase-Decision Confidence):** At least 80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item versus the pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per Charter assumption 6.1.7), measured via functional walkthrough of the mock checkout flow (quantitative UAT surveys deferred to post-MVP). (Charter OBJ-06) 
+
+### 
+
+### 
 
 ### **1.3 Project Deliverables**
 
@@ -52,7 +56,8 @@ The business problem addressed by the MVP is pre-purchase uncertainty — shoppe
 * Anthropometric or tailoring accuracy of body-proportion category brackets (shoulder width, waist, hip, cup size, thigh, including any cm sub-brackets such as "narrow \= 70–89 cm"). These categories exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category (e.g., "average hip") corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.  
 * Seller-side order management and fulfillment views (mock-checkout orders appear only in the purchasing user's order history, never in the Seller Dashboard; FR-6.9).  
 * Inventory/stock tracking, stock visibility to shoppers, and post-purchase logistics (delivery, shipping, packing, returns processing, etc); the mock e-commerce flow ends at checkout simulation and order-history recording.  
-* Style tags outside the controlled vocabulary (casual, smart, formal, sporty); non-vocabulary values are rejected at upload validation.
+* Style tags outside the controlled vocabulary (casual, smart, formal, sporty); non-vocabulary values are rejected at upload validation.  
+* Proprietary spreadsheet formats (XLSX, XLS, ODS) and multi-worksheet workbooks for Seller catalog uploads; the system strictly accepts standard CSV files to maintain a lightweight, dependency-free parsing pipeline and enforce a flat, single-tabular data contract.
 
 ### **1.5 Constraints**
 

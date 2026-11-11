@@ -67,12 +67,12 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 
 | Metric ID | Objective / Target | Addresses Problem | Method of Measurement |
 | :---- | :---- | :---- | :---- |
-| OBJ-01 | Fit uncertainty reduced before purchase: ≥80% of try-on sessions show improved self-reported fit/style confidence (pre/post within-session 1–5 scale: ≥+1 point gain or post ≥4/5) and rate the fit visualization "like" (≥4/5) | P1 | Pre/post session confidence rating \+ like/dislike rating captured during UAT (≥80% of sessions improve & ≥4/5) |
+| OBJ-01 | Fit uncertainty reduced before purchase: ≥80% of try-on sessions show improved self-reported fit/style confidence (pre/post within-session 1–5 scale: ≥+1 point gain or post ≥4/5) and rate the fit visualization favorably (≥4/5) | P1 | Panel observation of functional canvas delivery and explainable match reasons (Quantitative UAT surveys deferred to post-MVP) |
 | OBJ-02 | Friction & privacy cost removed: first-time Guest completes one try-on within 2 min, no training, no registration, no photo upload | P2 | Observed UAT session (≤2 min, zero uploads) |
 | OBJ-03 | Performance cost of existing solutions removed: 95% API \<500 ms; canvas \<1 s; load \<3 s | P2 | Automated performance test (SRS §4.1); render benchmark; load-time test |
 | OBJ-04 | Privacy cost removed: 100% pass on Security & Privacy checklist (TLS 1.2+, Argon2id, server-side RBAC, ephemeral guests, no photo upload) | P2 | Security audit & RT-09 checklist (100% pass) |
-| OBJ-05 | Style hesitation resolved: ≥80% approval ("like" ≥4/5) of color/style recommendations | P3 | Post-session recommendation rating (≥80% approval) |
-| OBJ-06 | Purchase-decision confidence improved: ≥80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item vs pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per assumption 6.1.7) | P1, P4 | Pre/post UAT confidence \+ return-intent ratings (≥80% of sessions improve) |
+| OBJ-05 | Style hesitation resolved: ≥80% approval ("like" ≥4/5) of color/style recommendations | P3 | Panel observation of visible, logically sound match reasons per FR-7.3/7.4 (Quantitative UAT surveys deferred to post-MVP) |
+| OBJ-06 | Purchase-decision confidence improved: ≥80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item vs pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per assumption 6.1.7) | P1, P4 | Functional walkthrough of successful mock checkout and order history generation (Quantitative UAT surveys deferred to post-MVP) |
 | OBJ-07 | Lost sales from hesitation reduced: ≥70% of created carts complete mock checkout | P4 | UAT commerce scenario (≥70% checkout) |
 | OBJ-08 | Manual-listing burden removed: 10-item CSV processed \<60 s | P5 | Pipeline timing test |
 | OBJ-09 | Inconsistent listings eliminated at source: ≥80% publish without manual correction | P5 | Seller Dashboard validation report audit |
@@ -112,7 +112,8 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 10. Anthropometric or tailoring accuracy of body-proportion category brackets. The avatar proportions exist solely to drive visual simulation of the deformable base silhouette; the system makes no claim that a category corresponds to a universal real-world measurement bracket, and no garment-size or fit conclusion shall be derived from them.  
 11. Seller-side order management and fulfillment: orders placed through the mock checkout are recorded only in the purchasing user's order history and are not reflected in any Seller dashboard (consistent with FR-6.9, no merchant role).  
 12. Inventory/stock tracking, stock-level visibility to shoppers, and all post-purchase logistics (delivery, shipping, packing, returns processing, etc.); the e-commerce flow is a simulation that ends at mock checkout and order history.  
-13. Style tags outside the controlled vocabulary (casual, smart, formal, sporty); non-vocabulary style values are rejected at upload validation.
+13. Style tags outside the controlled vocabulary (casual, smart, formal, sporty); non-vocabulary style values are rejected at upload validation.  
+14. Proprietary spreadsheet formats (XLSX, XLS, ODS) for Seller catalog uploads (CSV only, to maintain a lightweight, dependency-free parsing pipeline and prevent multi-sheet user errors).
 
 ### 
 
@@ -139,8 +140,8 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 | RT-02 | Customizable multi-angle avatar with saved presets (Idea Feature 1\) | FR-2.1–2.10 | 1.3.2 | Avatar creator & preset management | Integration test \+ UAT | Criteria 2, 6 / OBJ-02 |
 | RT-03 | Browsable, filterable clothing catalog with Seller metadata (Idea Feature 2\) | FR-3.1–3.4 | 1.2.1, 1.3.3 | Catalog browser \+ MongoDB catalog schema | Integration test | Criterion 1 / OBJ-03 |
 | RT-04 | Seller CSV upload with auto background removal & validation (Idea Feature 2\) | FR-4.1–4.8 | 1.3.3, 1.3.7 | Seller Dashboard \+ rembg/Pillow pipeline \+ validation reporting | Validation test suite (1.4.2), 100% pass on defined cases | Criteria 4, 5 / OBJ-08, OBJ-09 |
-| RT-05 | Multi-angle virtual try-on overlay canvas with outfit saving (Idea Feature 3\) | FR-5.1–5.8 | 1.3.4, 1.3.8 | React try-on canvas \+ outfit management | Render benchmark \+ UAT (incl. fit like/dislike rating) | Criterion 2, 9 / OBJ-01, OBJ-03 |
-| RT-06 | Explainable rule-based outfit recommendations (Idea Feature 4\) | FR-7.1–7.5 | 1.3.5 | Recommendation engine with visible scores | Service tests \+ weights-validation tests per SRS FR-7.2 \+ in-app recommendation rating | Criterion 10 / OBJ-05 |
+| RT-05 | Multi-angle virtual try-on overlay canvas with outfit saving (Idea Feature 3\) | FR-5.1–5.8 | 1.3.4, 1.3.8 | React try-on canvas \+ outfit management | Render benchmark \+ UAT survey (incl. fit rating; in-app UI deferred) | Criterion 2, 9 / OBJ-01, OBJ-03 |
+| RT-06 | Explainable rule-based outfit recommendations (Idea Feature 4\) | FR-7.1–7.5 | 1.3.5 | Recommendation engine with visible scores | Service tests \+ weights-validation tests per SRS FR-7.2 \+ UAT survey recommendation rating (in-app UI deferred) | Criterion 10 / OBJ-05 |
 | RT-07 | Mock cart, checkout, and order history (Idea Feature 5\) | FR-6.1–6.9 | 1.3.6 | Mock e-commerce module \+ mock gateway | End-to-end checkout test \+ UAT commerce scenario (pre/post simulated return-intent rating) | Criterion 8, 11 / OBJ-06, OBJ-07 |
 | RT-08 | Performance & load targets for API, canvas, page load | SRS §4.1 | 1.4.1 | Performance test report | Automated performance test | Criteria 1–3 / OBJ-03 |
 | RT-09 | Security & privacy (TLS 1.2+, hashed passwords, RA 10173\) *(enabling — compliance foundation; indirect problem link via OBJ-04/P2)* | SRS §4.2 | 1.3.1, 1.5.1 | Secure deployment config | Security review checklist | Criterion 7 / OBJ-04 |

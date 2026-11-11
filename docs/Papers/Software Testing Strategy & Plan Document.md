@@ -20,7 +20,7 @@ This document defines the software testing strategy and execution plan for the F
 * Achieve a **100% pass rate** on the defined validation-algorithm test cases (Scope Criterion 4/5 suite; KAN-83/KAN-85).  
 * Detect and resolve **100% of Critical/Blocker (P1/P2) defects** prior to the local staging demonstration and the Week 14 final defense (November 21, 2026).  
 * Meet all performance NFRs: 95% of catalog/filtering/recommendation/commerce API requests \<500 ms; canvas overlay, view-angle, and proportion-deformation renders \<1 s; initial load \<3 s; 10-item CSV pipeline \<60 s (Criteria 1–4).  
-* Meet UAT gates: first-time Guest try-on ≤2 minutes (Criterion 6); ≥80% fit/style confidence improvement and fit-visualization "like" (≥4/5) (Criterion 9); ≥80% recommendation approval (Criterion 10). Definition of Approval: "Approval" strictly means either selecting the "like" vote or giving a 4 or 5-star rating. A "dislike" vote or a 1–3 star rating does not count as approval.; ≥80% purchase-decision confidence improvement with lower return-intent (Criterion 11); ≥70% cart-to-mock-checkout completion (Criterion 8).  
+* Meet UAT gates: first-time Guest try-on ≤2 minutes (Criterion 6); ≥80% fit/style confidence improvement and fit-visualization rating ≥4/5 (Criterion 9); ≥80% recommendation approval (Criterion 10). (Note: Automated in-app rating UI is deferred to post-MVP; gates are measured via the manual UAT survey instrument). Note: The automated in-app rating UI and the manual UAT survey instrument for measuring user confidence and approval (Criteria 9, 10, 11\) are deferred to post-MVP phases. For the Semester 1 MVP, the functional delivery of explainable recommendations is validated via E2E testing and panel observation of match reasons (FR-7.3/7.4).; ≥80% purchase-decision confidence improvement with lower return-intent (Criterion 11); ≥70% cart-to-mock-checkout completion (Criterion 8).  
 * Pass 100% of the Security & Privacy checklist — TLS 1.2+, Argon2id/PBKDF2 hashing, server-side RBAC, ephemeral guests, no user photo upload,RA 10173-compliant account deletion via deactivation and restricted archival (Criterion 7/ RT-09).  
 * Maintain a predictable **Cost of Quality (CoQ)** by shifting defect detection left: weights  regression \+ ±1 sensitivity tests run at commit time (KAN-103), and API input-hardening tests (KAN-117) precede integration testing.
 
@@ -54,7 +54,7 @@ Note: The panel will conduct the User Acceptance Testing.
 | :---- | :---- | :---- | :---- | :---- |
 | Unit | Django models, serializers, views, scoring.py, knowledge table, Pillow/rembg validation rules, defensive input guards | Developers (Carlos – backend, Dein – frontend logic) | Every code commit and pull request (Django test runner \+ React unit tests) | KAN-82 / WBS 1.4.1; KAN-103; KAN-117 |
 | End-to-End (E2E) | Complete workflows spanning React frontend, Django REST API, MongoDB Atlas, and GridFS storage on the local staging host | Seth with Dein and Carlos | End of every sprint; mandatory gates before M3 (Week 8), M4 (Week 11), M5 (Week 14\) | KAN-83, KAN-84, KAN-85, KAN-86 / WBS 1.4.2 |
-| Acceptance / UAT | Role-based walkthroughs (Guest, Registered User, Seller), UAT survey instrument, in-app like/dislike ratings (FR-7.5) | PM (Seth) \+ Frontend/QA Coord. (Dein); end-user representatives from other sections | Week 12 phase gate prior to defense sign-off | KAN-87, KAN-88, KAN-89, KAN-90 / WBS 1.4.3 |
+| Acceptance / UAT | Role-based walkthroughs (Guest, Registered User, Seller). Note: In-app ratings and the UAT survey instrument are deferred to post-MVP; UAT will focus on functional walkthroughs and panel observation of explainable match reasons. | PM (Seth) \+ Frontend/QA Coord. (Dein); end-user representatives from other sections | Week 12 phase gate prior to defense sign-off | KAN-87, KAN-88, KAN-89, KAN-90 / WBS 1.4.3 |
 
 ## 
 
@@ -81,14 +81,6 @@ Note: The panel will conduct the User Acceptance Testing.
 
 ### 
 
-### 
-
-### 
-
-### 
-
-### 
-
 ### **3.3 Unit Test Case** 
 
 | Test ID | Target Module / Function | Input / Condition | Expected Outcome | Type | Status |
@@ -107,6 +99,7 @@ Note: The panel will conduct the User Acceptance Testing.
 | UT-12 | commerce mock gateway | Simulated decline response | Checkout error shown; no order record; cart intact | Edge / Defensive | Pass (KAN-118) |
 | UT-13 | catalog storage cleanup | Replace listing image; delete listing | Old GridFS ObjectIds absent from fs.files/fs.chunks | Regression | Planned (KAN-119) |
 | UT-14 | accounts preset serializer \+ canvas guardrails | Size equipped (e.g., S); attempt height/Body Build beyond the size-compatible sub-range | Control stops at the limit and shows the allowed-range message; backend still enforces global 120–220 cm / 86–112 cm (FR-2.3) | Edge/Defensive | In Progress |
+| UT-15 | catalog/serializers (file type guard) | Seller uploads an .xlsx or .xls file instead of .csv | Reject with "File must be a CSV" error; batch not created | Edge / Defensive | Planned |
 
 ## 
 
@@ -146,7 +139,7 @@ Note: The panel will conduct the User Acceptance Testing.
 | E2E-04 | Rejection → fix → republish loop (UC-16, UC-17, UC-19) | Item declared "red" with blue image | 1\. Upload. 2\. Read rejection reason. 3\. Edit listing, replace image. 4\. Re-validate. | Rejected item never published; after fix, status Active; old PNG purged | Report reason matches rule (e); GridFS old ObjectId absent (KAN-119) |
 | E2E-05 | Cart → mock checkout → order history (UC-11, UC-12, UC-13, UC-14) | Registered user; active catalog | 1\. Add 2 items. 2\. Update quantity. 3\. Checkout: address \+ payment. 4\. Mock approval. 5\. Open order history/detail. | Order record with items, store names, address, timestamp; cart cleared | Order fields complete (FR-6.6); ≥70% cart completion across runs (Criterion 8\) |
 | E2E-06 | RBAC negative paths (UC-08, UC-11) | Guest session; non-seller user | 1\. Guest opens cart/checkout. 2\. Non-seller opens Seller upload. | Guest prompted to register; non-seller denied | 401/403 returned server-side; no client-side bypass (Criterion 7\) |
-| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. 3\. Guest clicks like. 4\. Registered user clicks like. | Ranked items with visible scores/rules; Guest gets sign-up prompt; registered rating persists | Reasons shown per FR-7.3/7.4; sign-up/login prompt shown on Guest click; Guest ratings never persisted to the DB (blocked per FR-7.5) |
+| E2E-07 | Recommendations, match reasons, ratings (UC-05, UC-06) | Avatar with warm undertone | 1\. Open Recommendation Panel. 2\. View match reasons. | Ranked items with visible scores/rules. (Note: In-app rating UI clicks deferred to post-MVP; rating capture moved to UAT-02/UAT-03 survey). | Reasons shown per FR-7.3/7.4. (Note: In-app rating UI and guest rating prompts are deferred to post-MVP). |
 | E2E-08 | Canvas performance (UC-03, UC-04) | Mid-range laptop; staged catalog | 1\. Switch item. 2\. Toggle view. 3\. Change proportion.4. Equip a Dress/One-Piece → Top and Bottom slots replaced with confirmation (FR-5.2 v1.1). | Each overlay/deformation renders fluidly | Each render ≤1 s (Criterion 2; KAN-84 run) |
 | E2E-09 | API performance sweep | Staging under normal load | 1\. Script calls to catalog, filtering, recommendation, commerce endpoints. 2\. Compute 95th percentile. | Responses within threshold | 95% \<500 ms (Criterion 1\) |
 | E2E-10 | Account deletion (deactivation \+ archival)/ RA 10173 (SRS FR-1.4; RT-09 / RSK-08 checklist) | User with presets, outfits, orders | 1\. Request account deletion. 2\. Confirm.3. Query active collections for user data; verify the archived record is access-restricted and pseudonymized. | Account deactivated (login and all role access blocked); personal data removed from active collections and retained only in the restricted archive per the retention policy | Post-delete queries on active collections return nothing; the archive is readable only through the restricted retention path and holds no directly identifying fields (FR-1.4; Criterion 7 checklist) |
@@ -157,7 +150,7 @@ Note: The panel will conduct the User Acceptance Testing.
 
 ### **5.1 Scope & Purpose**
 
-* **Scope:** High-level validation of business objectives, user satisfaction, functional requirements, and usability with end-user representatives for all three roles: Guest, Registered User, Seller. Captures pre/post confidence, return intent, and in-app like/dislike ratings per FR-7.5 to evidence Criteria 6 and 9–11 and Charter OBJ-01, OBJ-02, OBJ-05, OBJ-06, OBJ-07, OBJ-09. Definition of Approval: For Criteria 9 and 10, "Approval" strictly means either selecting the "like" vote or giving a 4 or 5-star rating. A "dislike" vote or a 1–3 star rating does not count as approval.  
+* **Scope:** High-level validation of business objectives, user satisfaction, functional requirements, and usability with end-user representatives for all three roles: Guest, Registered User, Seller. Validates functional workflows and usability for Criteria 6 and 8\. Note: The in-app rating UI and UAT survey instrument for capturing pre/post confidence and return intent (Criteria 9–11) are deferred to post-MVP phases. MVP acceptance for the recommendation engine relies on panel observation of explainable match reasons (FR-7.3/7.4). (via manual UAT survey instrument, as in-app rating UI is deferred to post-MVP) and Charter OBJ-01, OBJ-02, OBJ-05, OBJ-06, OBJ-07, OBJ-09. Definition of Approval: For Criteria 9 and 10, "Approval" strictly means either selecting the "like" vote or giving a 4 or 5-star rating. A "dislike" vote or a 1–3 star rating does not count as approval.  
 * **Primary Owner:** Product Manager (Seth) and Frontend/QA Coordinator (Dein) as end-user representatives' facilitators; Kahlil archives survey instruments.  
 * **Execution Frequency:** Week 12 phase-gate sign-off prior to the Week 14 defense (KAN-87, KAN-88).
 
@@ -165,7 +158,7 @@ Note: The panel will conduct the User Acceptance Testing.
 
 * 100% of mandatory acceptance criteria met (Criteria 1–11 at their stated targets).  
 * Zero open Severity P1 (Critical) or P2 (High) defects.  
-* Signed UAT acceptance form plus archived survey results and rating logs (KAN-89) and consolidated NFR evidence log (KAN-90).  
+* Signed UAT acceptance form based on functional walkthroughs and panel observation (KAN-89). (Note: Survey results and rating logs are deferred to post-MVP). and consolidated NFR evidence log (KAN-90).  
 * Dry-run demonstration approved by the adviser during the bi-weekly review (KAN-80).
 
 ### **5.3 UAT Execution Template**
@@ -173,9 +166,9 @@ Note: The panel will conduct the User Acceptance Testing.
 | UAT ID | User Story / Requirement | Test Step / Action | Business Expectation | Stakeholder Sign-Off | Status |
 | :---- | :---- | :---- | :---- | :---- | :---- |
 | UAT-01 | As a first-time Guest, I want to complete one try-on within 2 minutes without training (FR-1.8, §4.4; Criterion 6 / OBJ-02) | Observer times a Guest session from landing page to equipped item with Front/Rear toggle. | Session completes ≤2:00 with zero photo uploads and no registration prompt blocking flow. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
-| UAT-02 | As a Registered User, I want confidence that the fit visualization suits me (FR-7.5; Criterion 9 / OBJ-01) | Pre-session confidence rating → try-on → post-session rating → in-app like/dislike on fit visualization. | ≥80% of sessions show ≥+1 gain or post ≥4/5 and rate "like" ≥4/5. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
-| UAT-03 | As a shopper, I want style recommendations I can trust (FR-7.3–7.5; Criterion 10 / OBJ-05) | Review Recommendation Panel with match reasons; rate recommendations post-session. | ≥80% approval ("like" ≥4/5). | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
-| UAT-04 | As a shopper, I want confidence in my purchase decision and lower intent to return (Criterion 11 / OBJ-06) | Pre/post purchase-decision confidence and return-intent ratings around a mock checkout session. | ≥80% of sessions report higher confidence and lower return-intent vs baseline. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
+| UAT-02 | As a Registered User, I want confidence that the fit visualization suits me (FR-7.5; Criterion 9 / OBJ-01) | Functional walkthrough of try-on canvas and observation of fit visualization. | Canvas renders correctly; panel observes functional delivery. (Quantitative confidence ratings deferred to post-MVP). | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
+| UAT-03 | As a shopper, I want style recommendations I can trust (FR-7.3–7.5; Criterion 10 / OBJ-05) | Review Recommendation Panel with match reasons; panel observes explainability. | Match reasons are visible and logically sound per FR-7.3/7.4. (Quantitative approval ratings deferred to post-MVP). | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
+| UAT-04 | As a shopper, I want confidence in my purchase decision and lower intent to return (Criterion 11 / OBJ-06) | Functional walkthrough of mock checkout session and order history generation. | Checkout completes successfully; order record is accurate. (Quantitative return-intent ratings deferred to post-MVP). | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
 | UAT-05 | As a Seller, I want to upload my catalog using the template and instruction sheet without help (FR-4.1–4.8; Criterion 5 / OBJ-09) | Seller participant downloads template, uploads 10 items unassisted, reads validation report. | ≥80% of items publish without manual correction; report reasons understood. | \[Carlos – Backend\] \[Participant\] | Planned (Week 12\) |
 | UAT-06 | As a Registered User, I want to complete a mock purchase end-to-end (FR-6.1–6.9; Criterion 8 / OBJ-07) | Build cart, checkout through mock gateway, verify order history entry. | ≥70% of created carts complete the simulated checkout. | \[Seth – PM\] \[Participant\] | Planned (Week 12\) |
 | UAT-07 | As a user, I want my data protected (FR-1.4–1.9; Criterion 7 / OBJ-04) | Walkthrough: password policy, guest ephemerality check, account deletion (deactivation \+ archival) request. | Checklist 100% pass; deletion deactivates the account and archives personal data under restricted access, with no active access remaining. | \[Seth – PM\] \[Carlos – Backend\] | Planned (Week 12\) |
@@ -218,9 +211,13 @@ Note: The panel will conduct the User Acceptance Testing.
 | 6 Usability | Guest try-on ≤2 min | Observed UAT session | Dein | KAN-88 |
 | 7 Security | Checklist 100% | Security review checklist | Carlos / Seth | KAN-90 |
 | 8 Commerce flow | ≥70% carts complete | UAT commerce scenario | Seth | KAN-89 |
-| 9 Fit/style confidence | ≥80% improve \+ like ≥4/5 | Pre/post ratings \+ in-app rating | Seth / Dein | KAN-89 |
-| 10 Recommendation approval | ≥80% like ≥4/5 | Post-session rating | Seth | KAN-89 |
-| 11 Purchase-decision confidence | ≥80% improve, lower return intent | Pre/post UAT ratings | Seth | KAN-89 |
+| 9 Fit/style confidence | Functional delivery of canvas | Panel observation (Survey deferred) | Seth / Dein | KAN-89 |
+| 10 Recommendation approval | Explainable match reasons visible | Panel observation (Survey deferred) | Seth | KAN-89 |
+| 11 Purchase-decision confidence | Successful mock checkout flow | Panel observation (Survey deferred) | Seth | KAN-89 |
+
+## 
+
+## 
 
 ## **Appendix A — Traceability: Suites → Requirements → Jira**
 
