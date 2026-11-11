@@ -357,10 +357,19 @@
   cursor: pointer;
 }
 
+/* FIX: contain + alpha-crop shows the whole garment; cover was cropping
+   transparent rembg PNGs into a ghost / sliver. */
 .order-history-product-image img {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 6px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.12));
+}
+
+.order-history-product-image > svg {
+  color: rgba(23, 19, 15, 0.65);
 }
 
 .order-history-product-image
@@ -545,6 +554,14 @@
   box-shadow: 0 7px 18px
     rgba(142, 100, 31, 0.18);
   transform: translateY(-1px);
+}
+
+.order-history-primary-button:disabled,
+.order-history-secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .order-history-empty {

@@ -8,6 +8,7 @@ import {
   checkoutAPI,
   invalidateCache,
 } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/OrderDetailsPage.css";
 
 const ORDERS_STORAGE_KEY = "fitfusion-orders";
@@ -26,7 +27,7 @@ function formatCurrency(value) {
 function mediaUrl(path) {
   if (!path) return "";
   const value = String(path);
-  if (value.startsWith("http")) return value;
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
   return `${API_URL}${value.startsWith("/") ? "" : "/"}${value}`;
 }
 
@@ -229,7 +230,20 @@ function HangerIcon() {
   );
 }
 
+/* FIX (invisible garments): same alpha-crop pipeline as Catalog / Checkout /
+   Confirmation / History, so transparent rembg PNGs render solid + centered.
+   object-fit: contain (CSS) shows the whole garment; hanger tile on failure. */
 function ProductImage({ item, onOpen }) {
+  const [failed, setFailed] = useState(false);
+  const src = mediaUrl(item.image || item.imageUrl || item.frontImageUrl || "");
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const displaySrc = cropped || src;
+
   return (
     <button
       type="button"
@@ -237,25 +251,17 @@ function ProductImage({ item, onOpen }) {
       onClick={onOpen}
       aria-label={`View ${item.name}`}
     >
-      {item.image ? (
-        <>
-          <img
-            src={item.image}
-            alt={item.name}
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-              const fallback = event.currentTarget.nextElementSibling;
-              if (fallback) fallback.style.display = "grid";
-            }}
-          />
-          <strong aria-hidden="true" style={{ display: "none" }}>
-            {(item.name || "P").charAt(0)}
-          </strong>
-        </>
+      {displaySrc && !failed ? (
+        <img
+          src={displaySrc}
+          alt={item.name}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
       ) : (
         <HangerIcon />
       )}
-      <small>×{item.quantity}</small>
+      <small>×{Number(item.quantity || 1)}</small>
     </button>
   );
 }
@@ -264,12 +270,6 @@ function OrderDetailsPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
 
-  /* Instant first paint from the durable local order record.
-     FIX (cancelled order reverted to Processing): the previous initializer
-     read getCacheOrder() SYNCHRONOUSLY, but that helper is async and returns
-     a Promise (always truthy), so it produced a garbage first paint and never
-     saw the locally-cancelled status. localStorage is now the synchronous
-     source of truth; the server sync below refreshes everything else. */
   const [order, setOrder] = useState(() => {
     const stored = readArray(ORDERS_STORAGE_KEY).find(
       (entry) => String(entry.id) === String(orderId)
@@ -296,7 +296,6 @@ function OrderDetailsPage() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  /* Background sync with the server */
   useEffect(() => {
     let cancelled = false;
     async function syncOrder() {
@@ -311,10 +310,6 @@ function OrderDetailsPage() {
         const storedOrder =
           stored && isRealOrderId(stored.id) ? normalizeStoredOrder(stored) : null;
         let merged = mergeStoredIntoBackend(backendOrder, storedOrder);
-        /* FIX: a cancellation recorded on this device (offline fallback) must
-           survive every server sync, e.g. when the cancel call never reached
-           the backend. Server-truth cancellations arrive as 'cancelled' and
-           map to "Cancelled" on their own. */
         if (storedOrder && storedOrder.status === "Cancelled") {
           merged = { ...merged, status: "Cancelled" };
         }
@@ -449,9 +444,6 @@ function OrderDetailsPage() {
     }
   }
 
-  /* Durable local cancellation record (offline fallback + instant paint).
-     Upserts so a cancel always persists even when the order was never
-     cached in localStorage (e.g. deep-linked details page). */
   function recordLocalCancellation() {
     const stored = readArray(ORDERS_STORAGE_KEY);
     const index = stored.findIndex((entry) => String(entry.id) === String(orderId));
@@ -479,11 +471,6 @@ function OrderDetailsPage() {
     }
   }
 
-  /* FIX (cancelled order reverted to Processing): cancellation is now persisted
-     in TWO places — the server (POST /orders/<id>/cancel/, new backend action)
-     and the durable local record (offline fallback overlay). The server call
-     busts the orders cache so every later sync sees the real cancelled status
-     instead of a stale cached 'processing' row. */
   async function handleCancelOrder() {
     if (isCancelling) return;
     setIsCancelling(true);

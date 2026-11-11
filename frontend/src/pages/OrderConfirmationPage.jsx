@@ -4,6 +4,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { API_URL, catalogAPI, checkoutAPI } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/OrderConfirmationPage.css";
 
 const LAST_ORDER_STORAGE_KEY =
@@ -56,8 +57,15 @@ function formatCurrency(value) {
 function mediaUrl(path) {
   if (!path) return "";
   const value = String(path);
-  if (value.startsWith("http")) return value;
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
   return `${API_URL}${value.startsWith("/") ? "" : "/"}${value}`;
+}
+
+/* Best available photo for a line item, normalized to the API origin. */
+function imageFor(item) {
+  return mediaUrl(
+    item?.image || item?.imageUrl || item?.frontImageUrl || ""
+  );
 }
 
 function isRealOrderId(id) {
@@ -119,6 +127,47 @@ function formatAddress(address) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+/* FIX (invisible garments): run the SAME alpha-crop pipeline the Catalog /
+   Checkout / Cart pages use (hole-repair + clustered crop + solid-alpha
+   tighten) so transparent rembg PNGs render as a solid, centered garment
+   instead of a faint ghost / sliver. object-fit: contain (CSS) shows it whole.
+   Letter tile remains the fallback for missing / failed assets. */
+function ConfirmationProductImage({ item, src, onOpen }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const displaySrc = cropped || src;
+
+  return (
+    <button
+      type="button"
+      className="order-confirmation-product-image"
+      onClick={onOpen}
+      aria-label={`View ${item.name}`}
+    >
+      {displaySrc && !failed ? (
+        <img
+          src={displaySrc}
+          alt={item.name}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <strong>
+          {(item.name || "Product").charAt(0)}
+        </strong>
+      )}
+      <small>
+        ×{Number(item.quantity || 1)}
+      </small>
+    </button>
+  );
 }
 
 function OrderConfirmationPage() {
@@ -359,10 +408,10 @@ function OrderConfirmationPage() {
                   `${item.productId}-${index}`
                 }
               >
-                <button
-                  type="button"
-                  className="order-confirmation-product-image"
-                  onClick={() =>
+                <ConfirmationProductImage
+                  item={item}
+                  src={imageFor(item)}
+                  onOpen={() =>
                     navigate(
                       `/shopper/products/${
                         item.productId ||
@@ -370,42 +419,7 @@ function OrderConfirmationPage() {
                       }`
                     )
                   }
-                  aria-label={`View ${item.name}`}
-                >
-                  {item.image ? (
-                    <>
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none";
-                          const fallback =
-                            event.currentTarget.nextElementSibling;
-                          if (fallback)
-                            fallback.style.display = "grid";
-                        }}
-                      />
-                      <strong
-                        aria-hidden="true"
-                        style={{ display: "none" }}
-                      >
-                        {(item.name || "P").charAt(0)}
-                      </strong>
-                    </>
-                  ) : (
-                    <strong>
-                      {(
-                        item.name || "Product"
-                      ).charAt(0)}
-                    </strong>
-                  )}
-                  <small>
-                    ×
-                    {Number(
-                      item.quantity || 1
-                    )}
-                  </small>
-                </button>
+                />
                 <div className="order-confirmation-product-copy">
                   <span>
                     {item.sellerName ||

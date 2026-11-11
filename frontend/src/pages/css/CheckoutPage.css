@@ -360,10 +360,35 @@
   background: #e2d8c7;
 }
 
+/* FIX: long order lists now scroll INSIDE the sticky review card with a
+   themed scrollbar, so the summary / Place Order button stay visible. */
 .checkout-products {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  max-height: min(430px, 52vh);
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #b57e20 #f2e7d2;
+}
+
+.checkout-products::-webkit-scrollbar {
+  width: 7px;
+}
+
+.checkout-products::-webkit-scrollbar-track {
+  background: #f2e7d2;
+  border-radius: 999px;
+}
+
+.checkout-products::-webkit-scrollbar-thumb {
+  background: #b57e20;
+  border-radius: 999px;
+}
+
+.checkout-products::-webkit-scrollbar-thumb:hover {
+  background: #8e641f;
 }
 
 .checkout-product {
@@ -384,10 +409,13 @@
   border-radius: 9px;
 }
 
-.checkout-product-image img {
+.order-confirmation-product-image img {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 6px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.12));
 }
 
 .checkout-product-image > strong {

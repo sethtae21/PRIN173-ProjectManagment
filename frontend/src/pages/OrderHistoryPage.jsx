@@ -5,10 +5,11 @@ import {
   cartAPI,
   catalogAPI,
   checkoutAPI,
-  getCachedOrders,
+  getCachedCart,
   invalidateCache,
   ratingsApi,
 } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/OrderHistoryPage.css";
 
 const ORDERS_STORAGE_KEY = "fitfusion-orders";
@@ -16,6 +17,23 @@ const CART_STORAGE_KEY = "fitfusion-cart";
 const RATINGS_STORAGE_KEY = "fitfusion-product-ratings";
 const IMAGE_CACHE_KEY = "fitfusion-order-image-map";
 const MAX_CART_QUANTITY = 10;
+
+/* Badge reads the SAME server-truth source as CatalogPage (sum of line
+   quantities); the localStorage mirror is only a first-paint / offline fallback. */
+function computeCartCount(cart) {
+  const items = Array.isArray(cart?.items) ? cart.items : [];
+  return items.reduce(
+    (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
+    0
+  );
+}
+
+function mirrorCartCount() {
+  return readArray(CART_STORAGE_KEY).reduce(
+    (sum, item) => sum + Math.max(1, Number(item.quantity) || 1),
+    0
+  );
+}
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
@@ -28,7 +46,7 @@ function formatCurrency(value) {
 function mediaUrl(path) {
   if (!path) return "";
   const value = String(path);
-  if (value.startsWith("http")) return value;
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
   return `${API_URL}${value.startsWith("/") ? "" : "/"}${value}`;
 }
 
@@ -132,13 +150,6 @@ function mergeOrderLists(primary, secondary) {
   return merged;
 }
 
-/* FIX (cancelled order reverted to Processing / empty Cancelled filter):
-   cancellations are recorded in localStorage by OrderDetailsPage (server call
-   + offline fallback). The server sync gives backend rows precedence and then
-   re-persists the list, which previously erased the local "Cancelled" status.
-   This overlay re-applies stored cancellations on first paint AND after every
-   sync, before setOrders + the localStorage rewrite, so the badge, the row,
-   and the Cancelled filter always agree. */
 function applyStoredCancellations(orderList) {
   const cancelledIds = new Set(
     readArray(ORDERS_STORAGE_KEY)
@@ -153,15 +164,11 @@ function applyStoredCancellations(orderList) {
   );
 }
 
-/* Instant first paint: memory cache (this session) + localStorage (last visit) */
 function initialOrders() {
-  const cached = (Array.isArray(getCachedOrders()) ? getCachedOrders() : []).map(normalizeBackendOrder);
-
   const stored = readArray(ORDERS_STORAGE_KEY)
     .filter((entry) => isRealOrderId(entry?.id))
     .map(normalizeStoredOrder);
-
-  return applyStoredCancellations(mergeOrderLists(cached, stored));
+  return applyStoredCancellations(stored);
 }
 
 async function enrichImages(orderList) {
@@ -226,7 +233,20 @@ function HangerIcon() {
   );
 }
 
+/* FIX (invisible garments): same alpha-crop pipeline as Catalog / Checkout /
+   Confirmation / Details, so transparent rembg PNGs render solid + centered.
+   object-fit: contain (CSS) shows the whole garment; hanger tile on failure. */
 function ProductImage({ item, onOpen }) {
+  const [failed, setFailed] = useState(false);
+  const src = mediaUrl(item.image || item.imageUrl || item.frontImageUrl || "");
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const displaySrc = cropped || src;
+
   return (
     <button
       type="button"
@@ -234,21 +254,13 @@ function ProductImage({ item, onOpen }) {
       onClick={onOpen}
       aria-label={`View ${item.name}`}
     >
-      {item.image ? (
-        <>
-          <img
-            src={item.image}
-            alt={item.name}
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-              const fallback = event.currentTarget.nextElementSibling;
-              if (fallback) fallback.style.display = "grid";
-            }}
-          />
-          <strong aria-hidden="true" style={{ display: "none" }}>
-            {(item.name || "P").charAt(0)}
-          </strong>
-        </>
+      {displaySrc && !failed ? (
+        <img
+          src={displaySrc}
+          alt={item.name}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
       ) : (
         <HangerIcon />
       )}
@@ -268,9 +280,7 @@ function OrderHistoryPage() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [notice, setNotice] = useState("");
   const [isBuying, setIsBuying] = useState(false);
-  const [cartProductCount, setCartProductCount] = useState(
-    () => readArray(CART_STORAGE_KEY).length
-  );
+  const [cartProductCount, setCartProductCount] = useState(mirrorCartCount);
   const ordersRef = useRef(orders);
 
   useEffect(() => {
@@ -287,19 +297,29 @@ function OrderHistoryPage() {
     localStorage.setItem(RATINGS_STORAGE_KEY, JSON.stringify(ratings));
   }, [ratings]);
 
+  /* Server-truth badge, refreshed on mutation / cross-tab / focus. */
   useEffect(() => {
-    function updateCartCount() {
-      setCartProductCount(readArray(CART_STORAGE_KEY).length);
+    let active = true;
+    async function refreshCartCount() {
+      try {
+        const cart = await getCachedCart(true);
+        if (active) setCartProductCount(computeCartCount(cart));
+      } catch {
+        if (active) setCartProductCount(mirrorCartCount());
+      }
     }
-    window.addEventListener("fitfusion-cart-updated", updateCartCount);
-    window.addEventListener("storage", updateCartCount);
+    refreshCartCount();
+    window.addEventListener("fitfusion-cart-updated", refreshCartCount);
+    window.addEventListener("storage", refreshCartCount);
+    window.addEventListener("focus", refreshCartCount);
     return () => {
-      window.removeEventListener("fitfusion-cart-updated", updateCartCount);
-      window.removeEventListener("storage", updateCartCount);
+      active = false;
+      window.removeEventListener("fitfusion-cart-updated", refreshCartCount);
+      window.removeEventListener("storage", refreshCartCount);
+      window.removeEventListener("focus", refreshCartCount);
     };
   }, []);
 
-  /* Background sync: never blocks the first paint */
   useEffect(() => {
     let cancelled = false;
     async function syncFromServer() {
@@ -308,9 +328,6 @@ function OrderHistoryPage() {
         const data = await checkoutAPI.getOrders();
         const backendOrders = (Array.isArray(data) ? data : []).map(normalizeBackendOrder);
         if (cancelled) return;
-        /* FIX: re-apply stored cancellations BEFORE rendering and BEFORE the
-           localStorage rewrite, so a cancelled order can never flip back to
-           its pre-cancel server status and the Cancelled filter stays populated. */
         const merged = applyStoredCancellations(
           mergeOrderLists(backendOrders, ordersRef.current)
         );
@@ -424,16 +441,6 @@ function OrderHistoryPage() {
     }
   }
 
-  /* FIX (order-page rating never reached the product page): the star control
-     used to write ONLY to localStorage, while ProductDetailsPage renders its
-     score from the backend /ratings/summary/ endpoint — so order ratings never
-     appeared there (0.0 / 0 verified ratings). The rating is now submitted to
-     the real ratings API using the exact contract ProductDetailsPage uses, the
-     cached summary is invalidated, and "fitfusion-rating-updated" is broadcast
-     so any OPEN product page refreshes instantly; a later visit re-fetches the
-     summary on mount anyway. localStorage stays as the per-order UI memory of
-     which stars you picked; if the server is unreachable the rating remains
-     device-only and the notice says so. */
   async function handleRating(orderId, productId, rating) {
     const ratingKey = `${orderId}-${productId}`;
     setRatings((currentRatings) => ({ ...currentRatings, [ratingKey]: rating }));
@@ -442,6 +449,7 @@ function OrderHistoryPage() {
         target_type: "item",
         target_id: String(productId),
         score: rating,
+        source: "order_history",
       });
       invalidateCache(`ratings:item:${productId}`);
       window.dispatchEvent(new Event("fitfusion-rating-updated"));
@@ -480,7 +488,7 @@ function OrderHistoryPage() {
           type="button"
           className="order-history-cart-button"
           onClick={() => navigate("/shopper/cart")}
-          aria-label={`Open cart with ${cartProductCount} products`}
+          aria-label={`Open cart with ${cartProductCount} items`}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 7H6" />

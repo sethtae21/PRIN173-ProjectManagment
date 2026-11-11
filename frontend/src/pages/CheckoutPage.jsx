@@ -7,11 +7,13 @@ import {
   Link,
   useNavigate,
 } from "react-router-dom";
-import { API_URL, authAPI, checkoutAPI, getCachedCart } from "../services/api";
+import { API_URL, authAPI, catalogAPI, checkoutAPI, getCachedCart } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CheckoutPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
 const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
+const IMAGE_CACHE_KEY = "fitfusion-order-image-map";
 const provinces = [
   "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan",
   "Albay", "Antique", "Apayao", "Aurora", "Basilan",
@@ -48,6 +50,15 @@ function formatCurrency(value) {
   }).format(value);
 }
 
+/* Normalize every stored path to the Django API origin so /media/... never
+   404s on the Vite origin. */
+function mediaUrl(path) {
+  if (!path) return "";
+  const value = String(path);
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
+  return `${API_URL}${value.startsWith("/") ? "" : "/"}${value}`;
+}
+
 function readStoredArray(key) {
   try {
     const storedValue = localStorage.getItem(key);
@@ -56,6 +67,17 @@ function readStoredArray(key) {
     return Array.isArray(parsedValue) ? parsedValue : [];
   } catch {
     return [];
+  }
+}
+
+function readStoredObject(key) {
+  try {
+    const storedValue = localStorage.getItem(key);
+    if (!storedValue) return {};
+    const parsedValue = JSON.parse(storedValue);
+    return parsedValue && typeof parsedValue === "object" ? parsedValue : {};
+  } catch {
+    return {};
   }
 }
 
@@ -70,6 +92,38 @@ function loadCheckoutItems() {
   return selectedCartItems;
 }
 
+/* FIX (invisible garments): run the SAME alpha-crop pipeline the Catalog /
+   Product Details / Cart pages use (hole-repair + clustered crop + solid-alpha
+   tighten) so transparent rembg PNGs render as a solid, centered garment
+   instead of a faint ghost / sliver. object-fit: contain (CSS) shows it whole.
+   Letter tile remains the fallback for missing / failed assets. */
+function CheckoutProductImage({ item, src }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const displaySrc = cropped || src;
+
+  return (
+    <div className="checkout-product-image">
+      {displaySrc && !failed ? (
+        <img
+          src={displaySrc}
+          alt={item.name}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <strong>{(item.name || "Product").charAt(0)}</strong>
+      )}
+      <small>×{Number(item.quantity || 1)}</small>
+    </div>
+  );
+}
+
 function CheckoutPage() {
   const navigate = useNavigate();
   const [checkoutItems] = useState(loadCheckoutItems);
@@ -78,6 +132,7 @@ function CheckoutPage() {
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const [catalogImages, setCatalogImages] = useState(() => readStoredObject(IMAGE_CACHE_KEY));
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -89,28 +144,54 @@ function CheckoutPage() {
     paymentMethod: "Cash on Delivery",
   });
 
-  /* ==========================================
-     FIX (autofill from database):
-     The old code checked for `localStorage.getItem("access_token")` (a legacy
-     key that doesn't exist in the current session) and used a raw fetch()
-     call. This rewrite uses authAPI.getProfile() which is JWT-aware (handles
-     token refresh automatically), maps the MongoDB-backed profile fields
-     correctly, and falls back to cached user data if the network fails.
-     All fields remain fully editable (controlled inputs, no readOnly).
-  ========================================== */
+  /* Backfill authoritative front images from the live catalog (shared cache). */
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCatalogImages() {
+      try {
+        const catalog = await catalogAPI.getAll();
+        if (!isMounted) return;
+        const map = { ...readStoredObject(IMAGE_CACHE_KEY) };
+        (Array.isArray(catalog) ? catalog : []).forEach((entry) => {
+          if (entry?.id && entry.front_image) {
+            map[String(entry.id)] = mediaUrl(entry.front_image);
+          }
+        });
+        setCatalogImages(map);
+        try {
+          localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(map));
+        } catch {
+          /* non-critical */
+        }
+      } catch (error) {
+        console.warn("Checkout: catalog image sync skipped →", error?.message || error);
+      }
+    }
+
+    loadCatalogImages();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function imageFor(item) {
+    const productId = String(item?.productId ?? item?.id ?? "");
+    return (
+      catalogImages[productId] ||
+      mediaUrl(item?.image || item?.imageUrl || item?.frontImageUrl || "")
+    );
+  }
+
+  /* Autofill from the JWT-aware profile API, with cached-user fallback. */
   useEffect(() => {
     let isMounted = true;
 
     async function fetchUserProfile() {
       try {
-        // Use the JWT-aware API client that handles token refresh automatically
         const profileData = await authAPI.getProfile();
-        
         if (!isMounted) return;
-
-        // Map the backend profile fields to the form
         const userData = profileData?.user || profileData || {};
-        
         setForm((prevForm) => ({
           ...prevForm,
           fullName: userData.full_name || userData.name || prevForm.fullName || "",
@@ -123,10 +204,7 @@ function CheckoutPage() {
         }));
       } catch (error) {
         console.error("Failed to fetch user profile from database:", error);
-        
         if (!isMounted) return;
-
-        // Fallback to cached user data if the network request fails
         const storedUser = localStorage.getItem("fitfusion-user");
         if (storedUser) {
           try {
@@ -139,7 +217,7 @@ function CheckoutPage() {
               street: userData.street || prevForm.street || "",
               city: userData.city || userData.barangay || prevForm.city || "",
               province: userData.province || prevForm.province || "",
-              postalCode: userData.postal_code || userData.postalCode || prevForm.postalCode || "",
+              postalCode: userData.postal_code || userData.postalCode || "",
             }));
           } catch {
             // Ignore JSON parse errors
@@ -151,7 +229,6 @@ function CheckoutPage() {
     }
 
     fetchUserProfile();
-
     return () => {
       isMounted = false;
     };
@@ -279,7 +356,6 @@ function CheckoutPage() {
     setIsSubmitting(true);
     setOrderError("");
     try {
-      // Update the user's profile with the checkout information
       await authAPI.updateProfile({
         full_name: form.fullName.trim(),
         mobile: form.contactNumber.trim(),
@@ -288,15 +364,14 @@ function CheckoutPage() {
         province: form.province,
         postal_code: form.postalCode.trim(),
       });
-      
+
       const address = [
         form.street.trim(),
         form.city.trim(),
         form.province,
         form.postalCode.trim(),
       ].filter(Boolean).join(", ");
-      
-      // Place the order using the checkout API (placeOrder alias is now available)
+
       const order = await checkoutAPI.placeOrder({
         recipient_name: form.fullName.trim(),
         recipient_email: form.email.trim(),
@@ -309,7 +384,7 @@ function CheckoutPage() {
           color: item.color || item.selectedColor || "",
         })),
       });
-      
+
       const orderItems = order.items.map((item) => {
         const checkoutItem = checkoutItems.find(
           (candidate) =>
@@ -327,13 +402,14 @@ function CheckoutPage() {
           size: item.size || checkoutItem?.size || "M",
           color: item.color || checkoutItem?.color || "Default",
           image:
+            imageFor(checkoutItem || item) ||
             checkoutItem?.image ||
             checkoutItem?.imageUrl ||
             checkoutItem?.frontImageUrl ||
             "",
         };
       });
-      
+
       const newOrder = {
         id: order.id,
         orderNumber: order.order_number || order.id,
@@ -361,7 +437,7 @@ function CheckoutPage() {
         shippingFee: Number(order.shipping_fee),
         total: Number(order.total_amount),
       };
-      
+
       localStorage.setItem("fitfusion-last-order", JSON.stringify(newOrder));
       const storedOrders = readStoredArray("fitfusion-orders");
       localStorage.setItem(
@@ -371,7 +447,7 @@ function CheckoutPage() {
       removePurchasedItemsFromCart();
       localStorage.removeItem(CHECKOUT_STORAGE_KEY);
       setShowConfirmation(false);
-      
+
       navigate("/shopper/order-confirmation", {
         replace: true,
         state: {
@@ -683,17 +759,7 @@ function CheckoutPage() {
                   className="checkout-product"
                   key={item.id || `${item.productId}-${index}`}
                 >
-                  <div className="checkout-product-image">
-                    {item.image || item.imageUrl ? (
-                      <img
-                        src={item.image || item.imageUrl}
-                        alt={item.name}
-                      />
-                    ) : (
-                      <strong>{(item.name || "Product").charAt(0)}</strong>
-                    )}
-                    <small>×{Number(item.quantity || 1)}</small>
-                  </div>
+                  <CheckoutProductImage item={item} src={imageFor(item)} />
                   <div className="checkout-product-copy">
                     <span>{item.sellerName || "FitFusion Seller"}</span>
                     <strong>{item.name}</strong>
