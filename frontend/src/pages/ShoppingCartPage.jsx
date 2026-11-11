@@ -7,12 +7,16 @@ import {
   Link,
   useNavigate,
 } from "react-router-dom";
-import { API_URL, cartAPI } from "../services/api";
+import { API_URL, cartAPI, catalogAPI } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/ShoppingCartPage.css";
 
 const CART_STORAGE_KEY = "fitfusion-cart";
 const CHECKOUT_STORAGE_KEY = "fitfusion-checkout-items";
 const MAX_QUANTITY = 10;
+/* Garments whose cropped aspect (w/h) is below this are "tall"
+   (pants, dresses) and get a taller tile so their full length shows. */
+const TALL_TILE_ASPECT = 0.8;
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", {
@@ -42,8 +46,10 @@ function normalizeCartItem(item, index) {
     productId,
     name: item.name || "Fashion Item",
     category: item.category || item.displayCategory || "Clothing",
-    sellerId:
-      item.sellerId || item.seller_id || "fitfusion-seller",
+    // CHANGED: no more hard-coded "fitfusion-seller" placeholder id. An empty
+    // sellerId falls back to the store-name route, which SellerStorePage
+    // resolves against live listings.
+    sellerId: item.sellerId || item.seller_id || "",
     sellerName:
       item.sellerName || item.store_name || "FitFusion Seller",
     price: Number(item.price || 0),
@@ -129,6 +135,58 @@ function loadCartItems() {
   }
 }
 
+/* CHANGED: route target for the seller link. Prefer the live seller ObjectId;
+   fall back to the store name (SellerStorePage resolves name params too) and
+   always hand the display name through router state. */
+function sellerStoreTarget(item) {
+  const target = item.sellerId || item.sellerName || "";
+  return {
+    to: `/shopper/sellers/${encodeURIComponent(target)}`,
+    state: { storeName: item.sellerName },
+  };
+}
+
+/* ==========================================
+   Centered, alpha-cropped garment image (same pipeline as CatalogPreview).
+   NEW: reports the cropped aspect ratio upward so the tile can grow for
+   tall garments (pants / dresses) and show their full length.
+========================================== */
+function CartItemImage({ src, alt, onAspect }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  function handleLoad(event) {
+    const img = event.currentTarget;
+    const nw = img.naturalWidth || img.width;
+    const nh = img.naturalHeight || img.height;
+    if (nw && nh && onAspect) {
+      onAspect(nw / nh);
+    }
+  }
+
+  if (!src || failed) {
+    return (
+      <span aria-hidden="true" className="cart-item-placeholder">
+        {(alt || "P").charAt(0)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={cropped || src}
+      alt={alt}
+      className="cart-item-img"
+      onLoad={handleLoad}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function ShoppingCartPage() {
   const navigate = useNavigate();
   const [cartItems, setCartItems] =
@@ -138,6 +196,8 @@ function ShoppingCartPage() {
   const [cartLoadError, setCartLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingRemoveId, setPendingRemoveId] = useState(null);
+  /* NEW: per-item cropped aspect ratio, used to size tall tiles. */
+  const [tileAspects, setTileAspects] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -146,12 +206,37 @@ function ShoppingCartPage() {
         const cart = await cartAPI.get();
         if (!isMounted) return;
         const savedItems = loadCartItems();
+
+        // CHANGED: the /cart/ payload carries store NAMES but no seller
+        // ObjectId, which is why the link used to point at the placeholder
+        // store. Enrich every row from the live catalog so the seller link
+        // opens the REAL store page.
+        const sellerById = new Map();
+        try {
+          const catalog = await catalogAPI.list();
+          const rows = Array.isArray(catalog)
+            ? catalog
+            : catalog?.results || [];
+          rows.forEach((row) => {
+            sellerById.set(String(row.id), {
+              sellerId: String(row.seller || row.seller_id || ""),
+              sellerName: row.store_name || "",
+            });
+          });
+        } catch (catalogError) {
+          console.warn(
+            "Cart: catalog enrichment skipped:",
+            catalogError?.message || catalogError
+          );
+        }
+
         const items = cart.items.map((item, index) => {
           const previousItem = savedItems.find(
             (saved) =>
               String(saved.productId ?? saved.id) ===
               String(item.catalog_item)
           );
+          const live = sellerById.get(String(item.catalog_item));
           const imageUrl = item.front_image_url
             ? item.front_image_url.startsWith("http")
               ? item.front_image_url
@@ -163,7 +248,14 @@ function ShoppingCartPage() {
               id: previousItem?.id || item.catalog_item,
               productId: item.catalog_item,
               name: item.name,
-              sellerName: item.store_name,
+              sellerId:
+                live?.sellerId ||
+                previousItem?.sellerId ||
+                "",
+              sellerName:
+                item.store_name ||
+                live?.sellerName ||
+                previousItem?.sellerName,
               price: item.price,
               quantity: item.quantity,
               available: item.available !== false,
@@ -281,6 +373,14 @@ function ShoppingCartPage() {
     availableItems.every(
       (item) => item.selected
     );
+
+  function handleTileAspect(itemId, aspect) {
+    setTileAspects((prev) =>
+      prev[itemId] === aspect
+        ? prev
+        : { ...prev, [itemId]: aspect }
+    );
+  }
 
   function updateItem(itemId, updates) {
     setCartItems((currentItems) =>
@@ -578,9 +678,14 @@ function ShoppingCartPage() {
               <div className="shopping-cart-product-list">
                 {cartItems.map((item) => {
                   const isUnavailable = item.available === false || item.sellerAccountDeleted;
+                  const tileAspect = tileAspects[item.id];
+                  const isTallTile =
+                    typeof tileAspect === "number" &&
+                    tileAspect < TALL_TILE_ASPECT;
+                  const storeTarget = sellerStoreTarget(item);
                   return (
                     <article
-                      className="shopping-cart-product"
+                      className={`shopping-cart-product${isUnavailable ? " is-unavailable" : ""}`}
                       key={item.id}
                     >
                       <input
@@ -597,7 +702,7 @@ function ShoppingCartPage() {
                       />
                       <button
                         type="button"
-                        className="shopping-cart-product-image"
+                        className={`shopping-cart-product-image${isTallTile ? " is-tall" : ""}`}
                         onClick={() =>
                           navigate(
                             `/shopper/products/${item.productId}`
@@ -605,17 +710,13 @@ function ShoppingCartPage() {
                         }
                         aria-label={`View ${item.name}`}
                       >
-                        {item.image ? (
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="cart-item-img"
-                          />
-                        ) : (
-                          <span aria-hidden="true" className="cart-item-placeholder">
-                            {item.name.charAt(0)}
-                          </span>
-                        )}
+                        <CartItemImage
+                          src={item.image}
+                          alt={item.name}
+                          onAspect={(aspect) =>
+                            handleTileAspect(item.id, aspect)
+                          }
+                        />
                         {item.originalPrice >
                           item.price && (
                           <small className="cart-discount-badge">
@@ -631,8 +732,11 @@ function ShoppingCartPage() {
                         )}
                       </button>
                       <div className="shopping-cart-product-info">
+                        {/* CHANGED: opens the LIVE seller store (real ObjectId
+                            from catalog enrichment, store-name fallback). */}
                         <Link
-                          to={`/shopper/sellers/${item.sellerId}`}
+                          to={storeTarget.to}
+                          state={storeTarget.state}
                           className="shopping-cart-seller"
                         >
                           {item.sellerName} →

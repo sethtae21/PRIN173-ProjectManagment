@@ -26,13 +26,6 @@ const SIZE_FILTERS = [
 ];
 
 // === ADD-TO-OUTFIT PICKER HANDSHAKE (FR-5.7 edit / KAN-69-115) =============
-// The outfit editor sets EDIT_MODE_KEY immediately before navigating here;
-// we CONSUME it on mount (remove) so a refresh or a later normal visit is
-// never accidentally in picker mode. Picks accumulate in a per-outfit queue
-// key; the editor applies that queue only when arrived-at via router state
-// from our "Back to Outfit" button (leak-proof commit). Mirrors the studio's
-// pending-item discipline, hardened for multi-pick. Class names for the
-// banner / picked states live in CatalogPage.css (appended picker block).
 const EDIT_MODE_KEY = "fitfusion-edit-outfit-mode";
 const RETURN_KEY_PREFIX = "fitfusion-edit-outfit-return-";
 
@@ -61,17 +54,13 @@ function removeSession(key) {
   }
 }
 
-// Helper to construct image URLs exactly like the Seller page does
 function mediaUrl(path) {
   if (!path) return null;
   if (String(path).startsWith("http")) return path;
   return `${API_URL}${String(path).startsWith("/") ? "" : "/"}${path}`;
 }
 
-// Legacy client mirror. RETAINED only for backward compatibility with any page that
-// still reads localStorage 'fitfusion-cart'; the badge itself is now server-derived
-// (KAN-69), so this no longer drives the UI count. A future pass that confirms every
-// reader is server-based can delete this and the mirror write in addToCart.
+// Legacy client mirror (backward compatibility only; badge is server-derived).
 function readCart() {
   try {
     const saved = localStorage.getItem("fitfusion-cart");
@@ -82,9 +71,6 @@ function readCart() {
   }
 }
 
-// Server cart is the source of truth (FR-6.1/6.2). Badge = sum of line quantities, the
-// identical formula used by SavedOutfitsPage / EditSavedOutfitPage and justified by
-// commerce/views.py (CartItem stores cart/item/quantity; quantity is the unit count).
 function computeCartCount(cart) {
   const items = Array.isArray(cart?.items) ? cart.items : [];
   return items.reduce(
@@ -101,14 +87,7 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-/* ==========================================
-   FIX (garment not centered in card):
-   rembg PNGs carry uneven transparent margins, so centering the raw canvas
-   leaves the garment sitting high/low inside the frame. CatalogPreview runs
-   every asset through the shared useAlphaCrop pipeline (hole-repair + union
-   crop of all garment components) so the GARMENT is what gets centered and
-   maximized. Falls back to the category placeholder chip on load failure.
-========================================== */
+/* Alpha-cropped, centered garment preview with a clean placeholder fallback. */
 function CatalogPreview({ src, alt, category }) {
   const [failed, setFailed] = useState(false);
   const cropped = useAlphaCrop(failed ? null : src);
@@ -141,18 +120,22 @@ function CatalogPage({ isGuest = false }) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  // Single "Filter By" control: price options sort the grid,
-  // size options filter the grid, "all" shows everything unsorted.
   const [filterOption, setFilterOption] = useState("all");
   const [cartCount, setCartCount] = useState(0);
-  const [addingToCart, setAddingToCart] = useState(false);
+
+  // FIX (per-item loading): a single shared boolean made EVERY card show
+  // "Adding..." when any one item was added. Track the ids of the items with
+  // an in-flight add instead, so only the clicked card shows the loading state
+  // and other cards remain fully interactive.
+  const [addingIds, setAddingIds] = useState(() => new Set());
+
   const [cartError, setCartError] = useState("");
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
   // === picker-mode state (only populated when launched from the editor) ====
   const [editMode, setEditMode] = useState(false);
-  const [editOutfit, setEditOutfit] = useState(null); // {id, name}
+  const [editOutfit, setEditOutfit] = useState(null);
   const [pickedIds, setPickedIds] = useState([]);
 
   useEffect(() => {
@@ -169,7 +152,6 @@ function CatalogPage({ isGuest = false }) {
                 displayCategory: p.category
                   ? p.category.charAt(0).toUpperCase() + p.category.slice(1)
                   : "Item",
-                // FIX: Use the mediaUrl helper to ensure correct path
                 imageUrl: mediaUrl(p.front_image),
                 rating: 0,
                 ratingsCount: 0,
@@ -193,14 +175,11 @@ function CatalogPage({ isGuest = false }) {
   }, []);
 
   // === consume the editor's one-shot mode key on mount =====================
-  // Removing it here guarantees a refresh / later normal visit is NOT in
-  // picker mode. Any pre-existing queue for that outfit is restored into
-  // local state so a mid-session reload of the catalog keeps the count.
   useEffect(() => {
     const mode = readSessionJSON(EDIT_MODE_KEY);
     if (!mode || !mode.id) return;
 
-    removeSession(EDIT_MODE_KEY); // consume immediately
+    removeSession(EDIT_MODE_KEY);
 
     const id = String(mode.id);
     setEditMode(true);
@@ -211,14 +190,6 @@ function CatalogPage({ isGuest = false }) {
   }, []);
 
   // === badge from the SERVER (KAN-69), guest-guarded =======================
-  // FIX: the previous badge read a localStorage mirror, so it (a) disagreed with the
-  // server-truth pages (Saved Outfits / Edit / Select-Items) and (b) never updated when
-  // another page added to the cart. We now read /cart/ and re-read on the same event the
-  // other pages dispatch. GUEST GUARD is mandatory: /cart/ is IsAuthenticated, and an
-  // unguarded mount fetch by a guest would 401 -> silent-refresh fail -> clearSession +
-  // redirect to /login, bouncing every guest off /guest/catalog. The storage listener is
-  // kept so a cross-tab mirror write still triggers a server re-read (cross-tab sync),
-  // but the VALUE always comes from the server, never from localStorage.
   useEffect(() => {
     if (guestMode) return undefined;
 
@@ -248,7 +219,6 @@ function CatalogPage({ isGuest = false }) {
   const filteredProducts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
 
-    // If the chosen filter option is one of the size codes, apply size filtering.
     const selectedSize = SIZE_FILTERS.some((s) => s.value === filterOption)
       ? filterOption
       : null;
@@ -271,7 +241,6 @@ function CatalogPage({ isGuest = false }) {
       return matchesSearch && matchesCategory && matchesSize;
     });
 
-    // Price options restored: they sort the (already filtered) result set.
     return [...filtered].sort((a, b) => {
       if (filterOption === "price-low") return a.price - b.price;
       if (filterOption === "price-high") return b.price - a.price;
@@ -298,14 +267,10 @@ function CatalogPage({ isGuest = false }) {
       showGuestRestriction("view the seller's complete store");
       return;
     }
-    
-    // FIX: The CatalogItemSerializer exposes the seller ID as `seller` (mapped from `seller_id`).
-    // We check `product.seller` first, with fallbacks for legacy or alternate payload shapes.
+
     const sellerId = product.seller || product.seller_id || product.store_id;
-    
+
     if (sellerId) {
-      // FIX: Navigate to the correct route defined in App.jsx (/shopper/sellers/:sellerId)
-      // instead of the mismatched /shopper/stores/:id.
       navigate(`/shopper/sellers/${sellerId}`);
     } else {
       console.warn("Seller ID not found for product:", product);
@@ -333,8 +298,6 @@ function CatalogPage({ isGuest = false }) {
 
   function backToOutfit() {
     if (!editOutfit) return;
-    // Commit gesture: navigate WITH router state so the editor knows to apply
-    // the queue (a normal mount would discard it -> leak-proof).
     navigate(
       `/shopper/saved-outfits/${encodeURIComponent(editOutfit.id)}/edit`,
       { state: { returnedFromCatalog: true, outfitId: editOutfit.id } }
@@ -347,26 +310,23 @@ function CatalogPage({ isGuest = false }) {
       return;
     }
 
-    setAddingToCart(true);
+    const productId = String(product.id);
+    // Ignore repeat clicks on the SAME item while its add is in flight, but
+    // never block other items.
+    if (addingIds.has(productId)) return;
+
+    setAddingIds((prev) => {
+      const next = new Set(prev);
+      next.add(productId);
+      return next;
+    });
     setCartError("");
 
     try {
-      // ✅ FIX: api.js exposes cartAPI.add(catalog_item, quantity) — there is
-      // no "addItem"/"getCart" method. The add returns the serialized cart, so the
-      // badge is set from server truth with no extra round-trip (single add, no
-      // concurrency here). The catalog is per-variant (FR-3.2/FR-4.1) and the cart
-      // line is keyed by the variant (views.py), so no size is sent -- the listing's
-      // size is intrinsic to product.id.
-      //
-      // NOTE (parse fix): the server response is `cart`; the legacy localStorage
-      // array is `mirror`. They MUST be distinct identifiers -- a prior draft
-      // declared `const cart` twice in this scope, which is a SyntaxError that
-      // broke the whole Vite build (App imports this module), not just the catalog.
       const cart = await cartAPI.add(product.id, 1);
       setCartCount(computeCartCount(cart));
 
-      // Legacy mirror retained for backward compatibility only (see readCart note);
-      // it no longer feeds the badge.
+      // Legacy mirror retained for backward compatibility only.
       const mirror = readCart();
       const existingIndex = mirror.findIndex((item) => item.id === product.id);
       const nextCart = [...mirror];
@@ -384,7 +344,6 @@ function CatalogPage({ isGuest = false }) {
           storeName: product.store_name,
           imageUrl: product.imageUrl,
           quantity: 1,
-          // FIX: carry the listing's real size instead of hardcoding "M"
           selectedSize: product.size || "M",
           selectedColor: product.color || "Default",
           selected: true,
@@ -395,7 +354,6 @@ function CatalogPage({ isGuest = false }) {
       window.dispatchEvent(new Event("fitfusion-cart-updated"));
     } catch (error) {
       console.error("Failed to save cart item:", error);
-      // ✅ FIX: Show the real server error reason instead of generic message.
       const reason = error?.fieldMessages?.()?.[0] || error?.message || "";
       setCartError(
         reason
@@ -403,7 +361,11 @@ function CatalogPage({ isGuest = false }) {
           : "We couldn't add this item to your cart. Please try again."
       );
     } finally {
-      setAddingToCart(false);
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
     }
   }
 
@@ -430,14 +392,13 @@ function CatalogPage({ isGuest = false }) {
       )}
 
       <div className="catalog-main-content">
-        {/* === picker banner (edit mode only; styled via .catalog-edit-banner) == */}
         {editMode && editOutfit && (
           <div className="catalog-edit-banner" role="status">
             <div className="catalog-edit-banner-text">
               <strong>Picking garments for “{editOutfit.name}”</strong>
               <span>
                 <span className="catalog-edit-count">{pickedIds.length}</span>
-                selected · press Back to Outfit to apply, then Save Changes in
+                {" "}selected · press Back to Outfit to apply, then Save Changes in
                 the editor.
               </span>
             </div>
@@ -540,6 +501,8 @@ function CatalogPage({ isGuest = false }) {
                   ? "added"
                   : "add"
                 : "view";
+              // Per-item loading: only this card shows "Adding...".
+              const isAdding = addingIds.has(String(product.id));
 
               return (
                 <article
@@ -565,8 +528,6 @@ function CatalogPage({ isGuest = false }) {
                         : `View ${product.name}`
                     }
                   >
-                    {/* Alpha-cropped, centered garment preview with a clean
-                        placeholder fallback (no DOM sibling hacks). */}
                     <CatalogPreview
                       src={product.imageUrl}
                       alt={product.name}
@@ -593,7 +554,6 @@ function CatalogPage({ isGuest = false }) {
                     )}
 
                     {editMode ? (
-                      // === picker footer: compact Add/Added control ==========
                       <div className="catalog-product-footer">
                         <div className="catalog-price-group">
                           <strong className="catalog-price">
@@ -636,11 +596,12 @@ function CatalogPage({ isGuest = false }) {
                         type="button"
                         className="catalog-cart-action"
                         onClick={() => addToCart(product)}
-                        disabled={addingToCart}
+                        disabled={isAdding}
+                        aria-busy={isAdding}
                       >
                         {guestMode
                           ? "Register to Add to Cart"
-                          : addingToCart
+                          : isAdding
                             ? "Adding..."
                             : "Add to Cart"}
                       </button>

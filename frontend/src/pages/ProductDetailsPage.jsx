@@ -145,6 +145,9 @@ function ProductDetailsPage({ isGuest = false }) {
         if (isMounted) {
           setProduct({
             ...data,
+            // CHANGED: keep the live seller ObjectId so "View Seller Store"
+            // can open the real store page (CatalogItemSerializer.seller).
+            sellerId: data.seller || data.seller_id || "",
             frontImageUrl: mediaUrl(data.front_image),
             rearImageUrl: mediaUrl(data.rear_image),
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
@@ -204,8 +207,23 @@ function ProductDetailsPage({ isGuest = false }) {
     };
   }, []);
 
+  // CHANGED (was a console.log no-op): open the LIVE seller store.
+  // Registered shoppers navigate to /shopper/sellers/<sellerObjectId>; when the
+  // ObjectId is unavailable we fall back to the store name in the param plus a
+  // storeName hand-off, which SellerStorePage resolves against live listings.
+  // Guests get the same registration gate the catalog uses for store views.
   function handleSellerNavigation() {
-    console.log("Viewing store for:", product?.store_name);
+    if (!product) return;
+    if (guestMode) {
+      setRestrictedFeature("view the seller's complete store");
+      setShowRegistrationModal(true);
+      return;
+    }
+    const target = product.sellerId || product.sellerName || "";
+    if (!target) return;
+    navigate(`/shopper/sellers/${encodeURIComponent(target)}`, {
+      state: { storeName: product.sellerName },
+    });
   }
 
   async function startUatSession() {

@@ -107,8 +107,16 @@
   color: #fffdf9;
 }
 
+/* CENTERED TOAST */
+
 .seller-item-success {
-  margin-bottom: 22px;
+  position: fixed;
+  z-index: 4000;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
   padding: 16px 20px;
   background: #f8f0d4;
   border: 1px solid #b57e20;
@@ -116,6 +124,20 @@
   color: #62430f;
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(23, 19, 15, 0.28);
+  animation: ff-toast-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+@keyframes ff-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .seller-item-introduction {
@@ -237,8 +259,6 @@
   gap: 13px;
 }
 
-/* FIX: the card no longer forces a tall rectangle. Its height now hugs
-   label + square stage + filename, so no dead space remains. */
 .seller-item-asset {
   display: flex;
   min-width: 0;
@@ -257,9 +277,6 @@
   font-weight: 800;
 }
 
-/* FIX: SQUARE stage (aspect-ratio 1 / 1) instead of the stretched rectangle.
-   The img inside is centered by the inline flex rules, and object-fit:
-   contain keeps the (alpha-cropped) garment undistorted in the middle. */
 .seller-item-asset-stage {
   flex: 0 0 auto;
   width: 100%;
@@ -616,7 +633,6 @@
   font-size: 10px;
 }
 
-/* NEW: Three-value size chip in Shopper Preview */
 .shopper-preview-size-chip {
   display: inline-block;
   padding: 8px 14px;
@@ -633,7 +649,6 @@
   min-height: auto;
 }
 
-/* NEW: SRS §1.2 compliance disclaimer */
 .shopper-preview-size-disclaimer {
   display: block;
   width: 100%;
@@ -650,16 +665,13 @@
   gap: 11px;
 }
 
-/* ✅ FIX: Replaced hard-coded gold background with dynamic class.
-   Added an inset shadow so light colors (like white) remain visible 
-   against the white card background. */
 .shopper-preview-color-swatch {
   width: 32px;
   height: 32px;
   border: 2px solid #fffdf9;
   border-radius: 50%;
   box-shadow: 0 0 0 1px #b57e20, inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-  background-color: #c89a43; /* Fallback only if inline style fails */
+  background-color: #c89a43;
 }
 
 .shopper-preview-color p {
@@ -901,7 +913,6 @@
   box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
-/* NEW: Edit modal size hint text */
 .seller-item-edit-hint {
   display: block;
   font-size: 9px;
@@ -1048,5 +1059,11 @@
 
   .seller-item-modal-actions button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seller-item-success {
+    animation: none;
   }
 }

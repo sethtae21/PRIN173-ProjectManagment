@@ -295,20 +295,29 @@
   cursor: not-allowed;
 }
 
-/* SUCCESS NOTICE */
+/* SUCCESS NOTICE — CENTERED TOAST */
 
 .seller-profile-notice {
+  position: fixed;
+  z-index: 4000;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 15px;
-  margin-bottom: 22px;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
   padding: 14px 18px;
   background: #fff6dc;
   border: 1px solid #d7af4b;
   border-radius: 9px;
   color: #775015;
   font-size: 12px;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(23, 19, 15, 0.28);
+  animation: ff-toast-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
 }
 
 .seller-profile-notice button {
@@ -317,6 +326,17 @@
   color: #775015;
   font-size: 21px;
   cursor: pointer;
+}
+
+@keyframes ff-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* MODAL OVERLAY */
@@ -912,5 +932,9 @@
   .seller-profile-logout-button,
   .seller-profile-deactivate-button {
     transition: none;
+  }
+
+  .seller-profile-notice {
+    animation: none;
   }
 }

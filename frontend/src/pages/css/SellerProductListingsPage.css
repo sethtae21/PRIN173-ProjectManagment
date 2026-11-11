@@ -95,15 +95,24 @@
   transform: translateY(-1px);
 }
 
-/* Feedback messages */
+/* Feedback messages — CENTERED TOASTS */
 
 .spl-success,
 .spl-error {
-  margin-bottom: 20px;
+  position: fixed;
+  z-index: 4000;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
   padding: 15px 20px;
   border-radius: 10px;
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(23, 19, 15, 0.28);
+  animation: ff-toast-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
 }
 
 .spl-success {
@@ -116,6 +125,17 @@
   background: #fff0ed;
   border: 1px solid #c58b83;
   color: #8b3b31;
+}
+
+@keyframes ff-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* Summary */
@@ -298,10 +318,6 @@
   font-weight: 800;
 }
 
-/* FIX: the real rembg transparent PNG inside the gold tile.
-   object-fit: contain + small padding keeps the whole cutout visible
-   (no cropping) on top of the gradient; border-radius: inherit keeps the
-   image inside the rounded corners of the tile. */
 .spl-product-image img {
   display: block;
   width: 100%;
@@ -343,8 +359,6 @@
   font-weight: 800;
   text-transform: uppercase;
 }
-
-/* Approved replaces the old Active status */
 
 .spl-status-approved {
   background: #17130f;
@@ -637,5 +651,12 @@
 
   .spl-modal-actions button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spl-success,
+  .spl-error {
+    animation: none;
   }
 }

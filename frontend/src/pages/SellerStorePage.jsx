@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useOutletContext, useLocation } from "react-router-dom";
 import { API_URL, cartAPI, catalogAPI } from "../services/api";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/SellerStorePage.css";
 
 /* ---------------------------------------------------------------------------
@@ -18,6 +19,20 @@ import "./css/SellerStorePage.css";
 --------------------------------------------------------------------------- */
 
 const CATEGORIES = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Footwear"];
+
+/* ==========================================
+   FIX (grid no longer looks weird):
+   The previous "semi-box" gave pants/dresses a TALLER tile than tops, so
+   every row ended at a different height and left big white voids (ragged,
+   misaligned grid). Now EVERY card uses ONE uniform tile box, so all image
+   areas are the same height and the rows line up cleanly like a normal
+   catalog. The garment is drawn with object-fit: contain, so pants and
+   dresses are STILL fully visible end-to-end (they just get a small, even
+   side margin inside the frame instead of being cropped). Tops/outerwear are
+   unchanged.
+========================================== */
+const CARD_BOX_ASPECT = 0.8; // one uniform tile width/height for every card
+const CARD_TILE_PADDING = "8px"; // even breathing margin; never crops the cloth
 
 function mediaUrl(path) {
   if (!path) return null;
@@ -76,6 +91,55 @@ function storeInitials(name) {
   return initials || "FF";
 }
 
+/* ==========================================
+   Card image: alpha-cropped garment (same pipeline as catalog / cart) drawn
+   inside a UNIFORM tile box. object-fit: contain guarantees the whole garment
+   (waistband to hem, sleeve to sleeve) is visible with an even margin, while
+   the identical box across all cards keeps the grid rows aligned. Category
+   chip on load failure / missing image.
+========================================== */
+function StoreCardImage({ src, alt, category }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) {
+    return <span className="seller-store-card-chip">{category}</span>;
+  }
+
+  return (
+    <span
+      className="seller-store-card-tile"
+      style={{
+        display: "grid",
+        placeItems: "center",
+        width: "100%",
+        aspectRatio: String(CARD_BOX_ASPECT), // SAME for every card -> aligned rows
+        background:
+          "radial-gradient(circle at center, rgba(215,175,75,0.22), transparent 48%), linear-gradient(145deg, #f8f5ef, #eadfc9)",
+        overflow: "hidden",
+      }}
+    >
+      <img
+        src={cropped || src}
+        alt={alt}
+        onError={() => setFailed(true)}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: "contain", // full garment visible, never cropped / stretched
+          padding: CARD_TILE_PADDING,
+          boxSizing: "border-box",
+        }}
+      />
+    </span>
+  );
+}
+
 function SellerStorePage({ isGuest = false }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,6 +156,9 @@ function SellerStorePage({ isGuest = false }) {
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [cartNotice, setCartNotice] = useState("");
+
+  /* Per-item add-to-cart loading: only the clicked button shows "Adding...". */
+  const [addingIds, setAddingIds] = useState(() => new Set());
 
   /* Store-name hand-off (product-page breadcrumb or ?store= query). Used ONLY
      when the route param cannot be matched to a live seller ObjectId. */
@@ -133,13 +200,23 @@ function SellerStorePage({ isGuest = false }) {
     };
   }, []);
 
-  /* This store's live listings: match by seller ObjectId first, then by the
-     handed-off store name (covers legacy links that only carried the name). */
+  /* This store's live listings. Resolution order:
+     1) seller ObjectId in the route param (normal case),
+     2) the param itself used as a store NAME (legacy / name-only links),
+     3) the handed-off store name from router state or ?store=.
+     Only when none resolve do we show the (legitimate) empty-store state. */
   const storeProducts = useMemo(() => {
+    const param = String(sellerId || "");
     const byId = catalogItems.filter(
-      (item) => item.sellerId && item.sellerId === String(sellerId)
+      (item) => item.sellerId && item.sellerId === param
     );
     if (byId.length) return byId;
+
+    const byParamName = catalogItems.filter(
+      (item) => item.sellerName.toLowerCase() === param.toLowerCase()
+    );
+    if (byParamName.length) return byParamName;
+
     if (fallbackStoreName) {
       const byName = catalogItems.filter(
         (item) =>
@@ -147,7 +224,7 @@ function SellerStorePage({ isGuest = false }) {
       );
       if (byName.length) return byName;
     }
-    return byId;
+    return [];
   }, [catalogItems, sellerId, fallbackStoreName]);
 
   /* Live-derived store identity + stats (no mock profile anywhere) */
@@ -195,6 +272,14 @@ function SellerStorePage({ isGuest = false }) {
       setCartNotice("Please log in to add items to your cart.");
       return;
     }
+    const id = String(product.id);
+    if (addingIds.has(id)) return;
+
+    setAddingIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
     try {
       // Real MongoDB ObjectId string -> POST /cart/add_item/
       await cartAPI.addItem(product.id, 1);
@@ -202,6 +287,12 @@ function SellerStorePage({ isGuest = false }) {
     } catch (err) {
       console.error("Seller store: add-to-cart failed:", err);
       setCartNotice("Could not add this item to your cart.");
+    } finally {
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
@@ -313,53 +404,63 @@ function SellerStorePage({ isGuest = false }) {
           </div>
         ) : (
           <div className="seller-store-grid">
-            {filteredProducts.map((product) => (
-              <article key={product.id} className="seller-store-card">
-                <button
-                  type="button"
-                  className="seller-store-card-image"
-                  onClick={() => handleViewDetails(product)}
-                  aria-label={`View ${product.name}`}
+            {filteredProducts.map((product) => {
+              const isAdding = addingIds.has(product.id);
+              return (
+                <article
+                  key={product.id}
+                  className="seller-store-card"
+                  /* Uniform tiles already align the image row; cards hug their
+                     own (now near-equal) content so there are no white voids. */
+                  style={{ alignSelf: "start" }}
                 >
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} />
-                  ) : (
-                    <span className="seller-store-card-chip">
+                  <button
+                    type="button"
+                    className="seller-store-card-image"
+                    onClick={() => handleViewDetails(product)}
+                    aria-label={`View ${product.name}`}
+                    style={{ display: "block", height: "auto", aspectRatio: "auto", padding: 0 }}
+                  >
+                    <StoreCardImage
+                      src={product.image}
+                      alt={product.name}
+                      category={product.category}
+                    />
+                  </button>
+                  <div className="seller-store-card-body">
+                    <span className="seller-store-card-category">
                       {product.category}
                     </span>
-                  )}
-                </button>
-                <div className="seller-store-card-body">
-                  <span className="seller-store-card-category">
-                    {product.category}
-                  </span>
-                  <h3>{product.name}</h3>
-                  <p className="seller-store-card-meta">
-                    {product.sizes.length > 0 && <span>Size {product.sizes.join(" / ")}</span>}
-                    {product.colors.length > 0 && <span>{product.colors.join(" / ")}</span>}
-                  </p>
-                  <p className="seller-store-card-price">
-                    {formatPeso(product.price)}
-                  </p>
-                  <div className="seller-store-card-actions">
-                    <button
-                      type="button"
-                      className="seller-store-try-on"
-                      onClick={() => handleViewDetails(product)}
-                    >
-                      View Details
-                    </button>
-                    <button
-                      type="button"
-                      className="seller-store-add-cart"
-                      onClick={() => handleAddToCart(product)}
-                    >
-                      Add to Cart
-                    </button>
+                    <h3>{product.name}</h3>
+                    <p className="seller-store-card-meta">
+                      {product.sizes.length > 0 && <span>Size {product.sizes.join(" / ")}</span>}
+                      {product.colors.length > 0 && <span>{product.colors.join(" / ")}</span>}
+                    </p>
+                    <p className="seller-store-card-price">
+                      {formatPeso(product.price)}
+                    </p>
+                    <div className="seller-store-card-actions">
+                      <button
+                        type="button"
+                        className="seller-store-try-on"
+                        onClick={() => handleViewDetails(product)}
+                      >
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        className="seller-store-add-cart"
+                        onClick={() => handleAddToCart(product)}
+                        disabled={isAdding}
+                        aria-busy={isAdding}
+                      >
+                        {isAdding ? "Adding..." : "Add to Cart"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

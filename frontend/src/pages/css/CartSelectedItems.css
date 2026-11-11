@@ -594,21 +594,40 @@
   line-height: 1.7;
 }
 
+/* CENTERED TOAST: top-center of the viewport instead of bottom-right. */
 .select-items-page .select-items-notification {
   position: fixed;
-  z-index: 100;
-  right: 16px;
-  bottom: 20px;
-  max-width: min(390px, calc(100vw - 32px));
+  z-index: 4000;
+  top: 24px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+  margin: 0;
   padding: 16px 20px;
   color: var(--select-white);
   background: var(--select-black);
   border: 1px solid var(--select-gold);
   border-radius: 10px;
-  box-shadow: 0 12px 35px rgba(23, 19, 15, 0.25);
+  box-shadow: 0 14px 40px rgba(23, 19, 15, 0.28);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.6;
+  text-align: center;
+  animation: ff-toast-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+@keyframes ff-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ==========================================
@@ -674,23 +693,14 @@
   .select-items-page .equipped-product-card {
     transition: none;
   }
+
+  .select-items-page .select-items-notification {
+    animation: none;
+  }
 }
 
 /* ============================================================
    GARMENT PHOTO + READ-ONLY SIZE (Defect B / UI-consistency pass)
-   APPENDED BLOCK ONLY -- no rule above is modified. The card now
-   renders the real, alpha-cropped, transparent garment through the
-   same useAlphaCrop + mediaUrl pipeline as CatalogPreview (the CSS
-   glyph .equipped-product-image / .product-shape above stays as the
-   no-image / load-failure fallback), and shows size as read-only
-   text matching the studio equipped card (the cart stores no size
-   column -- views.py -- so a dropdown could only misrepresent the
-   purchase). Placed after the media queries on purpose: the
-   responsive rules target the base .equipped-product-image, which
-   the photo element also carries, so the frame still shrinks
-   (92 -> 78 -> full) at each breakpoint and only the background/crop
-   differ via the higher-specificity --photo modifier. Tokens reuse
-   the gold/cream palette already declared in :root.
    ============================================================ */
 
 .equipped-product-image--photo {

@@ -27,7 +27,7 @@
 }
 
 /* ==========================================
-   HEADER - MATCHES ORDER HISTORY
+   HEADER
 ========================================== */
 
 .product-details-actions {
@@ -135,15 +135,13 @@
 }
 
 /* ==========================================
-   GARMENT PREVIEW - REAL IMAGES
+   GARMENT PREVIEW
 ========================================== */
 
 .product-details-gallery {
   min-width: 0;
 }
 
-/* FIX: square display box — the old min-height: 530px made it a tall
-   rectangle; aspect-ratio 1/1 keeps it a perfect square at any width. */
 .product-details-image-container {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -178,7 +176,6 @@
   transform: scale(1.02);
 }
 
-/* Placeholder when image fails to load */
 .product-details-placeholder {
   display: flex;
   align-items: center;
@@ -200,7 +197,7 @@
 }
 
 /* ==========================================
-   FRONT / REAR BUTTONS (Side view removed)
+   FRONT / REAR BUTTONS
 ========================================== */
 
 .product-view-buttons {
@@ -270,7 +267,7 @@
 }
 
 /* ==========================================
-   PRICE (Ratings removed - not in backend yet)
+   PRICE
 ========================================== */
 
 .product-price-row {
@@ -299,7 +296,7 @@
 }
 
 /* ==========================================
-   SIZE INFO CARD (Replaces fake Fit Match Score)
+   SIZE INFO CARD
 ========================================== */
 
 .product-match-card {
@@ -509,29 +506,61 @@
 }
 
 /* ==========================================
-   SUCCESS MESSAGE
+   NOTIFICATIONS — CENTERED TOASTS
+   (!important overrides the inline styles on .product-error-message)
 ========================================== */
 
+.product-success-message,
+.product-error-message {
+  position: fixed !important;
+  z-index: 4000 !important;
+  top: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(440px, calc(100vw - 32px)) !important;
+  margin: 0 !important;
+  padding: 14px 44px 14px 18px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  text-align: center !important;
+  box-shadow: 0 14px 40px rgba(23, 19, 15, 0.28) !important;
+  animation: ff-toast-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
 .product-success-message {
-  position: relative;
-  margin-top: 14px;
-  padding: 12px 40px 12px 15px;
-  background: #edf4e8;
-  border: 1px solid #9bad8a;
-  border-radius: 8px;
-  color: #425538;
-  font-size: 12px;
+  background: #edf4e8 !important;
+  border: 1px solid #9bad8a !important;
+  color: #425538 !important;
+}
+
+.product-error-message {
+  background: #fff0ed !important;
+  border: 1px solid #d78d7e !important;
+  color: #842c1f !important;
 }
 
 .product-success-message button {
   position: absolute;
   top: 50%;
-  right: 10px;
+  right: 12px;
   transform: translateY(-50%);
   background: transparent;
   border: 0;
+  color: inherit;
   font-size: 18px;
   cursor: pointer;
+}
+
+@keyframes ff-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ==========================================
@@ -632,8 +661,7 @@
 }
 
 /* ==========================================
-   PRODUCT RATINGS (Hidden - not in backend yet)
-   Keeping styles in case ratings are added later
+   PRODUCT RATINGS
 ========================================== */
 
 .product-ratings-header {
@@ -845,7 +873,7 @@
 }
 
 /* ==========================================
-   RESPONSIVE DESIGN
+   RESPONSIVE
 ========================================== */
 
 @media (max-width: 900px) {
@@ -878,9 +906,6 @@
     padding: 18px;
   }
 
-  /* FIX: removed the old min-height: 350px overrides so the
-     image container keeps its square aspect-ratio on mobile. */
-
   .product-main-actions,
   .guest-product-modal-actions {
     grid-template-columns: 1fr;
@@ -912,5 +937,12 @@
   .product-information-card,
   .product-ratings-section {
     padding: 22px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-success-message,
+  .product-error-message {
+    animation: none;
   }
 }
