@@ -15,6 +15,10 @@
  * - Female cup size
  * - Clothing overlays
  *
+ * Footwear support PERMANENTLY REMOVED: the catalog no longer accepts
+ * footwear items, so the footwear region, anchor, draw branch and fallback
+ * illustration were deleted. All other garment rendering is unchanged.
+ *
  * IMPORTANT:
  * The whole avatar uses ONE continuous mesh.
  * Arms are never separated from shoulders.
@@ -38,8 +42,8 @@
  *      horizontal long sleeves (wing length >= 0.5 x torso width AND
  *      aspect >= 2.2, e.g. the sweater) still drape shoulder->wrist.
  *   5. alpha-clip to the dilated body silhouette (cloth hugs arms/legs) for
- *      bottoms / footwear and the long-sleeve drape; dresses, layered tops,
- *      and OUTERWEAR skip it (HOOD-UNION-CROP v2: jackets must show full sleeves).
+ *      bottoms and the long-sleeve drape; dresses, layered tops, and
+ *      OUTERWEAR skip it (HOOD-UNION-CROP v2: jackets must show full sleeves).
  *   6. shared lattice warp (garment deforms with the body)
  * catalogIllustration() remains the fallback while loading / when missing.
  *
@@ -60,8 +64,8 @@
  * lower garments use the same mass-centroid horizontal centring the
  * long-sleeve top path already guarantees (alphaCentroidX), and bottoms /
  * skirt are waistline-anchored (top of region) exactly as dresses are
- * shoulder-anchored. Outerwear, footwear, plain tees and long-sleeve knits
- * are untouched: their crops are symmetric, so centroid == 0.5 and the
+ * shoulder-anchored. Outerwear, plain tees and long-sleeve knits are
+ * untouched: their crops are symmetric, so centroid == 0.5 and the
  * rendered pixels are byte-for-byte identical to before.
  */
 
@@ -643,7 +647,6 @@ const GARMENT_ANCHOR_T = {
   dresses: 0.245,
   bottoms: 0.52,
   skirt: 0.52,
-  footwear: 0.95,
 };
 
 export function garmentAnchorT(product) {
@@ -1210,7 +1213,6 @@ const GARMENT_REGIONS = {
     bottoms: { x0: -0.35, x1: 0.35, y0: 0.44, y1: 0.92 },
     skirt: { x0: -0.40, x1: 0.40, y0: 0.44, y1: 0.74 },
     dresses: { x0: -0.45, x1: 0.45, y0: 0.140, y1: 0.90 },
-    footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
   },
   female: {
     tops: { x0: -0.50, x1: 0.50, y0: 0.125, y1: 0.47 },
@@ -1219,7 +1221,6 @@ const GARMENT_REGIONS = {
     bottoms: { x0: -0.35, x1: 0.35, y0: 0.43, y1: 0.91 },
     skirt: { x0: -0.40, x1: 0.40, y0: 0.43, y1: 0.72 },
     dresses: { x0: -0.45, x1: 0.45, y0: 0.125, y1: 0.90 },
-    footwear: { x0: -0.28, x1: 0.28, y0: 0.90, y1: 1.0 },
   },
 };
 
@@ -1582,13 +1583,6 @@ function regionKeyForProduct(product) {
     name.includes("dress") && !name.includes("dress shirt");
 
   if (
-    category.includes("footwear") ||
-    category.includes("shoe")
-  ) {
-    return "footwear";
-  }
-
-  if (
     category.includes("dress") ||
     rawCategory.includes("dress") ||
     rawCategory.includes("gown") ||
@@ -1858,24 +1852,7 @@ export function garmentImageLayer(
     regionKey === "outerwear";
 
   try {
-    if (regionKey === "footwear") {
-      const aspect =
-        cropped.width / Math.max(1, cropped.height);
-
-      if (aspect >= 1.1) {
-        const rx = X(region.x0);
-        const rw = X(region.x1) - rx;
-        ctx.drawImage(cropped, rx, ry, rw, rh);
-      } else {
-        const leftX = X(-0.26);
-        const leftW = X(-0.03) - leftX;
-        const rightX = X(0.03);
-        const rightW = X(0.26) - rightX;
-
-        ctx.drawImage(cropped, leftX, ry, leftW, rh);
-        ctx.drawImage(cropped, rightX, ry, rightW, rh);
-      }
-    } else if (regionKey === "dresses") {
+    if (regionKey === "dresses") {
       const rw = X(region.x1) - X(region.x0);
 
       if (rw <= 0) return null;
@@ -2061,7 +2038,7 @@ export function garmentImageLayer(
     if (rw > 0) ctx.drawImage(cropped, rx, ry, rw, rh);
   }
 
-  // Silhouette clip (cloth hugs arms / legs / feet).
+  // Silhouette clip (cloth hugs arms / legs).
   // Skipped for dresses, layered tops, and OUTERWEAR (v2).
   if (bodyMaskSource && !skipClip) {
     const mask = newCanvas(width, height);
@@ -2252,23 +2229,6 @@ export function catalogIllustration(
       [0.35, 0.31],
       [0.32, 0.24],
       [0.20, 0.21],
-    ]);
-  } else if (
-    category.includes("footwear") ||
-    category.includes("shoe")
-  ) {
-    poly([
-      [-0.20, 0.955],
-      [-0.04, 0.955],
-      [-0.03, 0.995],
-      [-0.24, 0.995],
-    ]);
-
-    poly([
-      [0.04, 0.955],
-      [0.20, 0.955],
-      [0.24, 0.995],
-      [0.03, 0.995],
     ]);
   } else {
     return null;

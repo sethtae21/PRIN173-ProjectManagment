@@ -28,7 +28,8 @@ from drf_spectacular.types import OpenApiTypes
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
-# Size-label format rule (S/M/L only; footwear regional prefixes; cm rejected).
+# Size-label format rule (S, M, L, XL, 2XL, 3XL, 4XL only; cm rejected).
+# Footwear was permanently removed from the catalog.
 from recommendations.knowledge_table import validate_size_label
 # FR-4.7 color alignment: single source of truth shared with the legacy
 # catalog/validators.py and the upload/edit UIs (the mismatch message now
@@ -192,12 +193,10 @@ SELLER_IMAGE_GUIDELINES = (
     'the front image color automatically; you do not need to remove the background yourself.\n'
     'The Rear view must show the garment worn on a mannequin or hanging, photographed '
     'vertically (portrait orientation). Flat-lay photos rotated sideways are rejected automatically.\n'
-    'SIZE RULE: clothing sizes are S, M, or L ONLY - XS/XL/XXL and cm measurements '
-    '(e.g., "96 cm") are rejected automatically. The product page displays the cm '
-    'range bracket for standard sizes on its own. Footwear uses regional shoe sizes '
-    'with a region prefix (e.g., "US 9", "EU 40", "UK 7"); the product page shows the '
-    'EU, US and UK equivalents plus the EU-based cm foot-length bracket.\n'
-    'Supported categories: tops, bottoms, dresses, outerwear, footwear.\n'
+    'SIZE RULE: clothing sizes are S, M, L, XL, 2XL, 3XL, or 4XL ONLY - cm measurements '
+    '(e.g., "96 cm") and non-standard labels (e.g., XS, XXL) are rejected automatically. '
+    'The product page displays the cm range bracket for standard sizes on its own.\n'
+    'Supported categories: tops, bottoms, dresses, outerwear.\n'
 )
 
 
@@ -209,10 +208,8 @@ def build_catalog_template_csv():
             '📝 HOW TO UPLOAD: Replace the example row with your product details and matching Front and Rear image filenames. '
             f'Use style_tags from: {", ".join(STYLE_TAG_OPTIONS)}. '
             'Separate multiple tags with commas. '
-            'SIZE RULE: clothing sizes are S, M, or L ONLY - cm measurements are rejected; '
-            'the product page shows the cm range bracket automatically. Footwear: regional '
-            'sizes with a region prefix (e.g., "US 9", "EU 40", "UK 7"); all three region '
-            'equivalents are displayed on the product page.'
+            'SIZE RULE: clothing sizes are S, M, L, XL, 2XL, 3XL, or 4XL ONLY - cm measurements are rejected; '
+            'the product page shows the cm range bracket automatically.'
         ),
         *([''] * (len(CATALOG_CSV_COLUMNS) - 1)),
     ])
@@ -253,7 +250,7 @@ class CatalogValidator:
                     errors.append(f"Row {row_number}: Price must be positive")
             except (InvalidOperation, ValueError):
                 errors.append(f"Row {row_number}: Invalid price format")
-        valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear', 'footwear']
+        valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear']
         category = str(row.get('category', '')).strip().lower()
         if category == 'dresses/one-piece':
             category = 'dresses'
@@ -308,9 +305,9 @@ class CatalogValidator:
             return False, f"Invalid or corrupted image: {str(e)}"
 
     def check_garment_orientation(self, image_bytes, view_label, category=''):
+        # `category` is kept for call-site compatibility only; the footwear
+        # bypass was removed when footwear was permanently removed.
         if view_label not in self.ORIENTATION_CHECKED_VIEWS:
-            return True, None
-        if str(category).strip().lower() == 'footwear':
             return True, None
         try:
             image_bytes.seek(0)
@@ -738,7 +735,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 return stem_map[stem], None
             return None, f"{view_label}: '{csv_name}' not found among uploaded images"
 
-        category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear', 'footwear': 'footwear'}
+        category_map = {'tops': 'tops', 'bottoms': 'bottoms', 'dresses/one-piece': 'dresses', 'dresses': 'dresses', 'outerwear': 'outerwear'}
         for row_number, row in enumerate(rows, start=2):
             try:
                 if 'item_name' in row and 'name' not in row:

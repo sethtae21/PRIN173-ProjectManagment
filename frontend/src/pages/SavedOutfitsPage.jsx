@@ -159,7 +159,8 @@ function categorySlot(product) {
   const category = String(product.category || "").toLowerCase();
   if (/dress|gown|jumpsuit/.test(category)) return "dress";
   if (/outer|jacket|coat|blazer|cardigan/.test(category)) return "outerwear";
-  if (/shoe|footwear|sneaker|boot|sandal/.test(category)) return "shoes";
+  // Footwear permanently removed: legacy shoe items get no slot and are
+  // simply not drawn on the avatar (they still appear in the text list).
   if (/bottom|pants|trouser|jean|skirt|short/.test(category)) return "bottom";
   if (/top|shirt|blouse|sweater|hoodie|polo/.test(category)) return "top";
   return null;

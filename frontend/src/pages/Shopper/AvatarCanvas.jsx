@@ -137,14 +137,12 @@ function normalizeItem(item) {
 
   const category = String(item.category || "").toLowerCase();
 
+  // Footwear permanently removed from the catalog: no shoe mapping.
   const categories = {
     top: "Tops",
     tops: "Tops",
     bottom: "Bottoms",
     bottoms: "Bottoms",
-    shoes: "Footwear",
-    shoe: "Footwear",
-    footwear: "Footwear",
     dress: "Dresses",
     dresses: "Dresses",
     outerwear: "Outerwear",
@@ -245,17 +243,16 @@ export default function AvatarCanvas({
   }, [source, avatar?.skinTone, avatar?.undertone]);
 
   const garmentItems = useMemo(() => {
+    // Footwear permanently removed: no shoes slot is rendered.
     const items = equippedItems.dress
       ? [
           equippedItems.dress,
           equippedItems.outerwear,
-          equippedItems.shoes,
         ]
       : [
           equippedItems.bottom,
           equippedItems.top,
           equippedItems.outerwear,
-          equippedItems.shoes,
         ];
 
     return items

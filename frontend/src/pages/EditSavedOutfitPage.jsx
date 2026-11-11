@@ -184,7 +184,8 @@ function getSlot(item) {
 
   if (/dress|gown|jumpsuit/.test(text)) return "dress";
   if (/outer|jacket|coat|blazer|cardigan/.test(text)) return "outerwear";
-  if (/shoe|footwear|sneaker|boot|sandal/.test(text)) return "shoes";
+  // Footwear permanently removed: legacy shoe items get no slot and are
+  // simply not drawn on the avatar (they still appear in the garment list).
   if (/bottom|pant|trouser|jean|skirt|short/.test(text)) return "bottom";
   if (/top|shirt|blouse|sweater|hoodie|polo/.test(text)) return "top";
 

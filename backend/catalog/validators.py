@@ -53,8 +53,8 @@ class CatalogValidator:
             except ValueError:
                 self.errors.append(f"Row {row_number}: Invalid price format")
 
-        # Validate category
-        valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear', 'footwear']
+        # Validate category (footwear permanently removed)
+        valid_categories = ['tops', 'bottoms', 'dresses', 'outerwear']
         if 'category' in row and str(row['category']).lower() not in valid_categories:
             self.errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
 

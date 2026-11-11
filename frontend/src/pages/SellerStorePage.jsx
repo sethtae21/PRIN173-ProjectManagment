@@ -18,7 +18,8 @@ import "./css/SellerStorePage.css";
      unreachable API (error + retry), never invented product data.
 --------------------------------------------------------------------------- */
 
-const CATEGORIES = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Footwear"];
+// Footwear permanently removed from the catalog.
+const CATEGORIES = ["All", "Tops", "Bottoms", "Dresses", "Outerwear"];
 
 /* ==========================================
    FIX (grid no longer looks weird):
@@ -467,5 +468,4 @@ function SellerStorePage({ isGuest = false }) {
     </main>
   );
 }
-
 export default SellerStorePage;

@@ -203,12 +203,12 @@ function SellerItemDetailsPage() {
     return views[selectedView];
   }, [product, selectedView]);
 
-  // SIZE POLICY: clothing renders "M (96-102 cm)"; footwear renders the triple
-  // regional string from size_regions, e.g. "EU 40 · US 9 · UK 7 (24.5-25.0 cm)"
-  // (cm bracket is always EU-based, computed backend-side).
+  // SIZE POLICY: clothing renders "M (90-94 cm)" — the cm bracket is computed
+  // backend-side (knowledge_table.SIZE_RANGE_TABLE). Footwear was permanently
+  // removed, so there is no regional display string anymore.
   const sizeDisplay = useMemo(() => {
     if (!product) return null;
-    const label = product.size_regions || product.size || "";
+    const label = product.size || "";
     const cm = product.size_cm;
     if (cm) {
       return `${label} ${cm}`;
@@ -244,6 +244,14 @@ function SellerItemDetailsPage() {
 
   async function handleSaveChanges(event) {
     event.preventDefault();
+
+    // Instant client-side mirror of the backend S..4XL rule.
+    const sizeError = validateSizeLabel(editForm.sizes, editForm.category);
+    if (sizeError) {
+      alert(sizeError);
+      return;
+    }
+
     try {
       const payload = {
         name: editForm.name.trim(),
@@ -436,7 +444,6 @@ function SellerItemDetailsPage() {
                   <option value="bottoms">Bottoms</option>
                   <option value="dresses">Dresses</option>
                   <option value="outerwear">Outerwear</option>
-                  <option value="footwear">Footwear</option>
                 </select>
               </label>
               <label className="seller-item-edit-field">
@@ -445,13 +452,13 @@ function SellerItemDetailsPage() {
                   name="sizes"
                   value={editForm.sizes}
                   onChange={handleEditChange}
-                  placeholder="S, M, or L (or EU 40 / US 9 / UK 7 for footwear)"
+                  placeholder="S, M, L, XL, 2XL, 3XL, or 4XL"
                   required
                 />
                 <small className="seller-item-edit-hint">
-                  Clothing: S, M, or L only. XS/XL/XXL and measured cm entries are rejected automatically.
-                  Footwear: regional codes with a prefix (EU 40, US 9, UK 7). The product page shows the
-                  EU, US and UK equivalents plus the EU-based cm bracket.
+                  Clothing sizes: S, M, L, XL, 2XL, 3XL, or 4XL only. Measured cm entries
+                  (e.g., 96 cm) and other labels are rejected automatically. The product
+                  page shows the cm range bracket for each size.
                 </small>
               </label>
               <EditField label="Color" name="color" value={editForm.color} onChange={handleEditChange} required />

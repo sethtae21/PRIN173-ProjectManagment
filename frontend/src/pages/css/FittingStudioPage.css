@@ -461,12 +461,7 @@
   );
 }
 
-.studio-clothing-thumbnail.shoes span {
-  width: 42px;
-  height: 18px;
-  border-radius: 60% 20% 6px 6px;
-  background: #fffdf9;
-}
+/* Footwear permanently removed: the .shoes thumbnail rule is gone. */
 
 .studio-recommendation-information h3 {
   margin: 0 0 5px;
@@ -795,6 +790,9 @@
 
 /* ==========================================
    CLOTHING LAYERS
+   (Footwear permanently removed: the legacy
+   .equipped-shoe-left / .equipped-shoe-right
+   rules were deleted.)
 ========================================== */
 
 .equipped-top {
@@ -833,27 +831,6 @@
     45% 100%,
     18% 100%
   );
-}
-
-.equipped-shoe-left,
-.equipped-shoe-right {
-  position: absolute;
-  z-index: 7;
-  top: 420px;
-  width: 52px;
-  height: 20px;
-  border: 2px solid #5c554c;
-  border-bottom: 4px solid #b57e20;
-  border-radius: 50% 25% 8px 8px;
-  background: #fffdf9;
-}
-
-.equipped-shoe-left {
-  left: 47px;
-}
-
-.equipped-shoe-right {
-  right: 47px;
 }
 
 /* ==========================================
@@ -1258,8 +1235,7 @@
 
 .studio-save-outfit-input:focus {
   border-color: #8e641f;
-  box-shadow:
-    0 0 0 3px rgba(181, 126, 32, 0.12);
+  box-shadow: 0 0 0 3px rgba(181, 126, 32, 0.12);
 }
 
 .studio-save-outfit-input.invalid {

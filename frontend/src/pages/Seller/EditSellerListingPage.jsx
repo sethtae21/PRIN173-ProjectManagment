@@ -4,13 +4,13 @@ import { catalogAPI, validateSizeLabel } from "../../services/api";
 import "../css/EditSellerListingPage.css";
 
 // FIX: category option values must match the backend choices exactly
-// (lowercase); "Accessories" removed — it is not a valid backend category.
+// (lowercase). "Accessories" removed — not a valid backend category.
+// Footwear permanently removed from the catalog.
 const categories = [
   { value: "tops", label: "Tops" },
   { value: "bottoms", label: "Bottoms" },
   { value: "dresses", label: "Dresses" },
   { value: "outerwear", label: "Outerwear" },
-  { value: "footwear", label: "Footwear" },
 ];
 
 function EditSellerListingPage() {
@@ -165,7 +165,10 @@ function EditSellerListingPage() {
     if (!formData.name.trim()) nextErrors.name = "Product name is required.";
     if (!formData.description.trim()) nextErrors.description = "Product description is required.";
     if (!formData.category) nextErrors.category = "Please select a category.";
-    if (!formData.size) nextErrors.size = "Please enter a size.";
+    // Instant client-side mirror of the backend S..4XL rule (covers the
+    // empty case too: validateSizeLabel returns "Size is required.").
+    const sizeError = validateSizeLabel(formData.size, formData.category);
+    if (sizeError) nextErrors.size = sizeError;
     if (!formData.color.trim()) nextErrors.color = "Product color is required.";
     const numericPrice = Number(formData.price);
     if (!formData.price || Number.isNaN(numericPrice) || numericPrice <= 0) {
@@ -325,7 +328,7 @@ function EditSellerListingPage() {
                 name="size"
                 value={formData.size}
                 onChange={handleInputChange}
-                placeholder="S, M, or L (or EU 40 / US 9 / UK 7 for footwear)"
+                placeholder="S, M, L, XL, 2XL, 3XL, or 4XL"
                 required
               />
               {errors.size && <small className="edit-field-error">{errors.size}</small>}

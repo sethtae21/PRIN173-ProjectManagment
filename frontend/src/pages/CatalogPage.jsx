@@ -4,13 +4,13 @@ import { API_URL, cartAPI, catalogAPI } from "../services/api";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CatalogPage.css";
 
+// Footwear permanently removed from the catalog.
 const categories = [
   "All",
   "Tops",
   "Bottoms",
   "Dresses",
   "Outerwear",
-  "Footwear",
 ];
 
 // CHANGED: Added XL, 2XL, 3XL, 4XL to the size filter options to match

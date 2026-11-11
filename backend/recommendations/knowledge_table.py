@@ -14,15 +14,13 @@ Size-policy revision (integration with female/male avatar fix + size update):
   range: 120.0-218.0 cm. The FR-7.2 contrast rule now uses a deterministic
   midpoint split of that range (below / above 169.0 cm) - no named bands.
 * Body build range added: 86.0-112.0 cm.
-* Clothing sizes extended to S, M, L, XL, 2XL, 3XL, 4XL. The clothing size
-  table is REFERENCE-ONLY (displayed on product details in the
-  "AVAILABLE SIZE" block as e.g. "M (90-94 cm)" + "Standard size chart
-  reference."): pure cm, no inches, no regional equivalents.
-  Never scored, never stored.
-* Footwear regional size table (EU/US/UK) RESTORED for product-details
-  display. Backend cm calculation always uses the EU column; the product
-  page shows all three regional equivalents via the 'regions' key
-  (e.g. "EU 40 · US 9 · UK 7").
+* Clothing sizes: S, M, L, XL, 2XL, 3XL, 4XL. The clothing size table is
+  REFERENCE-ONLY (displayed on product details in the "AVAILABLE SIZE"
+  block as e.g. "M (90-94 cm)" + "Standard size chart reference."):
+  pure cm, no inches, no regional equivalents. Never scored, never stored.
+* Footwear PERMANENTLY REMOVED from the catalog: the regional shoe-size
+  table (EU/US/UK), its validation branches and its display helpers are
+  gone. Regional codes like "US 9" / "EU 40" are now rejected everywhere.
 * Body-proportion TOTAL OUTPUT = recommended size + average cm, where
   average = (height_cm + body_build_cm) / 2.
 """
@@ -85,21 +83,18 @@ def allowed_contrast(height_cm) -> set:
 
 
 # --- FR-7.2 rule 3: proportion-appropriate shading ---------------------------
+# Footwear group removed: the catalog no longer supports footwear items.
 CATEGORY_GROUPS = {
     "top": {"tops", "outerwear"},
     "bottom": {"bottoms"},
     "onepiece": {"dresses"},
-    "footwear": {"footwear"},
 }
 PROPORTION_SHADING = {
-    "top-heavy": {"top": {"dark"}, "bottom": {"light"}, "onepiece": set(),
-                  "footwear": {"light", "medium", "dark"}},
-    "bottom-heavy": {"top": {"light"}, "bottom": {"dark"}, "onepiece": set(),
-                     "footwear": {"light", "medium", "dark"}},
+    "top-heavy": {"top": {"dark"}, "bottom": {"light"}, "onepiece": set()},
+    "bottom-heavy": {"top": {"light"}, "bottom": {"dark"}, "onepiece": set()},
     "balanced": {"top": {"light", "medium", "dark"},
                  "bottom": {"light", "medium", "dark"},
-                 "onepiece": {"light", "medium", "dark"},
-                 "footwear": {"light", "medium", "dark"}},
+                 "onepiece": {"light", "medium", "dark"}},
 }
 
 # --- Size range table (REFERENCE-ONLY, expert-encoded) -----------------------
@@ -122,83 +117,24 @@ SIZE_RANGE_TABLE = {
 SIZE_OPTIONS = ('S', 'M', 'L', 'XL', '2XL', '3XL', '4XL')
 CLOTHING_SIZE_OPTIONS = SIZE_OPTIONS  # legacy alias (same policy for clothing)
 
-# --- Footwear regional size table (RESTORED, display-only) -------------------
-# One row per EU size with its US/UK equivalents and the EU-based foot-length
-# bracket in CM. BACKEND CM CALCULATION ALWAYS USES THE EU COLUMN: a US or UK
-# input is first resolved to its EU row, then the EU cm bracket is used.
-# The product page displays all three regional equivalents.
-# Approximation chart (whole sizes only): EU = US + 31, UK = US - 2.
-FOOTWEAR_SIZE_TABLE = (
-    # (eu, us, uk, foot-length cm)
-    (35, 4, 2, (22.0, 22.5)),
-    (36, 5, 3, (22.5, 23.0)),
-    (37, 6, 4, (23.0, 23.5)),
-    (38, 7, 5, (23.5, 24.0)),
-    (39, 8, 6, (24.0, 24.5)),
-    (40, 9, 7, (24.5, 25.0)),
-    (41, 10, 8, (25.0, 25.5)),
-    (42, 11, 9, (25.5, 26.0)),
-    (43, 12, 10, (26.0, 26.5)),
-    (44, 13, 11, (26.5, 27.0)),
-    (45, 14, 12, (27.0, 27.5)),
-    (46, 15, 13, (27.5, 28.0)),
-)
-
 # --- Size label validation (CSV upload + listing edits) ----------------------
-# Clothing (tops/bottoms/dresses/outerwear): label must be one of S..4XL.
-# Footwear: S..4XL or a prefixed regional code in the supported table
-# (EU 35-46, US 4-15, UK 2-13, whole sizes).
-# Any cm/measured entry is rejected for every category.
-_FOOTWEAR_REGIONAL_RE = re.compile(r'^(?:US|EU|UK)\s?\d{1,3}(?:\.\d+)?$', re.IGNORECASE)
+# Every category (tops/bottoms/dresses/outerwear): label must be one of S..4XL.
+# Any cm/measured entry is rejected. Footwear was permanently removed, so
+# regional shoe codes (US/EU/UK) are no longer accepted for any category.
 _MEASURED_RE = re.compile(
     r'\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)',
     re.IGNORECASE,
 )
 
 
-def _parse_regional(size_text):
-    """Return (prefix, number) for a prefixed regional code, else None."""
-    raw = str(size_text or '').strip()
-    if not _FOOTWEAR_REGIONAL_RE.match(raw):
-        return None
-    prefix = raw[:2].upper()
-    try:
-        return prefix, float(raw[2:].strip())
-    except ValueError:
-        return None
-
-
-def get_footwear_row(size_text):
-    """Find the FOOTWEAR_SIZE_TABLE row matching an EU/US/UK code, else None."""
-    parsed = _parse_regional(size_text)
-    if not parsed:
-        return None
-    prefix, number = parsed
-    index = {'EU': 0, 'US': 1, 'UK': 2}[prefix]
-    for row in FOOTWEAR_SIZE_TABLE:
-        if float(row[index]) == number:
-            return row
-    return None
-
-
-def get_footwear_equivalents(size_text):
-    """Return {'eu','us','uk','cm'} for a regional code, else None.
-    'cm' is ALWAYS the EU-based foot-length bracket."""
-    row = get_footwear_row(size_text)
-    if not row:
-        return None
-    eu, us, uk, cm = row
-    return {'eu': f"EU {eu}", 'us': f"US {us}", 'uk': f"UK {uk}", 'cm': cm}
-
-
 def validate_size_label(size_text, category=''):
     """
     Deterministic size-format rule. Returns (is_valid, error_message_or_None).
 
-    Clothing (tops/bottoms/dresses/outerwear): label must be S..4XL.
-    Footwear: S..4XL or a prefixed regional code in the supported table
-    (EU 35-46, US 4-15, UK 2-13, whole sizes).
-    Any cm/measured entry is rejected for every category.
+    All categories: label must be S, M, L, XL, 2XL, 3XL, or 4XL.
+    Any cm/measured entry is rejected. Regional shoe codes are rejected
+    (footwear was permanently removed from the catalog).
+    The `category` parameter is kept for call-site compatibility only.
     Empty values pass here - presence is enforced by the required-field rule.
     """
     raw = str(size_text or '').strip()
@@ -206,32 +142,11 @@ def validate_size_label(size_text, category=''):
         return True, None
 
     key = raw.upper()
-    cat = str(category or '').strip().lower()
 
     if _MEASURED_RE.search(raw):
-        suffix = (
-            " or a regional shoe size (e.g., US 9, EU 40)."
-            if cat == 'footwear' else "."
-        )
         return False, (
             f"Invalid size '{raw}': measured values with units (e.g., cm) are not accepted. "
-            f"Enter a standard size label ({', '.join(SIZE_OPTIONS)}){suffix}"
-        )
-
-    if cat == 'footwear':
-        if key in SIZE_OPTIONS:
-            return True, None
-        if _FOOTWEAR_REGIONAL_RE.match(key):
-            if get_footwear_row(key) is not None:
-                return True, None
-            return False, (
-                f"Invalid size '{raw}'. Regional shoe sizes must be whole sizes in the "
-                f"supported range: EU 35-46, US 4-15, or UK 2-13."
-            )
-        return False, (
-            f"Invalid size '{raw}'. Footwear sizes must be regional codes with a region "
-            f"prefix (e.g., US 9, EU 40, UK 7) or standard labels "
-            f"({', '.join(SIZE_OPTIONS)}); cm measurements are not accepted."
+            f"Enter a standard size label ({', '.join(SIZE_OPTIONS)})."
         )
 
     if key in SIZE_OPTIONS:
@@ -249,11 +164,10 @@ def get_size_ranges(size_text):
     product-details "AVAILABLE SIZE" block.
 
     Clothing (S..4XL): {'label', 'cm', 'regions': None} where 'cm' renders as
-    "(90-94 cm)" so the page shows e.g. "M (90-94 cm)".
-    Footwear regional: {'label', 'cm', 'regions'} where 'cm' is the EU-based
-    foot-length bracket and 'regions' is the triple display string
-    ("EU 40 · US 9 · UK 7").
-    Returns None for unknown sizes. Display-only: never scored, never stored.
+    "(90-94 cm)" so the page shows e.g. "M (90-94 cm)". The 'regions' key is
+    kept (always None) for payload-shape compatibility after the footwear
+    removal. Returns None for unknown sizes. Display-only: never scored,
+    never stored.
     """
     if not size_text:
         return None
@@ -265,14 +179,6 @@ def get_size_ranges(size_text):
             'label': raw_key,
             'cm': f"({entry['cm'][0]}-{entry['cm'][1]} cm)",
             'regions': None,
-        }
-
-    equiv = get_footwear_equivalents(raw_key)
-    if equiv:
-        return {
-            'label': raw_key,
-            'cm': f"({equiv['cm'][0]}-{equiv['cm'][1]} cm)",
-            'regions': f"{equiv['eu']} · {equiv['us']} · {equiv['uk']}",
         }
     return None
 

@@ -41,11 +41,12 @@
 // (The localStorage mirror half of the leak is purged in session.js
 // setSession()/clearSession() — see COMMERCE_SCOPE_KEYS there.)
 //
-// SIZE-POLICY UPDATE: the client-side size mirror now matches the revised
+// SIZE-POLICY UPDATE: the client-side size mirror matches the revised
 // backend knowledge_table.py — clothing sizes S, M, L, XL, 2XL, 3XL, 4XL
-// (pure cm reference table), footwear regional codes (EU/US/UK) restored,
-// and the body-proportion output mirror bodyProportion() returns
-// { size, average } where average = (height_cm + body_build_cm) / 2.
+// (pure cm reference table). Footwear was PERMANENTLY REMOVED: regional
+// shoe codes (EU/US/UK) are rejected everywhere. The body-proportion output
+// mirror bodyProportion() returns { size, average } where
+// average = (height_cm + body_build_cm) / 2.
 //
 // RECOMMENDATION SERVICE (FR-7.2/7.3/7.4): fetchRankedRecommendations() and
 // loadMatchReasons() are now exposed via recommendationsApi so the Fitting
@@ -581,16 +582,13 @@ export const deleteAccount = (refresh) => authApi.deleteAccount(refresh);
 // ----------------------------------------------------------------------------
 // Size-label validation — client-side MIRROR of backend
 // recommendations/knowledge_table.py validate_size_label().
-// Clothing: S..4XL policy. Footwear additionally accepts prefixed regional
-// codes (EU/US/UK) within supported whole-size ranges (table restored for
-// product-details display). The backend remains the authoritative gate
-// (FR-4.7 report, FR-4.8 display); this gives sellers instant feedback
-// before the PATCH round-trip.
+// All categories: S, M, L, XL, 2XL, 3XL, 4XL only. Footwear was PERMANENTLY
+// REMOVED — regional shoe codes (EU/US/UK) are rejected everywhere. The
+// backend remains the authoritative gate (FR-4.7 report, FR-4.8 display);
+// this gives sellers instant feedback before the PATCH round-trip.
 // Traceability: SRS FR-4.1, FR-4.7, FR-4.8 | Scope WBS 1.3.5 | OBJ-09.
 // ----------------------------------------------------------------------------
 const _CLOTHING_SIZE_OPTIONS = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-const _FOOTWEAR_REGIONAL_RE = /^(?:US|EU|UK)\s?(\d{1,3}(?:\.\d+)?)$/i;
-const _FOOTWEAR_RANGES = { EU: [35, 46], US: [4, 15], UK: [2, 13] };
 const _MEASURED_RE = /\d+(?:\.\d+)?\s*(?:inch|inches|in|cm|centimeter|centimeters|mm|"|″)/i;
 
 // Reference-only clothing size table (pure cm), mirror of backend
@@ -610,27 +608,15 @@ export const HEIGHT_RANGE = { min: 120, max: 218 };
 export const BODY_BUILD_RANGE = { min: 86, max: 112 };
 
 export function validateSizeLabel(sizeText, category = '') {
+  // `category` is accepted for call-site compatibility only — footwear was
+  // permanently removed, so every category uses the same S..4XL rule.
   const raw = String(sizeText || '').trim();
-  const isFootwear = String(category).toLowerCase() === 'footwear';
   if (!raw) return 'Size is required.';
   if (_MEASURED_RE.test(raw)) {
-    return `Measured values like "${raw}" are not accepted. Use ${_CLOTHING_SIZE_OPTIONS.join(', ')}${
-      isFootwear ? ' or a regional shoe size (e.g., EU 40).' : '.'
-    }`;
+    return `Measured values like "${raw}" are not accepted. Use ${_CLOTHING_SIZE_OPTIONS.join(', ')}.`;
   }
   const key = raw.toUpperCase();
   if (_CLOTHING_SIZE_OPTIONS.includes(key)) return null;
-  if (isFootwear) {
-    const m = key.match(_FOOTWEAR_REGIONAL_RE);
-    if (m) {
-      const prefix = key.slice(0, 2);
-      const n = Number(m[1]);
-      const [lo, hi] = _FOOTWEAR_RANGES[prefix];
-      if (Number.isInteger(n) && n >= lo && n <= hi) return null;
-      return `Regional shoe sizes must be whole sizes in the supported range: EU 35-46, US 4-15, or UK 2-13.`;
-    }
-    return `Invalid size "${raw}". Footwear sizes need a region prefix (EU 40, US 9, UK 7) or ${_CLOTHING_SIZE_OPTIONS.join('/')}.`;
-  }
   return `Invalid size "${raw}". Use standard clothing sizes only: ${_CLOTHING_SIZE_OPTIONS.join(', ')}.`;
 }
 

@@ -4,6 +4,7 @@ import { cartAPI, getCachedCart, API_URL } from "../services/api";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/CartSelectedItems.css";
 
+// Footwear permanently removed: the "Everyday Sneakers" demo entry is gone.
 const DEFAULT_ITEMS = [
   {
     id: "equipped-linen-shirt",
@@ -24,16 +25,6 @@ const DEFAULT_ITEMS = [
     colorCode: "#c9c0b4",
     size: "M",
     price: 1100,
-  },
-  {
-    id: "equipped-sneakers",
-    name: "Everyday Sneakers",
-    category: "Footwear",
-    seller: "Maison Sol",
-    color: "White",
-    colorCode: "#fffdf9",
-    size: "7",
-    price: 1500,
   },
   {
     id: "equipped-outerwear",

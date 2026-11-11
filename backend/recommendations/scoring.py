@@ -16,6 +16,11 @@ the human-readable reason changed ("shared style tags: ..."). The UI label
 rename ("Style match") is handled frontend-side. AvatarProfile.occasion_tags
 and ItemProfile.occasion_tags are kept as ignored legacy fields so existing
 callers (recommendations view, query params) keep working.
+
+Footwear removal: the footwear category was permanently removed from the
+catalog and from knowledge_table.CATEGORY_GROUPS / PROPORTION_SHADING. No
+scoring logic changed - _rule_shading already returns a graceful "not
+shade-scored" result for any category outside the group table.
 """
 from dataclasses import dataclass
 
@@ -42,7 +47,7 @@ class AvatarProfile:
 @dataclass(frozen=True)
 class ItemProfile:
     name: str
-    category: str                  # tops|bottoms|dresses|outerwear|footwear
+    category: str                  # tops|bottoms|dresses|outerwear
     color_family: tuple = ()
     color_description: str = ""
     style_tags: tuple = ()

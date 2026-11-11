@@ -153,8 +153,10 @@ function ProductDetailsPage({ isGuest = false }) {
             displayCategory: data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : "Item",
             sellerName: data.store_name || "FitFusion Store",
             availableSize: data.size || "M",
+            // CHANGED: footwear removed — size_regions no longer exists.
+            // Clothing label + backend-computed cm bracket, e.g. "M (90-94 cm)".
             sizeDisplay: [
-              data.size_regions || data.size || "M",
+              data.size || "M",
               data.size_cm || "",
             ].filter(Boolean).join(" ").trim(),
           });
