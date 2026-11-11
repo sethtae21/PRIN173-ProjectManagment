@@ -72,7 +72,7 @@ Document Identifier: IEEE-PC-FITFUSION-01  \|  Version: 1.1  \| Date: 2026-09-21
 | OBJ-03 | Performance cost of existing solutions removed: 95% API \<500 ms; canvas \<1 s; load \<3 s | P2 | Automated performance test (SRS §4.1); render benchmark; load-time test |
 | OBJ-04 | Privacy cost removed: 100% pass on Security & Privacy checklist (TLS 1.2+, Argon2id, server-side RBAC, ephemeral guests, no photo upload) | P2 | Security audit & RT-09 checklist (100% pass) |
 | OBJ-05 | Style hesitation resolved: ≥80% approval ("like" ≥4/5) of color/style recommendations | P3 | Panel observation of visible, logically sound match reasons per FR-7.3/7.4 (Quantitative UAT surveys deferred to post-MVP) |
-| OBJ-06 | Purchase-decision confidence improved: ≥80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item vs pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per assumption 6.1.7) | P1, P4 | Functional walkthrough of successful mock checkout and order history generation (Quantitative UAT surveys deferred to post-MVP) |
+| OBJ-06 | Purchase-decision confidence improved: ≥80% of UAT sessions report higher confidence in the purchase decision and lower intent to return the tried item vs pre-session baseline (self-reported proxy — real returns reduction is a post-MVP business outcome, per assumption 6.1.7) | P1, P4 | Functional walkthrough of successful mock checkout and order-history generation (quantitative UAT surveys deferred to post-MVP) |
 | OBJ-07 | Lost sales from hesitation reduced: ≥70% of created carts complete mock checkout | P4 | UAT commerce scenario (≥70% checkout) |
 | OBJ-08 | Manual-listing burden removed: 10-item CSV processed \<60 s | P5 | Pipeline timing test |
 | OBJ-09 | Inconsistent listings eliminated at source: ≥80% publish without manual correction | P5 | Seller Dashboard validation report audit |
@@ -211,6 +211,8 @@ R \= Responsible, A \= Accountable, C \= Consulted, I \= Informed
 **6.1.13** Known limitation: minor overlay misalignment or transient visual artifacts may occur at extreme proportion combinations or during rapid view switching, inherent to photo-based 2D overlay visualization (6.1.3); not treated as a functional defect while the alignment grid and Criterion 2 rendering target are met.
 
 **6.1.14** Design-bounds assumption: the supported avatar input ranges (height 120–220 cm; Body Build 86–112 cm) and the S–4XL apparel size grading (4-cm steps; 4XL tier capped at a 110–112 cm span) are design bounds informed by DOST-FNRI anthropometric averages \[R19\] and common Asian retail size-grading assumptions, not certified anthropometric or tailoring standards; the BMI-to-girth mapping (BMI proxy 21–32, WHO international cutoffs with Asia-Pacific cutoffs noted, mapped onto 86–112 cm) is a deterministic design mapping for visual simulation only and carries no medical, health, or physiological assessment claim (SRS §2.4).
+
+**6.1.15** The four-value style vocabulary (casual, smart, formal, sporty) is an MVP design bound covering the target dress-code contexts; no universal style taxonomy is claimed. Extension is post-MVP; out-of-vocabulary tags are rejected at upload (§4.2).
 
 ### 
 
