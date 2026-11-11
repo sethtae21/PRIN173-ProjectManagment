@@ -56,14 +56,23 @@ IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=IMAGE_WORKERS)
 _REMBG_SESSION = None
 _REMBG_SESSION_LOCK = threading.Lock()
 
-# MATTE PIPELINE VERSION SALT (LARGEST-CLUSTER v3 cleanup).
-# Bump this string whenever the matte pipeline changes so stale cached PNGs
-# (e.g. the v2/v3 blackened mattes) are auto-invalidated and recomputed.
-# v4 = clean matte only: the speculative face/hood blackener has been removed
-# because it smeared black over garment-interior voids (neckline, zipper,
-# logos). Genuine enclosed holes are repaired frontend-side by
-# fillTransparentHoles using NEIGHBOUR colour, never black.
-MATTE_PIPELINE_VERSION = "v4-clean-matte"
+# MATTE PIPELINE VERSION SALT. Bump whenever the matte pipeline changes so
+# stale cached PNGs are auto-invalidated and recomputed.
+# v6 = SOLID-AWARE faint rescue: only normalize a faint matte when NO solid
+# garment already exists, so a large faint ghost can never be boosted into
+# out-voting a small solid dress (floral cami case).
+MATTE_PIPELINE_VERSION = "v6-solid-aware-rescue"
+
+# FAINT-ALPHA RESCUE tuning (mirrors frontend useAlphaCrop).
+# TIGHTEN_SOLID is the alpha above which a pixel counts as SOLID garment
+# (matches frontend TIGHTEN_ALPHA = 96). THIS was the missing constant.
+TIGHTEN_SOLID = 96
+# If the MEDIAN alpha of non-transparent pixels is below this ceiling the
+# cutout is predominantly faint and we rescale alpha to make it solid.
+FAINT_ALPHA_CEILING = 200
+# Minimum fraction of pixels that must be solid garment, else the matte is
+# dust/empty and we reject with a clear re-photograph instruction.
+MIN_GARMENT_COVERAGE = 0.005
 
 
 def _matte_cache_digest(original: bytes) -> str:
@@ -118,15 +127,43 @@ def _jpeg_working_copy(image_bytes, max_side):
         return buf.getvalue(), (orig_w, orig_h)
 
 
+def _rescue_faint_alpha(img):
+    """Normalize a faint rembg matte so the garment becomes solid.
+
+    Only boosts when a transparent background exists AND no SOLID garment is
+    already present (so a large faint ghost never out-votes a small solid
+    dress). Uses the MEDIAN alpha of non-transparent pixels as the reference
+    so isolated hot pixels can't skew it. Returns (img, boosted_bool).
+    """
+    alpha = img.getchannel('A')
+    hist = alpha.histogram()
+    total = img.width * img.height
+    non_zero = sum(hist[1:])
+    if non_zero == 0 or hist[0] == 0:
+        return img, False
+    # If a SOLID garment already exists, do NOT boost faint ghosts alongside it
+    # (a large faint ghost must never out-vote a small solid dress).
+    solid_px = sum(hist[TIGHTEN_SOLID + 1:])
+    if total and (solid_px / total) >= MIN_GARMENT_COVERAGE:
+        return img, False
+    target = max(1, (non_zero + 1) // 2)
+    cum = 0
+    median = 255
+    for a in range(255, 0, -1):
+        cum += hist[a]
+        if cum >= target:
+            median = a
+            break
+    if median >= FAINT_ALPHA_CEILING:
+        return img, False
+    gain = 255.0 / max(1, median)
+    lut = [0] + [min(255, int(round(a * gain))) for a in range(1, 256)]
+    img.putalpha(alpha.point(lut))
+    return img, True
+
+
 # ----------------------------------------------------------------------------
 # TAG VOCABULARY (seller CSV + validation).
-# KAN-FIX: occasion_tags REMOVED from the upload pipeline entirely (template,
-# guidelines, validator, item creation). The approved style_tags vocabulary is
-# now EXACTLY the four shopper Style-Focus options (Fitting Studio bottom-left
-# control), lowercased: casual / smart / formal / sporty. Validation remains
-# case-insensitive, so "Casual" and "casual" are both accepted.
-# Legacy note: CatalogItem.occasion_tags still exists in MongoDB for old rows
-# but is read-only/ignored everywhere (serializer read_only, scoring ignores).
 # ----------------------------------------------------------------------------
 STYLE_TAG_OPTIONS = (
     'casual', 'smart', 'formal', 'sporty',
@@ -198,12 +235,9 @@ class CatalogValidator:
         'color_description', 'color_family', 'price',
         'front_image_filename', 'rear_image_filename'
     ]
-    # KAN-FIX: occasion_tags validation REMOVED; style_tags limited to the four
-    # Style-Focus tags. An occasion_tags column in an OLD template is ignored.
     TAG_OPTIONS = {
         'style_tags': frozenset(STYLE_TAG_OPTIONS),
     }
-    # Rear orientation rule (deterministic, Pillow-only, FR-4.7 extension).
     ORIENTATION_MAX_W_H = 1.0
     ORIENTATION_CHECKED_VIEWS = ('Rear',)
 
@@ -225,9 +259,6 @@ class CatalogValidator:
             category = 'dresses'
         if category and category not in valid_categories:
             errors.append(f"Row {row_number}: Invalid category '{row['category']}'")
-        # SIZE RULE (S/M/L policy + prefixed footwear regional codes):
-        # CSV path enforcement point. The edit path enforces the SAME rule via
-        # CatalogItemSerializer.validate_size -> validate_size_label.
         size_valid, size_error = validate_size_label(row.get('size', ''), category)
         if not size_valid:
             errors.append(f"Row {row_number}: {size_error}")
@@ -277,12 +308,6 @@ class CatalogValidator:
             return False, f"Invalid or corrupted image: {str(e)}"
 
     def check_garment_orientation(self, image_bytes, view_label, category=''):
-        """
-        Deterministic orientation check on the rembg-processed transparent PNG.
-        The Rear view must be portrait (w/h <= ORIENTATION_MAX_W_H); a flat-lay
-        rotated sideways produces a landscape alpha-bbox and is rejected.
-        Footwear is exempt (shoe photos are correctly landscape).
-        """
         if view_label not in self.ORIENTATION_CHECKED_VIEWS:
             return True, None
         if str(category).strip().lower() == 'footwear':
@@ -345,8 +370,26 @@ class CatalogValidator:
                 img = img.convert('RGBA')
             alpha_channel = img.split()[3]
             alpha_min, alpha_max = alpha_channel.getextrema()
+            # Sanity check BEFORE rescue so fully-opaque / fully-empty rembg
+            # output is still rejected exactly as before (existing tests).
             if alpha_min == 255 or alpha_max == 0:
                 raise ValueError("Background removal did not produce a valid transparent image.")
+
+            # SOLID-AWARE faint rescue (no-op when a solid garment exists).
+            img, rescued = _rescue_faint_alpha(img)
+            if rescued:
+                logger.info("Faint rembg matte rescued (alpha normalized) during upload.")
+
+            # Coherent-garment guard: reject dust/empty mattes clearly.
+            hist = img.getchannel('A').histogram()
+            total_px = img.width * img.height
+            solid_px = sum(hist[25:])
+            if total_px and (solid_px / total_px) < MIN_GARMENT_COVERAGE:
+                raise ValueError(
+                    "Background removal did not produce a valid transparent image: "
+                    "no coherent garment detected. Re-photograph the garment against "
+                    "a plain, contrasting background and re-upload."
+                )
 
             if orig_dims:
                 target_side = max(self.MIN_IMAGE_DIMENSION, min(max(orig_dims), REMBG_OUTPUT_CAP))
@@ -397,21 +440,9 @@ class CatalogValidator:
             return "#000000"
 
     def validate_color_alignment(self, declared_color, dominant_hex):
-        """Image-text color alignment (FR-4.7). Delegates to catalog.color_rules
-        so the rule set and the built-in "correct color to declare" suggestion
-        stay identical across the upload path, the edit path, and the legacy
-        catalog/validators.py module. The mismatch message now ends with the
-        exact color the seller should use (see color_rules.alignment_result),
-        which closes the former saturation dead zone where muted-but-hued
-        garments (e.g. light-wash denim #6e8391) matched NO rule and every
-        mapped declaration was wrongly rejected."""
         return alignment_result(declared_color, dominant_hex)
 
     def suggest_declared_color(self, dominant_hex):
-        """Return {"name","family","hex","description"} for the color a seller
-        should declare so validate_color_alignment passes, or None if the hex
-        cannot be parsed. Used by the upload/edit UIs to autofill the fix in
-        one click (the returned name is guaranteed to pass the validator)."""
         return suggest_declared_color(dominant_hex)
 
     def generate_color_palette_tags(self, dominant_hex, color_family):
@@ -448,7 +479,6 @@ def process_batch_background(batch_id):
         inflight_lock = threading.Lock()
 
         def _image_pipeline(item, field_name, view_label):
-            """Full per-image pipeline executed INSIDE a worker thread."""
             result = {'view': view_label, 'field': field_name, 'bytes': None,
                       'color': None, 'errors': []}
             img_field = getattr(item, field_name, None)
@@ -674,9 +704,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         reader = csv.DictReader(data_lines)
         rows = [row for row in reader if any(row.values())]
 
-        # Legacy 3-view template fix: data rows written without a side value
-        # shift the rear filename into side_image_filename, leaving the rear
-        # column empty. Move it back so mapping/validation see the real name.
         for row in rows:
             rear_value = (row.get('rear_image_filename') or '').strip()
             side_value = (row.get('side_image_filename') or '').strip()
@@ -738,9 +765,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         price = Decimal('0.00')
                 except (InvalidOperation, ValueError):
                     price = Decimal('0.00')
-                # KAN-FIX: occasion_tags is NO LONGER read from the CSV and NO
-                # LONGER written; the model field keeps its default empty list
-                # (legacy rows keep their stored values, display-only).
                 item = CatalogItem.objects.create(
                     name=item_name, description=row.get('description', ''),
                     category=category_map.get(raw_category, raw_category),
@@ -784,10 +808,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsSeller])
     def my_listings(self, request):
         items = CatalogItem.objects.filter(seller=request.user).order_by('-created_at')
-        # KAN-FIX (500 "Object of type ListSerializer is not JSON serializable"):
-        # Response() must receive .data (plain primitives), NOT the serializer
-        # object itself. The missing .data made every /catalog/my_listings/
-        # call (Product Listings, dashboard stats, validation page) crash.
         return Response(CatalogItemSerializer(items, many=True).data)
 
     @extend_schema(
@@ -821,8 +841,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         elif request.method in ['PUT', 'PATCH']:
-            # FIX: Re-ordered logic to validate images BEFORE saving text fields
-            # to guarantee atomicity (no partial updates if validation fails).
             image_fields = ('front_image', 'rear_image')
             payload = request.data.copy()
             replacement_images = {field: request.FILES.get(field) for field in image_fields if request.FILES.get(field)}
@@ -894,7 +912,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
             item.rejection_reasons = []
             updated = serializer.save()
 
-            # Save new images to GridFS
             old_image_names = {
                 field: getattr(updated, field).name for field in processed_images
             }
@@ -909,7 +926,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 if old_name:
                     getattr(updated, field).storage.delete(old_name)
 
-            # Generate palette tags if color check was performed
             if needs_color_check and 'front_color' in locals() and front_color:
                 updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
                     front_color, proposed_color_family

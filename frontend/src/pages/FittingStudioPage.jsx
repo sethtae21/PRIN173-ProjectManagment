@@ -28,6 +28,8 @@ import RatingControl from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
 import "./css/FittingStudioPage.css";
 
+const UAT_SURVEY_ENABLED = false; // set true to restore UAT pre/post survey popups
+
 const SKIN_TONES = [
   { name: "Light", value: "#f1c9a5" },
   { name: "Warm", value: "#dca77d" },
@@ -1486,7 +1488,10 @@ function FittingStudioPage({ isGuest = false }) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const basePath = isGuest ? "/guest" : "/shopper";
-  const uatEnabled = !isGuest && new URLSearchParams(window.location.search).get("uat") === "1";
+  const uatEnabled =
+    UAT_SURVEY_ENABLED &&
+    !isGuest &&
+    new URLSearchParams(window.location.search).get("uat") === "1";
   const isFemale = avatar.gender.toLowerCase() === "female";
   const bodyBuild = weightToVisualBuild(avatar.height, avatar.weight);
   const currentUatAnswers = uatPhase === "before" ? uatBeforeAnswers : uatAfterAnswers;
@@ -1744,7 +1749,7 @@ function FittingStudioPage({ isGuest = false }) {
 
     if (!item) return;
 
-    if (uatEnabled && !isGuest) {
+    if (UAT_SURVEY_ENABLED && uatEnabled && !isGuest) {
       const productId = String(item.id);
       const completed = readUatCompletionMap();
       setUatCurrentProductId(productId);
@@ -1814,7 +1819,11 @@ function FittingStudioPage({ isGuest = false }) {
   // defaultPrevented, so preventing here is enough to hold the navigation
   // until the shopper submits or skips the post-session rating.
   useEffect(() => {
+    if (!UAT_SURVEY_ENABLED) return;
+
     function handleCaptureClick(event) {
+      if (!UAT_SURVEY_ENABLED) return;
+
       const target = event.target;
       const anchor =
         target && typeof target.closest === "function"
@@ -1840,6 +1849,7 @@ function FittingStudioPage({ isGuest = false }) {
   // The timer re-arms on any pointer/key/scroll activity and never fires
   // while another modal is open or before the pre-session popup has shown.
   useEffect(() => {
+    if (!UAT_SURVEY_ENABLED) return;
     if (uatEnabled) return undefined;
 
     let timer = null;
@@ -1907,6 +1917,7 @@ function FittingStudioPage({ isGuest = false }) {
   // Recommendations panel. Fires at most once per studio visit. Tester mode
   // (?uat=1) keeps ownership of the charter UAT survey, so no double popup.
   function maybeOpenPreSurvey() {
+    if (!UAT_SURVEY_ENABLED) return;
     if (uatEnabled || preSurveyShownRef.current) return;
     preSurveyShownRef.current = true;
     setPreSurveyOpen(true);
@@ -1915,6 +1926,7 @@ function FittingStudioPage({ isGuest = false }) {
   // NEW (popup redesign): central post-session opener. Returns true when the
   // popup actually took over (caller must pause its own flow).
   function openPostSurvey(pending = {}) {
+    if (!UAT_SURVEY_ENABLED) return false;
     if (uatEnabled || postSurveyDoneRef.current || postSurveyOpenRef.current) {
       return false;
     }
@@ -1977,6 +1989,7 @@ function FittingStudioPage({ isGuest = false }) {
   // still created by the RatingControl on equipped items, which is the
   // surface the OBJ-01 KPI join reads.
   async function persistPopupSurvey(pre, post, vote) {
+    if (!UAT_SURVEY_ENABLED) return;
     if (isGuest) return;
 
     const payload = {
@@ -2013,6 +2026,7 @@ function FittingStudioPage({ isGuest = false }) {
 
   // PRE popup actions ------------------------------------------------------
   function submitPreSurvey() {
+    if (!UAT_SURVEY_ENABLED) return;
     const answers = { ...preAnswers };
     setPreSurveyOpen(false);
     preSurveyDoneRef.current = true;
@@ -2021,6 +2035,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function skipPreSurvey() {
+    if (!UAT_SURVEY_ENABLED) return;
     setPreSurveyOpen(false);
     preSurveyDoneRef.current = true;
     if (!isGuest) {
@@ -2030,6 +2045,7 @@ function FittingStudioPage({ isGuest = false }) {
 
   // POST popup actions -----------------------------------------------------
   async function submitPostSurvey() {
+    if (!UAT_SURVEY_ENABLED) return;
     const post = { ...postAnswers };
     const vote = postVote;
     const pre = readStagedPreAnswers();
@@ -2048,6 +2064,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function skipPostSurvey() {
+    if (!UAT_SURVEY_ENABLED) return;
     const pre = readStagedPreAnswers();
 
     postSurveyDoneRef.current = true;
@@ -2063,6 +2080,7 @@ function FittingStudioPage({ isGuest = false }) {
 
   // Guest call-to-action replaces the submit button on BOTH popups (FR-7.5).
   function handleGuestSurveyCta() {
+    if (!UAT_SURVEY_ENABLED) return;
     preSurveyDoneRef.current = true;
     postSurveyDoneRef.current = true;
     preSurveyShownRef.current = true;
@@ -2337,6 +2355,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   async function startUatSession(productId) {
+    if (!UAT_SURVEY_ENABLED) return null;
     if (!uatEnabled || isGuest || !productId) return null;
     const current = readUatSession();
     if (current && String(current.product_id) === String(productId)) {
@@ -2379,6 +2398,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   async function submitUatResponse(productId, phase, questionKey, value) {
+    if (!UAT_SURVEY_ENABLED) return null;
     const session = readUatSession();
     // FIX (charter-aligned UAT): `0` is a valid answer (style_discovery "No").
     // The old falsy guard (`!value`) dropped every zero-valued response before
@@ -2433,6 +2453,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function handleUatAnswer(productId, phase, questionKey, value) {
+    if (!UAT_SURVEY_ENABLED) return;
     if (!productId || !questionKey || value == null) return;
     void submitUatResponse(productId, phase, questionKey, value);
   }
@@ -2480,6 +2501,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function handleUatModalSave() {
+    if (!UAT_SURVEY_ENABLED) return;
     const productId = String(uatCurrentProductId || uatPendingEquipItem?.id || "");
     if (!productId) return;
 
@@ -2518,6 +2540,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function handleUatModalSkip() {
+    if (!UAT_SURVEY_ENABLED) return;
     const productId = String(uatCurrentProductId || uatPendingEquipItem?.id || "");
     if (uatSurveyPhase === "before") {
       setUatSurveyOpen(false);
@@ -2542,6 +2565,7 @@ function FittingStudioPage({ isGuest = false }) {
   }
 
   function handleUatFinishTryOn() {
+    if (!UAT_SURVEY_ENABLED) return;
     const productId = String(uatCurrentProductId || "");
     if (!productId) return;
     setUatSurveyPhase("after");
@@ -2721,7 +2745,7 @@ function FittingStudioPage({ isGuest = false }) {
           </button>
         </section>
 
-        {uatSurveyOpen && uatCurrentProductId && (
+        {UAT_SURVEY_ENABLED && uatSurveyOpen && uatCurrentProductId && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(24, 18, 14, 0.6)", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
             <div style={{ width: "min(780px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "#fffaf2", borderRadius: "18px", border: "1px solid #d7b777", boxShadow: "0 22px 60px rgba(39, 28, 17, 0.25)", padding: "24px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "18px" }}>
@@ -2822,7 +2846,7 @@ function FittingStudioPage({ isGuest = false }) {
           </div>
         )}
 
-        {uatThankYouVisible && (
+        {UAT_SURVEY_ENABLED && uatThankYouVisible && (
           <div style={{ marginBottom: "18px", background: "#f2f7ef", border: "1px solid #84ba85", borderRadius: "12px", padding: "12px 14px", color: "#1d4520", fontWeight: 600 }}>
             Thank you for helping us validate the shopping experience.
           </div>
@@ -3417,7 +3441,7 @@ function FittingStudioPage({ isGuest = false }) {
           questions, same direction as post so the gain math stays valid.
           Guests get the signup CTA instead of a submit button (FR-7.5).
       ========================================== */}
-      {preSurveyOpen && (
+      {UAT_SURVEY_ENABLED && preSurveyOpen && (
         <div className="studio-modal-backdrop" role="presentation">
           <section
             className="studio-save-outfit-modal studio-survey-modal"
@@ -3514,7 +3538,7 @@ function FittingStudioPage({ isGuest = false }) {
           Captures the pre/post delta + the fit like/dislike, then resumes
           the paused navigation or Save-Outfit modal.
       ========================================== */}
-      {postSurveyOpen && (
+      {UAT_SURVEY_ENABLED && postSurveyOpen && (
         <div className="studio-modal-backdrop" role="presentation">
           <section
             className="studio-save-outfit-modal studio-survey-modal"

@@ -3,6 +3,7 @@ import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom
 import { API_URL, cartAPI, ratingsApi, invalidateCache } from "../services/api";
 import { RATING_SOURCES } from "../services/uat";
 import { getAccessToken } from "../services/session";
+import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/ProductDetailsPage.css";
 
 function mediaUrl(path) {
@@ -64,6 +65,39 @@ function normalizeSummary(data) {
     score_count: Number(data?.score_count) || 0,
     star_counts: data?.star_counts || { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
   };
+}
+
+/* ==========================================
+   FIX (garment not centered on the details stage):
+   rembg PNGs carry uneven transparent margins (and sometimes hollow
+   interiors), so centering the raw canvas leaves the garment sitting
+   high/low — or nearly invisible. This mirrors CatalogPreview exactly:
+   every asset runs through the shared useAlphaCrop pipeline (hole-repair
+   + clustered crop + solid-alpha tighten) so the GARMENT itself is what
+   gets centered and maximized inside the square stage. Falls back to the
+   category placeholder chip on load failure, and to the raw src if the
+   canvas is tainted (CORS) — never broken.
+========================================== */
+function ProductPreviewImage({ src, alt, category }) {
+  const [failed, setFailed] = useState(false);
+  const cropped = useAlphaCrop(failed ? null : src);
+
+  if (!src || failed) {
+    return (
+      <div className="product-details-placeholder">
+        <span>{category}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={cropped || src}
+      alt={alt}
+      className="product-details-main-image"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function ProductDetailsPage({ isGuest = false }) {
@@ -395,17 +429,17 @@ function ProductDetailsPage({ isGuest = false }) {
         <section className="product-details-grid">
           <div className="product-details-gallery">
             <div className="product-details-image-container">
-              {currentImage ? (
-                <img
-                  src={currentImage}
-                  alt={`${product.name} - ${selectedView} view`}
-                  className="product-details-main-image"
-                />
-              ) : (
-                <div className="product-details-placeholder">
-                  <span>{product.displayCategory}</span>
-                </div>
-              )}
+              {/* FIX: same alpha-crop pipeline as the catalog cards, so the
+                  GARMENT (not the raw rembg canvas) is what gets centered.
+                  key={selectedView} remounts per view: a failed front image
+                  never poisons the rear, and the hook's session cache makes
+                  toggling back to a view instant. */}
+              <ProductPreviewImage
+                key={selectedView}
+                src={currentImage}
+                alt={`${product.name} - ${selectedView} view`}
+                category={product.displayCategory}
+              />
             </div>
             <div className="product-view-buttons">
               {["front", "rear"].map((view) => {
