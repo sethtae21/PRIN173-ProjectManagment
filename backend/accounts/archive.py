@@ -42,7 +42,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 # Grace window before a closed profile is relocated to cold storage.
-ARCHIVE_GRACE_DAYS = 5
+ARCHIVE_GRACE_DAYS = 1
 
 # Aware epoch used ONLY as a sort sentinel for legacy (NULL due) rows in the
 # preview; never written to the DB. Django 5+ removed django.utils.timezone.utc,
