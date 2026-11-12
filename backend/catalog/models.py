@@ -1,9 +1,13 @@
+import logging
+
 from django.conf import settings
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from accounts.storage import gridfs_storage
+
+logger = logging.getLogger(__name__)
 
 
 class UploadBatch(models.Model):
@@ -88,9 +92,20 @@ def cleanup_catalog_images(sender, instance, **kwargs):
     """
     Cascade-delete both image objects from GridFS
     when a listing is deleted to prevent orphaned files and protect free-tier quota.
+
+    KAN-119: GridFSStorage.delete() now RAISES when the bucket is unreachable.
+    post_delete runs AFTER the row is already gone, so propagating would return
+    HTTP 500 for a deletion that actually succeeded AND still leak the file.
+    Keep the delete, record the failure at ERROR so the orphan is attributable.
     """
     for field_name in ['front_image', 'rear_image']:
         file_field = getattr(instance, field_name)
         if file_field and file_field.name:
             # save=False prevents an unnecessary extra DB save since the model is being deleted
-            file_field.delete(save=False)
+            try:
+                file_field.delete(save=False)
+            except Exception as exc:
+                logger.error(
+                    "KAN-119 ORPHAN_RISK item=%s field=%s name=%s error=%s",
+                    instance.pk, field_name, file_field.name, exc,
+                )

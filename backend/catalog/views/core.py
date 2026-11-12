@@ -28,63 +28,32 @@ from drf_spectacular.types import OpenApiTypes
 from catalog.models import CatalogItem, UploadBatch
 from ..color_palette_config import get_palette_tags, COLOR_PALETTE_MAPPING
 from catalog.serializers import CatalogItemSerializer, UploadBatchSerializer, CSVUploadSerializer
-# Size-label format rule (S, M, L, XL, 2XL, 3XL, 4XL only; cm rejected).
-# Footwear was permanently removed from the catalog.
 from recommendations.knowledge_table import validate_size_label
-# FR-4.7 color alignment: single source of truth shared with the legacy
-# catalog/validators.py and the upload/edit UIs (the mismatch message now
-# embeds the exact "correct color to declare", and the UIs autofill it).
 from catalog.color_rules import alignment_result, suggest_declared_color
 
 logger = logging.getLogger(__name__)
 
 UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
 
-# ============================================================================
-# KAN-119 PERFORMANCE (SRS §4.1 / Criterion 4 / OBJ-08: 10 items < 60 s)
-# ----------------------------------------------------------------------------
 REMBG_WORKING_SIZE = int(getattr(settings, 'REMBG_WORKING_SIZE', 1024))
 REMBG_OUTPUT_CAP = int(getattr(settings, 'REMBG_OUTPUT_CAP', 1600))
-IMAGE_WORKERS = int(getattr(
-    settings, 'IMAGE_WORKERS', max(2, min(6, (os.cpu_count() or 4)))
-))
-REMBG_CACHE_DIR = Path(getattr(
-    settings, 'REMBG_CACHE_DIR', Path(settings.BASE_DIR) / 'rembg_cache'
-))
-
+IMAGE_WORKERS = int(getattr(settings, 'IMAGE_WORKERS', max(2, min(6, (os.cpu_count() or 4)))))
+REMBG_CACHE_DIR = Path(getattr(settings, 'REMBG_CACHE_DIR', Path(settings.BASE_DIR) / 'rembg_cache'))
 IMAGE_PROCESS_EXECUTOR = ThreadPoolExecutor(max_workers=IMAGE_WORKERS)
 
 _REMBG_SESSION = None
 _REMBG_SESSION_LOCK = threading.Lock()
-
-# MATTE PIPELINE VERSION SALT. Bump whenever the matte pipeline changes so
-# stale cached PNGs are auto-invalidated and recomputed.
-# v6 = SOLID-AWARE faint rescue: only normalize a faint matte when NO solid
-# garment already exists, so a large faint ghost can never be boosted into
-# out-voting a small solid dress (floral cami case).
 MATTE_PIPELINE_VERSION = "v6-solid-aware-rescue"
-
-# FAINT-ALPHA RESCUE tuning (mirrors frontend useAlphaCrop).
-# TIGHTEN_SOLID is the alpha above which a pixel counts as SOLID garment
-# (matches frontend TIGHTEN_ALPHA = 96). THIS was the missing constant.
 TIGHTEN_SOLID = 96
-# If the MEDIAN alpha of non-transparent pixels is below this ceiling the
-# cutout is predominantly faint and we rescale alpha to make it solid.
 FAINT_ALPHA_CEILING = 200
-# Minimum fraction of pixels that must be solid garment, else the matte is
-# dust/empty and we reject with a clear re-photograph instruction.
 MIN_GARMENT_COVERAGE = 0.005
 
 
 def _matte_cache_digest(original: bytes) -> str:
-    """Versioned sha256 so pipeline changes never serve a stale matte."""
-    return hashlib.sha256(
-        MATTE_PIPELINE_VERSION.encode("utf-8") + original
-    ).hexdigest()
+    return hashlib.sha256(MATTE_PIPELINE_VERSION.encode("utf-8") + original).hexdigest()
 
 
 def get_shared_rembg_session():
-    """One onnxruntime session for the whole process (Run() is thread-safe)."""
     global _REMBG_SESSION
     if _REMBG_SESSION is not None:
         return _REMBG_SESSION
@@ -95,11 +64,10 @@ def get_shared_rembg_session():
 
 
 def warm_rembg_session():
-    """Optional boot-time warmup; safe to call from a background thread."""
     try:
         get_shared_rembg_session()
         logger.info("rembg session warmed (%s).", settings.REMBG_MODEL)
-    except Exception as exc:  # never block boot on model load
+    except Exception as exc:
         logger.warning("rembg warmup deferred: %s", exc)
 
 
@@ -112,38 +80,25 @@ def _ensure_cache_dir() -> bool:
 
 
 def _jpeg_working_copy(image_bytes, max_side):
-    """Return (jpeg_bytes_of_downscaled_rgb_copy, (orig_w, orig_h))."""
     with Image.open(io.BytesIO(image_bytes)) as src:
         orig_w, orig_h = src.size
         if src.mode != 'RGB':
             src = src.convert('RGB')
         scale = min(1.0, float(max_side) / max(orig_w, orig_h))
         if scale < 1.0:
-            src = src.resize(
-                (max(1, int(round(orig_w * scale))), max(1, int(round(orig_h * scale)))),
-                Image.Resampling.LANCZOS,
-            )
+            src = src.resize((max(1, int(round(orig_w * scale))), max(1, int(round(orig_h * scale)))), Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         src.save(buf, format='JPEG', quality=92)
         return buf.getvalue(), (orig_w, orig_h)
 
 
 def _rescue_faint_alpha(img):
-    """Normalize a faint rembg matte so the garment becomes solid.
-
-    Only boosts when a transparent background exists AND no SOLID garment is
-    already present (so a large faint ghost never out-votes a small solid
-    dress). Uses the MEDIAN alpha of non-transparent pixels as the reference
-    so isolated hot pixels can't skew it. Returns (img, boosted_bool).
-    """
     alpha = img.getchannel('A')
     hist = alpha.histogram()
     total = img.width * img.height
     non_zero = sum(hist[1:])
     if non_zero == 0 or hist[0] == 0:
         return img, False
-    # If a SOLID garment already exists, do NOT boost faint ghosts alongside it
-    # (a large faint ghost must never out-vote a small solid dress).
     solid_px = sum(hist[TIGHTEN_SOLID + 1:])
     if total and (solid_px / total) >= MIN_GARMENT_COVERAGE:
         return img, False
@@ -163,21 +118,14 @@ def _rescue_faint_alpha(img):
     return img, True
 
 
-# ----------------------------------------------------------------------------
-# TAG VOCABULARY (seller CSV + validation).
-# ----------------------------------------------------------------------------
-STYLE_TAG_OPTIONS = (
-    'casual', 'smart', 'formal', 'sporty',
-)
+STYLE_TAG_OPTIONS = ('casual', 'smart', 'formal', 'sporty')
 CATALOG_CSV_COLUMNS = [
     'name', 'description', 'category', 'size', 'color', 'color_description',
-    'color_family', 'price', 'style_tags',
-    'front_image_filename', 'rear_image_filename',
+    'color_family', 'price', 'style_tags', 'front_image_filename', 'rear_image_filename',
 ]
 CATALOG_EXAMPLE_ROW = [
     'Example Product', 'Replace with a product description.', 'tops', 'M',
-    'White', 'Pure White', 'neutral', '599.00', 'casual',
-    'front.jpg', 'rear.jpg',
+    'White', 'Pure White', 'neutral', '599.00', 'casual', 'front.jpg', 'rear.jpg',
 ]
 SELLER_IMAGE_GUIDELINES = (
     'FitFusion AI Seller Catalog Upload Guidelines\n'
@@ -219,9 +167,6 @@ def build_catalog_template_csv():
     return output.getvalue()
 
 
-# ==========================================
-# Catalog Validator Logic
-# ==========================================
 class CatalogValidator:
     MIN_IMAGE_DIMENSION = 800
     MAX_IMAGE_DIMENSION = 4096
@@ -232,9 +177,7 @@ class CatalogValidator:
         'color_description', 'color_family', 'price',
         'front_image_filename', 'rear_image_filename'
     ]
-    TAG_OPTIONS = {
-        'style_tags': frozenset(STYLE_TAG_OPTIONS),
-    }
+    TAG_OPTIONS = {'style_tags': frozenset(STYLE_TAG_OPTIONS)}
     ORIENTATION_MAX_W_H = 1.0
     ORIENTATION_CHECKED_VIEWS = ('Rear',)
 
@@ -260,18 +203,11 @@ class CatalogValidator:
         if not size_valid:
             errors.append(f"Row {row_number}: {size_error}")
         for field, allowed_tags in self.TAG_OPTIONS.items():
-            submitted_tags = [
-                tag.strip() for tag in str(row.get(field, '')).split(',') if tag.strip()
-            ]
-            invalid_tags = [
-                tag for tag in submitted_tags if tag.casefold() not in allowed_tags
-            ]
+            submitted_tags = [tag.strip() for tag in str(row.get(field, '')).split(',') if tag.strip()]
+            invalid_tags = [tag for tag in submitted_tags if tag.casefold() not in allowed_tags]
             if invalid_tags:
                 choices = ', '.join(sorted(allowed_tags))
-                errors.append(
-                    f"Row {row_number}: Invalid {field} value(s): "
-                    f"{', '.join(invalid_tags)}. Choose from: {choices}."
-                )
+                errors.append(f"Row {row_number}: Invalid {field} value(s): {', '.join(invalid_tags)}. Choose from: {choices}.")
         return len(errors) == 0, errors
 
     def validate_image_format(self, image_file):
@@ -305,8 +241,6 @@ class CatalogValidator:
             return False, f"Invalid or corrupted image: {str(e)}"
 
     def check_garment_orientation(self, image_bytes, view_label, category=''):
-        # `category` is kept for call-site compatibility only; the footwear
-        # bypass was removed when footwear was permanently removed.
         if view_label not in self.ORIENTATION_CHECKED_VIEWS:
             return True, None
         try:
@@ -335,7 +269,6 @@ class CatalogValidator:
             return False, f"{view_label}: orientation check failed: {str(e)}"
 
     def process_image_with_rembg(self, image_file, session=None):
-        """KAN-119: cached, downscaled, fast-encoded background removal."""
         try:
             image_file.seek(0)
             original = image_file.read()
@@ -349,35 +282,26 @@ class CatalogValidator:
                         hit.seek(0)
                         return hit
                 except Exception:
-                    pass  # fall through to recompute
-
+                    pass
             orig_dims = None
             try:
                 working, orig_dims = _jpeg_working_copy(original, REMBG_WORKING_SIZE)
             except Exception:
-                working = original  # mocked/corrupt input: keep legacy path
-
+                working = original
             if session is not None:
                 output = remove(working, session=session)
             else:
                 output = remove(working, session=get_shared_rembg_session())
-
             img = Image.open(io.BytesIO(output))
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
             alpha_channel = img.split()[3]
             alpha_min, alpha_max = alpha_channel.getextrema()
-            # Sanity check BEFORE rescue so fully-opaque / fully-empty rembg
-            # output is still rejected exactly as before (existing tests).
             if alpha_min == 255 or alpha_max == 0:
                 raise ValueError("Background removal did not produce a valid transparent image.")
-
-            # SOLID-AWARE faint rescue (no-op when a solid garment exists).
             img, rescued = _rescue_faint_alpha(img)
             if rescued:
                 logger.info("Faint rembg matte rescued (alpha normalized) during upload.")
-
-            # Coherent-garment guard: reject dust/empty mattes clearly.
             hist = img.getchannel('A').histogram()
             total_px = img.width * img.height
             solid_px = sum(hist[25:])
@@ -387,7 +311,6 @@ class CatalogValidator:
                     "no coherent garment detected. Re-photograph the garment against "
                     "a plain, contrasting background and re-upload."
                 )
-
             if orig_dims:
                 target_side = max(self.MIN_IMAGE_DIMENSION, min(max(orig_dims), REMBG_OUTPUT_CAP))
             else:
@@ -395,21 +318,15 @@ class CatalogValidator:
             current_side = max(img.size)
             if current_side != target_side:
                 ratio = target_side / float(current_side)
-                img = img.resize(
-                    (max(1, int(round(img.width * ratio))), max(1, int(round(img.height * ratio)))),
-                    Image.Resampling.LANCZOS,
-                )
-
+                img = img.resize((max(1, int(round(img.width * ratio))), max(1, int(round(img.height * ratio)))), Image.Resampling.LANCZOS)
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG', compress_level=1)
             payload = img_byte_arr.getvalue()
-
             if _ensure_cache_dir():
                 try:
                     cache_path.write_bytes(payload)
                 except Exception:
-                    pass  # cache is best-effort only
-
+                    pass
             out = io.BytesIO(payload)
             out.seek(0)
             return out
@@ -446,13 +363,52 @@ class CatalogValidator:
         return get_palette_tags(color_family)
 
 
-# ==========================================
-# Background Processing Function
-# ==========================================
+# ============================================================================
+# KAN-119 — cleanup + commit primitives shared by both background pipelines
+# and the seller edit route.
+# ============================================================================
+ORPHAN_LOG_TAG = "KAN-119 ORPHAN_RISK"
+
+
+def _purge_gridfs(storage, name, *, item_id=None):
+    """Delete one stored object and report the outcome truthfully.
+
+    GridFSStorage.delete() already treats an absent file as a harmless no-op
+    and RAISES when the bucket is unreachable. We must not convert that raise
+    into a silent 'clean' result: log it at ERROR with enough detail to find
+    and sweep the orphan later. Returns True only when the object is gone.
+    """
+    if not name:
+        return True
+    try:
+        storage.delete(name)
+        return True
+    except Exception as exc:
+        logger.error("%s item=%s name=%s error=%s", ORPHAN_LOG_TAG, item_id, name, exc)
+        return False
+
+
+def _discard_written(names, item_id):
+    """Remove objects this worker just wrote (compensation after a delete race)."""
+    for field_name, name in names.items():
+        _purge_gridfs(CatalogItem._meta.get_field(field_name).storage, name, item_id=item_id)
+
+
+def _commit_item(item_id, **fields):
+    """Write worker results WITHOUT resurrecting a deleted listing.
+
+    Model.save() falls back to INSERT when its UPDATE matches zero rows, which
+    is exactly how a listing deleted mid-pipeline came back to life.
+    queryset.update() never inserts. It also bypasses auto_now, so updated_at
+    is stamped explicitly - that additionally guarantees a real modification,
+    making the return value a reliable 'the row was still there' signal.
+    """
+    fields['updated_at'] = timezone.now()
+    return CatalogItem.objects.filter(id=item_id).update(**fields) > 0
+
+
 def process_batch_background(batch_id):
     start_time = time.time()
-    print(f"\n{'='*60}")
-    print(f"🚀 Starting batch {batch_id} processing...")
     deferred_deletes = []
     try:
         time.sleep(0.5)
@@ -462,7 +418,6 @@ def process_batch_background(batch_id):
             batch = UploadBatch.objects.get(id=ObjectId(batch_id))
         batch.status = 'processing'
         batch.save()
-
         validator = CatalogValidator()
         rembg_session = get_shared_rembg_session()
         accepted_count = 0
@@ -470,14 +425,11 @@ def process_batch_background(batch_id):
         rejection_report = {}
         items = list(CatalogItem.objects.filter(batch=batch))
         total_items = len(items)
-        print(f"📦 Processing {total_items} items in batch {batch_id}...")
-
         inflight = {}
         inflight_lock = threading.Lock()
 
         def _image_pipeline(item, field_name, view_label):
-            result = {'view': view_label, 'field': field_name, 'bytes': None,
-                      'color': None, 'errors': []}
+            result = {'view': view_label, 'field': field_name, 'bytes': None, 'color': None, 'errors': []}
             img_field = getattr(item, field_name, None)
             original_name = getattr(img_field, 'name', None)
             if not img_field or not original_name:
@@ -488,7 +440,6 @@ def process_batch_background(batch_id):
             except Exception as e:
                 result['errors'].append(f"{view_label} read failed: {e}")
                 return result
-
             digest = _matte_cache_digest(original)
             with inflight_lock:
                 entry = inflight.get(digest)
@@ -511,7 +462,6 @@ def process_batch_background(batch_id):
                 return result
             payload = entry['payload']
             result['bytes'] = payload
-
             if field_name == 'front_image':
                 front_color = validator.extract_dominant_color(io.BytesIO(payload))
                 result['color'] = front_color
@@ -519,12 +469,9 @@ def process_batch_background(batch_id):
                 if not color_valid:
                     result['errors'].append(color_msg)
             else:
-                orient_valid, orient_msg = validator.check_garment_orientation(
-                    io.BytesIO(payload), view_label, category=item.category
-                )
+                orient_valid, orient_msg = validator.check_garment_orientation(io.BytesIO(payload), view_label, category=item.category)
                 if not orient_valid:
                     result['errors'].append(orient_msg)
-
             try:
                 processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
                 image_field = getattr(item, field_name)
@@ -539,25 +486,18 @@ def process_batch_background(batch_id):
             if item.status == 'rejected':
                 continue
             for field_name, view_label in [('front_image', 'Front'), ('rear_image', 'Rear')]:
-                futures[(str(item.id), field_name)] = IMAGE_PROCESS_EXECUTOR.submit(
-                    _image_pipeline, item, field_name, view_label
-                )
+                futures[(str(item.id), field_name)] = IMAGE_PROCESS_EXECUTOR.submit(_image_pipeline, item, field_name, view_label)
 
         for i, item in enumerate(items, 1):
-            item_start = time.time()
             if item.status == 'rejected':
                 rejected_count += 1
                 rejection_report[str(item.id)] = item.rejection_reasons or ['Rejected at upload']
                 continue
-
             item_errors = []
             front_color = "#000000"
-
             missing_assets = [
                 view_label
-                for field_name, view_label in (
-                    ('front_image', 'Front'), ('rear_image', 'Rear'),
-                )
+                for field_name, view_label in (('front_image', 'Front'), ('rear_image', 'Rear'))
                 if (str(item.id), field_name) not in futures
                 and not getattr(getattr(item, field_name, None), 'name', None)
             ]
@@ -566,7 +506,6 @@ def process_batch_background(batch_id):
                     f"Missing stored image assets: {', '.join(missing_assets)}. "
                     "The original upload did not persist the images; re-upload this listing."
                 )
-
             for field_name, view_label in [('front_image', 'Front'), ('rear_image', 'Rear')]:
                 future = futures.get((str(item.id), field_name))
                 if future is None:
@@ -578,38 +517,24 @@ def process_batch_background(batch_id):
                         front_color = res['color']
                 except Exception as e:
                     item_errors.append(f"{view_label} processing failed: {e}")
-
             if item_errors:
                 rejection_report[str(item.id)] = item_errors
                 item.status = 'rejected'
                 item.rejection_reasons = item_errors
                 item.save()
                 rejected_count += 1
-                print(f"❌ Item {i}/{total_items} ({item.name}) REJECTED: {', '.join(item_errors)}")
             else:
-                palette_tags = validator.generate_color_palette_tags(front_color, item.color_family)
-                item.compatible_color_palette_tags = palette_tags
+                item.compatible_color_palette_tags = validator.generate_color_palette_tags(front_color, item.color_family)
                 item.status = 'active'
                 item.save()
                 accepted_count += 1
-                item_time = time.time() - item_start
-                print(f"✅ Item {i}/{total_items} ({item.name}) processed in {item_time:.2f}s")
-
-        total_time = time.time() - start_time
         batch.accepted_count = accepted_count
         batch.rejected_count = rejected_count
         batch.rejection_report = rejection_report
         batch.status = 'completed'
         batch.completed_at = timezone.now()
         batch.save()
-        print(f"🏁 BATCH {batch_id} PROCESSING COMPLETE")
-        print(f"⏱️  Total Time: {total_time:.2f} seconds")
-        print(f"📊 Accepted: {accepted_count} | Rejected: {rejected_count}")
-        print(f"⚡ Average per item: {total_time/max(total_items,1):.2f} seconds")
-        print(f"{'='*60}\n")
     except Exception as e:
-        total_time = time.time() - start_time
-        print(f"❌ Batch {batch_id} failed after {total_time:.2f}s: {e}")
         try:
             batch = UploadBatch.objects.get(id=batch_id)
             batch.status = 'failed'
@@ -618,17 +543,97 @@ def process_batch_background(batch_id):
         except UploadBatch.DoesNotExist:
             pass
     finally:
+        # KAN-119: a failed deferred delete must be attributable, not a warning
+        # that leaves the batch looking clean while the object still exists.
         for image_field, original_name in deferred_deletes:
-            try:
-                if original_name:
-                    image_field.storage.delete(original_name)
-            except Exception as e:
-                logger.warning("Deferred GridFS delete failed for %s: %s", original_name, e)
+            _purge_gridfs(image_field.storage, original_name)
 
 
-# ==========================================
-# Catalog ViewSet
-# ==========================================
+def process_single_item_background(item_id):
+    """Re-run the full validation pipeline for a single edited listing.
+
+    GOAL 1: an edited/re-uploaded item must stay 'processing' until this
+    pipeline passes. It ends 'active' only if every check succeeds, otherwise
+    'rejected'. It never flips an item to 'active' as a shortcut.
+
+    KAN-119: the seller may DELETE the listing while this runs. Every write is
+    therefore guarded, and the final commit can never re-insert a deleted row.
+    """
+    try:
+        item = CatalogItem.objects.get(id=item_id)
+    except CatalogItem.DoesNotExist:
+        return
+    if item.status != 'processing':
+        return
+    validator = CatalogValidator()
+    rembg_session = get_shared_rembg_session()
+    item_errors = []
+    front_color = None
+    written_names = {}
+    for field_name, view_label in [('front_image', 'Front'), ('rear_image', 'Rear')]:
+        img_field = getattr(item, field_name, None)
+        original_name = getattr(img_field, 'name', None) if img_field else None
+        if not img_field or not original_name:
+            item_errors.append(
+                f"Missing stored image asset: {view_label}. "
+                "The original upload did not persist this image; re-upload this listing."
+            )
+            continue
+        try:
+            img_field.seek(0)
+            original = img_field.read()
+        except Exception as e:
+            item_errors.append(f"{view_label} read failed: {e}")
+            continue
+        try:
+            payload = validator.process_image_with_rembg(io.BytesIO(original), rembg_session).getvalue()
+        except Exception as e:
+            item_errors.append(f"{view_label} background removal failed: {e}")
+            continue
+        if field_name == 'front_image':
+            front_color = validator.extract_dominant_color(io.BytesIO(payload))
+            color_valid, color_msg = validator.validate_color_alignment(item.color, front_color)
+            if not color_valid:
+                item_errors.append(color_msg)
+        else:
+            orient_valid, orient_msg = validator.check_garment_orientation(io.BytesIO(payload), view_label, category=item.category)
+            if not orient_valid:
+                item_errors.append(orient_msg)
+        try:
+            # Deleted while we were processing: stop before creating orphans.
+            if not CatalogItem.objects.filter(id=item_id).exists():
+                _discard_written(written_names, item_id)
+                return
+            processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
+            img_field.save(processed_file.name, processed_file, save=False)
+            written_names[field_name] = img_field.name
+            if original_name and original_name != img_field.name:
+                _purge_gridfs(img_field.storage, original_name, item_id=item_id)
+        except Exception as e:
+            item_errors.append(f"{view_label} storage failed: {e}")
+
+    fields = {}
+    if item_errors:
+        fields['status'] = 'rejected'
+        fields['rejection_reasons'] = item_errors
+    else:
+        if front_color:
+            fields['compatible_color_palette_tags'] = validator.generate_color_palette_tags(front_color, item.color_family)
+        fields['status'] = 'active'
+        fields['rejection_reasons'] = []
+    fields.update(written_names)
+
+    if not _commit_item(item_id, **fields):
+        # Zero rows matched: the listing is gone. Drop what we just wrote.
+        if not CatalogItem.objects.filter(id=item_id).exists():
+            _discard_written(written_names, item_id)
+        return
+    # Deleted in the window between our commit and here: the post_delete signal
+    # may have seen the OLD refs, so the NEW ones are ours to remove.
+    if not CatalogItem.objects.filter(id=item_id).exists():
+        _discard_written(written_names, item_id)
+
+
 class CatalogViewSet(viewsets.ModelViewSet):
     queryset = CatalogItem.objects.filter(status='active')
     serializer_class = CatalogItemSerializer
@@ -662,7 +667,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-package')
     def download_package(self, request):
-        archive = io.StringIO() if False else io.BytesIO()
+        archive = io.BytesIO()
         with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as package:
             package.writestr('catalog_products.csv', build_catalog_template_csv())
             package.writestr('seller_image_guidelines.txt', SELLER_IMAGE_GUIDELINES)
@@ -700,7 +705,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         data_lines = lines[header_index:]
         reader = csv.DictReader(data_lines)
         rows = [row for row in reader if any(row.values())]
-
         for row in rows:
             rear_value = (row.get('rear_image_filename') or '').strip()
             side_value = (row.get('side_image_filename') or '').strip()
@@ -708,15 +712,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
             if not rear_value and side_value and 'side' not in side_stem:
                 row['rear_image_filename'] = side_value
                 row['side_image_filename'] = ''
-
         if len(rows) > settings.MAX_BATCH_ITEMS:
             return Response({'error': f'Upload exceeds maximum of {settings.MAX_BATCH_ITEMS} items.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(rows) == 0:
             return Response({'error': 'CSV file is empty'}, status=status.HTTP_400_BAD_REQUEST)
         if len(image_files) < len(rows) * 2:
-            return Response({
-                'error': 'Missing view images. Each item requires 2 images (Front, Rear). Please upload all required views.'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Missing view images. Each item requires 2 images (Front, Rear). Please upload all required views.'}, status=status.HTTP_400_BAD_REQUEST)
         batch = UploadBatch.objects.create(
             seller=request.user, store_name=request.user.store_name or "Unknown Store",
             status='processing', total_items=len(rows))
@@ -831,10 +832,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             return Response(CatalogItemSerializer(item).data)
         elif request.method == 'DELETE':
-            for field in ('front_image', 'rear_image'):
-                image = getattr(item, field)
-                if image and image.name:
-                    image.delete(save=False)
+            # GridFS cleanup is handled by the post_delete signal in catalog/models.py.
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         elif request.method in ['PUT', 'PATCH']:
@@ -845,15 +843,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 payload.pop(field, None)
 
             original_status = item.status
-
-            serializer = CatalogItemSerializer(
-                item, data=payload, partial=request.method == 'PATCH'
-            )
+            serializer = CatalogItemSerializer(item, data=payload, partial=request.method == 'PATCH')
             serializer.is_valid(raise_exception=True)
 
-            # 1. PROCESS AND VALIDATE IMAGES FIRST
+            # Fast-fail only on cheap, deterministic file checks. Semantic checks
+            # (rembg, orientation, color alignment) run in the background pipeline.
             validator = CatalogValidator()
-            processed_images = {}
             for field, image_file in replacement_images.items():
                 if image_file.size > validator.MAX_FILE_SIZE_BYTES:
                     return Response({field: 'Image must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -861,77 +856,65 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 dimensions_valid, dimensions_error = validator.check_image_dimensions(image_file)
                 if not format_valid or not dimensions_valid:
                     return Response({field: format_error or dimensions_error}, status=status.HTTP_400_BAD_REQUEST)
-                image_file.seek(0)
-                try:
-                    processed_images[field] = validator.process_image_with_rembg(
-                        image_file, get_shared_rembg_session()
-                    )
-                except Exception as error:
-                    return Response({field: str(error)}, status=status.HTTP_400_BAD_REQUEST)
-                if field == 'rear_image':
-                    view_label = 'Rear'
-                    orient_valid, orient_msg = validator.check_garment_orientation(
-                        processed_images[field], view_label, category=item.category
-                    )
-                    if not orient_valid:
-                        return Response({field: orient_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 2. COLOR ALIGNMENT CHECK
-            needs_color_check = (
-                'color_family' in serializer.validated_data
+            # GOAL 1: any meaningful edit re-enters validation. The item stays
+            # 'processing' and only the background pipeline may promote it.
+            needs_pipeline = (
+                original_status == 'rejected'
+                or bool(replacement_images)
                 or 'color' in serializer.validated_data
-                or 'front_image' in processed_images
-                or original_status == 'rejected'
+                or 'color_family' in serializer.validated_data
             )
-            proposed_color = serializer.validated_data.get('color', item.color)
-            proposed_color_family = serializer.validated_data.get('color_family', item.color_family)
-
-            if needs_color_check:
-                front_image_bytes = processed_images.get('front_image')
-                if front_image_bytes:
-                    front_image_bytes.seek(0)
-                    front_color = validator.extract_dominant_color(front_image_bytes)
-                elif item.front_image:
-                    item.front_image.seek(0)
-                    front_color = validator.extract_dominant_color(item.front_image)
-                else:
-                    front_color = None
-
-                if front_color:
-                    color_valid, color_message = validator.validate_color_alignment(
-                        proposed_color, front_color
-                    )
-                    if not color_valid:
-                        return Response({'front_image': color_message}, status=status.HTTP_400_BAD_REQUEST)
-
-            # 3. ALL VALIDATIONS PASSED. NOW COMMIT TEXT FIELDS AND STATUS CHANGE.
-            item.status = 'processing'
-            item.rejection_reasons = []
+            if needs_pipeline:
+                item.status = 'processing'
+                item.rejection_reasons = []
             updated = serializer.save()
 
-            old_image_names = {
-                field: getattr(updated, field).name for field in processed_images
-            }
-            for field, processed_bytes in processed_images.items():
-                processed_bytes.seek(0)
+            old_image_names = {}
+            for field, image_file in replacement_images.items():
+                old_name = getattr(updated, field).name
+                if old_name:
+                    old_image_names[field] = old_name
+                image_file.seek(0)
                 getattr(updated, field).save(
-                    f"{updated.id}_{field}.png",
-                    ContentFile(processed_bytes.read()),
+                    f"{updated.id}_{field}.jpg",
+                    ContentFile(image_file.read()),
                     save=False,
                 )
-                old_name = old_image_names.get(field)
-                if old_name:
-                    getattr(updated, field).storage.delete(old_name)
-
-            if needs_color_check and 'front_color' in locals() and front_color:
-                updated.compatible_color_palette_tags = validator.generate_color_palette_tags(
-                    front_color, proposed_color_family
-                )
-
-            updated.status = 'active'
-            updated.rejection_reasons = []
             updated.save()
-            return Response(CatalogItemSerializer(updated).data)
+
+            # KAN-119: queue revalidation BEFORE any storage cleanup. Deleting the
+            # old image first meant an unreachable bucket raised here, the task was
+            # never submitted, and the listing stayed 'processing' forever.
+            if needs_pipeline:
+                try:
+                    UPLOAD_EXECUTOR.submit(process_single_item_background, updated.id)
+                except Exception:
+                    logger.exception("KAN-119 could not queue revalidation for %s", updated.id)
+                    _commit_item(
+                        updated.id,
+                        status='rejected',
+                        rejection_reasons=['Revalidation could not be started. Please re-submit this listing.'],
+                    )
+                    return Response(
+                        {'error': 'Revalidation could not be queued. Please try again.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+            # Cleanup can now fail without stranding the item. Failures are logged
+            # at ERROR by _purge_gridfs and surfaced to the seller below.
+            cleanup_failed = [
+                old_name for field, old_name in old_image_names.items()
+                if not _purge_gridfs(getattr(updated, field).storage, old_name, item_id=updated.id)
+            ]
+
+            data = CatalogItemSerializer(updated).data
+            if cleanup_failed:
+                data['image_cleanup_warning'] = (
+                    'Previous image(s) could not be removed from storage. '
+                    'The failure has been logged for cleanup.'
+                )
+            return Response(data)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'download_template', 'download_package']:
@@ -939,9 +922,6 @@ class CatalogViewSet(viewsets.ModelViewSet):
         return [IsSeller()]
 
 
-# ==========================================
-# Startup Sweep (run on app boot)
-# ==========================================
 def mark_stale_batches_as_failed():
     try:
         stale_time = timezone.now() - timedelta(minutes=10)

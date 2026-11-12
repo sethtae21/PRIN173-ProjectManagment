@@ -140,7 +140,8 @@ class AccountManagementTests(TestCase):
         self.client.force_authenticate(None)
         # FIX: login is email-based.
         login = self.client.post('/auth/login/',
-                                 {'email': 'acct@test.com', 'password': 'NewPass123!@#'}, format='json')
+                                 {'email': 'acct@test.com', 'password': 'NewPass123!@#'},
+                                 format='json')
         self.assertEqual(login.status_code, 200)
 
     @patch('accounts.views.core.blacklist_refresh_token')
@@ -190,7 +191,8 @@ class AccountManagementTests(TestCase):
         # Verify login now fails
         self.client.force_authenticate(None)
         login = self.client.post('/auth/login/',
-                                 {'email': 'acct@test.com', 'password': 'OldPass123!@#'}, format='json')
+                                 {'email': 'acct@test.com', 'password': 'OldPass123!@#'},
+                                 format='json')
         self.assertEqual(login.status_code, 400)
 
 
@@ -266,8 +268,54 @@ class GridFSStorageDeletionTests(SimpleTestCase):
 
         storage.delete('legacy-name.png')
 
-        gridfs.find_one.assert_called_once_with({'filename': 'legacy-name'})
+        # KAN-119: delete() looks the name up VERBATIM, and _save() stores the
+        # full generated name (upload_to prefix + extension). The previous
+        # expectation of a stripped stem did not match the implementation.
+        gridfs.find_one.assert_called_once_with({'filename': 'legacy-name.png'})
         gridfs.delete.assert_called_once_with('legacy-id')
+
+    # ------------------------------------------------------------------
+    # KAN-119 cleanup contract (supports UT-13).
+    #   GridFS unreachable  -> FAIL FAST. A silent return for an outage is
+    #                          what makes an orphaned image look cleaned.
+    #   File already absent -> idempotent no-op, never an exception.
+    # Injected Mock GridFS: no Atlas connection, no database (SimpleTestCase).
+    # ------------------------------------------------------------------
+    def test_delete_propagates_failure_when_gridfs_is_unavailable(self):
+        gridfs = Mock()
+        storage = GridFSStorage()
+        storage._fs = gridfs
+
+        # create=False on purpose: if this internal boundary ever drifts, the
+        # test errors loudly instead of patching a phantom attribute.
+        with patch.object(storage, '_require_fs',
+                          side_effect=FileNotFoundError('GridFS is not reachable right now')):
+            with self.assertRaises(FileNotFoundError):
+                storage.delete('507f1f77bcf86cd799439011')
+
+        gridfs.find_one.assert_not_called()
+        gridfs.delete.assert_not_called()
+
+    def test_delete_is_a_noop_when_the_file_is_already_absent(self):
+        from bson import ObjectId
+
+        cases = (
+            ('507f1f77bcf86cd799439011', {'_id': ObjectId('507f1f77bcf86cd799439011')}),
+            ('catalog/front/legacy.png', {'filename': 'catalog/front/legacy.png'}),
+        )
+        for key, first_query in cases:
+            with self.subTest(key=key):
+                gridfs = Mock()
+                gridfs.find_one.return_value = None
+                storage = GridFSStorage()
+                storage._fs = gridfs
+
+                with self.assertLogs('accounts.storage', level='WARNING') as logs:
+                    self.assertIsNone(storage.delete(key))
+
+                self.assertEqual(gridfs.find_one.call_args_list[0].args[0], first_query)
+                gridfs.delete.assert_not_called()
+                self.assertTrue(any('not found' in message for message in logs.output))
 
 
 class DatabasePingRedactionTests(SimpleTestCase):
