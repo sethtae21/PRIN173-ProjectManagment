@@ -20,6 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from accounts.permissions import IsSeller
+from accounts.storage import gridfs_storage
 from PIL import Image
 from rembg import new_session, remove
 from bson.objectid import ObjectId
@@ -389,7 +390,10 @@ def _purge_gridfs(storage, name, *, item_id=None):
 
 
 def _discard_written(names, item_id):
-    """Remove objects this worker just wrote (compensation after a delete race)."""
+    """Remove objects this request/worker just wrote (compensation).
+
+    Only ever pass names that are NOT referenced by the persisted row.
+    """
     for field_name, name in names.items():
         _purge_gridfs(CatalogItem._meta.get_field(field_name).storage, name, item_id=item_id)
 
@@ -402,6 +406,10 @@ def _commit_item(item_id, **fields):
     queryset.update() never inserts. It also bypasses auto_now, so updated_at
     is stamped explicitly - that additionally guarantees a real modification,
     making the return value a reliable 'the row was still there' signal.
+
+    IMPORTANT: callers MUST pass every field they changed, including image
+    names written with FieldFile.save(save=False). Those live only on the
+    Python instance; omitting them here would orphan the new objects.
     """
     fields['updated_at'] = timezone.now()
     return CatalogItem.objects.filter(id=item_id).update(**fields) > 0
@@ -429,7 +437,8 @@ def process_batch_background(batch_id):
         inflight_lock = threading.Lock()
 
         def _image_pipeline(item, field_name, view_label):
-            result = {'view': view_label, 'field': field_name, 'bytes': None, 'color': None, 'errors': []}
+            result = {'view': view_label, 'field': field_name, 'bytes': None,
+                      'color': None, 'name': None, 'errors': []}
             img_field = getattr(item, field_name, None)
             original_name = getattr(img_field, 'name', None)
             if not img_field or not original_name:
@@ -476,7 +485,13 @@ def process_batch_background(batch_id):
                 processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
                 image_field = getattr(item, field_name)
                 image_field.save(processed_file.name, processed_file, save=False)
-                deferred_deletes.append((image_field, original_name))
+                # KAN-119: the batch commit uses queryset.update(), which cannot
+                # see save=False instance changes. Carry the new stored name out
+                # of this thread or the processed object becomes an orphan.
+                result['name'] = image_field.name
+                # KAN-119: carry the listing id so a failed deferred purge is
+                # attributable instead of logging item=None.
+                deferred_deletes.append((item.id, image_field, original_name))
             except Exception as e:
                 result['errors'].append(f"{view_label} storage failed: {e}")
             return result
@@ -495,6 +510,7 @@ def process_batch_background(batch_id):
                 continue
             item_errors = []
             front_color = "#000000"
+            written = {}
             missing_assets = [
                 view_label
                 for field_name, view_label in (('front_image', 'Front'), ('rear_image', 'Rear'))
@@ -515,19 +531,29 @@ def process_batch_background(batch_id):
                     item_errors.extend(res['errors'])
                     if res['color']:
                         front_color = res['color']
+                    if res.get('name'):
+                        written[res['field']] = res['name']
                 except Exception as e:
                     item_errors.append(f"{view_label} processing failed: {e}")
             if item_errors:
                 rejection_report[str(item.id)] = item_errors
-                item.status = 'rejected'
-                item.rejection_reasons = item_errors
-                item.save()
+                fields = {'status': 'rejected', 'rejection_reasons': item_errors}
                 rejected_count += 1
             else:
-                item.compatible_color_palette_tags = validator.generate_color_palette_tags(front_color, item.color_family)
-                item.status = 'active'
-                item.save()
+                fields = {
+                    'status': 'active',
+                    'compatible_color_palette_tags': validator.generate_color_palette_tags(front_color, item.color_family),
+                }
                 accepted_count += 1
+            fields.update(written)
+
+            # KAN-119: a seller may delete a listing while the batch runs.
+            # item.save() would re-INSERT the deleted row; _commit_item cannot.
+            # Counters and rejection_report are intentionally left unchanged so
+            # the batch report math and the frontend contract stay identical.
+            if not _commit_item(item.id, **fields):
+                if not CatalogItem.objects.filter(id=item.id).exists():
+                    _discard_written(written, item.id)
         batch.accepted_count = accepted_count
         batch.rejected_count = rejected_count
         batch.rejection_report = rejection_report
@@ -545,8 +571,8 @@ def process_batch_background(batch_id):
     finally:
         # KAN-119: a failed deferred delete must be attributable, not a warning
         # that leaves the batch looking clean while the object still exists.
-        for image_field, original_name in deferred_deletes:
-            _purge_gridfs(image_field.storage, original_name)
+        for deferred_item_id, image_field, original_name in deferred_deletes:
+            _purge_gridfs(image_field.storage, original_name, item_id=deferred_item_id)
 
 
 def process_single_item_background(item_id):
@@ -812,7 +838,8 @@ class CatalogViewSet(viewsets.ModelViewSet):
         summary="Manage a specific seller listing",
         description="GET details, PUT/PATCH update (with optional image replacement), or DELETE a specific catalog item.",
         parameters=[OpenApiParameter('item_id', OpenApiTypes.STR, OpenApiParameter.PATH, description="Item ID")],
-        responses={200: CatalogItemSerializer, 204: None, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+        responses={200: CatalogItemSerializer, 204: None, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT,
+                   404: OpenApiTypes.OBJECT, 503: OpenApiTypes.OBJECT},
         tags=['Seller Listings']
     )
     @action(
@@ -832,6 +859,23 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             return Response(CatalogItemSerializer(item).data)
         elif request.method == 'DELETE':
+            # KAN-119: post_delete runs AFTER the row is gone, so a cleanup
+            # failure there can only be logged - it cannot un-delete the row.
+            # Refuse up front instead: nothing is mutated, no orphan is created,
+            # and the seller gets a retryable error rather than a misleading 204.
+            # Private-access mirrors catalog.views.page_views.serve_gridfs_media.
+            if item.front_image.name or item.rear_image.name:
+                try:
+                    gridfs_storage._require_fs()
+                except Exception as exc:
+                    logger.error(
+                        "KAN-119 delete refused: image storage unreachable item=%s error=%s",
+                        item.id, exc,
+                    )
+                    return Response(
+                        {'error': 'Image storage is unavailable, so this listing was not deleted. Please try again shortly.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
             # GridFS cleanup is handled by the post_delete signal in catalog/models.py.
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -870,18 +914,44 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 item.rejection_reasons = []
             updated = serializer.save()
 
+            # KAN-119: serializer.save() has ALREADY persisted 'processing'.
+            # An unguarded storage failure below therefore stranded the listing
+            # in 'processing' forever (nothing sweeps CatalogItem, only batches).
+            # Track every object we write so a partial failure can be undone.
             old_image_names = {}
-            for field, image_file in replacement_images.items():
-                old_name = getattr(updated, field).name
-                if old_name:
-                    old_image_names[field] = old_name
-                image_file.seek(0)
-                getattr(updated, field).save(
-                    f"{updated.id}_{field}.jpg",
-                    ContentFile(image_file.read()),
-                    save=False,
-                )
-            updated.save()
+            new_image_names = {}
+            try:
+                for field, image_file in replacement_images.items():
+                    old_name = getattr(updated, field).name
+                    if old_name:
+                        old_image_names[field] = old_name
+                    image_file.seek(0)
+                    getattr(updated, field).save(
+                        f"{updated.id}_{field}.jpg",
+                        ContentFile(image_file.read()),
+                        save=False,
+                    )
+                    new_image_names[field] = getattr(updated, field).name
+                updated.save()
+            except Exception:
+                logger.exception("KAN-119 could not store replacement image(s) for %s", updated.id)
+                # updated.save() did NOT run, so the DB still references the OLD
+                # images. Purge ONLY the new objects; deleting old_image_names
+                # here would strip the listing's live references.
+                _discard_written(new_image_names, updated.id)
+                if needs_pipeline:
+                    _commit_item(
+                        updated.id,
+                        status='rejected',
+                        rejection_reasons=[
+                            'The replacement image could not be stored. Please re-submit this listing.'
+                        ],
+                    )
+                    return Response(
+                        {'error': 'The replacement image could not be stored. Please try again.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                raise
 
             # KAN-119: queue revalidation BEFORE any storage cleanup. Deleting the
             # old image first meant an unreachable bucket raised here, the task was
@@ -896,6 +966,12 @@ class CatalogViewSet(viewsets.ModelViewSet):
                         status='rejected',
                         rejection_reasons=['Revalidation could not be started. Please re-submit this listing.'],
                     )
+                    # KAN-119: updated.save() DID run here, so the row references
+                    # the NEW images and the superseded ones are unreferenced.
+                    # Without this purge the failure branch creates the very
+                    # orphan this ticket exists to prevent.
+                    for field, old_name in old_image_names.items():
+                        _purge_gridfs(getattr(updated, field).storage, old_name, item_id=updated.id)
                     return Response(
                         {'error': 'Revalidation could not be queued. Please try again.'},
                         status=status.HTTP_503_SERVICE_UNAVAILABLE,

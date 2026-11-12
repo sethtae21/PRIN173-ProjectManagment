@@ -136,6 +136,68 @@ def isolated_gridfs():
     return stack, bucket
 
 
+class _GridFSIsolatedMixin:
+    """Shared KAN-119 fixture: fake bucket, private rembg cache, GridFS helpers.
+
+    Subclasses define their own setUp and MUST call super().setUp() so the
+    isolation is installed before any image is written.
+    """
+
+    def setUp(self):
+        super().setUp()
+        stack, self.gridfs = isolated_gridfs()
+        self.addCleanup(stack.close)
+        self.assertIs(
+            gridfs_storage, CatalogItem._meta.get_field('front_image').storage,
+            'Injected GridFS double must be the same object the model fields use.',
+        )
+        # A shared on-disk rembg cache can serve a stale matte and skip the
+        # patched remove() entirely. Give each test a private cache dir.
+        cache_dir = tempfile.TemporaryDirectory(prefix='kan119-rembg-')
+        self.addCleanup(cache_dir.cleanup)
+        stack.enter_context(patch('catalog.views.core.REMBG_CACHE_DIR', Path(cache_dir.name)))
+
+    @staticmethod
+    def _png_bytes(size=(800, 800), color=(255, 255, 255, 128)):
+        image = Image.new('RGBA', size, color)
+        output = io.BytesIO()
+        image.save(output, format='PNG')
+        return output.getvalue()
+
+    def _gridfs_file(self, storage_name):
+        """Return the GridFS file document for a stored field name, or None."""
+        if not storage_name:
+            return None
+        fs = gridfs_storage._require_fs()
+        if ObjectId.is_valid(storage_name):
+            return fs.find_one({'_id': ObjectId(storage_name)})
+        return fs.find_one({'filename': storage_name})
+
+    def _item_gridfs_files(self, item_id):
+        """All GridFS file documents whose filename contains this item's ID.
+
+        Django's ImageField prepends the upload_to prefix (e.g. 'catalog/front/')
+        to the filename, so we search fs.files for the 24-char item_id anywhere
+        in the path.
+        """
+        gridfs_storage._require_fs()
+        db = gridfs_storage._db
+        return list(db['fs.files'].find({'filename': {'$regex': str(item_id)}}))
+
+    def _item_with_images(self, **overrides):
+        """Active listing with BOTH views already persisted."""
+        defaults = dict(
+            name='Shirt', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral', price=10.0,
+            seller=self.seller, store_name='Test Store', status='active')
+        defaults.update(overrides)
+        item = CatalogItem.objects.create(**defaults)
+        item.front_image.save(f'{item.id}_front.png', ContentFile(self._png_bytes()), save=False)
+        item.rear_image.save(f'{item.id}_rear.png', ContentFile(self._png_bytes()), save=True)
+        item.refresh_from_db()
+        return item
+
+
 class CatalogColorAlignmentTests(SimpleTestCase):
     def test_accepts_dominant_shade_of_declared_color(self):
         is_valid, _ = CatalogValidator().validate_color_alignment('Red', '#d21823')
@@ -199,7 +261,7 @@ class CatalogTagValidationTests(SimpleTestCase):
         self.assertTrue(any('not-an-occasion' in error and 'occasion_tags' in error for error in errors))
 
 
-class CatalogValidationAndCRUDTests(TestCase):
+class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
     def setUp(self):
         self.client = APIClient()
         self.seller = User.objects.create_user(
@@ -209,68 +271,13 @@ class CatalogValidationAndCRUDTests(TestCase):
             full_name='Test User', email='user@test.com', password='Test123!@#', role='user')
         self.valid_img = SimpleUploadedFile("test.jpg", b"fake_image_data", content_type="image/jpeg")
         self.oversized_img = SimpleUploadedFile("large.jpg", b"x" * (5 * 1024 * 1024 + 100), content_type="image/jpeg")
-
-        # KAN-119: never touch the configured MONGODB_URI bucket from tests.
-        stack, self.gridfs = isolated_gridfs()
-        self.addCleanup(stack.close)
-        self.assertIs(
-            gridfs_storage, CatalogItem._meta.get_field('front_image').storage,
-            'Injected GridFS double must be the same object the model fields use.',
-        )
-
-        # KAN-119: a shared on-disk rembg cache can serve a stale matte and skip
-        # the patched remove() entirely. Give each test a private cache dir.
-        cache_dir = tempfile.TemporaryDirectory(prefix='kan119-rembg-')
-        self.addCleanup(cache_dir.cleanup)
-        stack.enter_context(patch('catalog.views.core.REMBG_CACHE_DIR', Path(cache_dir.name)))
+        super().setUp()
 
     def _get_valid_csv(self):
         return (
             "name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n"
             "Test Shirt,A nice shirt,tops,M,White,Pure white,neutral,20.00,casual,everyday,test_front.jpg,test_rear.jpg\n"
         )
-
-    @staticmethod
-    def _png_bytes(size=(800, 800), color=(255, 255, 255, 128)):
-        image = Image.new('RGBA', size, color)
-        output = io.BytesIO()
-        image.save(output, format='PNG')
-        return output.getvalue()
-
-    def _gridfs_file(self, storage_name):
-        """Return the live GridFS file document for a stored field name, or None."""
-        if not storage_name:
-            return None
-        fs = gridfs_storage._require_fs()
-        if ObjectId.is_valid(storage_name):
-            return fs.find_one({'_id': ObjectId(storage_name)})
-        return fs.find_one({'filename': storage_name})
-
-    def _item_gridfs_files(self, item_id):
-        """Return all GridFS file documents associated with an item's ID.
-
-        Django's ImageField prepends the `upload_to` prefix (e.g. 'catalog/front/')
-        to the filename. We query the underlying MongoDB `fs.files` collection
-        directly and search for the unique 24-char item_id anywhere in the path.
-        """
-        fs = gridfs_storage._require_fs()
-        db = gridfs_storage._db
-        item_id_str = str(item_id)
-        files_collection = db['fs.files']
-        return list(files_collection.find({'filename': {'$regex': item_id_str}}))
-
-    def _item_with_images(self, **overrides):
-        """Active listing with BOTH views already persisted (KAN-119 fixture)."""
-        defaults = dict(
-            name='Shirt', description='desc', category='tops', size='M',
-            color='White', color_description='white', color_family='neutral', price=10.0,
-            seller=self.seller, store_name='Test Store', status='active')
-        defaults.update(overrides)
-        item = CatalogItem.objects.create(**defaults)
-        item.front_image.save(f'{item.id}_front.png', ContentFile(self._png_bytes()), save=False)
-        item.rear_image.save(f'{item.id}_rear.png', ContentFile(self._png_bytes()), save=True)
-        item.refresh_from_db()
-        return item
 
     # --- PERMISSIONS ---
     def test_guest_cannot_upload(self):
@@ -649,6 +656,7 @@ class CatalogValidationAndCRUDTests(TestCase):
             return io.BytesIO(payload)
 
         with patch('catalog.views.core.CatalogValidator.process_image_with_rembg', process_then_delete), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()), \
              patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)):
             response = self.client.patch(
                 f'/catalog/my-listings/{item_id}/', {'front_image': replacement}, format='multipart')
@@ -675,6 +683,7 @@ class CatalogValidationAndCRUDTests(TestCase):
 
         with patch('catalog.views.core.CatalogValidator.process_image_with_rembg',
                    lambda s, f, session=None: io.BytesIO(payload)), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()), \
              patch('catalog.views.core._commit_item', side_effect=delete_then_commit), \
              patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)):
             response = self.client.patch(
@@ -702,6 +711,7 @@ class CatalogValidationAndCRUDTests(TestCase):
 
         with patch('catalog.views.core.CatalogValidator.process_image_with_rembg',
                    lambda s, f, session=None: io.BytesIO(payload)), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()), \
              patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)), \
              patch.object(type(gridfs_storage), 'delete', flaky_delete), \
              self.assertLogs('catalog', level='ERROR') as logs:
@@ -719,9 +729,11 @@ class CatalogValidationAndCRUDTests(TestCase):
     def test_pipeline_submission_failure_does_not_leave_item_processing(self):
         self.client.force_authenticate(user=self.seller)
         item = self._item_with_images()
+        old_front = item.front_image.name
         replacement = SimpleUploadedFile('new.png', self._png_bytes(), content_type='image/png')
-
-        with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=RuntimeError('executor down')):
+    
+        with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=RuntimeError('executor down')), \
+             self.assertLogs('catalog', level='ERROR'):
             response = self.client.patch(
                 f'/catalog/my-listings/{item.id}/', {'front_image': replacement}, format='multipart')
 
@@ -729,3 +741,220 @@ class CatalogValidationAndCRUDTests(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.status, 'rejected')
         self.assertTrue(item.rejection_reasons)
+        # KAN-119: this branch must not create the orphan it exists to prevent.
+        self.assertNotIn(ObjectId(old_front), self.gridfs.files,
+                         'Superseded image was left orphaned by the submit-failure branch')
+        self.assertIsNotNone(self._gridfs_file(item.front_image.name),
+                             'The persisted replacement reference does not resolve')
+    # ==========================================
+    # KAN-119 DELETE PRE-FLIGHT (no misleading 204)
+    # ==========================================
+    def test_delete_refused_when_gridfs_unreachable_leaves_listing_intact(self):
+        self.client.force_authenticate(user=self.seller)
+        item = self._item_with_images()
+        before = dict(self.gridfs.files)
+
+        with patch.object(gridfs_storage, '_require_fs',
+                          side_effect=FileNotFoundError('GridFS is not reachable right now')), \
+             self.assertLogs('catalog', level='ERROR') as logs:
+            response = self.client.delete(f'/catalog/my-listings/{item.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertTrue(CatalogItem.objects.filter(id=item.id).exists(),
+                        'Listing was deleted even though image cleanup was impossible')
+        self.assertEqual(self.gridfs.files, before, 'Objects were removed on a refused delete')
+        self.assertTrue(any('delete refused' in message for message in logs.output))
+
+    def test_delete_without_images_still_succeeds_when_gridfs_unreachable(self):
+        self.client.force_authenticate(user=self.seller)
+        item = CatalogItem.objects.create(
+            name='No Image Shirt', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral', price=10.0,
+            seller=self.seller, store_name='Test Store', status='rejected')
+
+        with patch.object(gridfs_storage, '_require_fs',
+                          side_effect=FileNotFoundError('GridFS is not reachable right now')):
+            response = self.client.delete(f'/catalog/my-listings/{item.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(CatalogItem.objects.filter(id=item.id).exists())
+    # ==========================================
+    # KAN-119 REPLACEMENT-WRITE FAILURE (no stuck 'processing')
+    # ==========================================
+    def test_replacement_storage_failure_does_not_strand_processing(self):
+        self.client.force_authenticate(user=self.seller)
+        item = self._item_with_images()
+        old_front = item.front_image.name
+        old_rear = item.rear_image.name
+        before = set(self.gridfs.files)
+        replacement = SimpleUploadedFile('new.png', self._png_bytes(), content_type='image/png')
+
+        with patch.object(type(gridfs_storage), '_save',
+                          side_effect=FileNotFoundError('GridFS is not reachable right now')), \
+             self.assertLogs('catalog', level='ERROR'):
+            response = self.client.patch(
+                f'/catalog/my-listings/{item.id}/', {'front_image': replacement}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        item.refresh_from_db()
+        self.assertNotEqual(item.status, 'processing',
+                            'Replacement write failure stranded the listing in processing')
+        self.assertEqual(item.status, 'rejected')
+        self.assertTrue(item.rejection_reasons)
+        # updated.save() never ran: the row must still reference the ORIGINALS.
+        self.assertEqual(item.front_image.name, old_front)
+        self.assertEqual(item.rear_image.name, old_rear)
+        self.assertIsNotNone(self._gridfs_file(old_front))
+        self.assertIsNotNone(self._gridfs_file(old_rear))
+        self.assertEqual(set(self.gridfs.files), before,
+                         'A partially written replacement was left orphaned')
+
+    def test_partial_replacement_write_is_compensated(self):
+        """Front succeeds, rear fails: the new front must be purged, originals kept."""
+        self.client.force_authenticate(user=self.seller)
+        item = self._item_with_images()
+        old_front = item.front_image.name
+        old_rear = item.rear_image.name
+        before = set(self.gridfs.files)
+        payload = self._png_bytes()
+
+        real_save = type(gridfs_storage)._save
+
+        def flaky_save(storage_self, name, content):
+            if 'rear_image' in name:
+                raise FileNotFoundError('GridFS is not reachable right now')
+            return real_save(storage_self, name, content)
+
+        with patch.object(type(gridfs_storage), '_save', flaky_save), \
+             self.assertLogs('catalog', level='ERROR'):
+            response = self.client.patch(
+                f'/catalog/my-listings/{item.id}/',
+                {'front_image': SimpleUploadedFile('f.png', payload, content_type='image/png'),
+                 'rear_image': SimpleUploadedFile('r.png', payload, content_type='image/png')},
+                format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        item.refresh_from_db()
+        self.assertEqual(item.status, 'rejected')
+        self.assertEqual(item.front_image.name, old_front)
+        self.assertEqual(item.rear_image.name, old_rear)
+        self.assertEqual(set(self.gridfs.files), before,
+                         'The successfully written front replacement was not compensated')
+        self.assertEqual(set(self.gridfs.chunks), before)
+
+    def test_rejected_listing_with_missing_assets_cannot_be_promoted(self):
+        """Acceptance rule: a rejected item with no stored assets stays rejected."""
+        self.client.force_authenticate(user=self.seller)
+        item = CatalogItem.objects.create(
+            name='Assetless Shirt', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral', price=10.0,
+            seller=self.seller, store_name='Test Store', status='rejected',
+            rejection_reasons=['Missing stored image assets'])
+
+        with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()):
+            response = self.client.patch(
+                f'/catalog/my-listings/{item.id}/', {'description': 'Now described'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item.refresh_from_db()
+        self.assertEqual(item.status, 'rejected')
+        self.assertTrue(any('Missing stored image asset' in str(r) for r in item.rejection_reasons))
+        self.assertEqual(self.gridfs.files, {})
+        self.assertEqual(self.gridfs.chunks, {})
+
+
+class CatalogBatchGuardTests(_GridFSIsolatedMixin, TestCase):
+    """KAN-119: the batch worker must not resurrect a deleted listing, and its
+    guarded commit must still persist the processed image names."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.seller = User.objects.create_user(
+            full_name='Batch Seller', email='batch-seller@test.com', password='Test123!@#',
+            role='seller', store_name='Batch Store')
+        super().setUp()
+
+    def _csv(self):
+        return (
+            'name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename\n'
+            'Batch Shirt,desc,tops,M,Red,Bright red,red,20.00,casual,front.png,rear.png\n'
+        )
+
+    def _upload(self, payload):
+        csv_file = SimpleUploadedFile('batch.csv', self._csv().encode(), content_type='text/csv')
+        images = [
+            SimpleUploadedFile(f'{view}.png', payload, content_type='image/png')
+            for view in ('front', 'rear')
+        ]
+        with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()), \
+             patch('catalog.views.core.CatalogValidator.process_image_with_rembg',
+                   lambda s, f, session=None: io.BytesIO(payload)):
+            return self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart')
+
+    def test_batch_commit_persists_processed_image_names(self):
+        """Guards the orphan trap: _commit_item must carry the new image names."""
+        self.client.force_authenticate(user=self.seller)
+        payload = self._png_bytes(color=(210, 24, 35, 128))
+
+        response = self._upload(payload)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        item = CatalogItem.objects.get(batch_id=response.data['batch_id'])
+        self.assertEqual(item.status, 'active')
+        for field_name in ('front_image', 'rear_image'):
+            name = getattr(item, field_name).name
+            self.assertTrue(name, f'{field_name} reference was not persisted by the batch commit')
+            self.assertTrue(ObjectId.is_valid(name))
+            self.assertIsNotNone(self._gridfs_file(name), f'{field_name} points at a missing object')
+        self.assertEqual(len(self._item_gridfs_files(item.id)), 2)
+        self.assertEqual(len(self.gridfs.files), 2)
+        self.assertEqual(len(self.gridfs.chunks), 2)
+
+    def test_delete_during_batch_processing_does_not_resurrect_item(self):
+        self.client.force_authenticate(user=self.seller)
+        payload = self._png_bytes(color=(210, 24, 35, 128))
+        csv_file = SimpleUploadedFile('batch.csv', self._csv().encode(), content_type='text/csv')
+        images = [
+            SimpleUploadedFile(f'{view}.png', payload, content_type='image/png')
+            for view in ('front', 'rear')
+        ]
+        state = {'deleted': False}
+
+        def process_then_delete(validator_self, image_file, session=None):
+            if not state['deleted']:
+                state['deleted'] = True
+                CatalogItem.objects.filter(batch__isnull=False).delete()
+            return io.BytesIO(payload)
+
+        with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)), \
+             patch('catalog.views.core.get_shared_rembg_session', return_value=object()), \
+             patch('catalog.views.core.CatalogValidator.process_image_with_rembg', process_then_delete):
+            response = self.client.post('/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertTrue(state['deleted'], 'Race was never exercised')
+        self.assertFalse(CatalogItem.objects.filter(batch_id=response.data['batch_id']).exists(),
+                         'Batch worker resurrected a deleted listing')
+        self.assertEqual(self.gridfs.files, {})
+        self.assertEqual(self.gridfs.chunks, {})
+
+    def test_batch_deferred_purge_failure_is_attributable_to_the_listing(self):
+        """A failed deferred purge must name the listing, not log item=None."""
+        self.client.force_authenticate(user=self.seller)
+        payload = self._png_bytes(color=(210, 24, 35, 128))
+
+        def refuse(storage_self, name):
+            raise FileNotFoundError('GridFS is not reachable right now')
+
+        with patch.object(type(gridfs_storage), 'delete', refuse), \
+             self.assertLogs('catalog', level='ERROR') as logs:
+            response = self._upload(payload)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        item = CatalogItem.objects.get(batch_id=response.data['batch_id'])
+        self.assertTrue(
+            any('KAN-119 ORPHAN_RISK' in m and f'item={item.id}' in m for m in logs.output),
+            f'Deferred purge failure was not attributable to the listing: {logs.output}',
+        )
