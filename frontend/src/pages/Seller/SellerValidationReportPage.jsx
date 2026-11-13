@@ -156,20 +156,24 @@ function SellerValidationReportPage() {
       batchItems
         .filter((item) => {
           const status = String(item.status).toLowerCase();
+
+          // FIX: live status is authoritative. A fixed item (active) must never
+          // appear here, and the frozen batchReport.rejection_report snapshot
+          // is no longer used to pin items into this panel.
+          if (status === "active") return false;
+
           const hasReasons =
             Array.isArray(item.rejection_reasons) &&
             item.rejection_reasons.length > 0;
-          const inReport = Boolean(
-            batchReport?.rejection_report?.[String(item.id)]
-          );
-          return status === "rejected" || hasReasons || inReport;
+          return status === "rejected" || hasReasons;
         })
         .map((item) => {
+          // FIX: reasons come from the live item only; stale snapshot text
+          // (e.g. the old "declared 'Blue'" message) can never resurface.
           const reasons =
             (Array.isArray(item.rejection_reasons) &&
               item.rejection_reasons.length > 0 &&
               item.rejection_reasons) ||
-            batchReport?.rejection_report?.[String(item.id)] ||
             ["Validation failed."];
           return {
             id: String(item.id),
@@ -178,7 +182,7 @@ function SellerValidationReportPage() {
             reason: Array.isArray(reasons) ? reasons.join("; ") : reasons,
           };
         }),
-    [batchItems, batchReport]
+    [batchItems]
   );
 
   const pendingItems = useMemo(

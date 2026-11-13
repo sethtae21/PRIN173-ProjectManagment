@@ -575,6 +575,26 @@ def process_batch_background(batch_id):
             _purge_gridfs(image_field.storage, original_name, item_id=deferred_item_id)
 
 
+def _is_pipeline_matte(image_bytes: bytes) -> bool:
+    """True when the stored image already went through rembg (real transparency).
+
+    Re-matting a matte fails inside process_image_with_rembg: the RGBA->RGB
+    working copy flattens transparency to a black background, rembg returns a
+    fully opaque image, and the alpha-extrema guard raises ("Background removal
+    did not produce a valid transparent image"). Detect mattes and skip
+    straight to the semantic checks (color / orientation).
+    """
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            if img.mode != 'RGBA':
+                return False
+            hist = img.getchannel('A').histogram()
+            total = img.width * img.height or 1
+            return hist[0] / total >= 0.05 and sum(hist[25:]) / total >= 0.05
+    except Exception:
+        return False
+
+
 def process_single_item_background(item_id):
     """Re-run the full validation pipeline for a single edited listing.
 
@@ -584,6 +604,11 @@ def process_single_item_background(item_id):
 
     KAN-119: the seller may DELETE the listing while this runs. Every write is
     therefore guarded, and the final commit can never re-insert a deleted row.
+
+    Matte-aware: images stored by a prior pipeline run are already transparent
+    PNGs. Feeding them through rembg again fails the alpha-extrema guard, so
+    mattes skip background removal and go straight to color/orientation checks.
+    Only RAW replacement photos are matted here.
     """
     try:
         item = CatalogItem.objects.get(id=item_id)
@@ -592,7 +617,7 @@ def process_single_item_background(item_id):
     if item.status != 'processing':
         return
     validator = CatalogValidator()
-    rembg_session = get_shared_rembg_session()
+    rembg_session = None  # lazy: only load rembg when a RAW photo actually needs matting
     item_errors = []
     front_color = None
     written_names = {}
@@ -612,7 +637,12 @@ def process_single_item_background(item_id):
             item_errors.append(f"{view_label} read failed: {e}")
             continue
         try:
-            payload = validator.process_image_with_rembg(io.BytesIO(original), rembg_session).getvalue()
+            if _is_pipeline_matte(original):
+                payload = original  # already matted by a prior run: do NOT re-run rembg
+            else:
+                if rembg_session is None:
+                    rembg_session = get_shared_rembg_session()
+                payload = validator.process_image_with_rembg(io.BytesIO(original), rembg_session).getvalue()
         except Exception as e:
             item_errors.append(f"{view_label} background removal failed: {e}")
             continue
@@ -625,18 +655,19 @@ def process_single_item_background(item_id):
             orient_valid, orient_msg = validator.check_garment_orientation(io.BytesIO(payload), view_label, category=item.category)
             if not orient_valid:
                 item_errors.append(orient_msg)
-        try:
-            # Deleted while we were processing: stop before creating orphans.
-            if not CatalogItem.objects.filter(id=item_id).exists():
-                _discard_written(written_names, item_id)
-                return
-            processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
-            img_field.save(processed_file.name, processed_file, save=False)
-            written_names[field_name] = img_field.name
-            if original_name and original_name != img_field.name:
-                _purge_gridfs(img_field.storage, original_name, item_id=item_id)
-        except Exception as e:
-            item_errors.append(f"{view_label} storage failed: {e}")
+        if payload is not original:
+            try:
+                # Deleted while we were processing: stop before creating orphans.
+                if not CatalogItem.objects.filter(id=item_id).exists():
+                    _discard_written(written_names, item_id)
+                    return
+                processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
+                img_field.save(processed_file.name, processed_file, save=False)
+                written_names[field_name] = img_field.name
+                if original_name and original_name != img_field.name:
+                    _purge_gridfs(img_field.storage, original_name, item_id=item_id)
+            except Exception as e:
+                item_errors.append(f"{view_label} storage failed: {e}")
 
     fields = {}
     if item_errors:
