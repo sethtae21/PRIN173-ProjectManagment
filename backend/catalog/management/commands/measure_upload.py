@@ -10,6 +10,12 @@ Fixed for this project's custom User model (email-based, no `username` field).
 CHANGED: after the verdict the command deletes its own batch + catalog items
 (pass --keep-data to inspect them), so acceptance runs can never leak
 "Timing Product NN" rows into the shopper catalog / recommendations again.
+
+KAN-119: fixture cleanup no longer deletes GridFS objects by hand. The
+CatalogItem post_delete receiver owns that and logs failures at ERROR with the
+KAN-119 ORPHAN_RISK tag. The previous manual loop double-deleted and swallowed
+every error with `except Exception: pass`, which hid orphans instead of
+reporting them.
 """
 import csv
 import io
@@ -182,9 +188,16 @@ class Command(BaseCommand):
 
         return batch_id, len(rows)
 
-    # ADDED: post-verdict cleanup so acceptance runs stop polluting the
-    # shopper catalog / recommendations. Best-effort GridFS image deletion.
     def _cleanup_fixtures(self, batch, options):
+        """Remove the timing fixtures after the measurement window.
+
+        KAN-119: GridFS cleanup is owned exclusively by the CatalogItem
+        post_delete receiver, which removes BOTH blobs and logs any failure at
+        ERROR with the KAN-119 ORPHAN_RISK tag. Deleting the rows is therefore
+        sufficient AND observable. The previous manual per-field loop here
+        double-deleted every object and swallowed all errors with
+        `except Exception: pass`, hiding orphans instead of reporting them.
+        """
         if options.get('keep_data'):
             self.stdout.write(self.style.WARNING(
                 ' --keep-data given: timing fixtures left in the catalog.'
@@ -192,16 +205,12 @@ class Command(BaseCommand):
             return
 
         items = list(CatalogItem.objects.filter(batch=batch))
-        for item in items:
-            for field_name in ('front_image', 'rear_image'):
-                try:
-                    getattr(item, field_name).delete()
-                except Exception:
-                    pass  # best-effort GridFS cleanup only
         CatalogItem.objects.filter(batch=batch).delete()
         batch.delete()
         self.stdout.write(self.style.SUCCESS(
-            f'🧹 Cleanup: removed {len(items)} timing items + batch {batch.id}.'
+            f'🧹 Cleanup: removed {len(items)} timing items + batch {batch.id} '
+            f'(GridFS blobs removed by the post_delete receiver; any failure is '
+            f'logged as KAN-119 ORPHAN_RISK).'
         ))
 
     def handle(self, *args, **options):

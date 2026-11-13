@@ -54,6 +54,27 @@ class _FakeFilesCollection:
     def count_documents(self, query):
         return len(self.find(query))
 
+    def delete_one(self, query):
+        # Mirrors pymongo Collection.delete_one for the sweep command's
+        # raw-collection deletion path (same call GridFS.delete makes).
+        self._bucket.files.pop((query or {}).get('_id'), None)
+
+    def insert_many(self, docs, ordered=False):
+        """Mirror pymongo's insert_many, including duplicate-key semantics, so
+        backup_gridfs_orphans --restore uses the SAME code path as against Atlas."""
+        from types import SimpleNamespace
+        from pymongo.errors import BulkWriteError
+        inserted, errors = [], []
+        for index, doc in enumerate(docs):
+            if doc['_id'] in self._bucket.files:
+                errors.append({'index': index, 'code': 11000, 'errmsg': 'duplicate key'})
+                continue
+            self._bucket.files[doc['_id']] = dict(doc)
+            inserted.append(doc['_id'])
+        if errors:
+            raise BulkWriteError({'nInserted': len(inserted), 'writeErrors': errors})
+        return SimpleNamespace(inserted_ids=inserted)
+
 
 class _FakeChunksCollection:
     def __init__(self, bucket):
@@ -61,14 +82,50 @@ class _FakeChunksCollection:
 
     def find(self, query):
         ids = (query.get('files_id') or {}).get('$in', list(self._bucket.chunks))
-        return [
-            {'files_id': file_id, 'n': index, 'data': chunk}
-            for file_id in ids
-            for index, chunk in enumerate(self._bucket.chunks.get(file_id, []))
-        ]
+        docs = []
+        for file_id in ids:
+            for index, chunk in enumerate(self._bucket.chunks.get(file_id, [])):
+                docs.append({
+                    # Real fs.chunks documents each have their own _id. Omitting
+                    # it made the BSON backup un-restorable (KeyError: '_id').
+                    '_id': self._bucket.chunk_id(file_id, index),
+                    'files_id': file_id,
+                    'n': index,
+                    'data': chunk,
+                })
+        return docs
 
     def count_documents(self, query):
         return len(self.find(query))
+
+    def delete_many(self, query):
+        # Mirrors pymongo Collection.delete_many({'files_id': ...}).
+        file_id = (query or {}).get('files_id')
+        self._bucket.chunks.pop(file_id, None)
+        self._bucket.forget_chunk_ids(file_id)
+
+    def insert_many(self, docs, ordered=False):
+        """Rebuild chunks[files_id] as an ORDERED list, filling slot n.
+
+        Keyed by files_id (NOT the chunk _id) and written per-slot, so restoring
+        a multi-chunk file works and re-restoring is naturally idempotent.
+        """
+        from types import SimpleNamespace
+        inserted = []
+        for doc in docs:
+            file_id = doc['files_id']
+            index = int(doc.get('n', 0))
+            data = doc.get('data', b'')
+            if not isinstance(data, bytes):
+                data = bytes(data)
+            slot = self._bucket.chunks.setdefault(file_id, [])
+            while len(slot) <= index:
+                slot.append(b'')
+            if slot[index] == data:
+                continue                      # already restored — no-op
+            slot[index] = data
+            inserted.append(doc.get('_id'))
+        return SimpleNamespace(inserted_ids=inserted)
 
 
 class _FakeDB:
@@ -86,11 +143,30 @@ class _FakeDB:
 
 
 class FakeGridFSBucket:
-    """Minimal gridfs.GridFS stand-in. delete() removes files AND chunks."""
+    """Minimal gridfs.GridFS stand-in. delete() removes files AND chunks.
+
+    NOTE: there must be exactly ONE definition of this class. A second, older
+    definition below it silently shadowed this one (Python keeps the last
+    binding), which removed chunk_id/forget_chunk_ids and broke the sweep and
+    backup commands with AttributeError.
+    """
 
     def __init__(self):
         self.files = {}
         self.chunks = {}
+        # Stable per-(file, n) chunk ids so a BSON backup round-trips and a
+        # repeated restore is recognised as a duplicate rather than a new chunk.
+        self._chunk_ids = {}
+
+    def chunk_id(self, file_id, index):
+        key = (file_id, index)
+        if key not in self._chunk_ids:
+            self._chunk_ids[key] = ObjectId()
+        return self._chunk_ids[key]
+
+    def forget_chunk_ids(self, file_id):
+        for key in [k for k in self._chunk_ids if k[0] == file_id]:
+            self._chunk_ids.pop(key, None)
 
     def put(self, content, filename=None, **kwargs):
         data = content.read() if hasattr(content, 'read') else bytes(content)
@@ -120,6 +196,7 @@ class FakeGridFSBucket:
     def delete(self, file_id):
         self.files.pop(file_id, None)
         self.chunks.pop(file_id, None)
+        self.forget_chunk_ids(file_id)
 
 
 def isolated_gridfs():
@@ -731,7 +808,7 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
         item = self._item_with_images()
         old_front = item.front_image.name
         replacement = SimpleUploadedFile('new.png', self._png_bytes(), content_type='image/png')
-    
+
         with patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=RuntimeError('executor down')), \
              self.assertLogs('catalog', level='ERROR'):
             response = self.client.patch(
@@ -746,6 +823,7 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
                          'Superseded image was left orphaned by the submit-failure branch')
         self.assertIsNotNone(self._gridfs_file(item.front_image.name),
                              'The persisted replacement reference does not resolve')
+
     # ==========================================
     # KAN-119 DELETE PRE-FLIGHT (no misleading 204)
     # ==========================================
@@ -778,6 +856,7 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(CatalogItem.objects.filter(id=item.id).exists())
+
     # ==========================================
     # KAN-119 REPLACEMENT-WRITE FAILURE (no stuck 'processing')
     # ==========================================
@@ -958,3 +1037,281 @@ class CatalogBatchGuardTests(_GridFSIsolatedMixin, TestCase):
             any('KAN-119 ORPHAN_RISK' in m and f'item={item.id}' in m for m in logs.output),
             f'Deferred purge failure was not attributable to the listing: {logs.output}',
         )
+
+
+# ==========================================
+# KAN-119 / UT-13 — DELETE-PATH MATRIX
+# Verifies the post_delete receiver fires on every CatalogItem removal path
+# and removes BOTH fs.files AND fs.chunks entries. GridFS unreachable must
+# never 500 the seller's request — the row is still gone, the failure is logged.
+# ==========================================
+class CatalogDeletePathTests(_GridFSIsolatedMixin, TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.seller = User.objects.create_user(
+            full_name='Delete Seller', email='del-seller@test.com',
+            password='Test123!@#', role='seller', store_name='Delete Store')
+        self.buyer = User.objects.create_user(
+            full_name='Buyer', email='buyer@test.com',
+            password='Test123!@#', role='shopper')
+        super().setUp()
+
+    def _item_with_images_and_cart_and_outfit(self, *, status='active'):
+        """Active listing with both views, one cart line, one outfit row."""
+        from commerce.models import Cart, CartItem
+        from outfits.models import Outfit
+        item = CatalogItem.objects.create(
+            name='Shirt', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral',
+            price=10.0, seller=self.seller, store_name='Delete Store', status=status)
+        item.front_image.save(f'{item.id}_front.png', ContentFile(self._png_bytes()), save=False)
+        item.rear_image.save(f'{item.id}_rear.png', ContentFile(self._png_bytes()), save=True)
+        item.refresh_from_db()
+
+        cart = Cart.objects.create(user=self.buyer)
+        CartItem.objects.create(
+            cart=cart, item=item, quantity=1,
+            item_name=item.name, store_name=item.store_name,
+            catalog_item_id=str(item.pk))
+
+        outfit = Outfit.objects.create(user=self.buyer, name='Look')
+        outfit.items.add(item)
+        return item, cart, outfit
+
+    def test_queryset_delete_removes_both_blobs_and_detach_intact(self):
+        """QuerySet.delete() -> receiver fires -> both blobs gone, cart detached, outfit through-row gone."""
+        from commerce.models import CartItem
+        from outfits.models import Outfit
+        item, cart, outfit = self._item_with_images_and_cart_and_outfit()
+        front_name = item.front_image.name
+        rear_name = item.rear_image.name
+        item_id = item.id
+        OutfitItemThrough = Outfit.items.through
+
+        CatalogItem.objects.filter(id=item_id).delete()
+
+        self.assertFalse(CatalogItem.objects.filter(id=item_id).exists())
+        # UT-13 wording: both fs.files AND fs.chunks are gone.
+        self.assertIsNone(self._gridfs_file(front_name),
+                          "Front blob survived QuerySet.delete()")
+        self.assertIsNone(self._gridfs_file(rear_name),
+                          "Rear blob survived QuerySet.delete()")
+        self.assertEqual(self.gridfs.files, {})
+        self.assertEqual(self.gridfs.chunks, {})
+        # Cart line detached with snapshot fields intact (KAN-56 pattern).
+        cart_item = CartItem.objects.filter(cart=cart).first()
+        self.assertIsNotNone(cart_item)
+        self.assertIsNone(cart_item.item)
+        self.assertEqual(cart_item.catalog_item_id, str(item_id))
+        self.assertEqual(cart_item.item_name, 'Shirt')
+        self.assertEqual(cart_item.store_name, 'Delete Store')
+        # Outfit through-table has zero orphan rows for this item.
+        self.assertEqual(
+            OutfitItemThrough.objects.filter(catalogitem_id=item_id).count(), 0)
+
+    def test_seller_cascade_removes_both_blobs(self):
+        """Deleting the seller CASCADEs through their listings -> receiver fires."""
+        item, _cart, _outfit = self._item_with_images_and_cart_and_outfit()
+        front_name = item.front_image.name
+        rear_name = item.rear_image.name
+        item_id = item.id
+
+        self.seller.delete()
+
+        self.assertFalse(CatalogItem.objects.filter(id=item_id).exists())
+        self.assertIsNone(self._gridfs_file(front_name))
+        self.assertIsNone(self._gridfs_file(rear_name))
+        self.assertEqual(self.gridfs.files, {})
+        self.assertEqual(self.gridfs.chunks, {})
+
+    def test_delete_with_gridfs_unreachable_succeeds_and_logs_error(self):
+        """GridFS down during post_delete -> row still deleted, ERROR logged, never 500."""
+        self.client.force_authenticate(user=self.seller)
+        item = self._item_with_images()
+        item_id = item.id
+
+        def refuse(*_args, **_kwargs):
+            raise FileNotFoundError('GridFS is not reachable right now')
+
+        with patch.object(type(gridfs_storage), 'delete', refuse), \
+             self.assertLogs('catalog', level='ERROR') as logs:
+            response = self.client.delete(f'/catalog/my-listings/{item_id}/')
+
+        # Row still deleted (post_delete caught the failure instead of propagating).
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(CatalogItem.objects.filter(id=item_id).exists())
+        # Orphan is real AND logged with attribution.
+        self.assertTrue(any('KAN-119 ORPHAN_RISK' in m for m in logs.output))
+        self.assertEqual(len(self.gridfs.files), 2,
+                         'Blobs should remain when GridFS is unreachable')
+
+    def test_another_sellers_item_untouched_by_delete(self):
+        """Owner-scoped 404: seller A cannot delete seller B's listing."""
+        other = User.objects.create_user(
+            full_name='Other', email='other@test.com',
+            password='Test123!@#', role='seller', store_name='Other')
+        victim = CatalogItem.objects.create(
+            name='Other Shirt', description='desc', category='tops', size='M',
+            color='Red', color_description='red', color_family='red', price=10.0,
+            seller=other, store_name='Other Store', status='active')
+        victim.front_image.save(f'{victim.id}_front.png',
+                                ContentFile(self._png_bytes()), save=True)
+        victim.refresh_from_db()
+        front_name = victim.front_image.name
+
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.delete(f'/catalog/my-listings/{victim.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(CatalogItem.objects.filter(id=victim.id).exists())
+        self.assertIsNotNone(self._gridfs_file(front_name),
+                             'Another seller\'s blob must not be touched')
+
+
+# ==========================================
+# KAN-119 / RSK-03 — SWEEP_ORPHAN_GRIDFS COMMAND
+# ==========================================
+class CatalogSweepOrphanTests(_GridFSIsolatedMixin, TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            full_name='Sweep Seller', email='sweep@test.com',
+            password='Test123!@#', role='seller', store_name='Sweep Store')
+        super().setUp()
+
+    def _call_command(self, **kwargs):
+        from django.core.management import call_command
+        out, err = io.StringIO(), io.StringIO()
+        call_command('sweep_orphan_gridfs', stdout=out, stderr=err, **kwargs)
+        return out.getvalue(), err.getvalue()
+
+    def _plant_orphan(self, filename='catalog/front/orphan.png', payload=b'x' * 1024):
+        """Write directly to the fake bucket, bypassing any CatalogItem row."""
+        fs = gridfs_storage._require_fs()
+        return fs.put(io.BytesIO(payload), filename=filename)
+
+    def test_sweep_dry_run_does_not_delete(self):
+        item = CatalogItem.objects.create(
+            name='Kept', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral',
+            price=10.0, seller=self.seller, store_name='Sweep Store', status='active')
+        item.front_image.save(f'{item.id}_front.png',
+                              ContentFile(self._png_bytes()), save=True)
+        item.refresh_from_db()
+        orphan_id = self._plant_orphan()
+
+        out, _ = self._call_command()   # default = dry-run
+
+        self.assertIn('Orphans found: 1', out)
+        self.assertIn('Dry-run complete', out)
+        # Orphan still there, referenced blob still there.
+        self.assertEqual(len(self.gridfs.files), 2)
+        self.assertIn(orphan_id, self.gridfs.files)
+
+    def test_sweep_delete_removes_orphans_only(self):
+        item = CatalogItem.objects.create(
+            name='Kept', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral',
+            price=10.0, seller=self.seller, store_name='Sweep Store', status='active')
+        item.front_image.save(f'{item.id}_front.png',
+                              ContentFile(self._png_bytes()), save=True)
+        item.refresh_from_db()
+        kept_name = item.front_image.name
+        orphan_id = self._plant_orphan(payload=b'y' * 2048)
+
+        out, _ = self._call_command(delete=True)
+
+        self.assertIn('Sweep complete: 1/1 orphan(s) deleted', out)
+        self.assertIn('2,048 byte(s)', out)
+        # Referenced blob still referenced and present.
+        self.assertIsNotNone(self._gridfs_file(kept_name))
+        # Orphan gone from BOTH fs.files AND fs.chunks (UT-13 wording).
+        self.assertNotIn(orphan_id, self.gridfs.files)
+        self.assertNotIn(orphan_id, self.gridfs.chunks)
+
+    def test_sweep_ignores_non_catalog_prefixes(self):
+        """A blob under a different upload_to must never be touched."""
+        other_id = self._plant_orphan(filename='avatars/something.png')
+        out, _ = self._call_command()
+        self.assertIn('Orphans found: 0', out)
+        self.assertIn(other_id, self.gridfs.files)
+
+    def test_sweep_is_idempotent(self):
+        self._plant_orphan()
+        self._call_command(delete=True)
+        out2, _ = self._call_command(delete=True)
+        self.assertIn('Orphans found: 0', out2)
+
+
+# ==========================================
+# KAN-119 — backup_gridfs_orphans round-trip
+# ==========================================
+class CatalogGridFSBackupTests(_GridFSIsolatedMixin, TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            full_name='Backup Seller', email='backup@test.com',
+            password='Test123!@#', role='seller', store_name='Backup Store')
+        super().setUp()
+
+    def _call(self, command, **kwargs):
+        from django.core.management import call_command
+        out, err = io.StringIO(), io.StringIO()
+        call_command(command, stdout=out, stderr=err, **kwargs)
+        return out.getvalue(), err.getvalue()
+
+    def _plant(self, filename='catalog/front/orphan.png', payload=b'z' * 4096):
+        fs = gridfs_storage._require_fs()
+        return fs.put(io.BytesIO(payload), filename=filename)
+
+    def _temp_path(self):
+        handle = tempfile.TemporaryDirectory(prefix='kan119-backup-')
+        self.addCleanup(handle.cleanup)
+        return str(Path(handle.name) / 'orphans.bson')
+
+    def test_backup_then_sweep_then_restore_round_trip(self):
+        orphan_id = self._plant()
+        path = self._temp_path()
+
+        out, _ = self._call('backup_gridfs_orphans', out=path)
+        self.assertIn('Backup written', out)
+        self.assertIn('Chunks captured: 1', out)
+
+        self._call('sweep_orphan_gridfs', delete=True)
+        self.assertNotIn(orphan_id, self.gridfs.files)
+        self.assertNotIn(orphan_id, self.gridfs.chunks)
+
+        out, _ = self._call('backup_gridfs_orphans', restore=path)
+        self.assertIn('Restore complete', out)
+        self.assertIn(orphan_id, self.gridfs.files)
+        self.assertIn(orphan_id, self.gridfs.chunks)
+        self.assertEqual(self.gridfs.chunks[orphan_id], [b'z' * 4096])
+
+    def test_backup_excludes_referenced_blobs(self):
+        item = CatalogItem.objects.create(
+            name='Kept', description='desc', category='tops', size='M',
+            color='White', color_description='white', color_family='neutral',
+            price=10.0, seller=self.seller, store_name='Backup Store', status='active')
+        item.front_image.save(f'{item.id}_front.png',
+                              ContentFile(self._png_bytes()), save=True)
+        item.refresh_from_db()
+        kept_id = ObjectId(item.front_image.name)
+        orphan_id = self._plant()
+        path = self._temp_path()
+
+        self._call('backup_gridfs_orphans', out=path)
+        self._call('sweep_orphan_gridfs', delete=True)
+
+        self.assertIn(kept_id, self.gridfs.files)
+        self.assertNotIn(orphan_id, self.gridfs.files)
+
+    def test_restore_is_idempotent(self):
+        self._plant()
+        path = self._temp_path()
+        self._call('backup_gridfs_orphans', out=path)
+        self._call('backup_gridfs_orphans', restore=path)
+        before = len(self.gridfs.files)
+        self._call('backup_gridfs_orphans', restore=path)
+        self.assertEqual(len(self.gridfs.files), before)
+
+    def test_backup_with_no_orphans_writes_nothing(self):
+        out, _ = self._call('backup_gridfs_orphans', out=self._temp_path())
+        self.assertIn('No orphans found', out)
