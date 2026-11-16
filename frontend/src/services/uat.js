@@ -32,6 +32,7 @@ export const RATING_SOURCES = Object.freeze({
   RECOMMENDATION_PANEL: "recommendation_panel",
   FIT_VISUALIZATION: "fit_visualization",
   PRODUCT_PAGE: "product_page",
+  ORDER_HISTORY: "order_history",
 });
 
 // ---- UAT session storage: ONE prefix, defined once --------------------------
@@ -74,25 +75,25 @@ export function isUATAnswer(value) {
 }
 
 // ============================================================================
-// IN-APP RATING CONTRACT (SRS FR-7.5 / Scope Criteria 9 & 10) — REDESIGNED.
-// Stars ONLY (1-5); 4-5 stars = approval. No like/dislike anywhere in the UI.
-// Ratings are BUTTON-TRIGGERED (no auto popups) and exist in exactly 2 places:
-//   1. Recommendation Panel -> ONE button rating the OVERALL recommendation
-//      set (target_type 'item', source 'recommendation_panel', target_id
-//      'panel-overall-<studioSessionId>').
-//   2. Fitting Studio canvas -> "Rate Avatar Look" (source 'fit_visualization',
-//      one row per equipped garment) + Pre/Post-Try-On Check buttons writing
-//      FITTING_STUDIO_SURVEYS (fit_rating_score replaces fit_like_dislike).
-// Guests: DB write blocked; payload held in sessionStorage (dies with the
-// session, FR-1.9) and the sign-up/login modal opens (FR-7.5).
+// IN-APP RATING CONTRACT (SRS FR-7.5 / Scope Criteria 9-11) — SRS-ALIGNED COPY.
+// Stars ONLY (1-5); 4-5 stars = Approval, 1-3 = Not approval. No like/dislike.
+// Surfaces:
+//   1. Recommendation Panel  -> overall set, accounts_rating target_type=item,
+//      source=recommendation_panel, target_id='panel-overall-<studioSessionId>'.
+//   2. Try-On Canvas         -> accounts_rating target_type=fit,
+//      source=fit_visualization (one row per equipped garment).
+//   3. Pre/Post Try-On Check -> accounts_fittingstudiosurvey (confidence +
+//      return intent, 1-5, same direction within each pair).
+//   4. Mock-Checkout Success -> auto popup, accounts_rating target_type=fit,
+//      source=fit_visualization (fit-accuracy of the avatar preview).
+// GUESTS: clicking ANY star blocks the action, saves/caches NOTHING, and shows
+// the sign-up/login prompt below (FR-7.5 / FR-1.9). Registered users persist.
 // ============================================================================
 
 export const RATING_APPROVAL_MIN = 4;
 
-export const GUEST_RATING_CTA = "Sign up or Log in to save your rating";
-
-// Session-scoped hold for guest ratings (never localStorage, never the DB).
-export const GUEST_PENDING_RATING_KEY = "fitfusion-guest-pending-rating";
+// Exact guest-block prompt (SRS / SADD): shown when a Guest clicks a star.
+export const GUEST_RATING_PROMPT = "Please sign up or log in to save your rating.";
 
 export const PANEL_OVERALL_TARGET_PREFIX = "panel-overall-";
 
@@ -116,7 +117,7 @@ const RETURN_LABELS = Object.freeze([
   "Very Likely to Return",
 ]);
 
-// A. Recommendation Panel — overall style/color rating.
+// 1. Recommendation Panel (SRS-aligned copy).
 export const RECOMMENDATION_RATING_COPY = Object.freeze({
   buttonLabel: "Rate Recommendations",
   eyebrow: "RECOMMENDATION PANEL",
@@ -128,7 +129,7 @@ export const RECOMMENDATION_RATING_COPY = Object.freeze({
     {
       key: "score",
       prompt:
-        "How well do these recommended styles and colors suit your avatar profile?",
+        "How well does this recommendation match your style and color palette?",
       labels: Object.freeze([
         "Poor match",
         "Fair match",
@@ -140,7 +141,7 @@ export const RECOMMENDATION_RATING_COPY = Object.freeze({
   ]),
 });
 
-// B. Fitting Studio — on-avatar fit visualization rating.
+// 2. Try-On Canvas visualization (SRS-aligned copy).
 export const FIT_RATING_COPY = Object.freeze({
   buttonLabel: "Rate Avatar Look",
   eyebrow: "FIT VISUALIZATION",
@@ -151,8 +152,7 @@ export const FIT_RATING_COPY = Object.freeze({
   questions: Object.freeze([
     {
       key: "score",
-      prompt:
-        "How satisfied are you with how this outfit looks on your personalized avatar?",
+      prompt: "Rate this outfit visualization on your avatar.",
       labels: Object.freeze([
         "Very Dissatisfied",
         "Dissatisfied",
@@ -164,7 +164,7 @@ export const FIT_RATING_COPY = Object.freeze({
   ]),
 });
 
-// C. Fitting Studio — pre-session check (before try-on).
+// 3a. Pre-session check (SRS §5.1 / SADD accounts_fittingstudiosurvey).
 export const PRE_CHECK_COPY = Object.freeze({
   buttonLabel: "Pre-Try-On Check",
   eyebrow: "BEFORE TRY-ON",
@@ -174,19 +174,18 @@ export const PRE_CHECK_COPY = Object.freeze({
     {
       key: "confidence",
       prompt:
-        "Before using the virtual try-on, how confident are you choosing clothes that suit your body type and skin tone?",
+        "Before trying on: How confident are you in choosing items that suit you?",
       labels: CONFIDENCE_LABELS,
     },
     {
       key: "return_intent",
-      prompt:
-        "Without previewing items on an avatar, how likely are you to return clothes bought online due to style or look mismatch?",
+      prompt: "How likely are you to return items bought online?",
       labels: RETURN_LABELS,
     },
   ]),
 });
 
-// D. Fitting Studio — post-session check (after try-on).
+// 3b. Post-session check (SRS §5.1 / SADD accounts_fittingstudiosurvey).
 export const POST_CHECK_COPY = Object.freeze({
   buttonLabel: "Post-Try-On Check",
   eyebrow: "AFTER TRY-ON",
@@ -196,14 +195,37 @@ export const POST_CHECK_COPY = Object.freeze({
     {
       key: "confidence",
       prompt:
-        "After seeing outfits on your avatar, how confident are you now in deciding whether an item suits you?",
+        "After trying on: How confident are you in your purchase/style decision?",
       labels: CONFIDENCE_LABELS,
     },
     {
       key: "return_intent",
-      prompt:
-        "Based on this avatar preview, how likely would you be to return these items if purchased?",
+      prompt: "How likely are you to return these items?",
       labels: RETURN_LABELS,
+    },
+  ]),
+});
+
+// 4. Mock-Checkout Success pop-up (exact wording from SRS FR-7.5).
+//    Auto-opens after a successful mock checkout; Registered users only.
+export const CHECKOUT_FIT_ACCURACY_COPY = Object.freeze({
+  eyebrow: "MOCK CHECKOUT SUCCESS",
+  title: "Rate Fit Accuracy",
+  helperNote:
+    "This rates how accurately the avatar preview represented the garment on you.",
+  submitLabel: "Submit",
+  skipLabel: "Skip",
+  questions: Object.freeze([
+    {
+      key: "score",
+      prompt: "How accurately did the avatar preview show this garment on you?",
+      labels: Object.freeze([
+        "Very Inaccurate",
+        "Inaccurate",
+        "Neutral",
+        "Accurate",
+        "Very Accurate",
+      ]),
     },
   ]),
 });

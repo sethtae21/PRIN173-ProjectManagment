@@ -6,15 +6,13 @@ import {
   catalogAPI,
   checkoutAPI,
   getCachedCart,
-  invalidateCache,
-  ratingsApi,
 } from "../services/api";
+import ProductStarRating from "../components/ProductStarRating";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/OrderHistoryPage.css";
 
 const ORDERS_STORAGE_KEY = "fitfusion-orders";
 const CART_STORAGE_KEY = "fitfusion-cart";
-const RATINGS_STORAGE_KEY = "fitfusion-product-ratings";
 const IMAGE_CACHE_KEY = "fitfusion-order-image-map";
 const MAX_CART_QUANTITY = 10;
 
@@ -275,7 +273,6 @@ function OrderHistoryPage() {
   const [syncInFlight, setSyncInFlight] = useState(true);
   const [syncNotice, setSyncNotice] = useState("");
   const [syncAttempt, setSyncAttempt] = useState(0);
-  const [ratings, setRatings] = useState(() => readObject(RATINGS_STORAGE_KEY));
   const [activeFilter, setActiveFilter] = useState("All");
   const [sortOrder, setSortOrder] = useState("newest");
   const [notice, setNotice] = useState("");
@@ -292,10 +289,6 @@ function OrderHistoryPage() {
     const timeout = window.setTimeout(() => setNotice(""), 2500);
     return () => window.clearTimeout(timeout);
   }, [notice]);
-
-  useEffect(() => {
-    localStorage.setItem(RATINGS_STORAGE_KEY, JSON.stringify(ratings));
-  }, [ratings]);
 
   /* Server-truth badge, refreshed on mutation / cross-tab / focus. */
   useEffect(() => {
@@ -441,27 +434,6 @@ function OrderHistoryPage() {
     }
   }
 
-  async function handleRating(orderId, productId, rating) {
-    const ratingKey = `${orderId}-${productId}`;
-    setRatings((currentRatings) => ({ ...currentRatings, [ratingKey]: rating }));
-    try {
-      await ratingsApi.submit({
-        target_type: "item",
-        target_id: String(productId),
-        score: rating,
-        source: "order_history",
-      });
-      invalidateCache(`ratings:item:${productId}`);
-      window.dispatchEvent(new Event("fitfusion-rating-updated"));
-      setNotice(`Your ${rating}-star rating was saved.`);
-    } catch (error) {
-      console.warn("Order history: rating sync skipped →", error?.message || error);
-      setNotice(
-        `Your ${rating}-star rating was saved on this device (server unreachable).`
-      );
-    }
-  }
-
   const showLoadingCard = orders.length === 0 && syncInFlight;
 
   return (
@@ -590,50 +562,39 @@ function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="order-history-products">
-                    {items.map((item, index) => {
-                      const ratingKey = `${order.id}-${item.productId || item.id}`;
-                      const currentRating = Number(ratings[ratingKey] || 0);
-                      return (
-                        <div
-                          className="order-history-product"
-                          key={item.id || `${item.productId}-${index}`}
-                        >
-                          <ProductImage item={item} onOpen={() => openProduct(item)} />
-                          <div className="order-history-product-copy">
-                            <span>{item.sellerName || "FitFusion Seller"}</span>
-                            <button type="button" onClick={() => openProduct(item)}>
-                              {item.name || "Fashion Item"}
-                            </button>
-                            <small>Size: {item.size || "M"}</small>
-                            <small>Color: {item.color || "Default"}</small>
-                          </div>
-                          <div className="order-history-product-price">
-                            <span>Item total</span>
-                            <strong>
-                              {formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}
-                            </strong>
-                          </div>
-                          {order.status !== "Cancelled" && item.productId && (
-                            <div className="order-history-rating">
-                              <span>Rate product</span>
-                              <div role="group" aria-label={`Rate ${item.name}`}>
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <button
-                                    type="button"
-                                    key={star}
-                                    className={star <= currentRating ? "selected" : ""}
-                                    onClick={() => handleRating(order.id, item.productId, star)}
-                                    aria-label={`${star} star rating`}
-                                  >
-                                    ★
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                    {items.map((item, index) => (
+                      <div
+                        className="order-history-product"
+                        key={item.id || `${item.productId}-${index}`}
+                      >
+                        <ProductImage item={item} onOpen={() => openProduct(item)} />
+                        <div className="order-history-product-copy">
+                          <span>{item.sellerName || "FitFusion Seller"}</span>
+                          <button type="button" onClick={() => openProduct(item)}>
+                            {item.name || "Fashion Item"}
+                          </button>
+                          <small>Size: {item.size || "M"}</small>
+                          <small>Color: {item.color || "Default"}</small>
                         </div>
-                      );
-                    })}
+                        <div className="order-history-product-price">
+                          <span>Item total</span>
+                          <strong>
+                            {formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}
+                          </strong>
+                        </div>
+                        {order.status !== "Cancelled" && item.productId && (
+                          <ProductStarRating
+                            orderId={order.id}
+                            product={{
+                              id: item.productId,
+                              name: item.name,
+                              size: item.size,
+                            }}
+                            onRated={(msg) => setNotice(msg)}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
                   <div className="order-history-card-footer">
                     <div>

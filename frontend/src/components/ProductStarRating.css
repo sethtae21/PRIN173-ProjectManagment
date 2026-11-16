@@ -46,9 +46,76 @@
   border-radius: 3px;
 }
 
+.order-product-rating-stars button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .order-product-star-rating small {
   display: block;
   margin-top: 5px;
   color: #81786e;
   font-size: 8px;
+}
+
+/* Guest-block prompt (exact SRS copy + Sign Up / Log In / Cancel). */
+.order-rating-auth-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(23, 19, 15, 0.65);
+}
+
+.order-rating-auth-prompt {
+  width: min(100%, 420px);
+  padding: 28px;
+  background: #fffdf9;
+  border: 1px solid #d7af4b;
+  border-radius: 14px;
+  color: #17130f;
+  text-align: center;
+  box-shadow: 0 25px 70px rgba(23, 19, 15, 0.32);
+}
+
+.order-rating-auth-prompt h3 {
+  margin: 0 0 18px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.order-rating-auth-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.order-rating-auth-actions button {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1.2px solid #b57e20;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: #8e641f;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.order-rating-auth-actions button:first-child {
+  background: linear-gradient(135deg, #17130f, #8e641f 57%, #d7af4b);
+  color: #fffdf9;
+}
+
+.order-rating-auth-actions button:hover {
+  box-shadow: 0 8px 20px rgba(142, 100, 31, 0.18);
+}
+
+@media (max-width: 480px) {
+  .order-rating-auth-actions {
+    grid-template-columns: 1fr;
+  }
 }

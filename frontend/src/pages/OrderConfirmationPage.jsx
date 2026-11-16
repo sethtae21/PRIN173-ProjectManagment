@@ -3,7 +3,14 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { API_URL, catalogAPI, checkoutAPI } from "../services/api";
+import { API_URL, catalogAPI, checkoutAPI, ratingsApi } from "../services/api";
+import { getAccessToken } from "../services/session";
+import {
+  CHECKOUT_FIT_ACCURACY_COPY,
+  RATING_SOURCES,
+  RATING_TARGET_TYPES,
+} from "../services/uat";
+import RatingModal from "../components/RatingControl";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/OrderConfirmationPage.css";
 
@@ -192,6 +199,17 @@ function OrderConfirmationPage() {
     };
   });
 
+  /* NEW (SRS FR-7.5 / Image 2 & 3): Mock-Checkout Success fit-accuracy popup.
+     Auto-opens ONCE after a successful mock checkout (fresh navigation state
+     carries orderId). Registered users only — guests never reach checkout.
+     Optional & skippable: Skip / close never blocks the confirmation page. */
+  const [fitAccuracyOpen, setFitAccuracyOpen] = useState(
+    () => Boolean(location.state?.orderId) && Boolean(getAccessToken())
+  );
+  const [fitAccuracyValues, setFitAccuracyValues] = useState({});
+  const [fitAccuracySaving, setFitAccuracySaving] = useState(false);
+  const [fitAccuracyError, setFitAccuracyError] = useState("");
+
   /* Background sync only: resolve the stored order number
      and any missing product images from the server. */
   useEffect(() => {
@@ -307,6 +325,52 @@ function OrderConfirmationPage() {
         shippingFee;
   const displayNumber =
     order.orderNumber || order.id;
+
+  function setFitAccuracyValue(key, score) {
+    setFitAccuracyValues((current) => ({ ...current, [key]: score }));
+  }
+
+  function closeFitAccuracy() {
+    setFitAccuracyOpen(false);
+    setFitAccuracyError("");
+  }
+
+  async function submitFitAccuracy() {
+    const score = fitAccuracyValues.score;
+    if (score == null) {
+      setFitAccuracyError("Please select a star rating from 1 to 5.");
+      return;
+    }
+    if (!getAccessToken()) {
+      closeFitAccuracy();
+      return;
+    }
+    setFitAccuracySaving(true);
+    setFitAccuracyError("");
+    try {
+      const targets = items
+        .map((item) => String(item.productId || item.id || ""))
+        .filter(Boolean);
+      const ids = targets.length ? targets : [String(order.id)];
+      await Promise.all(
+        ids.map((targetId) =>
+          ratingsApi.submit({
+            target_type: RATING_TARGET_TYPES.FIT,
+            target_id: targetId,
+            score,
+            source: RATING_SOURCES.FIT_VISUALIZATION,
+          })
+        )
+      );
+      window.dispatchEvent(new Event("fitfusion-rating-updated"));
+      closeFitAccuracy();
+    } catch (error) {
+      console.warn("Fit-accuracy rating failed:", error?.message || error);
+      setFitAccuracyError("We couldn't save your rating. Please try again.");
+    } finally {
+      setFitAccuracySaving(false);
+    }
+  }
 
   return (
     <main className="order-confirmation-page">
@@ -537,6 +601,21 @@ function OrderConfirmationPage() {
           <strong> #{displayNumber}</strong>
         </p>
       </div>
+
+      {/* Mock-Checkout Success fit-accuracy popup (1-5 stars + Skip / Submit). */}
+      {fitAccuracyOpen && (
+        <RatingModal
+          config={CHECKOUT_FIT_ACCURACY_COPY}
+          values={fitAccuracyValues}
+          onChange={setFitAccuracyValue}
+          onPrimary={submitFitAccuracy}
+          onClose={closeFitAccuracy}
+          primaryLabel={CHECKOUT_FIT_ACCURACY_COPY.submitLabel}
+          secondaryLabel={CHECKOUT_FIT_ACCURACY_COPY.skipLabel}
+          saving={fitAccuracySaving}
+          error={fitAccuracyError}
+        />
+      )}
     </main>
   );
 }

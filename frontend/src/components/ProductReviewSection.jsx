@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ratingsApi } from "../services/api";
 import { getAccessToken } from "../services/session";
+import { RATING_SOURCES, GUEST_RATING_PROMPT } from "../services/uat";
 import "./ProductReviewSection.css";
 
 function readStoredObject(key, fallback) {
@@ -75,7 +76,7 @@ function ProductReviewSection({
 }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
-  
+
   // FIX: Use canonical session manager so registered users never see the popup
   const isRegisteredUser = Boolean(getAccessToken());
 
@@ -130,12 +131,14 @@ function ProductReviewSection({
       return;
     }
 
-    // NEW: Submit the star score to the DB so it reflects in the summary
+    // Submit the star score to the DB (product_page surface) so it reflects
+    // in the summary and never leaks into OBJ-05 recommendation approval.
     try {
       await ratingsApi.submit({
         target_type: 'item',
         target_id: product.id,
         score: selectedRating,
+        source: RATING_SOURCES.PRODUCT_PAGE,
       });
     } catch (err) {
       console.warn("Failed to submit score to server:", err);
@@ -317,7 +320,7 @@ function ProductReviewSection({
           )}
         </aside>
       </div>
-      
+
       {showRegistrationPrompt && (
         <div
           className="product-review-auth-backdrop"
@@ -341,17 +344,18 @@ function ProductReviewSection({
             >
               ×
             </button>
-            <h3 id="product-review-auth-title">Sign in to rate this product</h3>
-            <p>Create an account or log in to submit your rating.</p>
-            <button type="button" onClick={() => navigate("/signup")}>
-              Create Account
-            </button>
-            <button type="button" onClick={() => navigate("/login")}>
-              Log In
-            </button>
-            <button type="button" onClick={() => setShowRegistrationPrompt(false)}>
-              Continue as Guest
-            </button>
+            <h3 id="product-review-auth-title">{GUEST_RATING_PROMPT}</h3>
+            <div className="product-review-auth-actions">
+              <button type="button" onClick={() => navigate("/signup")}>
+                Sign Up
+              </button>
+              <button type="button" onClick={() => navigate("/login")}>
+                Log In
+              </button>
+              <button type="button" onClick={() => setShowRegistrationPrompt(false)}>
+                Cancel
+              </button>
+            </div>
           </section>
         </div>
       )}

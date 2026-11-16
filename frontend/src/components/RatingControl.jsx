@@ -2,25 +2,21 @@ import { useEffect } from "react";
 import "./RatingControl.css";
 
 /* ============================================================================
-   Star-only rating modal (SRS FR-7.5 / Scope Criteria 9 & 10).
-   CHANGED (rating redesign): the old inline per-item star row is GONE. Ratings
-   are now BUTTON-TRIGGERED modals with a 1-5 star scale (4-5 = approval) and
-   explicit per-star meanings. One shared modal serves all four surfaces:
-     A. Recommendation Panel  -> overall recommendation set
-     B. Fit Visualization     -> on-avatar look (needs >= 1 equipped garment)
-     C. Pre-Try-On Check      -> confidence + return intent (before)
-     D. Post-Try-On Check     -> confidence + return intent (after)
-   The component is presentational: the page owns values, validation, guest
-   session-hold and persistence. Guests never reach the network from here.
+   Star-only rating modal (SRS FR-7.5 / Scope Criteria 9-11).
+   Button-triggered (studio) or auto-triggered (mock-checkout success).
+   1-5 stars; 4-5 = Approval. No like/dislike anywhere.
+   Presentational: the page owns values, validation, guest blocking and
+   persistence. Guests never reach the network from here.
    Props:
-     config       { eyebrow, title, helperNote, submitLabel, questions[] }
-     values       { [questionKey]: 1..5 }
-     onChange     (key, score) => void
-     onPrimary    () => void   (submit OR guest hold+prompt, decided by page)
-     onClose      () => void
-     primaryLabel string       (submit label, or the guest sign-up CTA)
-     saving       bool
-     error        string
+     config        { eyebrow, title, helperNote, submitLabel, questions[] }
+     values        { [questionKey]: 1..5 }
+     onChange      (key, score) => void   (page blocks guests here)
+     onPrimary     () => void
+     onClose       () => void
+     primaryLabel  string
+     secondaryLabel string  (default "Cancel"; checkout passes "Skip")
+     saving        bool
+     error         string
 ============================================================================ */
 function RatingModal({
   config,
@@ -29,6 +25,7 @@ function RatingModal({
   onPrimary,
   onClose,
   primaryLabel,
+  secondaryLabel = "Cancel",
   saving = false,
   error = "",
 }) {
@@ -126,7 +123,7 @@ function RatingModal({
             onClick={onClose}
             disabled={saving}
           >
-            Cancel
+            {secondaryLabel}
           </button>
           <button
             type="button"

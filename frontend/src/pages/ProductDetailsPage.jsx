@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { API_URL, cartAPI, ratingsApi, invalidateCache } from "../services/api";
-import { RATING_SOURCES } from "../services/uat";
+import { RATING_SOURCES, GUEST_RATING_PROMPT } from "../services/uat";
 import { getAccessToken } from "../services/session";
 import { useAlphaCrop } from "../hooks/useAlphaCrop";
 import "./css/ProductDetailsPage.css";
@@ -106,11 +106,11 @@ function ProductDetailsPage({ isGuest = false }) {
   const outletContext = useOutletContext();
   const guestMode = isGuest || outletContext?.isGuest === true;
   const basePath = guestMode ? "/guest" : "/shopper";
-  
+
   const [product, setProduct] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   const [selectedView, setSelectedView] = useState("front");
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState("");
@@ -121,6 +121,8 @@ function ProductDetailsPage({ isGuest = false }) {
   const [cartCount, setCartCount] = useState(getCartCount());
 
   const [showTryOnModal, setShowTryOnModal] = useState(false);
+  // NEW (guest-block rule): rating-specific prompt with the exact SRS copy.
+  const [showRatingAuthPrompt, setShowRatingAuthPrompt] = useState(false);
 
   const [ratingSummary, setRatingSummary] = useState({
     average: 0,
@@ -134,7 +136,7 @@ function ProductDetailsPage({ isGuest = false }) {
     let isMounted = true;
     setIsLoading(true);
     setError("");
-    
+
     async function fetchProduct() {
       try {
         const response = await fetch(`${API_URL}/catalog/${productId}/`);
@@ -171,7 +173,7 @@ function ProductDetailsPage({ isGuest = false }) {
         if (isMounted) setIsLoading(false);
       }
     }
-    
+
     if (productId) fetchProduct();
     return () => { isMounted = false; };
   }, [productId]);
@@ -318,18 +320,18 @@ function ProductDetailsPage({ isGuest = false }) {
       return;
     }
     if (!product || isAddingToCart) return;
-    
+
     setIsAddingToCart(true);
     setCartError("");
     setMessage("");
-    
+
     try {
       await cartAPI.addItem(product.id, quantity);
-      
+
       const cart = readCart();
       const existingIndex = cart.findIndex((item) => item.id === product.id);
       const nextCart = [...cart];
-      
+
       if (existingIndex >= 0) {
         nextCart[existingIndex] = {
           ...nextCart[existingIndex],
@@ -348,7 +350,7 @@ function ProductDetailsPage({ isGuest = false }) {
           selected: true,
         });
       }
-      
+
       localStorage.setItem("fitfusion-cart", JSON.stringify(nextCart));
       setCartCount(getCartCount());
       window.dispatchEvent(new Event("fitfusion-cart-updated"));
@@ -363,9 +365,9 @@ function ProductDetailsPage({ isGuest = false }) {
   }
 
   async function handleStarRate(stars) {
-    if (guestMode) {
-      setRestrictedFeature("rate products");
-      setShowRegistrationModal(true);
+    // GUEST BLOCK: no cache, no network — exact sign-up/login prompt only.
+    if (guestMode || !getAccessToken()) {
+      setShowRatingAuthPrompt(true);
       return;
     }
     try {
@@ -533,9 +535,9 @@ function ProductDetailsPage({ isGuest = false }) {
               <button type="button" className="product-try-button" onClick={handleTryOn}>
                 Try in Fitting Studio
               </button>
-              <button 
-                type="button" 
-                className="product-cart-button" 
+              <button
+                type="button"
+                className="product-cart-button"
                 onClick={handleAddToCart}
                 disabled={isAddingToCart}
               >
@@ -607,11 +609,11 @@ function ProductDetailsPage({ isGuest = false }) {
                 <button
                   key={star}
                   type="button"
-                  style={{ 
-                    background: "none", 
-                    border: "none", 
-                    fontSize: "24px", 
-                    cursor: "pointer", 
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "24px",
+                    cursor: "pointer",
                     color: star <= (hoverRating || userRating) ? "#d39819" : "#d2be91",
                     padding: "0 2px"
                   }}
@@ -639,8 +641,8 @@ function ProductDetailsPage({ isGuest = false }) {
             <div className="product-rating-breakdown">
               {[5, 4, 3, 2, 1].map((stars) => {
                 const count = ratingSummary.star_counts[String(stars)] || 0;
-                const percentage = ratingSummary.score_count > 0 
-                  ? Math.round((count / ratingSummary.score_count) * 100) 
+                const percentage = ratingSummary.score_count > 0
+                  ? Math.round((count / ratingSummary.score_count) * 100)
                   : 0;
                 return (
                   <RatingBar
@@ -723,6 +725,44 @@ function ProductDetailsPage({ isGuest = false }) {
               onClick={() => setShowTryOnModal(false)}
             >
               Decide Later
+            </button>
+          </section>
+        </div>
+      )}
+
+      {/* NEW (guest-block rule): exact rating prompt, Sign Up / Log In / Cancel. */}
+      {showRatingAuthPrompt && (
+        <div
+          className="guest-product-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setShowRatingAuthPrompt(false)}
+        >
+          <section
+            className="guest-product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-rating-auth-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="guest-product-close"
+              aria-label="Close rating prompt"
+              onClick={() => setShowRatingAuthPrompt(false)}
+            >
+              ×
+            </button>
+            <h2 id="product-rating-auth-title">{GUEST_RATING_PROMPT}</h2>
+            <div className="guest-product-modal-actions">
+              <button type="button" onClick={() => navigate("/signup")}>Sign Up</button>
+              <button type="button" onClick={() => navigate("/login")}>Log In</button>
+            </div>
+            <button
+              type="button"
+              className="guest-product-cancel"
+              onClick={() => setShowRatingAuthPrompt(false)}
+            >
+              Cancel
             </button>
           </section>
         </div>
