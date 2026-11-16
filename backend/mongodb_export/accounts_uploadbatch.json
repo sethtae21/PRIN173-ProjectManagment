@@ -1,0 +1,132 @@
+[
+  {
+    "_id": "6af2cb71655abe362412d144",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 6,
+    "rejected_count": 4,
+    "rejection_report": {
+      "6af2cb78655abe362412d166": [
+        "Front: Image too small (1408x768). Minimum is 800x800.",
+        "Rear: Image too small (1408x768). Minimum is 800x800."
+      ],
+      "6af2cb78655abe362412d167": [
+        "Row 9: Invalid size 'XXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+        "Front: Image too small (1408x768). Minimum is 800x800.",
+        "Rear: Image too small (1408x768). Minimum is 800x800."
+      ],
+      "6af2cb78655abe362412d168": [
+        "Row 10: Invalid size 'XXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+        "Front: Image too small (1408x768). Minimum is 800x800.",
+        "Rear: Image too small (1408x768). Minimum is 800x800."
+      ],
+      "6af2cb78655abe362412d169": [
+        "Row 11: Invalid size 'XXXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+        "Front: Image too small (1408x768). Minimum is 800x800.",
+        "Rear: Image too small (1408x768). Minimum is 800x800."
+      ]
+    },
+    "created_at": "2026-11-10 07:44:49.202000",
+    "completed_at": "2026-11-10 07:45:05.384000"
+  },
+  {
+    "_id": "6af2ce5c655abe362412d182",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 7,
+    "rejected_count": 3,
+    "rejection_report": {
+      "6af2ce61655abe362412d1a8": [
+        "Row 9: Invalid size 'XXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically."
+      ],
+      "6af2ce61655abe362412d1a9": [
+        "Row 10: Invalid size 'XXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically."
+      ],
+      "6af2ce62655abe362412d1aa": [
+        "Row 11: Invalid size 'XXXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically."
+      ]
+    },
+    "created_at": "2026-11-10 07:57:16.759000",
+    "completed_at": "2026-11-10 07:57:44.487000"
+  },
+  {
+    "_id": "6af2cee0655abe362412d1c7",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 9,
+    "rejected_count": 1,
+    "rejection_report": {
+      "6af2cee6655abe362412d1f2": [
+        "Color mismatch: declared 'Blue' but image appears to be different color (#6e8391)"
+      ]
+    },
+    "created_at": "2026-11-10 07:59:28.267000",
+    "completed_at": "2026-11-10 07:59:56.943000"
+  },
+  {
+    "_id": "6af2cfb3655abe362412d224",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 9,
+    "rejected_count": 1,
+    "rejection_report": {
+      "6af2cfba655abe362412d24f": [
+        "Color mismatch: declared 'Light Blue' but image appears to be different color (#6e8391)"
+      ]
+    },
+    "created_at": "2026-11-10 08:02:59.694000",
+    "completed_at": "2026-11-10 08:03:11.283000"
+  },
+  {
+    "_id": "6af2d019655abe362412d281",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 9,
+    "rejected_count": 1,
+    "rejection_report": {
+      "6af2d01f655abe362412d2ac": [
+        "Color mismatch: declared 'Light Blue' but image appears to be different color (#6e8391)"
+      ]
+    },
+    "created_at": "2026-11-10 08:04:41.402000",
+    "completed_at": "2026-11-10 08:04:53.228000"
+  },
+  {
+    "_id": "6af2d0ad655abe362412d2de",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 9,
+    "rejected_count": 1,
+    "rejection_report": {
+      "6af2d0b2655abe362412d309": [
+        "Color mismatch: declared 'Blue' but image appears to be different color (#6e8391)"
+      ]
+    },
+    "created_at": "2026-11-10 08:07:09.249000",
+    "completed_at": "2026-11-10 08:07:19.737000"
+  },
+  {
+    "_id": "6af2dcf96a99eadef40a3bfd",
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "status": "completed",
+    "total_items": 10,
+    "accepted_count": 10,
+    "rejected_count": 0,
+    "rejection_report": {},
+    "created_at": "2026-11-10 08:59:37.696000",
+    "completed_at": "2026-11-10 08:59:53.262000"
+  }
+]

@@ -1,0 +1,284 @@
+[
+  {
+    "_id": "6acce33592d9de309d9078d6",
+    "app": "contenttypes",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:05.553000"
+  },
+  {
+    "_id": "6acce33592d9de309d9078d7",
+    "app": "contenttypes",
+    "name": "0002_remove_content_type_name",
+    "applied": "2026-10-12 13:40:05.617000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078d8",
+    "app": "auth",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:06.162000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078d9",
+    "app": "auth",
+    "name": "0002_alter_permission_name_max_length",
+    "applied": "2026-10-12 13:40:06.195000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078da",
+    "app": "auth",
+    "name": "0003_alter_user_email_max_length",
+    "applied": "2026-10-12 13:40:06.249000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078db",
+    "app": "auth",
+    "name": "0004_alter_user_username_opts",
+    "applied": "2026-10-12 13:40:06.317000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078dc",
+    "app": "auth",
+    "name": "0005_alter_user_last_login_null",
+    "applied": "2026-10-12 13:40:06.351000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078dd",
+    "app": "auth",
+    "name": "0006_require_contenttypes_0002",
+    "applied": "2026-10-12 13:40:06.381000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078de",
+    "app": "auth",
+    "name": "0007_alter_validators_add_error_messages",
+    "applied": "2026-10-12 13:40:06.418000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078df",
+    "app": "auth",
+    "name": "0008_alter_user_username_max_length",
+    "applied": "2026-10-12 13:40:06.474000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078e0",
+    "app": "auth",
+    "name": "0009_alter_user_last_name_max_length",
+    "applied": "2026-10-12 13:40:06.511000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078e1",
+    "app": "auth",
+    "name": "0010_alter_group_name_max_length",
+    "applied": "2026-10-12 13:40:06.567000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078e2",
+    "app": "auth",
+    "name": "0011_update_proxy_permissions",
+    "applied": "2026-10-12 13:40:06.617000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078e3",
+    "app": "auth",
+    "name": "0012_alter_user_first_name_max_length",
+    "applied": "2026-10-12 13:40:06.661000"
+  },
+  {
+    "_id": "6acce33692d9de309d9078e4",
+    "app": "auth",
+    "name": "0013_alter_group_id_alter_permission_id_alter_user_id",
+    "applied": "2026-10-12 13:40:06.788000"
+  },
+  {
+    "_id": "6acce33792d9de309d9078e5",
+    "app": "accounts",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:07.402000"
+  },
+  {
+    "_id": "6acce33792d9de309d9078e6",
+    "app": "admin",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:07.667000"
+  },
+  {
+    "_id": "6acce33792d9de309d9078e7",
+    "app": "admin",
+    "name": "0002_logentry_remove_auto_add",
+    "applied": "2026-10-12 13:40:07.723000"
+  },
+  {
+    "_id": "6acce33792d9de309d9078e8",
+    "app": "admin",
+    "name": "0003_logentry_add_action_flag_choices",
+    "applied": "2026-10-12 13:40:07.814000"
+  },
+  {
+    "_id": "6acce33892d9de309d9078e9",
+    "app": "admin",
+    "name": "0004_alter_logentry_id",
+    "applied": "2026-10-12 13:40:08.005000"
+  },
+  {
+    "_id": "6acce33892d9de309d9078ea",
+    "app": "catalog",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:08.552000"
+  },
+  {
+    "_id": "6acce33992d9de309d9078eb",
+    "app": "commerce",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:09.527000"
+  },
+  {
+    "_id": "6acce33992d9de309d9078ec",
+    "app": "contenttypes",
+    "name": "0003_alter_contenttype_id",
+    "applied": "2026-10-12 13:40:09.638000"
+  },
+  {
+    "_id": "6acce33a92d9de309d9078ed",
+    "app": "outfits",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:10.201000"
+  },
+  {
+    "_id": "6acce33a92d9de309d9078ee",
+    "app": "ratings",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:10.543000"
+  },
+  {
+    "_id": "6acce33a92d9de309d9078ef",
+    "app": "sessions",
+    "name": "0001_initial",
+    "applied": "2026-10-12 13:40:10.762000"
+  },
+  {
+    "_id": "6ad83446707cd39e51b192ca",
+    "app": "catalog",
+    "name": "0002_catalogitem_size_max_cm_catalogitem_size_min_cm",
+    "applied": "2026-10-21 03:40:54.666000"
+  },
+  {
+    "_id": "6ad84e0450787affe4ed2ecb",
+    "app": "catalog",
+    "name": "0003_remove_catalogitem_size_max_cm_and_more",
+    "applied": "2026-10-21 05:30:44.057000"
+  },
+  {
+    "_id": "6ad9a2357bf8bae2b93e9648",
+    "app": "commerce",
+    "name": "0002_order_contact_number_order_recipient_name_and_more",
+    "applied": "2026-10-22 05:42:13.051000"
+  },
+  {
+    "_id": "6ad9a2357bf8bae2b93e9649",
+    "app": "commerce",
+    "name": "0003_order_recipient_email",
+    "applied": "2026-10-22 05:42:13.261000"
+  },
+  {
+    "_id": "6adf124d99c988773cc8c279",
+    "app": "catalog",
+    "name": "0004_remove_catalogitem_side_image",
+    "applied": "2026-10-26 08:41:49.294000"
+  },
+  {
+    "_id": "6adf134e6b4e09a4de918293",
+    "app": "commerce",
+    "name": "0004_order_order_number",
+    "applied": "2026-10-26 08:46:06.300000"
+  },
+  {
+    "_id": "6ae2f50aee28440c886302ef",
+    "app": "accounts",
+    "name": "0002_remove_user_body_proportions_remove_user_height_and_more",
+    "applied": "2026-10-29 07:26:02.125000"
+  },
+  {
+    "_id": "6ae55c5ec38c50cb6df132c6",
+    "app": "outfits",
+    "name": "0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more",
+    "applied": "2026-10-31 03:11:26.055000"
+  },
+  {
+    "_id": "6aeac07f718ef92d8c7be770",
+    "app": "commerce",
+    "name": "0005_order_user_nullable",
+    "applied": "2026-11-04 05:19:59.303000"
+  },
+  {
+    "_id": "6aec4d25ddd4dee63f2efd43",
+    "app": "ratings",
+    "name": "0002_alter_rating_unique_together_rating_source_and_more",
+    "applied": "2026-11-05 09:32:21.916000"
+  },
+  {
+    "_id": "6aee0ac1d6086125a39f002e",
+    "app": "outfits",
+    "name": "0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more",
+    "applied": "2026-11-06 17:13:37.665000"
+  },
+  {
+    "_id": "6aeede048cde250082464981",
+    "app": "ratings",
+    "name": "0003_uatsession_uatresponse",
+    "applied": "2026-11-07 08:15:00.003000"
+  },
+  {
+    "_id": "6aeeeb04b43b393bccb26a1c",
+    "app": "accounts",
+    "name": "0003_archiveduser_user_archived_at_user_status_and_more",
+    "applied": "2026-11-07 09:10:28.010000"
+  },
+  {
+    "_id": "6aeef0a95af9f3b9d028f74e",
+    "app": "accounts",
+    "name": "0004_remove_archiveduser_retention_expires_at_and_more",
+    "applied": "2026-11-07 09:34:33.625000"
+  },
+  {
+    "_id": "6aeef389129a060c5148ec14",
+    "app": "accounts",
+    "name": "0004_remove_archiveduser_retention_expires_at",
+    "applied": "2026-11-07 09:46:49.411000"
+  },
+  {
+    "_id": "6af1b4f5aea7efc5c2a951e7",
+    "app": "ratings",
+    "name": "0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more",
+    "applied": "2026-11-09 11:56:37.956000"
+  },
+  {
+    "_id": "6af1cd61780a71a4d015f6b1",
+    "app": "accounts",
+    "name": "0005_user_fitting_studio_surveys",
+    "applied": "2026-11-09 13:40:49.360000"
+  },
+  {
+    "_id": "6af1cfdce508fab8a0569d05",
+    "app": "accounts",
+    "name": "0006_remove_user_fitting_studio_surveys_and_more",
+    "applied": "2026-11-09 13:51:24.078000"
+  },
+  {
+    "_id": "6af1d00d3528284f1d33e6b5",
+    "app": "commerce",
+    "name": "0006_cartitem_catalog_item_id_cartitem_item_name_and_more",
+    "applied": "2026-11-09 13:52:13.829000"
+  },
+  {
+    "_id": "6af1d5f23c6d0dcbd6c7dc1c",
+    "app": "accounts",
+    "name": "0007_user_latest_fitting_studio_survey",
+    "applied": "2026-11-09 14:17:22.228000"
+  },
+  {
+    "_id": "6af47888cb85cc763debb41a",
+    "app": "catalog",
+    "name": "0005_alter_catalogitem_category",
+    "applied": "2026-11-11 14:15:36.986000"
+  }
+]

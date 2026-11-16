@@ -74,49 +74,140 @@ export function isUATAnswer(value) {
 }
 
 // ============================================================================
-// FITTING STUDIO PRE/POST SESSION POPUPS (Criterion 9 / Criterion 11 / OBJ-01)
-// CHANGED (popup redesign): the page-level popups now use a TWO-QUESTION
-// contract with shopper-friendly wording. Both phases use the SAME 1-5
-// direction (higher = better) so the ≥+1 point gain calculation stays valid.
-//   * confidence    -> pre/post fit+style confidence (Criterion 9)
-//   * return_intent -> pre/post keep-vs-return intent, 5 = keep (Criterion 11)
-// The like/dislike on the fit visualization is a SEPARATE binary toggle
-// (fit_like_dislike) so it never conflates with the confidence stars.
-// Payload names mirror the KAN-89 survey log:
-//   { session_id, user_type, pre_confidence, pre_return_intent,
-//     post_confidence, post_return_intent, fit_like_dislike, timestamp }
+// IN-APP RATING CONTRACT (SRS FR-7.5 / Scope Criteria 9 & 10) — REDESIGNED.
+// Stars ONLY (1-5); 4-5 stars = approval. No like/dislike anywhere in the UI.
+// Ratings are BUTTON-TRIGGERED (no auto popups) and exist in exactly 2 places:
+//   1. Recommendation Panel -> ONE button rating the OVERALL recommendation
+//      set (target_type 'item', source 'recommendation_panel', target_id
+//      'panel-overall-<studioSessionId>').
+//   2. Fitting Studio canvas -> "Rate Avatar Look" (source 'fit_visualization',
+//      one row per equipped garment) + Pre/Post-Try-On Check buttons writing
+//      FITTING_STUDIO_SURVEYS (fit_rating_score replaces fit_like_dislike).
+// Guests: DB write blocked; payload held in sessionStorage (dies with the
+// session, FR-1.9) and the sign-up/login modal opens (FR-7.5).
 // ============================================================================
-export const STUDIO_SURVEY_QUESTIONS = Object.freeze([
-  {
-    key: "confidence",
-    prePrompt:
-      "How confident do you feel that you can find an outfit that fits your body type and personal style today?",
-    preLowLabel: "Not at all confident",
-    preHighLabel: "Very confident",
-    postPrompt:
-      "After seeing these outfits on your avatar, how confident do you feel about your fit and style choices now?",
-    postLowLabel: "Less confident than before",
-    postHighLabel: "Much more confident",
-  },
-  {
-    key: "return_intent",
-    prePrompt:
-      "If you were to buy the items you're about to try on without seeing them first, how likely would you be to return them?",
-    preLowLabel: "Definitely would return",
-    preHighLabel: "Definitely would keep",
-    postPrompt:
-      "Based on what you just saw, how likely are you to keep (not return) the items you tried on?",
-    postLowLabel: "Definitely would return",
-    postHighLabel: "Definitely would keep",
-  },
+
+export const RATING_APPROVAL_MIN = 4;
+
+export const GUEST_RATING_CTA = "Sign up or Log in to save your rating";
+
+// Session-scoped hold for guest ratings (never localStorage, never the DB).
+export const GUEST_PENDING_RATING_KEY = "fitfusion-guest-pending-rating";
+
+export const PANEL_OVERALL_TARGET_PREFIX = "panel-overall-";
+
+export function panelOverallTargetId(studioSessionId) {
+  return `${PANEL_OVERALL_TARGET_PREFIX}${studioSessionId}`;
+}
+
+const CONFIDENCE_LABELS = Object.freeze([
+  "Not Confident",
+  "Slightly Confident",
+  "Moderately Confident",
+  "Confident",
+  "Very Confident",
 ]);
 
-// Guest-facing call-to-action that REPLACES the submit button on both popups
-// (FR-7.5: guests see the prompt, nothing is persisted).
-export const STUDIO_GUEST_CTA =
-  "Sign up to save your ratings & get personalized recommendations";
+const RETURN_LABELS = Object.freeze([
+  "Very Unlikely to Return",
+  "Unlikely to Return",
+  "Neutral",
+  "Likely to Return",
+  "Very Likely to Return",
+]);
 
-// RESERVED: popup confidence answers no longer travel through /ratings/;
-// only the fit-visualization like/dislike does (source fit_visualization).
-// Kept exported so the backend source vocabulary stays stable.
+// A. Recommendation Panel — overall style/color rating.
+export const RECOMMENDATION_RATING_COPY = Object.freeze({
+  buttonLabel: "Rate Recommendations",
+  eyebrow: "RECOMMENDATION PANEL",
+  title: "Rate These Recommendations",
+  helperNote:
+    "Ratings evaluate style & color suggestions on your avatar, not physical garment sizing.",
+  submitLabel: "Submit Rating",
+  questions: Object.freeze([
+    {
+      key: "score",
+      prompt:
+        "How well do these recommended styles and colors suit your avatar profile?",
+      labels: Object.freeze([
+        "Poor match",
+        "Fair match",
+        "Neutral / Okay",
+        "Good match",
+        "Great match",
+      ]),
+    },
+  ]),
+});
+
+// B. Fitting Studio — on-avatar fit visualization rating.
+export const FIT_RATING_COPY = Object.freeze({
+  buttonLabel: "Rate Avatar Look",
+  eyebrow: "FIT VISUALIZATION",
+  title: "Rate On-Avatar Visualization",
+  helperNote:
+    "This rates the visual preview on your avatar only, not physical garment fit.",
+  submitLabel: "Submit Rating",
+  questions: Object.freeze([
+    {
+      key: "score",
+      prompt:
+        "How satisfied are you with how this outfit looks on your personalized avatar?",
+      labels: Object.freeze([
+        "Very Dissatisfied",
+        "Dissatisfied",
+        "Neutral",
+        "Satisfied",
+        "Very Satisfied",
+      ]),
+    },
+  ]),
+});
+
+// C. Fitting Studio — pre-session check (before try-on).
+export const PRE_CHECK_COPY = Object.freeze({
+  buttonLabel: "Pre-Try-On Check",
+  eyebrow: "BEFORE TRY-ON",
+  title: "Before You Try On",
+  submitLabel: "Save Pre-Session Check",
+  questions: Object.freeze([
+    {
+      key: "confidence",
+      prompt:
+        "Before using the virtual try-on, how confident are you choosing clothes that suit your body type and skin tone?",
+      labels: CONFIDENCE_LABELS,
+    },
+    {
+      key: "return_intent",
+      prompt:
+        "Without previewing items on an avatar, how likely are you to return clothes bought online due to style or look mismatch?",
+      labels: RETURN_LABELS,
+    },
+  ]),
+});
+
+// D. Fitting Studio — post-session check (after try-on).
+export const POST_CHECK_COPY = Object.freeze({
+  buttonLabel: "Post-Try-On Check",
+  eyebrow: "AFTER TRY-ON",
+  title: "After Your Try-On Session",
+  submitLabel: "Save Post-Session Check",
+  questions: Object.freeze([
+    {
+      key: "confidence",
+      prompt:
+        "After seeing outfits on your avatar, how confident are you now in deciding whether an item suits you?",
+      labels: CONFIDENCE_LABELS,
+    },
+    {
+      key: "return_intent",
+      prompt:
+        "Based on this avatar preview, how likely would you be to return these items if purchased?",
+      labels: RETURN_LABELS,
+    },
+  ]),
+});
+
+// RESERVED (legacy): kept exported so the backend source vocabulary stays
+// stable; the redesigned UI no longer sends popup-sourced ratings.
 export const POPUP_RATING_SOURCE = "fitting_studio_popup";

@@ -18,16 +18,7 @@ SETUP_RETRY_SECONDS = 30
 
 @deconstructible
 class GridFSStorage(Storage):
-    """GridFS storage with retryable setup.
-
-    The old version cached a failed connection attempt forever
-    (_use_gridfs = False), so one transient Atlas hiccup on the first
-    /media/ request made every product image 404 until the server was
-    restarted. This version retries at most once per SETUP_RETRY_SECONDS
-    and always resolves an explicit database name (URI path, else
-    FALLBACK_DB_NAME) so get_database() can never raise ConfigurationError
-    on a path-less URI.
-    """
+    """GridFS storage with retryable setup."""
 
     def __init__(self):
         self._client = None
@@ -53,9 +44,7 @@ class GridFSStorage(Storage):
             logger.info("GridFS storage connected (db=%s).", db_name)
             return True
         except Exception as exc:
-            logger.warning(
-                "GridFS setup failed (retry in %ss): %s", SETUP_RETRY_SECONDS, exc
-            )
+            logger.warning("GridFS setup failed (retry in %ss): %s", SETUP_RETRY_SECONDS, exc)
             self._client = None
             self._db = None
             self._fs = None
@@ -90,15 +79,18 @@ class GridFSStorage(Storage):
         return f"/media/{name}"
 
     def delete(self, name):
-        try:
-            fs = self._require_fs()
-        except FileNotFoundError:
-            return
+        # GOAL 2: surface cleanup failures instead of silently swallowing them.
+        # _require_fs() raises FileNotFoundError when GridFS is unreachable, so a
+        # failed delete now propagates to the caller rather than looking successful.
+        fs = self._require_fs()
         file = fs.find_one({"_id": ObjectId(name)}) if ObjectId.is_valid(name) else None
         if file is None:
             file = fs.find_one({"filename": name})
         if file:
             fs.delete(file._id)
+        else:
+            # Already gone (e.g. signal + explicit delete raced). Not an error.
+            logger.warning("GridFS delete: file '%s' not found.", name)
 
 
 gridfs_storage = GridFSStorage()

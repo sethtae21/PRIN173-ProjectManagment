@@ -5,6 +5,8 @@ so the checkout page can auto-fill delivery information.
 Traceability: SRS FR-1.2, FR-1.3
 """
 
+import uuid
+
 from django.utils import timezone  # stamp the archive grace-window clock
 
 from rest_framework import permissions, status
@@ -89,14 +91,19 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # ---------------------------------------------------------------------------
-# FITTING STUDIO PRE/POST SESSION POPUPS (Criterion 9 / 11, OBJ-01 / KAN-89).
-# Each submit writes TWO places, in one request:
-#   1. accounts_fittingstudiosurvey — one FLAT document per visit (history).
-#   2. accounts_user.latest_fitting_studio_survey — a single FLAT mirror object
-#      on the account document, so the rating is visible on dein's user row in
-#      Compass without any array nesting.
-# accounts_rating is NEVER touched by the popups (FR-7.5 surfaces only).
-# Guests can never reach this view (IsAuthenticated) — FR-1.9.
+# FITTING STUDIO SURVEYS (Criterion 9 / 11, OBJ-01 / KAN-89) — STARS ONLY.
+# CHANGED (rating redesign):
+#   * fit_like_dislike is GONE; fit_rating_score (1-5) replaces it.
+#   * UPSERT per (user, session_id): the Pre-Try-On Check creates the visit
+#     document; the Post-Try-On Check and the "Rate Avatar Look" score UPDATE
+#     the same document, so confidence_gain becomes computable once both
+#     phases exist. One flat row per visit in accounts_fittingstudiosurvey.
+#   * Every submit also mirrors the newest state FLAT onto
+#     accounts_user.latest_fitting_studio_survey (readable in Compass).
+# accounts_rating is NEVER touched here (FR-7.5 star surfaces write it via
+# POST /ratings/ from the frontend). Guests cannot reach this view
+# (IsAuthenticated) — FR-1.9; the frontend holds guest payloads in
+# sessionStorage and shows the sign-up/login modal instead.
 # ---------------------------------------------------------------------------
 
 SURVEY_SCORE_KEYS = (
@@ -104,9 +111,8 @@ SURVEY_SCORE_KEYS = (
     'pre_return_intent',
     'post_confidence',
     'post_return_intent',
+    'fit_rating_score',
 )
-
-SURVEY_VOTE_KEYS = ('fit_like_dislike',)
 
 SURVEY_SESSION_ID_MAX = 64
 
@@ -120,12 +126,6 @@ def _clean_survey_score(value):
     except (TypeError, ValueError):
         return None
     return number if 1 <= number <= 5 else None
-
-
-def _clean_survey_vote(value):
-    """Accept only 'like' / 'dislike'; blank or junk -> None."""
-    vote = str(value or '').strip().lower()
-    return vote if vote in ('like', 'dislike') else None
 
 
 def _clean_session_id(value):
@@ -157,21 +157,42 @@ def _confidence_gain(pre, post):
     return None
 
 
+def _survey_payload(row):
+    """Flat, Compass-readable serialization of one visit document."""
+    return {
+        'id': str(row.id),
+        'user_email': row.user_email,
+        'session_id': row.session_id,
+        'user_type': row.user_type,
+        'pre_confidence': row.pre_confidence,
+        'pre_return_intent': row.pre_return_intent,
+        'post_confidence': row.post_confidence,
+        'post_return_intent': row.post_return_intent,
+        'confidence_gain': row.confidence_gain,
+        'fit_rating_score': row.fit_rating_score,
+        'equipped_item_ids': row.equipped_item_ids,
+        'avatar_context': row.avatar_context,
+        'submitted_at': row.submitted_at.isoformat() if row.submitted_at else None,
+    }
+
+
 class FittingStudioSurveyView(APIView):
     """
     POST /profile/fitting-studio-survey/
-        Create one flat survey document AND mirror it onto the account.
-        Payload: { "survey": { session_id, pre_confidence, pre_return_intent,
-                               post_confidence, post_return_intent,
-                               fit_like_dislike,
-                               equipped_item_ids: [...],
-                               avatar_context: {...} } }
-        `user`, `user_email`, `user_type`, `confidence_gain`, `submitted_at`
-        are SERVER-derived so clients cannot forge evidence.
+        Upsert ONE flat visit document (keyed by user + session_id) AND mirror
+        it onto the account. Payload:
+          { "survey": { session_id,
+                        pre_confidence, pre_return_intent,
+                        post_confidence, post_return_intent,
+                        fit_rating_score,
+                        equipped_item_ids: [...], avatar_context: {...} } }
+        Only the fields PRESENT in the payload are written; earlier phases of
+        the same visit are preserved. `user`, `user_email`, `user_type`,
+        `confidence_gain`, `submitted_at` are SERVER-derived.
 
     GET /profile/fitting-studio-survey/
-        List the authenticated account's survey visits (newest first) plus the
-        on-account mirror.
+        List the authenticated account's visit documents (newest first) plus
+        the on-account mirror.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -181,26 +202,7 @@ class FittingStudioSurveyView(APIView):
             'success': True,
             'count': rows.count(),
             'latest': request.user.latest_fitting_studio_survey or None,
-            'surveys': [
-                {
-                    'id': str(row.id),
-                    'user_email': row.user_email,
-                    'session_id': row.session_id,
-                    'user_type': row.user_type,
-                    'pre_confidence': row.pre_confidence,
-                    'pre_return_intent': row.pre_return_intent,
-                    'post_confidence': row.post_confidence,
-                    'post_return_intent': row.post_return_intent,
-                    'confidence_gain': row.confidence_gain,
-                    'fit_like_dislike': row.fit_like_dislike,
-                    'equipped_item_ids': row.equipped_item_ids,
-                    'avatar_context': row.avatar_context,
-                    'submitted_at': (
-                        row.submitted_at.isoformat() if row.submitted_at else None
-                    ),
-                }
-                for row in rows
-            ],
+            'surveys': [_survey_payload(row) for row in rows],
         }, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -214,23 +216,15 @@ class FittingStudioSurveyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cleaned = {}
-        for key in SURVEY_SCORE_KEYS:
-            cleaned[key] = _clean_survey_score(survey.get(key))
-        for key in SURVEY_VOTE_KEYS:
-            cleaned[key] = _clean_survey_vote(survey.get(key))
+        cleaned = {key: _clean_survey_score(survey.get(key)) for key in SURVEY_SCORE_KEYS}
         cleaned['session_id'] = _clean_session_id(survey.get('session_id'))
-        cleaned['equipped_item_ids'] = _clean_equipped_ids(
-            survey.get('equipped_item_ids')
-        )
-        cleaned['avatar_context'] = _clean_avatar_context(
-            survey.get('avatar_context')
-        )
+        cleaned['equipped_item_ids'] = _clean_equipped_ids(survey.get('equipped_item_ids'))
+        cleaned['avatar_context'] = _clean_avatar_context(survey.get('avatar_context'))
 
-        # Reject a survey that carries no signal at all so neither storage
+        # Reject a payload that carries no signal at all so neither storage
         # location fills with empty placeholders.
         if (
-            all(cleaned[key] is None for key in SURVEY_SCORE_KEYS + SURVEY_VOTE_KEYS)
+            all(cleaned[key] is None for key in SURVEY_SCORE_KEYS)
             and not cleaned['equipped_item_ids']
         ):
             return Response(
@@ -238,44 +232,37 @@ class FittingStudioSurveyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        row = FittingStudioSurvey.objects.create(
+        session_id = cleaned['session_id'] or uuid.uuid4().hex
+        row, created = FittingStudioSurvey.objects.get_or_create(
             user=request.user,
-            user_email=request.user.email or '',
-            session_id=cleaned['session_id'],
-            user_type='registered',  # server-derived; guests cannot reach here
-            pre_confidence=cleaned['pre_confidence'],
-            pre_return_intent=cleaned['pre_return_intent'],
-            post_confidence=cleaned['post_confidence'],
-            post_return_intent=cleaned['post_return_intent'],
-            confidence_gain=_confidence_gain(
-                cleaned['pre_confidence'], cleaned['post_confidence']
-            ),
-            fit_like_dislike=cleaned['fit_like_dislike'],
-            equipped_item_ids=cleaned['equipped_item_ids'],
-            avatar_context=cleaned['avatar_context'],
+            session_id=session_id,
+            defaults={
+                'user_email': request.user.email or '',
+                'user_type': 'registered',  # server-derived; guests never here
+            },
         )
 
+        # Write ONLY the phases/scores present in this payload so the pre-check
+        # and post-check of one visit accumulate on the same document.
+        for key in SURVEY_SCORE_KEYS:
+            if cleaned[key] is not None:
+                setattr(row, key, cleaned[key])
+        if cleaned['equipped_item_ids']:
+            row.equipped_item_ids = cleaned['equipped_item_ids']
+        if cleaned['avatar_context']:
+            row.avatar_context = cleaned['avatar_context']
+        row.user_email = request.user.email or row.user_email
+        row.confidence_gain = _confidence_gain(row.pre_confidence, row.post_confidence)
+        row.save()
+
         # Mirror the newest visit FLAT onto the accounts_user document so the
-        # rating is visible directly on the account in Compass (readable, no
-        # array). History stays in accounts_fittingstudiosurvey.
-        request.user.latest_fitting_studio_survey = {
-            'survey_id': str(row.id),
-            'session_id': row.session_id,
-            'pre_confidence': row.pre_confidence,
-            'pre_return_intent': row.pre_return_intent,
-            'post_confidence': row.post_confidence,
-            'post_return_intent': row.post_return_intent,
-            'confidence_gain': row.confidence_gain,
-            'fit_like_dislike': row.fit_like_dislike,
-            'equipped_item_ids': row.equipped_item_ids,
-            'submitted_at': (
-                row.submitted_at.isoformat() if row.submitted_at else None
-            ),
-        }
+        # rating is visible directly on the account in Compass (no array).
+        request.user.latest_fitting_studio_survey = _survey_payload(row)
         request.user.save(update_fields=['latest_fitting_studio_survey'])
 
         return Response({
             'success': True,
+            'created': created,
             'message': 'Fitting studio survey saved to your account.',
             'survey_id': str(row.id),
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

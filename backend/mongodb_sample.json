@@ -1,0 +1,276 @@
+{
+  "accounts_archiveduser": [
+    {
+      "_id": "6aeeebec3613cb0abfcb1e68",
+      "email": "[REDACTED]",
+      "full_name": "[REDACTED]",
+      "role": "seller",
+      "store_name": "DUCS",
+      "status": "archive",
+      "mobile": "[REDACTED]",
+      "street": "[REDACTED]",
+      "barangay": "[REDACTED]",
+      "city": "[REDACTED]",
+      "province": "[REDACTED]",
+      "postal_code": "[REDACTED]",
+      "password": "[REDACTED]",
+      "is_active": false,
+      "is_staff": false,
+      "last_login": "[REDACTED]",
+      "date_joined": "2026-11-07 09:13:15.031000",
+      "closed_account_id": "6aeeebab1d6b29bf2eaf9367",
+      "archived_at": "2026-11-07 09:13:55.895000",
+      "cold_moved_at": "2026-11-12 09:13:55.895000"
+    }
+  ],
+  "accounts_avatarpreset": [
+    {
+      "_id": "6ae1bc14e6fdfc32154dbc5f",
+      "user_id": "6adc6b9cd6fd28a6bb7415bf",
+      "name": "ccac",
+      "gender": "male",
+      "height": 164,
+      "weight": 93,
+      "skin_tone": "#855338",
+      "undertone": "cool",
+      "shoulder": "broad",
+      "waist": "slim",
+      "hip": "slim",
+      "cup_size": "",
+      "thigh": "slim",
+      "is_default": false,
+      "created_at": "2026-10-28 09:10:44.783000",
+      "updated_at": "2026-10-28 09:10:44.783000",
+      "body_build_cm": 99.0,
+      "style_focus": "casual"
+    }
+  ],
+  "accounts_cart": [
+    {
+      "_id": "6adda728ec8a8522de15fb81",
+      "user_id": "6adc6b9cd6fd28a6bb7415bf",
+      "created_at": "2026-10-25 06:52:24.157000",
+      "updated_at": "2026-10-25 06:52:24.157000"
+    }
+  ],
+  "accounts_cartitem": [],
+  "accounts_catalogitem": [
+    {
+      "_id": "6af2cb71655abe362412d145",
+      "name": "Navy Formal Blazer",
+      "description": "A tailored single-breasted blazer with notched lapels for office and formal events.",
+      "category": "outerwear",
+      "size": "L",
+      "color": "Navy",
+      "color_description": "Deep navy suiting fabric",
+      "color_family": "blue",
+      "price": "2499.00",
+      "style_tags": [
+        "smart",
+        "formal"
+      ],
+      "occasion_tags": [],
+      "compatible_color_palette_tags": [
+        "cool-tone",
+        "calm",
+        "winter",
+        "silver",
+        "professional"
+      ],
+      "seller_id": "6adc29d152f78b00f270c180",
+      "store_name": "seth storeeee",
+      "front_image": "6af2cb7f655abe362412d16b",
+      "rear_image": "6af2cb7f655abe362412d16c",
+      "status": "active",
+      "rejection_reasons": [],
+      "batch_id": "6af2cb71655abe362412d144",
+      "created_at": "2026-11-10 07:44:49.462000",
+      "updated_at": "2026-11-10 07:45:04.126000"
+    }
+  ],
+  "accounts_fittingstudiosurvey": [
+    {
+      "_id": "6af1d03b707d27abf8b68a95",
+      "user_id": "6adc3d58d6fd28a6bb7415a9",
+      "user_email": "dein@gmail.com",
+      "session_id": "studio-mw9bmicb-olpbs5cj",
+      "user_type": "registered",
+      "pre_confidence": 5,
+      "pre_return_intent": 5,
+      "post_confidence": 3,
+      "post_return_intent": 5,
+      "confidence_gain": -2,
+      "fit_like_dislike": "like",
+      "equipped_item_ids": [],
+      "avatar_context": {
+        "gender": "Female",
+        "height": "189.7",
+        "weight": "102.51883408846152",
+        "body_build_cm": 103.7
+      },
+      "submitted_at": "2026-11-09 13:52:59.895000"
+    }
+  ],
+  "accounts_order": [
+    {
+      "_id": "6ae1d292e222c9a42bd595a0",
+      "user_id": "6adc6b9cd6fd28a6bb7415bf",
+      "order_number": "FF-23902237",
+      "status": "pending",
+      "recipient_name": "[REDACTED]",
+      "recipient_email": "[REDACTED]",
+      "contact_number": "[REDACTED]",
+      "shipping_address": "[REDACTED]",
+      "payment_method": "Cash on Delivery",
+      "transaction_ref": "",
+      "shipping_fee": "0.00",
+      "total_amount": "11085.00",
+      "created_at": "2026-10-28 10:46:42.482000"
+    }
+  ],
+  "accounts_orderitem": [
+    {
+      "_id": "6ae1d292e222c9a42bd595a1",
+      "order_id": "6ae1d292e222c9a42bd595a0",
+      "catalog_item_id": null,
+      "item_name": "Classic White Shirt",
+      "store_name": "seth store",
+      "unit_price": "599.00",
+      "quantity": 3,
+      "size": "M",
+      "color": "Default"
+    }
+  ],
+  "accounts_outfit": [
+    {
+      "_id": "6ae55c8db3ebeb13b4dbbced",
+      "user_id": "6adc3d58d6fd28a6bb7415a9",
+      "name": "panis",
+      "occasion": "Casual",
+      "description": "",
+      "avatar_preset_id": "6ae5556012be8ed135e7cbe8",
+      "avatar_gender": "female",
+      "avatar_height": 154,
+      "avatar_weight": 58,
+      "avatar_skin_tone": "#dca77d",
+      "avatar_undertone": "cool",
+      "avatar_shoulder": "broad",
+      "avatar_waist": "average",
+      "avatar_hip": "slim",
+      "avatar_thigh": "slim",
+      "avatar_cup_size": "B",
+      "avatar_view": "front",
+      "created_at": "2026-10-31 03:12:13.132000",
+      "updated_at": "2026-10-31 03:57:03.621000"
+    }
+  ],
+  "accounts_outfit_items": [
+    {
+      "_id": "6af45d622b24b4ec5b695d77",
+      "outfit_id": "6af45d622b24b4ec5b695d76",
+      "catalogitem_id": "6af2dcff6a99eadef40a3c28"
+    }
+  ],
+  "accounts_rating": [
+    {
+      "_id": "6ae9b3a1b5c1e35ed14c6b02",
+      "user_id": "6adc3d58d6fd28a6bb7415a9",
+      "target_type": "item",
+      "target_id": "6add932dec8a8522de15f9fb",
+      "score": 5,
+      "vote": null,
+      "created_at": "2026-11-03 10:12:49.746000",
+      "updated_at": "2026-11-03 10:21:25.249000",
+      "source": ""
+    }
+  ],
+  "accounts_uploadbatch": [
+    {
+      "_id": "6af2cb71655abe362412d144",
+      "seller_id": "6adc29d152f78b00f270c180",
+      "store_name": "seth storeeee",
+      "status": "completed",
+      "total_items": 10,
+      "accepted_count": 6,
+      "rejected_count": 4,
+      "rejection_report": {
+        "6af2cb78655abe362412d166": [
+          "Front: Image too small (1408x768). Minimum is 800x800.",
+          "Rear: Image too small (1408x768). Minimum is 800x800."
+        ],
+        "6af2cb78655abe362412d167": [
+          "Row 9: Invalid size 'XXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+          "Front: Image too small (1408x768). Minimum is 800x800.",
+          "Rear: Image too small (1408x768). Minimum is 800x800."
+        ],
+        "6af2cb78655abe362412d168": [
+          "Row 10: Invalid size 'XXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+          "Front: Image too small (1408x768). Minimum is 800x800.",
+          "Rear: Image too small (1408x768). Minimum is 800x800."
+        ],
+        "6af2cb78655abe362412d169": [
+          "Row 11: Invalid size 'XXXXL'. Use standard clothing sizes only: S, M, L, XL, 2XL, 3XL, 4XL. Do not enter cm measurements; the product page shows the cm range automatically.",
+          "Front: Image too small (1408x768). Minimum is 800x800.",
+          "Rear: Image too small (1408x768). Minimum is 800x800."
+        ]
+      },
+      "created_at": "2026-11-10 07:44:49.202000",
+      "completed_at": "2026-11-10 07:45:05.384000"
+    }
+  ],
+  "accounts_user": [
+    {
+      "_id": "6adc29d152f78b00f270c180",
+      "password": "[REDACTED]",
+      "last_login": "[REDACTED]",
+      "is_superuser": false,
+      "email": "[REDACTED]",
+      "full_name": "[REDACTED]",
+      "role": "seller",
+      "store_name": "seth storeeee",
+      "mobile": "[REDACTED]",
+      "street": "[REDACTED]",
+      "barangay": "[REDACTED]",
+      "city": "[REDACTED]",
+      "province": "[REDACTED]",
+      "postal_code": "[REDACTED]",
+      "is_active": true,
+      "is_staff": false,
+      "date_joined": "2026-10-24 03:45:21.222000",
+      "archived_at": null,
+      "status": "active",
+      "latest_fitting_studio_survey": {}
+    }
+  ],
+  "accounts_user_groups": [],
+  "accounts_user_user_permissions": [],
+  "auth_group": [],
+  "auth_group_permissions": [],
+  "auth_permission": [],
+  "django_admin_log": [],
+  "django_content_type": [
+    {
+      "_id": "6adc2956c6acf1624191de5a",
+      "app_label": "admin",
+      "model": "logentry"
+    }
+  ],
+  "django_migrations": [
+    {
+      "_id": "6acce33592d9de309d9078d6",
+      "app": "contenttypes",
+      "name": "0001_initial",
+      "applied": "2026-10-12 13:40:05.553000"
+    }
+  ],
+  "django_session": [],
+  "token_blacklist": [
+    {
+      "_id": "6aec87d05d7595e255507088",
+      "jti": "26866cd2550946f6973ed1759941c582",
+      "expires_at": "2026-11-12 13:37:46"
+    }
+  ],
+  "uat_response": [],
+  "uat_session": []
+}

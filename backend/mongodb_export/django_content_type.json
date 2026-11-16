@@ -1,0 +1,97 @@
+[
+  {
+    "_id": "6adc2956c6acf1624191de5a",
+    "app_label": "admin",
+    "model": "logentry"
+  },
+  {
+    "_id": "6adc2956c6acf1624191de5c",
+    "app_label": "auth",
+    "model": "permission"
+  },
+  {
+    "_id": "6adc2956c6acf1624191de5b",
+    "app_label": "auth",
+    "model": "group"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de5d",
+    "app_label": "contenttypes",
+    "model": "contenttype"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de5e",
+    "app_label": "sessions",
+    "model": "session"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de5f",
+    "app_label": "accounts",
+    "model": "user"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de61",
+    "app_label": "catalog",
+    "model": "uploadbatch"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de60",
+    "app_label": "catalog",
+    "model": "catalogitem"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de62",
+    "app_label": "outfits",
+    "model": "avatarpreset"
+  },
+  {
+    "_id": "6adc2957c6acf1624191de63",
+    "app_label": "outfits",
+    "model": "outfit"
+  },
+  {
+    "_id": "6adc2958c6acf1624191de64",
+    "app_label": "commerce",
+    "model": "cart"
+  },
+  {
+    "_id": "6adc2958c6acf1624191de65",
+    "app_label": "commerce",
+    "model": "cartitem"
+  },
+  {
+    "_id": "6adc2958c6acf1624191de66",
+    "app_label": "commerce",
+    "model": "order"
+  },
+  {
+    "_id": "6adc2958c6acf1624191de67",
+    "app_label": "commerce",
+    "model": "orderitem"
+  },
+  {
+    "_id": "6adc2958c6acf1624191de68",
+    "app_label": "ratings",
+    "model": "rating"
+  },
+  {
+    "_id": "6aeede058cde250082464982",
+    "app_label": "ratings",
+    "model": "uatresponse"
+  },
+  {
+    "_id": "6aeede058cde250082464983",
+    "app_label": "ratings",
+    "model": "uatsession"
+  },
+  {
+    "_id": "6aeeeb04b43b393bccb26a1d",
+    "app_label": "accounts",
+    "model": "archiveduser"
+  },
+  {
+    "_id": "6af1cfdce508fab8a0569d06",
+    "app_label": "accounts",
+    "model": "fittingstudiosurvey"
+  }
+]

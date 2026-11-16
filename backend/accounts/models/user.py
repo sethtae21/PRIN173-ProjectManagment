@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
 
@@ -75,11 +76,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     province = models.CharField(max_length=255, blank=True, null=True)
     postal_code = models.CharField(max_length=10, blank=True, null=True)
 
-    # NEW (readable on-account mirror): a SINGLE FLAT object with the user's
-    # most recent fitting-studio popup survey, embedded directly on the
-    # accounts_user document so Compass shows the latest pre/post ratings and
-    # like/dislike at a glance (no array nesting). The full per-visit history
-    # lives in accounts_fittingstudiosurvey (FittingStudioSurvey below).
+    # Readable on-account mirror: a SINGLE FLAT object with the user's most
+    # recent fitting-studio survey, embedded directly on the accounts_user
+    # document so Compass shows the latest pre/post stars at a glance (no
+    # array nesting). Full per-visit history lives in
+    # accounts_fittingstudiosurvey (FittingStudioSurvey below).
     latest_fitting_studio_survey = models.JSONField(default=dict, blank=True)
 
     # NOTE (avatar refactor): the legacy body attributes
@@ -134,18 +135,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 # ---------------------------------------------------------------------------
 # ONE FLAT DOCUMENT PER FITTING-STUDIO VISIT (Criterion 9 / 11, OBJ-01 / KAN-89).
-# In MongoDB Compass each visit is a standalone, human-readable document with
-# scalar columns (pre/post confidence, keep-intent, computed gain, like/dislike)
-# plus the owner's email denormalized in (no join needed to read it).
-# The newest visit is ALSO mirrored as User.latest_fitting_studio_survey so the
-# rating is visible directly on the accounts_user document.
+# CHANGED (stars-only redesign): fit_like_dislike is REPLACED by
+# fit_rating_score (1-5 stars, 4-5 = approval). Pre/post confidence and
+# return-intent stay 1-5 with the SAME direction within each pair so deltas
+# are computable. The newest visit is ALSO mirrored as
+# User.latest_fitting_studio_survey so the rating is visible directly on the
+# accounts_user document. One row per (user, session_id): the pre-check creates
+# it, the post-check / fit rating UPDATE it (see FittingStudioSurveyView).
 # ---------------------------------------------------------------------------
 class FittingStudioSurvey(models.Model):
-    VOTE_CHOICES = (
-        ('like', 'Like'),
-        ('dislike', 'Dislike'),
-    )
-
     # Owner FK; related_name keeps a natural accessor:
     # user.fitting_studio_surveys.all()
     user = models.ForeignKey(
@@ -157,11 +155,12 @@ class FittingStudioSurvey(models.Model):
     user_email = models.EmailField(blank=True, default='', max_length=254)
 
     # Client-generated studio-visit id (bounded by the view's sanitizer).
+    # Acts as the upsert key: pre-check, post-check and fit rating for the
+    # same visit all land on ONE document.
     session_id = models.CharField(max_length=64, blank=True, default='')
     user_type = models.CharField(max_length=16, default='registered')
 
-    # The four 1-5 star answers (same direction pre & post so the ≥+1 gain
-    # calculation for Criterion 9 stays valid). NULL = skipped / not asked.
+    # The 1-5 star answers. NULL = skipped / not asked yet.
     pre_confidence = models.IntegerField(blank=True, null=True)
     pre_return_intent = models.IntegerField(blank=True, null=True)
     post_confidence = models.IntegerField(blank=True, null=True)
@@ -171,9 +170,11 @@ class FittingStudioSurvey(models.Model):
     # either side is missing. Makes the OBJ-01 gain visible at a glance.
     confidence_gain = models.IntegerField(blank=True, null=True)
 
-    # Binary fit-visualization reaction (Criterion 9 "like" evidence).
-    fit_like_dislike = models.CharField(
-        max_length=8, choices=VOTE_CHOICES, blank=True, null=True
+    # CHANGED (stars-only): replaces fit_like_dislike. On-avatar fit
+    # visualization satisfaction, 1-5 stars (4-5 = approval, Criterion 9).
+    fit_rating_score = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
 
     # Context snapshots (tried-on catalog ids + avatar state at submit time).
