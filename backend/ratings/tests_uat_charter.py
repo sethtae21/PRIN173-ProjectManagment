@@ -1,317 +1,456 @@
-"""ratings/tests_uat_charter.py — Charter §3.2 UAT KPI alignment (KAN-89 evidence wiring).
-
-Run (Atlas awake):  python manage.py test ratings.tests_uat_charter -v 2
 """
-import json
-from uuid import uuid4
+accounts/tests_archive_retention.py — FR-1.4 / RA 10173 end-of-retention proof.
 
-from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase, TestCase
-from django.urls import reverse
+Companion to accounts.tests.AccountManagementTests, which proves the FIRST half
+of the lifecycle (DELETE /profile/ -> 200 archive, data RETAINED, login blocked).
+This suite proves the SECOND half: the prune sweep relocates the profile to
+accounts_archiveduser and erases/pseudonymizes the active collections.
+
+Chain covered end-to-end:
+  active --DELETE /profile/--> archived in accounts_user (grace window)
+         --prune sweep-------> accounts_archiveduser + active data erased
+
+Includes the forward eligibility math (due = archived_at + ARCHIVE_GRACE_DAYS),
+the legacy NULL-stamp branch, --force, the preview (moves nothing), PSEUDONYMIZED
+cold-copy idempotency (FR-1.4: no direct identifiers or credentials at rest),
+the legacy-row backfill command, the order pseudonymization + buyer-cart detach
+cascade, and sweep resilience (one bad row never stalls the rest).
+
+Run: python manage.py test accounts.tests_archive_retention -v 2
+"""
+from datetime import timedelta
+from unittest.mock import patch
+
+from django.core.management import call_command
+from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
-# FIX: UAT_VALUE_MIN/MAX live in models.py (where the field validator uses them)
-from .models import Rating, UATResponse, UATSession, UAT_VALUE_MIN, UAT_VALUE_MAX
-from .uat_kpis import (
-    APPROVAL_MIN_SCORE, CHARTER_THRESHOLDS, CONFIDENCE_GAIN_MIN,
-    CONFIDENCE_POST_PASS, EVENT_CART_CREATED, EVENT_CHECKOUT_COMPLETED,
-    KPI_OBJ01, KPI_OBJ02, KPI_OBJ03, KPI_OBJ04, KPI_OBJ05, KPI_OBJ06,
-    KPI_OBJ07, KPI_OBJ08, KPI_OBJ09, PAIRED_QUESTIONS,
-    SOURCE_FIT_VISUALIZATION, SOURCE_PRODUCT_PAGE, SOURCE_RECOMMENDATION_PANEL,
-    STATUS_BELOW, STATUS_MANUAL, STATUS_MET, STATUS_NOT_RUN,
-    SUPPLEMENTARY_QUESTIONS,
-    build_uat_workbook_rows, record_uat_commerce_event,
+from accounts.archive import (
+    ARCHIVE_GRACE_DAYS,
+    archive_due_date,
+    describe_archive_schedule,
+    prune_expired_archived_users,
 )
+from accounts.models import ArchivedUser, FittingStudioSurvey, User
+from accounts.pseudonymization import pseudonym_for, pseudonymous_profile_fields
+from catalog.models import CatalogItem
+from commerce.models import Cart, CartItem, Order
+from outfits.models import AvatarPreset, Outfit
+from ratings.models import Rating
 
-User = get_user_model()
+PASSWORD = 'Test123!@#'
 
 
-def _shopper(username):
-    # Matches the project's account factory usage elsewhere in the suite.
+def _user(email, role='shopper', **extra):
     return User.objects.create_user(
-        email=f'{username}@example.com',
-        full_name=username.replace('_', ' ').title(),
-        password='Test123!@#',
-        role='shopper',
+        email=email,
+        full_name=email.split('@')[0].replace('.', ' ').title(),
+        password=PASSWORD,
+        role=role,
+        **extra,
     )
 
 
-class CharterThresholdLockTests(SimpleTestCase):
-    """These ARE the Charter §3.2 numbers. If this test fails, someone edited
-    a charter constant — that is a baselined change requiring adviser/CCB
-    sign-off, not a code convenience."""
-
-    def test_charter_numbers_are_locked(self):
-        self.assertEqual(CHARTER_THRESHOLDS['OBJ-01'], 80.0)
-        self.assertEqual(CHARTER_THRESHOLDS['OBJ-05'], 80.0)
-        self.assertEqual(CHARTER_THRESHOLDS['OBJ-06'], 80.0)
-        self.assertEqual(CHARTER_THRESHOLDS['OBJ-07'], 70.0)
-        self.assertEqual(CHARTER_THRESHOLDS['OBJ-09'], 80.0)
-        self.assertEqual(CONFIDENCE_GAIN_MIN, 1)
-        self.assertEqual(CONFIDENCE_POST_PASS, 4)
-        self.assertEqual(APPROVAL_MIN_SCORE, 4)
-        self.assertEqual((UAT_VALUE_MIN, UAT_VALUE_MAX), (0, 5))
-
-    def test_question_contract_and_rating_sources(self):
-        sources = dict(Rating.SOURCE_CHOICES)
-        for required in (SOURCE_RECOMMENDATION_PANEL, SOURCE_FIT_VISUALIZATION,
-                         SOURCE_PRODUCT_PAGE):
-            self.assertIn(required, sources)
-        self.assertEqual(len(PAIRED_QUESTIONS), 4)
-        self.assertIn('style_discovery', SUPPLEMENTARY_QUESTIONS)
+def _archive(user, days_ago=0, stamp=True):
+    """Mirror ProfileView.destroy's archive write, then back-date the clock."""
+    user.status = 'archive'
+    user.is_active = False
+    user.archived_at = (timezone.now() - timedelta(days=days_ago)) if stamp else None
+    user.save(update_fields=['status', 'is_active', 'archived_at'])
+    # Reload so assertions use the DB's stored precision (BSON dates are
+    # millisecond-precision; comparing against the in-memory value is flaky).
+    user.refresh_from_db()
+    return user
 
 
-class UATSessionCreateTests(TestCase):
-    """OBJ-01 join integrity: the session must persist product_id so fit
-    ratings can be matched to their try-on session."""
+def _listing(owner, name='Blue Jacket'):
+    return CatalogItem.objects.create(
+        name=name,
+        description='Retention test item.',
+        category='tops',
+        size='M',
+        color='Blue',
+        color_description='Navy blue',
+        color_family='blue',
+        price='49.95',
+        seller=owner,
+        store_name=owner.store_name or 'Retention Store',
+        status='active',
+    )
+
+
+def _order(user, number):
+    return Order.objects.create(
+        user=user,
+        order_number=number,
+        status='paid',
+        recipient_name='Acct User',
+        recipient_email=user.email,
+        contact_number='09123456789',
+        shipping_address='123 Sample Street, Makati',
+        payment_method='Cash on Delivery',
+        total_amount='250.00',
+    )
+
+
+class ArchiveEligibilityMathTests(TestCase):
+    """The forward grace-window rule, asserted literally."""
+
+    def test_due_date_is_archived_at_plus_grace_days(self):
+        user = _archive(_user('math@test.com'), days_ago=3)
+        expected = user.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
+        self.assertEqual(archive_due_date(user), expected)
+        # The User property must mirror the module helper exactly.
+        self.assertEqual(user.archive_due_date, expected)
+
+    def test_custom_window_is_honoured(self):
+        user = _archive(_user('window@test.com'), days_ago=3)
+        self.assertEqual(
+            archive_due_date(user, days=30),
+            user.archived_at + timedelta(days=30),
+        )
+
+    def test_legacy_null_stamp_has_no_due_date(self):
+        user = _archive(_user('legacy-math@test.com'), stamp=False)
+        self.assertIsNone(archive_due_date(user))
+        self.assertIsNone(user.archive_due_date)
+
+    def test_fresh_archive_is_not_relocated(self):
+        user = _archive(_user('fresh@test.com'), days_ago=0)
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+        self.assertFalse(ArchivedUser.objects.filter(closed_account_id=str(user.pk)).exists())
+
+    def test_overdue_archive_is_relocated(self):
+        user = _archive(_user('overdue@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=uid).exists())
+
+    def test_legacy_null_stamp_is_relocated_immediately(self):
+        user = _archive(_user('legacy-now@test.com'), stamp=False)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+
+    def test_force_relocates_a_fresh_archive(self):
+        user = _archive(_user('forced@test.com'), days_ago=0)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(force=True), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+
+    def test_active_accounts_are_never_relocated(self):
+        active = _user('active@test.com')
+        active.archived_at = timezone.now() - timedelta(days=ARCHIVE_GRACE_DAYS + 30)
+        active.save(update_fields=['archived_at'])
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertEqual(prune_expired_archived_users(force=True), 0)
+        self.assertTrue(User.objects.filter(pk=active.pk).exists())
+
+
+class ArchiveSchedulePreviewTests(TestCase):
+    """--preview must explain the math and move NOTHING."""
 
     def setUp(self):
-        self.client = APIClient()
-        self.user = _shopper('uat_session_create')
-        self.client.force_authenticate(self.user)
-        self.url = reverse('uat-session-create')
+        self.fresh = _archive(_user('preview-fresh@test.com'), days_ago=0)
+        self.overdue = _archive(
+            _user('preview-overdue@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
 
-    def test_session_create_stores_product_id_for_obj01_join(self):
-        product_id = uuid4().hex
-        response = self.client.post(
-            self.url, {'role': 'shopper', 'product_id': product_id}, format='json')
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['product_id'], product_id)
-        session = UATSession.objects.get(session_id=response.data['session_id'])
-        self.assertEqual(session.product_id, product_id)
-        self.assertEqual(session.status, 'active')
+    def test_preview_reports_schedule_and_moves_nothing(self):
+        rows = describe_archive_schedule()
+        self.assertEqual(len(rows), 2)
+        by_email = {row['email']: row for row in rows}
+
+        fresh_row = by_email[self.fresh.email]
+        self.assertFalse(fresh_row['eligible'])
+        self.assertIn('day(s)', fresh_row['remaining'])
+        self.assertEqual(
+            fresh_row['due_date'],
+            self.fresh.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS),
+        )
+
+        overdue_row = by_email[self.overdue.email]
+        self.assertTrue(overdue_row['eligible'])
+
+        # Preview is read-only.
+        self.assertEqual(ArchivedUser.objects.count(), 0)
+        self.assertTrue(User.objects.filter(pk=self.fresh.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.overdue.pk).exists())
+
+    def test_preview_force_marks_every_row_eligible(self):
+        rows = describe_archive_schedule(force=True)
+        self.assertTrue(all(row['eligible'] for row in rows))
+        fresh_row = next(r for r in rows if r['email'] == self.fresh.email)
+        self.assertIn('(forced)', fresh_row['remaining'])
+        self.assertEqual(ArchivedUser.objects.count(), 0)
+
+    def test_preview_lists_legacy_rows_as_immediate(self):
+        _archive(_user('preview-legacy@test.com'), stamp=False)
+        rows = describe_archive_schedule()
+        legacy = next(r for r in rows if r['email'] == 'preview-legacy@test.com')
+        self.assertIsNone(legacy['due_date'])
+        self.assertTrue(legacy['eligible'])
+        self.assertIn('legacy', legacy['remaining'])
 
 
-class UATResponseZeroValueTests(TestCase):
-    """Bug: numeric zero ("No") must be saved; null/empty/non-integer/unknown
-    keys must still fail cleanly."""
+class ColdCopyTests(TestCase):
+    """accounts_archiveduser content, idempotency, and timestamp semantics.
+
+    CHANGED (FR-1.4 audit fix): the cold copy is PSEUDONYMIZED, not intact.
+    Direct identifiers and credentials must never be written at rest.
+    """
+
+    def test_cold_copy_is_pseudonymized_and_idempotent(self):
+        user = _user('cold@test.com', mobile='09123456789', city='Makati City')
+        raw_hash = user.password
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        uid = str(user.pk)
+
+        first = ArchivedUser.from_user(user)
+        second = ArchivedUser.from_user(user)  # crash-retry path
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(ArchivedUser.objects.filter(closed_account_id=uid).count(), 1)
+
+        # FR-1.4: synthetic identity, cleared contact data, empty credential.
+        expected = pseudonymous_profile_fields(uid)
+        for name, value in expected.items():
+            self.assertEqual(getattr(first, name), value, name)
+        self.assertEqual(first.password, '')
+        self.assertNotEqual(first.password, raw_hash)
+        self.assertNotEqual(first.email, user.email)
+        self.assertNotEqual(first.full_name, user.full_name)
+        for raw in ('cold@test.com', '09123456789', 'Makati City'):
+            self.assertNotIn(raw, str(first.__dict__))
+
+        # Retention-purpose fields survive.
+        self.assertEqual(first.role, user.role)
+        self.assertEqual(first.closed_account_id, uid)
+        self.assertEqual(first.status, 'archive')
+        self.assertFalse(first.is_active)
+
+    def test_seller_store_identity_is_cleared(self):
+        seller = _user('cold-seller@test.com', role='seller', store_name='Cold Store')
+        _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(seller)
+        self.assertEqual(cold.store_name, '')
+        self.assertEqual(cold.role, 'seller')
+        self.assertNotIn('Cold Store', str(cold.__dict__))
+
+    def test_from_user_heals_a_legacy_intact_row(self):
+        """A row written BEFORE the fix is healed on re-touch, not duplicated."""
+        user = _user('heal@test.com', mobile='09123456789')
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        ArchivedUser.objects.filter(pk=cold.pk).update(
+            email=user.email, full_name=user.full_name,
+            mobile='09123456789', password=user.password,
+        )
+        healed = ArchivedUser.from_user(user)
+        self.assertEqual(healed.pk, cold.pk)
+        self.assertEqual(
+            ArchivedUser.objects.filter(closed_account_id=str(user.pk)).count(), 1)
+        healed.refresh_from_db()
+        self.assertEqual(
+            healed.email, pseudonymous_profile_fields(str(user.pk))['email'])
+        self.assertEqual(healed.password, '')
+        self.assertEqual(healed.mobile, '')
+
+    def test_cold_moved_at_stores_the_scheduled_due_date(self):
+        """DOCUMENTED BEHAVIOUR (not the relocation instant).
+
+        ArchivedUser.from_user() writes archived_at + ARCHIVE_GRACE_DAYS into
+        cold_moved_at, so this field audits the SCHEDULE, not the wall-clock
+        move. See the corrected archive.py docstring and the open RA 10173
+        audit-trail item in the sprint notes.
+        """
+        user = _archive(_user('scheduled@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        expected = user.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
+        self.assertLess(abs((cold.cold_moved_at - expected).total_seconds()), 1)
+        # ...and it is demonstrably NOT "now".
+        self.assertGreater(abs((cold.cold_moved_at - timezone.now()).total_seconds()), 3600)
+
+    def test_cold_moved_at_falls_back_to_now_for_legacy_rows(self):
+        user = _archive(_user('legacy-cold@test.com'), stamp=False)
+        before = timezone.now()
+        cold = ArchivedUser.from_user(user)
+        self.assertIsNotNone(cold.cold_moved_at)
+        self.assertGreaterEqual(cold.cold_moved_at, before - timedelta(seconds=1))
+        self.assertLess(abs((cold.cold_moved_at - timezone.now()).total_seconds()), 60)
+
+
+class ColdArchiveBackfillTests(TestCase):
+    """The repeatable cleanup for rows archived BEFORE the pseudonymization fix."""
 
     def setUp(self):
-        self.client = APIClient()
-        self.user = _shopper('uat_zero')
-        self.client.force_authenticate(self.user)
-        session = UATSession.objects.create(
-            user=self.user, product_id=uuid4().hex, role='shopper')
-        self.product_id = session.product_id
-        self.session_id = session.session_id
-        self.url = reverse('uat-response-submit')
+        self.legacy = ArchivedUser.objects.create(
+            closed_account_id='legacy0001',
+            email='legacy@test.com',
+            full_name='Legacy Person',
+            role='seller',
+            status='archive',
+            store_name='Legacy Store',
+            mobile='09181234567',
+            street='1 Old St',
+            barangay='Old Brgy',
+            city='Old City',
+            province='Old Province',
+            postal_code='0000',
+            password='pbkdf2_sha256$legacyhash',
+            is_active=False,
+            is_staff=True,
+            last_login=timezone.now(),
+            date_joined=timezone.now(),
+            archived_at=timezone.now() - timedelta(days=120),
+            cold_moved_at=timezone.now() - timedelta(days=30),
+        )
 
-    def _post(self, value):
-        return self.client.post(self.url, {
-            'session_id': self.session_id, 'product_id': self.product_id,
-            'phase': 'supplementary', 'question_key': 'style_discovery', 'value': value,
-        }, format='json')
+    def test_preview_writes_nothing(self):
+        call_command('pseudonymize_archived_users')
+        self.legacy.refresh_from_db()
+        self.assertEqual(self.legacy.email, 'legacy@test.com')
+        self.assertEqual(self.legacy.password, 'pbkdf2_sha256$legacyhash')
 
-    def test_zero_answer_is_saved_not_dropped(self):
-        response = self._post(0)
-        self.assertEqual(response.status_code, 201)
-        saved = UATResponse.objects.get(session__session_id=self.session_id,
-                                        question_key='style_discovery')
-        self.assertEqual(saved.value, 0)
-
-    def test_null_answer_is_still_rejected(self):
-        self.assertEqual(self._post(None).status_code, 400)
-
-    def test_empty_string_answer_is_rejected(self):
-        self.assertEqual(self._post('').status_code, 400)
-
-    def test_fractional_answer_is_rejected_not_truncated(self):
-        # int(1.5) would silently truncate to 1; the view must refuse it.
-        self.assertEqual(self._post(1.5).status_code, 400)
-        self.assertFalse(UATResponse.objects.filter(
-            session__session_id=self.session_id).exists())
-
-    def test_unknown_question_key_rejected(self):
-        response = self.client.post(self.url, {
-            'session_id': self.session_id, 'product_id': self.product_id,
-            'phase': 'supplementary', 'question_key': 'vibes', 'value': 3,
-        }, format='json')
-        self.assertEqual(response.status_code, 400)
+    def test_apply_pseudonymizes_and_is_repeatable(self):
+        call_command('pseudonymize_archived_users', '--apply')
+        self.legacy.refresh_from_db()
+        expected = pseudonymous_profile_fields('legacy0001')
+        for name, value in expected.items():
+            self.assertEqual(getattr(self.legacy, name), value, name)
+        self.assertEqual(self.legacy.email,
+                         f"archived-{pseudonym_for('legacy0001')}@archive.invalid")
+        # Retention-purpose fields are untouched.
+        self.assertEqual(self.legacy.role, 'seller')
+        self.assertEqual(self.legacy.closed_account_id, 'legacy0001')
+        self.assertIsNotNone(self.legacy.cold_moved_at)
+        # Second run is a guaranteed no-op.
+        before = self.legacy.email
+        call_command('pseudonymize_archived_users', '--apply')
+        self.legacy.refresh_from_db()
+        self.assertEqual(self.legacy.email, before)
 
 
-class UATCharterKPITests(TestCase):
+class RetentionErasureTests(TestCase):
+    """RA 10173: after the window, active collections hold no personal data."""
+
     def setUp(self):
-        self.product_id = uuid4().hex  # no dependency on seeded catalog ids
-        self.users = [_shopper(f'uatkpi{i}') for i in range(6)]
-        self.sessions = [
-            UATSession.objects.create(user=user, product_id=self.product_id, role='shopper')
-            for user in self.users
-        ]
+        self.user = _user('erase@test.com')
+        self.preset = AvatarPreset.objects.create(
+            user=self.user, name='P', gender='female',
+            height=165, weight=55, skin_tone='#d9aa82',
+        )
+        self.outfit = Outfit.objects.create(user=self.user, name='My Outfit')
+        self.cart = Cart.objects.create(user=self.user)
+        self.rating = Rating.objects.create(
+            user=self.user, target_type='item', target_id='erase-target',
+            score=5, source='recommendation_panel',
+        )
+        self.survey = FittingStudioSurvey.objects.create(
+            user=self.user, session_id='studio-erase-0001',
+            pre_confidence=2, post_confidence=4, fit_rating=5,
+        )
+        self.order = _order(self.user, 'FF-ERASE-0001')
+        _archive(self.user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        self.uid = str(self.user.pk)
 
-    def _answer(self, session, question_key, phase, value):
-        UATResponse.objects.create(session=session, product_id=self.product_id,
-                                   question_key=question_key, phase=phase, value=value)
+    def test_relocation_erases_active_personal_data(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
 
-    def _row(self, kpi):
-        for row in build_uat_workbook_rows():
-            if row['kpi'] == kpi:
-                return row
-        raise AssertionError(f'No workbook row named {kpi!r}')
+        self.assertFalse(User.objects.filter(pk=self.uid).exists())
+        self.assertFalse(AvatarPreset.objects.filter(pk=self.preset.pk).exists())
+        self.assertFalse(Outfit.objects.filter(pk=self.outfit.pk).exists())
+        self.assertFalse(Cart.objects.filter(pk=self.cart.pk).exists())
+        self.assertFalse(Rating.objects.filter(pk=self.rating.pk).exists())
+        self.assertFalse(FittingStudioSurvey.objects.filter(pk=self.survey.pk).exists())
+        self.assertFalse(FittingStudioSurvey.objects.filter(user_email='erase@test.com').exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=self.uid).exists())
+        # The cold row itself carries no direct identifiers or credentials.
+        cold = ArchivedUser.objects.get(closed_account_id=self.uid)
+        self.assertNotEqual(cold.email, 'erase@test.com')
+        self.assertEqual(cold.password, '')
 
-    # ---- OBJ-01 ----------------------------------------------------------
-    def test_obj01_counts_percent_of_eligible_sessions_including_fit_rating(self):
-        s_pass_full, s_fail_no_rating, s_fail_style, s_ineligible, s_pass_vote_only, _ = self.sessions
-        pid = self.product_id
-        # Pass: fit gain +2, style gain +1, fit rating 5 stars.
-        self._answer(s_pass_full, 'fit_confidence', 'before', 2)
-        self._answer(s_pass_full, 'fit_confidence', 'after', 4)
-        self._answer(s_pass_full, 'style_confidence', 'before', 3)
-        self._answer(s_pass_full, 'style_confidence', 'after', 4)
-        Rating.objects.create(user=s_pass_full.user, target_type='fit', target_id=pid,
-                              score=5, source=SOURCE_FIT_VISUALIZATION)
-        # Fails: confidence passes but no fit_visualization rating. Ratings
-        # tagged with another surface must NOT count for OBJ-01.
-        self._answer(s_fail_no_rating, 'fit_confidence', 'before', 2)
-        self._answer(s_fail_no_rating, 'fit_confidence', 'after', 4)
-        self._answer(s_fail_no_rating, 'style_confidence', 'before', 2)
-        self._answer(s_fail_no_rating, 'style_confidence', 'after', 4)
-        Rating.objects.create(user=s_fail_no_rating.user, target_type='fit', target_id=pid,
-                              score=5, source=SOURCE_PRODUCT_PAGE)
-        # Fails: style flat at 3 (gain 0, post < 4) despite a fit like.
-        self._answer(s_fail_style, 'fit_confidence', 'before', 3)
-        self._answer(s_fail_style, 'fit_confidence', 'after', 4)
-        self._answer(s_fail_style, 'style_confidence', 'before', 3)
-        self._answer(s_fail_style, 'style_confidence', 'after', 3)
-        Rating.objects.create(user=s_fail_style.user, target_type='fit', target_id=pid,
-                              score=5, source=SOURCE_FIT_VISUALIZATION)
-        # Ineligible: missing style 'after' -> excluded from the denominator.
-        self._answer(s_ineligible, 'fit_confidence', 'before', 2)
-        self._answer(s_ineligible, 'fit_confidence', 'after', 5)
-        self._answer(s_ineligible, 'style_confidence', 'before', 2)
-        # Pass: 4->4 (post >= 4 with zero gain) + 'like' vote alone.
-        self._answer(s_pass_vote_only, 'fit_confidence', 'before', 4)
-        self._answer(s_pass_vote_only, 'fit_confidence', 'after', 4)
-        self._answer(s_pass_vote_only, 'style_confidence', 'before', 1)
-        self._answer(s_pass_vote_only, 'style_confidence', 'after', 2)
-        Rating.objects.create(user=s_pass_vote_only.user, target_type='fit', target_id=pid,
-                              vote='like', source=SOURCE_FIT_VISUALIZATION)
+    def test_orders_survive_but_are_pseudonymized(self):
+        order_id = self.order.pk
+        self.assertEqual(prune_expired_archived_users(), 1)
 
-        row = self._row(KPI_OBJ01)
-        self.assertEqual(row['denominator'], '4')
-        self.assertEqual(row['numerator'], '2')
-        self.assertEqual(row['actual_result'], '50.00%')
-        self.assertEqual(row['status'], STATUS_BELOW)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.pk, order_id)      # record retained
+        self.assertIsNone(self.order.user)             # personal link dropped
+        self.assertEqual(self.order.recipient_name, '')
+        self.assertEqual(self.order.contact_number, '')
+        self.assertEqual(self.order.recipient_email, '')
+        self.assertEqual(self.order.shipping_address, '')
+        self.assertEqual(str(self.order.total_amount), '250.00')  # business data kept
 
-    # ---- OBJ-06 ----------------------------------------------------------
-    def test_obj06_requires_both_confidence_gain_and_return_intent_drop(self):
-        s_pass, s_flat_return, s_flat_confidence, s_unpaired, _, _ = self.sessions
-        self._answer(s_pass, 'purchase_confidence', 'before', 2)
-        self._answer(s_pass, 'purchase_confidence', 'after', 4)
-        self._answer(s_pass, 'return_intent', 'before', 4)
-        self._answer(s_pass, 'return_intent', 'after', 2)
-        # Confidence up, return intent flat -> fails.
-        self._answer(s_flat_return, 'purchase_confidence', 'before', 2)
-        self._answer(s_flat_return, 'purchase_confidence', 'after', 3)
-        self._answer(s_flat_return, 'return_intent', 'before', 3)
-        self._answer(s_flat_return, 'return_intent', 'after', 3)
-        # Return intent down, confidence flat -> fails.
-        self._answer(s_flat_confidence, 'purchase_confidence', 'before', 3)
-        self._answer(s_flat_confidence, 'purchase_confidence', 'after', 3)
-        self._answer(s_flat_confidence, 'return_intent', 'before', 4)
-        self._answer(s_flat_confidence, 'return_intent', 'after', 1)
-        # Missing return_intent 'before' -> ineligible.
-        self._answer(s_unpaired, 'purchase_confidence', 'before', 2)
-        self._answer(s_unpaired, 'purchase_confidence', 'after', 5)
-        self._answer(s_unpaired, 'return_intent', 'after', 1)
+    def test_login_blocked_after_relocation(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
+        client = APIClient()
+        res = client.post('/auth/login/',
+                          {'email': 'erase@test.com', 'password': PASSWORD},
+                          format='json')
+        self.assertEqual(res.status_code, 400)
 
-        row = self._row(KPI_OBJ06)
-        self.assertEqual(row['denominator'], '3')
-        self.assertEqual(row['numerator'], '1')
-        self.assertEqual(row['actual_result'], '33.33%')
-        self.assertEqual(row['status'], STATUS_BELOW)
-
-    # ---- OBJ-05 ----------------------------------------------------------
-    def test_obj05_measures_recommendation_panel_approval_not_style_discovery(self):
-        u1, u2, u3, u4, u5, u6 = self.users
-        pid = self.product_id
-        Rating.objects.create(user=u1, target_type='item', target_id=pid,
-                              score=5, source=SOURCE_RECOMMENDATION_PANEL)
-        Rating.objects.create(user=u2, target_type='item', target_id=pid,
-                              score=4, source=SOURCE_RECOMMENDATION_PANEL)
-        Rating.objects.create(user=u3, target_type='item', target_id=pid,
-                              score=3, source=SOURCE_RECOMMENDATION_PANEL)
-        Rating.objects.create(user=u4, target_type='item', target_id=pid,
-                              vote='like', source=SOURCE_RECOMMENDATION_PANEL)
-        # Must NOT leak into OBJ-05: a product-page rating and survey answers.
-        Rating.objects.create(user=u5, target_type='item', target_id=pid,
-                              score=5, source=SOURCE_PRODUCT_PAGE)
-        self._answer(self.sessions[5], 'style_discovery', 'supplementary', 1)
-
-        row = self._row(KPI_OBJ05)
-        self.assertEqual(row['denominator'], '4')
-        self.assertEqual(row['numerator'], '3')
-        self.assertEqual(row['actual_result'], '75.00%')
-        self.assertEqual(row['status'], STATUS_BELOW)
-
-        Rating.objects.create(user=u6, target_type='item', target_id=pid,
-                              score=5, source=SOURCE_RECOMMENDATION_PANEL)
-        row = self._row(KPI_OBJ05)
-        self.assertEqual(row['actual_result'], '80.00%')
-        self.assertEqual(row['status'], STATUS_MET)
-
-    # ---- OBJ-07 ----------------------------------------------------------
-    def test_obj07_counts_completed_checkouts_over_created_carts(self):
-        s_done, s_abandoned, s_tryon_only = self.sessions[:3]
-        s_done.notes = '{"cart_created": true, "checkout_completed": true}'
-        s_done.save()
-        s_abandoned.notes = '{"cart_created": true}'
-        s_abandoned.save()
-        # s_tryon_only has no cart event -> never enters the denominator.
-
-        row = self._row(KPI_OBJ07)
-        self.assertEqual(row['denominator'], '2')
-        self.assertEqual(row['numerator'], '1')
-        self.assertEqual(row['actual_result'], '50.00%')
-        self.assertEqual(row['status'], STATUS_BELOW)
-
-    # ---- context rows ----------------------------------------------------
-    def test_zero_no_answer_counts_in_style_discovery_context_row(self):
-        self._answer(self.sessions[0], 'style_discovery', 'supplementary', 0)
-        row = self._row('CONTEXT| Style discovery (survey — not OBJ-05 evidence)')
-        self.assertEqual(row['sample_size'], 1)
-        self.assertEqual(row['numerator'], '0')
-        self.assertEqual(row['denominator'], '1')
-        self.assertEqual(row['actual_result'], '0.00% Yes')
+    def test_second_sweep_is_a_noop(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertEqual(ArchivedUser.objects.filter(closed_account_id=self.uid).count(), 1)
 
 
-class UATCommerceHookTests(TestCase):
-    def test_hook_requires_active_session_and_completes_on_checkout(self):
-        user = _shopper('hook_user')
-        self.assertFalse(record_uat_commerce_event(user, EVENT_CART_CREATED))  # no session
+class SellerDetachTests(TestCase):
+    """A deleted seller must never leave a buyer's cart pointing at a dead item."""
 
-        session = UATSession.objects.create(user=user, product_id=uuid4().hex, role='shopper')
-        self.assertTrue(record_uat_commerce_event(user, EVENT_CART_CREATED))
-        self.assertTrue(record_uat_commerce_event(user, EVENT_CHECKOUT_COMPLETED))
-        session.refresh_from_db()
-        self.assertEqual(session.status, 'completed')
-        notes = json.loads(session.notes)
-        self.assertIs(notes.get('cart_created'), True)
-        self.assertIs(notes.get('checkout_completed'), True)
-        # Completed session is no longer active: later commerce events are
-        # ignored, so one session can never inflate the cart denominator.
-        self.assertFalse(record_uat_commerce_event(user, EVENT_CART_CREATED))
-        self.assertFalse(record_uat_commerce_event(user, 'bogus_event'))
-        self.assertFalse(record_uat_commerce_event(None, EVENT_CART_CREATED))
+    def test_buyer_cart_items_are_detached_not_deleted(self):
+        seller = _user('seller-erase@test.com', role='seller', store_name='Retention Store')
+        buyer = _user('buyer-keep@test.com')
+        item = _listing(seller)
+        item_id = str(item.pk)
+        buyer_cart = Cart.objects.create(user=buyer)
+        cart_item = CartItem.objects.create(cart=buyer_cart, item=item, quantity=2)
+
+        _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        self.assertEqual(prune_expired_archived_users(), 1)
+
+        self.assertFalse(CatalogItem.objects.filter(pk=item_id).exists())
+        self.assertTrue(Cart.objects.filter(pk=buyer_cart.pk).exists())
+
+        cart_item.refresh_from_db()
+        self.assertIsNone(cart_item.item)
+        self.assertEqual(cart_item.catalog_item_id, item_id)
+        self.assertEqual(cart_item.item_name, 'Blue Jacket')
+        self.assertEqual(cart_item.store_name, 'Retention Store')
+        self.assertTrue(cart_item.seller_account_deleted)
+        self.assertTrue(cart_item.unavailable_reason)
+        self.assertEqual(cart_item.quantity, 2)
+
+        # The buyer's own account is untouched.
+        self.assertTrue(User.objects.filter(pk=buyer.pk).exists())
 
 
-class UATWorkbookEmptyTests(TestCase):
-    def test_empty_database_reports_not_run_with_zero_samples(self):
-        rows = {row['kpi']: row for row in build_uat_workbook_rows()}
-        for kpi in (KPI_OBJ01, KPI_OBJ05, KPI_OBJ06, KPI_OBJ07):
-            self.assertEqual(rows[kpi]['status'], STATUS_NOT_RUN)
-            self.assertEqual(rows[kpi]['sample_size'], 0)
-            self.assertEqual(rows[kpi]['actual_result'], '')
-        for kpi in (KPI_OBJ02, KPI_OBJ03, KPI_OBJ04, KPI_OBJ08, KPI_OBJ09):
-            self.assertEqual(rows[kpi]['status'], STATUS_MANUAL)
-            self.assertTrue(rows[kpi]['evidence_reference'])
+class SweepResilienceTests(TestCase):
+    """One bad row must never stall the whole sweep."""
 
-    def test_subjective_surveys_are_labelled_context_not_charter_evidence(self):
-        rows = {row['kpi']: row for row in build_uat_workbook_rows()}
-        context_rows = [k for k in rows if k.startswith('CONTEXT|')]
-        self.assertEqual(len(context_rows), 6)
-        for kpi in context_rows:
-            self.assertEqual(rows[kpi]['objective'], 'Context only')
+    def test_failure_on_one_row_is_logged_and_skipped(self):
+        bad = _archive(_user('bad@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        good = _archive(_user('good@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        bad_id, good_id = str(bad.pk), str(good.pk)
 
-    def test_no_proposed_targets_remain(self):
-        for row in build_uat_workbook_rows():
-            self.assertNotIn('proposed', row['target'].lower())
+        original = ArchivedUser.from_user
+
+        def flaky(user):
+            if user.email == 'bad@test.com':
+                raise RuntimeError('simulated cold-copy failure')
+            return original(user)
+
+        with patch.object(ArchivedUser, 'from_user', side_effect=flaky):
+            with self.assertLogs('accounts.archive', level='ERROR') as logs:
+                moved = prune_expired_archived_users()
+
+        self.assertEqual(moved, 1)
+        self.assertTrue(any('Failed to cold-archive' in m for m in logs.output))
+        # Bad row survived untouched; good row completed the whole cascade.
+        self.assertTrue(User.objects.filter(pk=bad_id).exists())
+        self.assertFalse(User.objects.filter(pk=good_id).exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=good_id).exists())
+        self.assertFalse(ArchivedUser.objects.filter(closed_account_id=bad_id).exists())

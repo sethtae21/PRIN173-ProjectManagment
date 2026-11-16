@@ -17,6 +17,12 @@ Rules baked into this module:
     are reported as manual-evidence rows. Subjective survey answers are
     exported only as "Context only" rows and are never substituted.
 
+STAR-ONLY BASELINE (SRS FR-7.5 / Scope Criteria 9-11):
+  Approval is expressed ONLY as an integer star score >= APPROVAL_MIN_SCORE
+  (4). The former vote='like' approval path was retired together with the
+  Rating.vote column (ratings migration 0005). Every locked charter threshold
+  is unchanged; only the *expression* of approval moved to stars.
+
 Keep the questionnaire constants in sync with frontend/src/services/uat.js.
 """
 import json
@@ -30,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Charter §3.2 thresholds (Criteria 5, 8–11). LOCKED by CharterThresholdLockTests.
 # ---------------------------------------------------------------------------
 CHARTER_THRESHOLDS = {
-    'OBJ-01': 80.0,   # Criterion 9  — fit/style confidence + fit "like"
+    'OBJ-01': 80.0,   # Criterion 9  — fit/style confidence + fit stars >= 4
     'OBJ-05': 80.0,   # Criterion 10 — recommendation approval
     'OBJ-06': 80.0,   # Criterion 11 — confidence up AND return intent down
     'OBJ-07': 70.0,   # Criterion 8  — carts completing mock checkout
@@ -48,8 +54,8 @@ CHECKLIST_PASS_PERCENT = 100        # OBJ-04 / RT-09
 CSV_PIPELINE_ITEM_COUNT = 10        # OBJ-08
 CSV_PIPELINE_BUDGET_SECONDS = 60
 
-# Per-session scoring rules (Criterion 9: gain >= +1 OR post >= 4/5;
-# "like" >= 4/5 per FR-7.5 which allows like/dislike OR 1–5).
+# Per-session scoring rules (Criterion 9: gain >= +1 OR post >= 4/5).
+# STAR-ONLY: approval is score >= 4/5; there is no like/dislike dimension.
 CONFIDENCE_GAIN_MIN = 1
 CONFIDENCE_POST_PASS = 4
 APPROVAL_MIN_SCORE = 4
@@ -171,11 +177,14 @@ def _confidence_improved(pair):
 
 
 def _rating_approves(row):
-    """FR-7.5: approval can be expressed as vote 'like' OR score ≥ 4/5."""
+    """STAR-ONLY approval (SRS FR-7.5): an integer score >= 4 approves.
+
+    CHANGED (audit fix): the former `vote == 'like'` path is GONE — the vote
+    column was removed by ratings migration 0005, so a like can no longer
+    masquerade as a star approval in any charter KPI.
+    """
     score = row.get('score')
-    if score is not None and int(score) >= APPROVAL_MIN_SCORE:
-        return True
-    return row.get('vote') == 'like'
+    return score is not None and int(score) >= APPROVAL_MIN_SCORE
 
 
 def _rate_summary(numerator, denominator, threshold_pct, evidence_reference):
@@ -199,7 +208,7 @@ def _at_least(threshold_pct):
 # ---------------------------------------------------------------------------
 def _obj01_fit_style_summary():
     """Criterion 9: % of ELIGIBLE try-on sessions where fit AND style
-    confidence improved AND the fit visualization was rated "like".
+    confidence improved AND the fit visualization was approved (>= 4 stars).
     Fit ratings join to sessions by (user, product) — UATSessionCreateView
     persists product_id — and must be tagged source='fit_visualization' /
     target_type='fit'."""
@@ -207,7 +216,8 @@ def _obj01_fit_style_summary():
     style_pairs = _paired_values('style_confidence')
     eligible_keys = sorted(set(fit_pairs) & set(style_pairs))
     evidence = ('Pre/post fit_confidence + style_confidence answers joined to '
-                'fit_visualization in-app ratings (FR-7.5 / KAN-89 / KAN-101).')
+                'fit_visualization in-app STAR ratings (FR-7.5 / KAN-89 / KAN-101). '
+                f'Approval = score ≥ {APPROVAL_MIN_SCORE}/5.')
     if not eligible_keys:
         return {**_not_run(),
                 'evidence_reference': f'{evidence} No eligible sessions captured yet.'}
@@ -215,21 +225,22 @@ def _obj01_fit_style_summary():
     session_user = {(session.pk, str(session.product_id)): session.user_id
                     for session in UATSession.objects.all()}
 
-    fit_likes = set()
+    # STAR-ONLY: read score only; the vote column no longer exists.
+    fit_approvals = set()
     for row in Rating.objects.filter(
         target_type='fit',
         source=SOURCE_FIT_VISUALIZATION,
-    ).values('user_id', 'target_id', 'score', 'vote'):
+    ).values('user_id', 'target_id', 'score'):
         if _rating_approves(row):
-            fit_likes.add((row['user_id'], str(row['target_id'])))
+            fit_approvals.add((row['user_id'], str(row['target_id'])))
 
     met = 0
     for key in eligible_keys:
         fit_ok = _confidence_improved(fit_pairs[key])
         style_ok = _confidence_improved(style_pairs[key])
         user_id = session_user.get(key)
-        liked = user_id is not None and (user_id, key[1]) in fit_likes
-        if fit_ok and style_ok and liked:
+        approved = user_id is not None and (user_id, key[1]) in fit_approvals
+        if fit_ok and style_ok and approved:
             met += 1
 
     return _rate_summary(met, len(eligible_keys),
@@ -238,13 +249,14 @@ def _obj01_fit_style_summary():
 
 def _obj05_recommendation_approval_summary():
     """Criterion 10: % of recorded recommendation_panel ratings approving.
-    Product-page / fit ratings and all survey questions are excluded."""
+    Product-page / fit ratings and all survey questions are excluded.
+    STAR-ONLY: approval = score >= APPROVAL_MIN_SCORE."""
     rows = list(Rating.objects.filter(
         target_type='item',
         source=SOURCE_RECOMMENDATION_PANEL,
-    ).values('score', 'vote'))
+    ).values('score'))
     evidence = ('Rating rows with source=recommendation_panel (FR-7.5 / KAN-101). '
-                'Approval = vote "like" or score ≥ 4/5.')
+                f'Approval = score ≥ {APPROVAL_MIN_SCORE}/5 (stars only).')
     if not rows:
         return {**_not_run(),
                 'evidence_reference': f'{evidence} No ratings recorded yet.'}
@@ -377,7 +389,7 @@ def build_uat_workbook_rows():
         KPI_OBJ01, 'OBJ-01',
         f'{_at_least(CHARTER_THRESHOLDS["OBJ-01"])} of eligible try-on sessions show fit AND '
         f'style confidence gain ≥ +{CONFIDENCE_GAIN_MIN} point OR post ≥ {CONFIDENCE_POST_PASS}/5, '
-        f'AND rate the fit visualization "like" (≥ {APPROVAL_MIN_SCORE}/5) '
+        f'AND rate the fit visualization ≥ {APPROVAL_MIN_SCORE}/5 stars '
         '(Charter §3.2 OBJ-01 / Scope Criterion 9)',
         _obj01_fit_style_summary(),
     )
@@ -408,7 +420,7 @@ def build_uat_workbook_rows():
     add_row(
         KPI_OBJ05, 'OBJ-05',
         f'{_at_least(CHARTER_THRESHOLDS["OBJ-05"])} of recorded Recommendation-Panel ratings '
-        f'approve the recommendation ("like" or score ≥ {APPROVAL_MIN_SCORE}/5) '
+        f'approve the recommendation (score ≥ {APPROVAL_MIN_SCORE}/5 stars) '
         '(Charter §3.2 OBJ-05 / Scope Criterion 10)',
         _obj05_recommendation_approval_summary(),
     )

@@ -129,8 +129,9 @@
         <input type="password" id="pw_new" placeholder="New password (8+, A-z, 0-9, !@#)">
         <button onclick="changePassword()">🔁 Change Password</button>
         <hr>
-        <small>⚠️ Deletes the logged-in account AND all its data (presets, outfits, cart). Use a throwaway account!</small>
-        <button class="danger" onclick="deleteAccount()">☠️ Delete My Account (RA 10173 erasure)</button>
+        <small>⚠️ Archives the logged-in account (FR-1.4 grace window); login is blocked immediately,
+        presets/outfits/cart cascade is deferred to the prune sweep. Use a throwaway account!</small>
+        <button class="danger" onclick="deleteAccount()">☠️ Archive My Account (FR-1.4 grace window)</button>
         <div id="accountResult"></div>
     </div>
 
@@ -141,9 +142,9 @@
         <div id="securityResult"></div>
     </div>
 
-    <!-- 10 KAN-101 -->
+    <!-- 10 KAN-101 STAR-ONLY -->
     <div class="section">
-        <h2>10. In-App Ratings <span class="badge">KAN-101 • FR-7.5</span></h2>
+        <h2>10. In-App Ratings <span class="badge">KAN-101 • FR-7.5 • STAR-ONLY</span></h2>
         <input type="text" id="rate_target_id" placeholder="Target ID (item or fit)" value="6ab52dc83c8d812f8b7ee414">
         <select id="rate_target_type">
             <option value="item">item (recommended product)</option>
@@ -154,9 +155,15 @@
             <option value="3">3 ★</option><option value="2">2 ★</option>
             <option value="1">1 ★</option>
         </select>
+        <select id="rate_source">
+            <option value="recommendation_panel">recommendation_panel (OBJ-05 / Criterion 10)</option>
+            <option value="fit_visualization">fit_visualization (OBJ-01 / Criterion 9)</option>
+            <option value="product_page">product_page</option>
+            <option value="order_history">order_history</option>
+        </select>
+        <small>Like/dislike controls removed — thumbs were a stale dev-only demo. Star-only payload
+        is {target_type, target_id, score: int 1..5, source}; 4–5 ★ = approval.</small>
         <button class="success" onclick="submitRating()">⭐ Submit Rating</button>
-        <button onclick="submitRating('like')">👍 Like</button>
-        <button onclick="submitRating('dislike')">👎 Dislike</button>
         <button onclick="getRatingSummary()">📊 Summary</button>
         <button onclick="getMyRatings()">📋 My Ratings</button>
         <div id="ratingResult"></div>
@@ -323,15 +330,15 @@
                 weight: parseFloat(val('preset_weight')),
                 skin_tone: val('preset_skin'),
                 // CRITICAL: If changing to male, cup_size MUST be null to pass backend validation
-                cup_size: g === 'female' ? 'B' : null 
+                cup_size: g === 'female' ? 'B' : null
             };
 
             const res = await fetch(`/presets/${id}/`, {
-                method: 'PATCH', 
+                method: 'PATCH',
                 headers: authHeaders(true),
                 body: JSON.stringify(payload)
             });
-            
+
             const data = await res.json().catch(() => ({}));
             res.ok ? show(out, true, '✅ Updated successfully!\n' + JSON.stringify(data, null, 2))
                    : show(out, false, `❌ ${res.status} Update failed:\n` + JSON.stringify(data, null, 2));
@@ -377,18 +384,21 @@
                    : show(out, false, '❌ ' + JSON.stringify(data, null, 2));
         }
         async function deleteAccount() {
+            // GAP-1 NOTE: ProfileView.destroy now returns 200 (FR-1.4 archive + grace window),
+            // not the 204 of the old hard-delete. Login is blocked immediately, cascade is
+            // deferred to the prune sweep. The demo message is adjusted to match.
             const out = 'accountResult';
             if (!accessToken) return show(out, false, '⚠️ Login first');
-            if (!confirm('Permanently delete this account and ALL its data?')) return;
+            if (!confirm('Archive this account (FR-1.4 grace window)? Login will be blocked immediately.')) return;
             const res = await fetch('/profile/', {
                 method: 'DELETE', headers: authHeaders(true),
                 body: JSON.stringify({ refresh: refreshToken })
             });
-            if (res.status === 204) {
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
                 accessToken = ''; refreshToken = ''; currentUser = null; updateStatus();
-                show(out, true, '☠️ Account deleted (204). All presets/outfits/cart cascaded. Refresh token blacklisted.\nLogin with it again → should fail.');
+                show(out, true, '🗄️ Account archived (FR-1.4). Login blocked. Presets/outfits/cart retained until the prune sweep (90-day grace window).\nResponse: ' + JSON.stringify(data, null, 2));
             } else {
-                const data = await res.json().catch(() => ({}));
                 show(out, false, '❌ ' + res.status + ' ' + JSON.stringify(data, null, 2));
             }
         }
@@ -415,11 +425,20 @@
                 `Step 1 rotation: ${r1.status} (new tokens issued)\nStep 2 replay OLD refresh: ${r2.status} ${JSON.stringify(d2)}\n${r2.status === 401 ? '✅ BLACKLIST ENFORCED — rotated token cannot be reused.' : '❌ Expected 401!'}`);
         }
 
-        // 10 — KAN-101 Ratings
-        async function submitRating(vote) {
+        // 10 — KAN-101 STAR-ONLY ratings
+        // GAP-4: Like/Dislike buttons and the `vote` payload branch are REMOVED. The star-only
+        // payload is {target_type, target_id, score: int 1..5, source} — the four SADD sources
+        // listed in RatingSerializer.SOURCE_CHOICES, all required server-side.
+        // Guests get 403 + {prompt: 'signup_login', persisted: false} (FR-1.9); the demo
+        // handles that case separately below so the UI stays informative instead of "❌ 403".
+        async function submitRating() {
             const out = 'ratingResult';
-            const body = { target_type: val('rate_target_type'), target_id: val('rate_target_id') };
-            if (vote) body.vote = vote; else body.score = parseInt(val('rate_score'), 10);
+            const body = {
+                target_type: val('rate_target_type'),
+                target_id: val('rate_target_id'),
+                score: parseInt(val('rate_score'), 10),
+                source: val('rate_source'),
+            };
 
             const res = await fetch('/ratings/', {
                 method: 'POST',
@@ -428,10 +447,14 @@
             });
             const data = await res.json();
 
-            if (res.ok && data.persisted === false) {
+            // Guest path: 403 + signup_login prompt, nothing persisted (FR-1.9).
+            if (!res.ok && data.prompt === 'signup_login') {
                 document.getElementById(out).innerHTML =
-                    `<div class="info">🔒 Guest rating counted for THIS SESSION only (discarded later).\nPrompt: ${data.prompt} — ${data.message}</div>`;
-            } else if (res.ok) {
+                    `<div class="info">🔒 ${data.detail}\nPrompt: ${data.prompt} — persisted=${data.persisted} (guest, nothing stored).</div>`;
+                return;
+            }
+
+            if (res.ok && data.persisted) {
                 show(out, true, '✅ Rating persisted!\n' + JSON.stringify(data.rating, null, 2));
             } else {
                 show(out, false, '❌ ' + JSON.stringify(data, null, 2));

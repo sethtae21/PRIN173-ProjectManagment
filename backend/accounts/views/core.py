@@ -1,13 +1,13 @@
 """
 accounts/views/core.py
-Profile management view — returns full user data including address fields
-so the checkout page can auto-fill delivery information.
-Traceability: SRS FR-1.2, FR-1.3
+Profile management + Fitting Studio survey (star-only).
+Traceability: SRS FR-1.2, FR-1.3, FR-7.5; SADD FITTING_STUDIO_SURVEYS.
 """
 
 import uuid
 
-from django.utils import timezone  # stamp the archive grace-window clock
+from django.db import IntegrityError
+from django.utils import timezone
 
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -24,36 +24,20 @@ from commerce.models import CartItem, Order
 
 
 class ProfileView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
-
-    GET  /api/profile/         → returns full user data (including address fields)
-    PATCH /api/profile/        → updates editable profile fields
-    DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
-                                 is_active=False, archived_at=now. ALL linked
-                                 data is retained so support can restore within
-                                 90 days; the prune sweep (accounts/archive.py)
-                                 relocates the profile to accounts_archiveduser
-                                 after the window closes.
-    """
+    """FR-1.2 / FR-1.3 profile GET / PATCH / DELETE (archive grace window)."""
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        """Return the authenticated user."""
         return self.request.user
 
     def retrieve(self, request, *args, **kwargs):
-        """Return the authenticated user's full profile including address."""
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
         return Response({
             'success': True,
-            'user': serializer.data
+            'user': self.get_serializer(self.get_object()).data
         }, status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
-        """Update editable profile fields (name, mobile, address, etc.)."""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -66,11 +50,6 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         }, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
-        """
-        FR-1.4 archive (grace window): flip status + is_active and stamp
-        archived_at so the 90-day cold-relocation clock starts. No linked data
-        is touched here — that is the prune sweep's job after the window.
-        """
         user = self.get_object()
         refresh_raw = request.data.get('refresh')
         if refresh_raw:
@@ -81,7 +60,7 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
 
         user.status = 'archive'
         user.is_active = False
-        user.archived_at = timezone.now()  # start the 90-day window
+        user.archived_at = timezone.now()
         user.save(update_fields=['status', 'is_active', 'archived_at'])
 
         return Response({
@@ -91,19 +70,19 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # ---------------------------------------------------------------------------
-# FITTING STUDIO SURVEYS (Criterion 9 / 11, OBJ-01 / KAN-89) — STARS ONLY.
-# CHANGED (rating redesign):
-#   * fit_like_dislike is GONE; fit_rating_score (1-5) replaces it.
-#   * UPSERT per (user, session_id): the Pre-Try-On Check creates the visit
-#     document; the Post-Try-On Check and the "Rate Avatar Look" score UPDATE
-#     the same document, so confidence_gain becomes computable once both
-#     phases exist. One flat row per visit in accounts_fittingstudiosurvey.
-#   * Every submit also mirrors the newest state FLAT onto
-#     accounts_user.latest_fitting_studio_survey (readable in Compass).
-# accounts_rating is NEVER touched here (FR-7.5 star surfaces write it via
-# POST /ratings/ from the frontend). Guests cannot reach this view
-# (IsAuthenticated) — FR-1.9; the frontend holds guest payloads in
-# sessionStorage and shows the sign-up/login modal instead.
+# FITTING STUDIO SURVEY — STAR-ONLY, REGISTERED SHOPPERS ONLY.
+# Strict validation: a PROVIDED star must be a real int 1..5. Strings, bools
+# and fractions are REJECTED with 400 (never coerced, never silently nulled).
+# Absent / null keys mean "not answered yet" and are simply not written.
+# CHANGED (audit fixes):
+#   * Legacy reaction keys (fit_like_dislike / vote / like / dislike) are now
+#     EXPLICITLY rejected with 400 instead of being silently ignored.
+#   * The non-baselined `user_type` field is gone from payload and mirror.
+#   * (user, session_id) uniqueness is DB-enforced (migration 0011 + the
+#     matching Meta.unique_together); a lost create race resolves to the
+#     existing row and merges into it below.
+#   * GAP 2: the merge writes ONLY the fields this phase supplied, so two
+#     concurrent phases can no longer clobber each other with stale NULLs.
 # ---------------------------------------------------------------------------
 
 SURVEY_SCORE_KEYS = (
@@ -111,39 +90,44 @@ SURVEY_SCORE_KEYS = (
     'pre_return_intent',
     'post_confidence',
     'post_return_intent',
-    'fit_rating_score',
+    'fit_rating',
 )
 
 SURVEY_SESSION_ID_MAX = 64
 
+LEGACY_REACTION_KEYS = ('fit_like_dislike', 'vote', 'like', 'dislike')
+LEGACY_REACTION_DETAIL = (
+    'Like/dislike voting is no longer supported; submit a 1-5 star score instead.'
+)
 
-def _clean_survey_score(value):
-    """Clamp a payload score to a legal 1-5 star value; anything else -> None."""
-    if value in (None, ''):
+
+class _InvalidStar(ValueError):
+    pass
+
+
+def _strict_star(value, field):
+    if value is None or value == '':
         return None
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return None
-    return number if 1 <= number <= 5 else None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _InvalidStar(f'{field} must be an integer 1-5.')
+    if not 1 <= value <= 5:
+        raise _InvalidStar(f'{field} must be between 1 and 5.')
+    return value
 
 
 def _clean_session_id(value):
-    """Sanitize the client studio-visit id to a bounded plain string."""
     if value is None:
         return ''
     return str(value).strip()[:SURVEY_SESSION_ID_MAX]
 
 
 def _clean_equipped_ids(value):
-    """Keep the tried-on catalog ids as strings, capped defensively."""
     if not isinstance(value, list):
         return []
     return [str(entry) for entry in value if entry is not None][:50]
 
 
 def _clean_avatar_context(value):
-    """Whitelist the avatar snapshot fields stored with each survey."""
     if not isinstance(value, dict):
         return {}
     allowed = ('gender', 'height', 'weight', 'body_build_cm')
@@ -151,25 +135,22 @@ def _clean_avatar_context(value):
 
 
 def _confidence_gain(pre, post):
-    """Server-computed pre→post delta; None when either side is missing."""
     if isinstance(pre, int) and isinstance(post, int):
         return post - pre
     return None
 
 
 def _survey_payload(row):
-    """Flat, Compass-readable serialization of one visit document."""
     return {
         'id': str(row.id),
         'user_email': row.user_email,
         'session_id': row.session_id,
-        'user_type': row.user_type,
         'pre_confidence': row.pre_confidence,
         'pre_return_intent': row.pre_return_intent,
         'post_confidence': row.post_confidence,
         'post_return_intent': row.post_return_intent,
         'confidence_gain': row.confidence_gain,
-        'fit_rating_score': row.fit_rating_score,
+        'fit_rating': row.fit_rating,
         'equipped_item_ids': row.equipped_item_ids,
         'avatar_context': row.avatar_context,
         'submitted_at': row.submitted_at.isoformat() if row.submitted_at else None,
@@ -178,21 +159,15 @@ def _survey_payload(row):
 
 class FittingStudioSurveyView(APIView):
     """
-    POST /profile/fitting-studio-survey/
-        Upsert ONE flat visit document (keyed by user + session_id) AND mirror
-        it onto the account. Payload:
-          { "survey": { session_id,
-                        pre_confidence, pre_return_intent,
-                        post_confidence, post_return_intent,
-                        fit_rating_score,
-                        equipped_item_ids: [...], avatar_context: {...} } }
-        Only the fields PRESENT in the payload are written; earlier phases of
-        the same visit are preserved. `user`, `user_email`, `user_type`,
-        `confidence_gain`, `submitted_at` are SERVER-derived.
+    POST /profile/fitting-studio-survey/  (registered shoppers only)
+        Upsert ONE visit document keyed by (user, session_id) and mirror it
+        onto accounts_user.latest_fitting_studio_survey.
+        Payload: { "survey": { session_id, pre_confidence, pre_return_intent,
+                               post_confidence, post_return_intent, fit_rating,
+                               equipped_item_ids, avatar_context } }
 
-    GET /profile/fitting-studio-survey/
-        List the authenticated account's visit documents (newest first) plus
-        the on-account mirror.
+    GET  /profile/fitting-studio-survey/
+        The caller's visit documents (newest first) + the on-account mirror.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -206,8 +181,14 @@ class FittingStudioSurveyView(APIView):
         }, status=status.HTTP_200_OK)
 
     def post(self, request):
+        # RBAC: surveys are a REGISTERED SHOPPER surface. Sellers out.
+        if getattr(request.user, 'role', None) != 'shopper':
+            return Response(
+                {'detail': 'Only registered shoppers can submit fitting studio ratings.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         survey = request.data.get('survey') if isinstance(request.data, dict) else None
-        # Form-encoded bodies arrive as QueryDict; JSON bodies as plain dict.
         if hasattr(survey, 'dict'):
             survey = survey.dict()
         if not isinstance(survey, dict):
@@ -216,13 +197,26 @@ class FittingStudioSurveyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cleaned = {key: _clean_survey_score(survey.get(key)) for key in SURVEY_SCORE_KEYS}
+        # HARDENING (audit fix): reject legacy reaction keys outright instead
+        # of silently ignoring them, so stale clients surface loudly.
+        legacy_keys = set(LEGACY_REACTION_KEYS) & set(survey.keys())
+        if legacy_keys:
+            return Response(
+                {key: LEGACY_REACTION_DETAIL for key in sorted(legacy_keys)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cleaned = {}
+        try:
+            for key in SURVEY_SCORE_KEYS:
+                cleaned[key] = _strict_star(survey.get(key), key)
+        except _InvalidStar as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         cleaned['session_id'] = _clean_session_id(survey.get('session_id'))
         cleaned['equipped_item_ids'] = _clean_equipped_ids(survey.get('equipped_item_ids'))
         cleaned['avatar_context'] = _clean_avatar_context(survey.get('avatar_context'))
 
-        # Reject a payload that carries no signal at all so neither storage
-        # location fills with empty placeholders.
         if (
             all(cleaned[key] is None for key in SURVEY_SCORE_KEYS)
             and not cleaned['equipped_item_ids']
@@ -233,30 +227,61 @@ class FittingStudioSurveyView(APIView):
             )
 
         session_id = cleaned['session_id'] or uuid.uuid4().hex
-        row, created = FittingStudioSurvey.objects.get_or_create(
-            user=request.user,
-            session_id=session_id,
-            defaults={
-                'user_email': request.user.email or '',
-                'user_type': 'registered',  # server-derived; guests never here
-            },
-        )
+        # CONCURRENCY (gap 2): migration 0011 AND the matching
+        # FittingStudioSurvey.Meta.unique_together enforce ONE document per
+        # (user, session_id) in the database itself.
+        # NOTE: Django MongoDB Backend runs in autocommit mode and does NOT
+        # support django.db.transaction (it ships its own
+        # django_mongodb_backend.transaction API), and select_for_update() is a
+        # no-op there. So this block is deliberately NOT wrapped in
+        # django.db.transaction.atomic(): a lost insert race raises
+        # IntegrityError immediately, cannot poison an outer transaction, and
+        # deterministically resolves to the SAME row below.
+        try:
+            row, created = FittingStudioSurvey.objects.get_or_create(
+                user=request.user,
+                session_id=session_id,
+                defaults={
+                    'user_email': request.user.email or '',
+                },
+            )
+        except IntegrityError:
+            row = FittingStudioSurvey.objects.get(
+                user=request.user, session_id=session_id,
+            )
+            created = False
 
-        # Write ONLY the phases/scores present in this payload so the pre-check
-        # and post-check of one visit accumulate on the same document.
+        # MERGE (two-phase, lost-update safe): write ONLY the fields this phase
+        # actually supplied, as ONE targeted update — a single-document $set is
+        # atomic in MongoDB (and a column-scoped UPDATE on SQL). The previous
+        # full row.save() wrote EVERY field from a possibly stale in-memory
+        # snapshot, so a concurrent phase could overwrite the other phase's
+        # answers with stale NULLs.
+        updates = {'user_email': request.user.email or row.user_email}
         for key in SURVEY_SCORE_KEYS:
             if cleaned[key] is not None:
-                setattr(row, key, cleaned[key])
+                updates[key] = cleaned[key]
         if cleaned['equipped_item_ids']:
-            row.equipped_item_ids = cleaned['equipped_item_ids']
+            updates['equipped_item_ids'] = cleaned['equipped_item_ids']
         if cleaned['avatar_context']:
-            row.avatar_context = cleaned['avatar_context']
-        row.user_email = request.user.email or row.user_email
-        row.confidence_gain = _confidence_gain(row.pre_confidence, row.post_confidence)
-        row.save()
+            updates['avatar_context'] = cleaned['avatar_context']
+        FittingStudioSurvey.objects.filter(pk=row.pk).update(**updates)
 
-        # Mirror the newest visit FLAT onto the accounts_user document so the
-        # rating is visible directly on the account in Compass (no array).
+        # SERVER-COMPUTED gain, from the FRESHEST stored answers (never from the
+        # client, never from a stale snapshot). The extra filter is a
+        # compare-and-set: if another phase changed either input since this
+        # read, the update matches nothing and that writer computes the gain
+        # instead — a stale gain is never written.
+        row.refresh_from_db()
+        gain = _confidence_gain(row.pre_confidence, row.post_confidence)
+        if row.confidence_gain != gain:
+            FittingStudioSurvey.objects.filter(
+                pk=row.pk,
+                pre_confidence=row.pre_confidence,
+                post_confidence=row.post_confidence,
+            ).update(confidence_gain=gain)
+            row.refresh_from_db()
+
         request.user.latest_fitting_studio_survey = _survey_payload(row)
         request.user.save(update_fields=['latest_fitting_studio_survey'])
 

@@ -1,4 +1,11 @@
-"""Acceptance tests for the KAN-118 commerce API."""
+"""Acceptance tests for the KAN-118 commerce API.
+
+ADDED (audit coverage): the mock-checkout success fit-accuracy popup is
+OPTIONAL (SRS FR-7.5). These tests prove checkout completes, persists and
+remains readable with ZERO rating rows — i.e. the shopper pressed Skip /
+closed the popup — and that a post-checkout fit rating is a separate,
+owner-scoped, star-only write.
+"""
 
 from decimal import Decimal
 
@@ -8,6 +15,7 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from catalog.models import CatalogItem
 from commerce.models import Cart, CartItem, Order, OrderItem
+from ratings.models import Rating
 
 
 class CommerceAPITests(TestCase):
@@ -253,3 +261,72 @@ class CommerceAPITests(TestCase):
         response = self.client.get('/orders/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, [])
+
+    # ------------------------------------------------------------------
+    # NEW (audit coverage): the fit-accuracy popup is OPTIONAL / SKIPPABLE.
+    # ------------------------------------------------------------------
+    def test_checkout_completes_when_fit_accuracy_popup_is_skipped(self):
+        """Skip / close on the success popup must not undo or block checkout:
+        the order exists, the cart is cleared, and NO rating row is written."""
+        CartItem.objects.create(
+            cart=Cart.objects.create(user=self.user), item=self.item, quantity=1
+        )
+        response = self.client.post(
+            '/checkout/',
+            {
+                'recipient_name': 'Shopper',
+                'contact_number': '09123456789',
+                'shipping_address': '1 Test Street',
+                'payment_method': 'Cash on Delivery',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        # Shopper dismissed the popup -> zero ratings, order still intact.
+        self.assertEqual(Rating.objects.count(), 0)
+        self.assertEqual(Order.objects.filter(user=self.user).count(), 1)
+        self.assertFalse(CartItem.objects.filter(cart__user=self.user).exists())
+
+        history = self.client.get('/orders/')
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(len(history.data), 1)
+        detail = self.client.get(f"/orders/{response.data['id']}/")
+        self.assertEqual(detail.status_code, 200)
+
+    def test_post_checkout_fit_rating_is_separate_star_only_write(self):
+        """Submitting the popup writes ONE star-only fit row per ordered item
+        and never mutates the order."""
+        CartItem.objects.create(
+            cart=Cart.objects.create(user=self.user), item=self.item, quantity=1
+        )
+        checkout = self.client.post(
+            '/checkout/',
+            {
+                'recipient_name': 'Shopper',
+                'contact_number': '09123456789',
+                'shipping_address': '1 Test Street',
+                'payment_method': 'Cash on Delivery',
+            },
+            format='json',
+        )
+        self.assertEqual(checkout.status_code, 201)
+
+        rate = self.client.post(
+            '/ratings/',
+            {
+                'target_type': 'fit',
+                'target_id': str(self.item.pk),
+                'score': 4,
+                'source': 'fit_visualization',
+            },
+            format='json',
+        )
+        self.assertEqual(rate.status_code, 201)
+        self.assertEqual(Rating.objects.count(), 1)
+        row = Rating.objects.get()
+        self.assertEqual(row.score, 4)
+        self.assertEqual(row.source, 'fit_visualization')
+
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(str(order.pk), checkout.data['id'])
+        self.assertEqual(order.status, 'pending')

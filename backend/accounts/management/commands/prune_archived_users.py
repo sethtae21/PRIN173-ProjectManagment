@@ -12,6 +12,11 @@ Usage:
                                                           #   archived row's due date
                                                           #   (archived_at + window) and
                                                           #   days remaining; moves nothing
+    python manage.py prune_archived_users --sanitize-existing
+                                                          # FR-1.4 backfill: pseudonymize
+                                                          #   legacy intact cold rows
+                                                          #   (idempotent; add --preview
+                                                          #   for a dry run)
 
 Cron example (daily at 03:00):
     0 3 * * *  /path/to/.venv/bin/python /path/to/backend/manage.py prune_archived_users
@@ -34,7 +39,8 @@ class Command(BaseCommand):
         "Move accounts archived longer than the grace window (default 90 days) "
         "from accounts_user into the accounts_archiveduser cold collection, "
         "pseudonymizing their orders and cascade-removing their working data. "
-        "Use --force to relocate immediately, --preview to inspect the schedule."
+        "Use --force to relocate immediately, --preview to inspect the schedule, "
+        "--sanitize-existing to pseudonymize legacy cold rows."
     )
 
     def add_arguments(self, parser):
@@ -55,11 +61,28 @@ class Command(BaseCommand):
             help="Print each archived row's archived_at, due date (archived_at + window), "
                  "days remaining and eligible-now flag, then exit without moving anything.",
         )
+        parser.add_argument(
+            '--sanitize-existing',
+            action='store_true',
+            help="FR-1.4 backfill: pseudonymize legacy intact accounts_archiveduser rows "
+                 "(idempotent, safe to re-run). Combine with --preview for a dry run.",
+        )
 
     def handle(self, *args, **options):
         days = options['days']
         force = options['force']
         preview = options['preview']
+
+        if options['sanitize_existing']:
+            from accounts.pseudonymization import sanitize_existing_archives
+            stats = sanitize_existing_archives(apply=not preview)
+            label = 'dry-run' if preview else 'applied'
+            self.stdout.write(self.style.SUCCESS(
+                f"Legacy archive sanitization ({label}): "
+                f"scanned={stats['scanned']} "
+                f"pseudonymized={stats['pseudonymized']} "
+                f"already_clean={stats['already_clean']}"
+            ))
 
         if preview:
             rows = describe_archive_schedule(days=days, force=force)

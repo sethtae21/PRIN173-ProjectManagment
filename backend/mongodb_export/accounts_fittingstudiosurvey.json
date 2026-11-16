@@ -4,13 +4,11 @@
     "user_id": "6adc3d58d6fd28a6bb7415a9",
     "user_email": "dein@gmail.com",
     "session_id": "studio-mw9bmicb-olpbs5cj",
-    "user_type": "registered",
     "pre_confidence": 5,
     "pre_return_intent": 5,
     "post_confidence": 3,
     "post_return_intent": 5,
     "confidence_gain": -2,
-    "fit_like_dislike": "like",
     "equipped_item_ids": [],
     "avatar_context": {
       "gender": "Female",
@@ -18,20 +16,19 @@
       "weight": "102.51883408846152",
       "body_build_cm": 103.7
     },
-    "submitted_at": "2026-11-09 13:52:59.895000"
+    "submitted_at": "2026-11-09T13:52:59.895000",
+    "fit_rating": null
   },
   {
     "_id": "6af1d091707d27abf8b68a96",
     "user_id": "6adc3d58d6fd28a6bb7415a9",
     "user_email": "dein@gmail.com",
     "session_id": "studio-mw9bod9n-5n1a2xdp",
-    "user_type": "registered",
     "pre_confidence": 3,
     "pre_return_intent": 4,
     "post_confidence": 5,
     "post_return_intent": 5,
     "confidence_gain": 2,
-    "fit_like_dislike": "dislike",
     "equipped_item_ids": [],
     "avatar_context": {
       "gender": "Male",
@@ -39,20 +36,19 @@
       "weight": "102.51883408846152",
       "body_build_cm": 103.7
     },
-    "submitted_at": "2026-11-09 13:54:25.569000"
+    "submitted_at": "2026-11-09T13:54:25.569000",
+    "fit_rating": null
   },
   {
     "_id": "6af1d3e0a146d658e3434c8f",
     "user_id": "6adc3d58d6fd28a6bb7415a9",
     "user_email": "dein@gmail.com",
     "session_id": "studio-mw9c6gup-3va81iey",
-    "user_type": "registered",
     "pre_confidence": 2,
     "pre_return_intent": 5,
     "post_confidence": 3,
     "post_return_intent": 3,
     "confidence_gain": 1,
-    "fit_like_dislike": "like",
     "equipped_item_ids": [],
     "avatar_context": {
       "gender": "Male",
@@ -60,20 +56,19 @@
       "weight": "102.51883408846152",
       "body_build_cm": 103.7
     },
-    "submitted_at": "2026-11-09 14:08:32.334000"
+    "submitted_at": "2026-11-09T14:08:32.334000",
+    "fit_rating": null
   },
   {
     "_id": "6af1d6399d83d929a2bff28f",
     "user_id": "6adc3d58d6fd28a6bb7415a9",
     "user_email": "dein@gmail.com",
     "session_id": "studio-mw9cjdty-kzblpy1g",
-    "user_type": "registered",
     "pre_confidence": 3,
     "pre_return_intent": 5,
     "post_confidence": 3,
     "post_return_intent": 1,
     "confidence_gain": 0,
-    "fit_like_dislike": "dislike",
     "equipped_item_ids": [],
     "avatar_context": {
       "gender": "Male",
@@ -81,6 +76,7 @@
       "weight": "102.51883408846152",
       "body_build_cm": 103.7
     },
-    "submitted_at": "2026-11-09 14:18:33.771000"
+    "submitted_at": "2026-11-09T14:18:33.771000",
+    "fit_rating": null
   }
 ]

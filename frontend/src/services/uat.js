@@ -26,7 +26,7 @@ export const UAT_SUPPLEMENTARY_KEYS = Object.freeze([
 export const UAT_VALUE_MIN = 0; // "No" is encoded as 0 and MUST be submittable
 export const UAT_VALUE_MAX = 5;
 
-// ---- rating surfaces (mirror Rating.SOURCE_CHOICES / uat_kpis.py) ----------
+// ---- rating surfaces (mirror Rating.SOURCE_CHOICES — FOUR ONLY) -----------
 export const RATING_TARGET_TYPES = Object.freeze({ ITEM: "item", FIT: "fit" });
 export const RATING_SOURCES = Object.freeze({
   RECOMMENDATION_PANEL: "recommendation_panel",
@@ -35,7 +35,7 @@ export const RATING_SOURCES = Object.freeze({
   ORDER_HISTORY: "order_history",
 });
 
-// ---- UAT session storage: ONE prefix, defined once --------------------------
+// ---- UAT session storage: ONE prefix, defined once -------------------------
 export const UAT_SESSION_STORAGE_PREFIX = "fitfusion-uat-session-";
 
 export function uatSessionStorageKey(userId) {
@@ -61,45 +61,43 @@ export function findAnyStoredUATSession() {
   return null;
 }
 
-// ---- endpoints --------------------------------------------------------------
+// ---- endpoints -------------------------------------------------------------
 export const UAT_ENDPOINTS = Object.freeze({
   session: "/ratings/uat/session/",
   response: "/ratings/uat/response/",
   export: "/ratings/uat/export/",
 });
 
-// ---- answer guard -----------------------------------------------------------
-// FIX: 0 is a VALID answer (style_discovery "No"). Only null/undefined/empty is skipped.
+// ---- answer guard ----------------------------------------------------------
+// 0 is a VALID answer (style_discovery "No"). Only null/undefined/empty skips.
 export function isUATAnswer(value) {
   return value !== null && value !== undefined && value !== "";
 }
 
 // ============================================================================
-// IN-APP RATING CONTRACT (SRS FR-7.5 / Scope Criteria 9-11) — SRS-ALIGNED COPY.
-// Stars ONLY (1-5); 4-5 stars = Approval, 1-3 = Not approval. No like/dislike.
+// IN-APP RATING CONTRACT — STAR-ONLY (SRS FR-7.5 / Scope Criteria 9-11).
+// 1-5 integers; 4-5 = Approval, 1-3 = Not approval. NO like/dislike anywhere.
+//
 // Surfaces:
-//   1. Recommendation Panel  -> overall set, accounts_rating target_type=item,
-//      source=recommendation_panel, target_id='panel-overall-<studioSessionId>'.
-//   2. Try-On Canvas         -> accounts_rating target_type=fit,
-//      source=fit_visualization (one row per equipped garment).
-//   3. Pre/Post Try-On Check -> accounts_fittingstudiosurvey (confidence +
-//      return intent, 1-5, same direction within each pair).
-//   4. Mock-Checkout Success -> auto popup, accounts_rating target_type=fit,
-//      source=fit_visualization (fit-accuracy of the avatar preview).
-// GUESTS: clicking ANY star blocks the action, saves/caches NOTHING, and shows
-// the sign-up/login prompt below (FR-7.5 / FR-1.9). Registered users persist.
+//   1. Recommendation Panel -> PER recommended item, real catalog target_id,
+//      target_type 'item', source 'recommendation_panel'.
+//   2. Try-On Canvas        -> target_type 'fit', source 'fit_visualization'
+//      (one row per equipped garment).
+//   3. Pre/Post Try-On Check-> accounts_fittingstudiosurvey (confidence +
+//      return intent; fit field name is `fit_rating`).
+//   4. Mock-Checkout Success-> auto popup, target_type 'fit',
+//      source 'fit_visualization'.
+//
+// GUESTS: clicking a star blocks IMMEDIATELY, caches NOTHING (no sessionStorage,
+// no localStorage), and shows GUEST_RATING_PROMPT (Sign Up / Log In / Cancel).
 // ============================================================================
 
 export const RATING_APPROVAL_MIN = 4;
 
-// Exact guest-block prompt (SRS / SADD): shown when a Guest clicks a star.
 export const GUEST_RATING_PROMPT = "Please sign up or log in to save your rating.";
 
-export const PANEL_OVERALL_TARGET_PREFIX = "panel-overall-";
-
-export function panelOverallTargetId(studioSessionId) {
-  return `${PANEL_OVERALL_TARGET_PREFIX}${studioSessionId}`;
-}
+// SADD FITTING_STUDIO_SURVEYS star field name.
+export const SURVEY_FIT_RATING_KEY = "fit_rating";
 
 const CONFIDENCE_LABELS = Object.freeze([
   "Not Confident",
@@ -117,19 +115,18 @@ const RETURN_LABELS = Object.freeze([
   "Very Likely to Return",
 ]);
 
-// 1. Recommendation Panel (SRS-aligned copy).
+// 1. Recommendation Panel — PER ITEM (real target_id).
 export const RECOMMENDATION_RATING_COPY = Object.freeze({
-  buttonLabel: "Rate Recommendations",
+  buttonLabel: "Rate Recommendation",
   eyebrow: "RECOMMENDATION PANEL",
-  title: "Rate These Recommendations",
+  title: "Rate This Recommendation",
   helperNote:
     "Ratings evaluate style & color suggestions on your avatar, not physical garment sizing.",
   submitLabel: "Submit Rating",
   questions: Object.freeze([
     {
       key: "score",
-      prompt:
-        "How well does this recommendation match your style and color palette?",
+      prompt: "How well does this recommendation match your style and color palette?",
       labels: Object.freeze([
         "Poor match",
         "Fair match",
@@ -173,8 +170,7 @@ export const PRE_CHECK_COPY = Object.freeze({
   questions: Object.freeze([
     {
       key: "confidence",
-      prompt:
-        "Before trying on: How confident are you in choosing items that suit you?",
+      prompt: "Before trying on: How confident are you in choosing items that suit you?",
       labels: CONFIDENCE_LABELS,
     },
     {
@@ -185,7 +181,7 @@ export const PRE_CHECK_COPY = Object.freeze({
   ]),
 });
 
-// 3b. Post-session check (SRS §5.1 / SADD accounts_fittingstudiosurvey).
+// 3b. Post-session check.
 export const POST_CHECK_COPY = Object.freeze({
   buttonLabel: "Post-Try-On Check",
   eyebrow: "AFTER TRY-ON",
@@ -194,8 +190,7 @@ export const POST_CHECK_COPY = Object.freeze({
   questions: Object.freeze([
     {
       key: "confidence",
-      prompt:
-        "After trying on: How confident are you in your purchase/style decision?",
+      prompt: "After trying on: How confident are you in your purchase/style decision?",
       labels: CONFIDENCE_LABELS,
     },
     {
@@ -207,7 +202,6 @@ export const POST_CHECK_COPY = Object.freeze({
 });
 
 // 4. Mock-Checkout Success pop-up (exact wording from SRS FR-7.5).
-//    Auto-opens after a successful mock checkout; Registered users only.
 export const CHECKOUT_FIT_ACCURACY_COPY = Object.freeze({
   eyebrow: "MOCK CHECKOUT SUCCESS",
   title: "Rate Fit Accuracy",
@@ -229,7 +223,3 @@ export const CHECKOUT_FIT_ACCURACY_COPY = Object.freeze({
     },
   ]),
 });
-
-// RESERVED (legacy): kept exported so the backend source vocabulary stays
-// stable; the redesigned UI no longer sends popup-sourced ratings.
-export const POPUP_RATING_SOURCE = "fitting_studio_popup";

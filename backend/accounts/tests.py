@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from django.test import TestCase
 from django.test import SimpleTestCase
 from unittest.mock import Mock, patch
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from accounts.archive import ARCHIVE_GRACE_DAYS
 from accounts.models import User
 from commerce.models import Cart, Order
 from outfits.models import AvatarPreset, Outfit
@@ -71,7 +74,17 @@ class AvatarPresetCRUDTests(TestCase):
 # KAN-56 ADDED: Account Management Tests
 # ==========================================
 class AccountManagementTests(TestCase):
-    """KAN-56: profile view/update, password change, account deletion (FR-1.2–1.4, RA 10173)."""
+    """KAN-56: profile view/update, password change, account archive
+    (FR-1.2–1.4, RA 10173).
+
+    CHANGED (stale-test fix):
+      * Password change lives at POST /auth/change-password/ with
+        old_password / new_password / new_password_confirm. The old
+        /profile/password/ + current_password contract no longer exists (404).
+      * DELETE /profile/ is the baselined FR-1.4 ARCHIVE grace window (200),
+        not a hard delete (204). Linked data is RETAINED for
+        ARCHIVE_GRACE_DAYS and only relocated/purged by accounts/archive.py.
+    """
 
     def setUp(self):
         self.client = APIClient()
@@ -125,15 +138,29 @@ class AccountManagementTests(TestCase):
         self.assertFalse(hasattr(self.user, 'height'))
 
     def test_password_change_wrong_current_rejected(self):
-        res = self.client.post('/profile/password/',
-                               {'current_password': 'WrongPass1!', 'new_password': 'NewPass123!@#'},
-                               format='json')
+        # FIX: canonical route + payload keys (see PasswordChangePersistenceTests).
+        res = self.client.post(
+            '/auth/change-password/',
+            {
+                'old_password': 'WrongPass1!',
+                'new_password': 'NewPass123!@#',
+                'new_password_confirm': 'NewPass123!@#',
+            },
+            format='json')
         self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('OldPass123!@#'))
 
     def test_password_change_success_and_login(self):
-        res = self.client.post('/profile/password/',
-                               {'current_password': 'OldPass123!@#', 'new_password': 'NewPass123!@#'},
-                               format='json')
+        # FIX: canonical route + payload keys (see PasswordChangePersistenceTests).
+        res = self.client.post(
+            '/auth/change-password/',
+            {
+                'old_password': 'OldPass123!@#',
+                'new_password': 'NewPass123!@#',
+                'new_password_confirm': 'NewPass123!@#',
+            },
+            format='json')
         self.assertEqual(res.status_code, 200)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewPass123!@#'))
@@ -145,8 +172,16 @@ class AccountManagementTests(TestCase):
         self.assertEqual(login.status_code, 200)
 
     @patch('accounts.views.core.blacklist_refresh_token')
-    def test_delete_account_cascades_and_blocks_login(self, mock_blacklist):
-        # Create related data to verify CASCADE deletion
+    def test_delete_account_archives_and_blocks_login(self, mock_blacklist):
+        """FR-1.4 BASELINED grace window (replaces the old hard-delete test).
+
+        DELETE /profile/ archives the account: HTTP 200, status='archive',
+        is_active=False, archived_at stamped, refresh token blacklisted, and
+        login blocked. EVERY linked record is RETAINED untouched for
+        ARCHIVE_GRACE_DAYS so support can restore; the RA 10173 erasure /
+        relocation proof belongs to the prune sweep (accounts/archive.py),
+        which runs after the window closes — not to this endpoint.
+        """
         preset = AvatarPreset.objects.create(
             user=self.user, name='P', gender='female',
             height=165, weight=55, skin_tone='#d9aa82'
@@ -167,28 +202,36 @@ class AccountManagementTests(TestCase):
 
         refresh = RefreshToken.for_user(self.user)
 
-        # Delete account with refresh token to blacklist it
+        # Archive the account, blacklisting the supplied refresh token.
         res = self.client.delete('/profile/', {'refresh': str(refresh)}, format='json')
-        self.assertEqual(res.status_code, 204)
+        self.assertEqual(res.status_code, 200)
         mock_blacklist.assert_called_once()
 
-        # Verify user is gone
-        self.assertFalse(User.objects.filter(email='acct@test.com').exists())
+        # The account row is RETAINED (cold-relocation happens later).
+        self.assertTrue(User.objects.filter(email='acct@test.com').exists())
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.status, 'archive')
+        self.assertFalse(self.user.is_active)
+        self.assertIsNotNone(self.user.archived_at)
 
-        # Verify active personal data is removed (RA 10173 erasure proof)
-        self.assertFalse(AvatarPreset.objects.filter(pk=preset.pk).exists())
-        self.assertFalse(Outfit.objects.filter(pk=outfit.pk).exists())
-        self.assertFalse(Cart.objects.filter(pk=cart.pk).exists())
+        # The 90-day grace-window clock starts at archived_at.
+        self.assertEqual(
+            self.user.archive_due_date,
+            self.user.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS),
+        )
 
-        # Verify the archived order remains but all active PII is stripped
+        # ALL linked data survives the grace window (restorable by support).
+        self.assertTrue(AvatarPreset.objects.filter(pk=preset.pk).exists())
+        self.assertTrue(Outfit.objects.filter(pk=outfit.pk).exists())
+        self.assertTrue(Cart.objects.filter(pk=cart.pk).exists())
         order.refresh_from_db()
-        self.assertIsNone(order.user)
-        self.assertEqual(order.recipient_name, '')
-        self.assertEqual(order.contact_number, '')
-        self.assertEqual(order.recipient_email, '')
-        self.assertEqual(order.shipping_address, '')
+        self.assertEqual(order.user_id, self.user.pk)
+        self.assertEqual(order.recipient_name, 'Acct User')
+        self.assertEqual(order.contact_number, '09123456789')
+        self.assertEqual(order.recipient_email, 'acct@test.com')
+        self.assertEqual(order.shipping_address, '123 Sample Street, Makati')
 
-        # Verify login now fails
+        # Login is blocked while the account is archived.
         self.client.force_authenticate(None)
         login = self.client.post('/auth/login/',
                                  {'email': 'acct@test.com', 'password': 'OldPass123!@#'},

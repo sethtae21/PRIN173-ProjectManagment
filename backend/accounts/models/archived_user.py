@@ -6,9 +6,19 @@ LIFECYCLE (FR-1.4 / RA 10173 retention):
   active  --(user clicks Archive / DELETE /profile/)-->  archived in accounts_user
   archived --(prune sweep, accounts/archive.py, after 90 days)-->  MOVED HERE
 
+PRIVACY (FR-1.4 / RA 10173):
+  The cold row is PSEUDONYMOUS, never an intact copy. from_user() writes only
+  the values produced by accounts.pseudonymization.pseudonymous_profile_fields:
+  a keyed pseudonymous email, the constant display name, cleared contact /
+  address / store identity, an EMPTY password (the hash is never copied), and
+  cleared behavioral timestamps. Legacy intact documents are scrubbed by
+  migration 0012 and the repeatable `pseudonymize_archived_users` command.
+  Retained for legitimate purpose: closed_account_id (idempotency/audit key),
+  role (non-identifying), status, archived_at, cold_moved_at.
+
 DATE SEMANTICS (Updated per request):
   archived_at   = the moment the user pressed Archive (clock start).
-  cold_moved_at = NOW STORES THE SCHEDULED WINDOW DATE (archived_at + ARCHIVE_GRACE_DAYS, currently 5 days for testing).
+  cold_moved_at = NOW STORES THE SCHEDULED WINDOW DATE (archived_at + ARCHIVE_GRACE_DAYS).
                   This is the "February" date you see in Compass.
                   DOCUMENTED TRADE-OFF: per the explicit request, this field holds
                   the SCHEDULED date rather than the real relocation instant, so the
@@ -19,9 +29,8 @@ DATE SEMANTICS (Updated per request):
                   Legacy rows with archived_at = NULL fall back to timezone.now().
 """
 from datetime import timedelta
-
 from django.db import models
-
+from accounts.pseudonymization import ensure_pseudonymized, pseudonymous_profile_fields
 
 class ArchivedUser(models.Model):
     ROLE_CHOICES = (
@@ -33,7 +42,7 @@ class ArchivedUser(models.Model):
         ('archive', 'Archive'),
     )
 
-    # Identity / profile
+    # Identity / profile — PSEUDONYMOUS VALUES ONLY (see module docstring).
     email = models.EmailField(max_length=255, db_index=True)
     full_name = models.CharField(max_length=255)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='shopper')
@@ -63,7 +72,7 @@ class ArchivedUser(models.Model):
     closed_account_id = models.CharField(max_length=64)
     archived_at = models.DateTimeField(blank=True, null=True)
 
-    # Stores the SCHEDULED move date (archived_at + 90 days), not the real move time.
+    # Stores the SCHEDULED move date (archived_at + ARCHIVE_GRACE_DAYS), not the real move time.
     cold_moved_at = models.DateTimeField()
 
     class Meta:
@@ -81,11 +90,12 @@ class ArchivedUser(models.Model):
 
     @classmethod
     def from_user(cls, user):
-        """Build + persist an intact cold copy of a live (archived) User.
+        """Build + persist a PSEUDONYMOUS cold tombstone of a live (archived) User.
 
         Idempotent: if a copy for this closed_account_id already exists (a
-        previous sweep crashed mid-run), it is returned untouched instead of
-        duplicated. Must be called BEFORE the live row is deleted.
+        previous sweep crashed mid-run), it is returned — and healed through
+        ensure_pseudonymized() so a legacy INTACT copy can never survive a
+        retry. Must be called BEFORE the live row is deleted.
         """
         from django.utils import timezone
         from accounts.archive import ARCHIVE_GRACE_DAYS
@@ -93,35 +103,21 @@ class ArchivedUser(models.Model):
         closed_id = str(user.pk)
         existing = cls.objects.filter(closed_account_id=closed_id).first()
         if existing:
+            ensure_pseudonymized(existing)  # no-op when already clean
             return existing
 
         archived_at = getattr(user, 'archived_at', None)
 
-        # LOGIC (per request): cold_moved_at = the scheduled 90-day date.
+        # LOGIC (per request): cold_moved_at = the scheduled grace-window date.
         if archived_at:
             move_date = archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
         else:
-            # Legacy rows with no archive stamp: cannot compute +90, fall back to now.
+            # Legacy rows with no archive stamp: cannot compute +N, fall back to now.
             move_date = timezone.now()
 
         return cls.objects.create(
-            email=user.email,
-            full_name=user.full_name,
-            role=user.role,
-            store_name=user.store_name,
-            status='archive',
-            mobile=user.mobile,
-            street=user.street,
-            barangay=user.barangay,
-            city=user.city,
-            province=user.province,
-            postal_code=user.postal_code,
-            password=user.password,
-            is_active=False,
-            is_staff=user.is_staff,
-            last_login=user.last_login,
-            date_joined=user.date_joined,
+            **pseudonymous_profile_fields(closed_id, role=user.role),
             closed_account_id=closed_id,
             archived_at=archived_at,
-            cold_moved_at=move_date,  # <--- Stores the scheduled (Feb) date here
+            cold_moved_at=move_date,  # <--- Stores the scheduled date here
         )

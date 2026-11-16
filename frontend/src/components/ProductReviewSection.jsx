@@ -131,8 +131,9 @@ function ProductReviewSection({
       return;
     }
 
-    // Submit the star score to the DB (product_page surface) so it reflects
-    // in the summary and never leaks into OBJ-05 recommendation approval.
+    // CHANGED (audit fix): the star score is persisted to the DB FIRST and the
+    // local review is only written when the server accepted it. A failed
+    // submission now surfaces an error instead of a false "saved" success.
     try {
       await ratingsApi.submit({
         target_type: 'item',
@@ -142,9 +143,11 @@ function ProductReviewSection({
       });
     } catch (err) {
       console.warn("Failed to submit score to server:", err);
+      setError("We couldn't save your rating. Please try again.");
+      return;
     }
 
-    // Keep local storage for the text comment (backend Rating model only tracks score/vote)
+    // Keep local storage for the text comment (backend Rating model only tracks score).
     const review = {
       id: existingReview?.id || `review-${Date.now()}`,
       productId: String(product.id),

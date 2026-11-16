@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
+STAR_VALIDATORS = [MinValueValidator(1), MaxValueValidator(5)]
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, full_name, password=None, **extra_fields):
@@ -38,7 +40,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     # 'active' = live account; 'archive' = deleted by the user, retained in
-    # accounts_user for the 90-day grace window, then relocated to
+    # accounts_user for the grace window, then relocated to
     # accounts_archiveduser by the prune sweep (see accounts/archive.py).
     STATUS_CHOICES = (
         ('active', 'Active'),
@@ -61,9 +63,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_index=True,
     )
 
-    # Moment the account was flipped to 'archive'. Drives the 90-day
-    # cold-relocation window. NULL = archived before this field existed
-    # (treated as expired by the sweep so legacy rows get cleaned up).
+    # Moment the account was flipped to 'archive'. Drives the grace-window clock.
     archived_at = models.DateTimeField(blank=True, null=True)
 
     # Contact Information
@@ -78,9 +78,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     # Readable on-account mirror: a SINGLE FLAT object with the user's most
     # recent fitting-studio survey, embedded directly on the accounts_user
-    # document so Compass shows the latest pre/post stars at a glance (no
-    # array nesting). Full per-visit history lives in
-    # accounts_fittingstudiosurvey (FittingStudioSurvey below).
+    # document so Compass shows the latest stars at a glance (no array nesting).
+    # Full per-visit history lives in accounts_fittingstudiosurvey.
     latest_fitting_studio_survey = models.JSONField(default=dict, blank=True)
 
     # NOTE (avatar refactor): the legacy body attributes
@@ -120,7 +119,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
     # NEW (no migration: this is a property, not a field).
-    # The forward form of the grace-window rule: due = archived_at + 90 days.
+    # The forward form of the grace-window rule: due = archived_at + N days.
     # NULL archived_at (legacy rows) => due immediately => returns None, and
     # callers treat None as "already eligible". Imports are local to the body
     # so this can never create a circular import with accounts.archive.
@@ -134,48 +133,36 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 # ---------------------------------------------------------------------------
-# ONE FLAT DOCUMENT PER FITTING-STUDIO VISIT (Criterion 9 / 11, OBJ-01 / KAN-89).
-# CHANGED (stars-only redesign): fit_like_dislike is REPLACED by
-# fit_rating_score (1-5 stars, 4-5 = approval). Pre/post confidence and
-# return-intent stay 1-5 with the SAME direction within each pair so deltas
-# are computable. The newest visit is ALSO mirrored as
-# User.latest_fitting_studio_survey so the rating is visible directly on the
-# accounts_user document. One row per (user, session_id): the pre-check creates
-# it, the post-check / fit rating UPDATE it (see FittingStudioSurveyView).
+# ONE FLAT DOCUMENT PER FITTING-STUDIO VISIT (SADD FITTING_STUDIO_SURVEYS).
+# STAR-ONLY: fit_rating (1..5) replaces every like/dislike remnant.
+# CHANGED (audit fix): the non-baselined `user_type` column is REMOVED
+# (migration 0010); the owner is already identified by `user` + `user_email`.
+# Upsert key = (user, session_id): pre-check creates, post-check / fit rating
+# complete the SAME document so confidence_gain is server-computed.
+# NULLABLE stars are intentional — see migration 0009 and the SADD amendment:
+# prompts are optional/skippable (FR-7.5) and submitted in two phases.
 # ---------------------------------------------------------------------------
 class FittingStudioSurvey(models.Model):
-    # Owner FK; related_name keeps a natural accessor:
-    # user.fitting_studio_surveys.all()
     user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='fitting_studio_surveys',
-    )
+        User, on_delete=models.CASCADE, related_name='fitting_studio_surveys')
     # Denormalized for readability in Compass.
     user_email = models.EmailField(blank=True, default='', max_length=254)
 
     # Client-generated studio-visit id (bounded by the view's sanitizer).
-    # Acts as the upsert key: pre-check, post-check and fit rating for the
-    # same visit all land on ONE document.
     session_id = models.CharField(max_length=64, blank=True, default='')
-    user_type = models.CharField(max_length=16, default='registered')
 
-    # The 1-5 star answers. NULL = skipped / not asked yet.
-    pre_confidence = models.IntegerField(blank=True, null=True)
-    pre_return_intent = models.IntegerField(blank=True, null=True)
-    post_confidence = models.IntegerField(blank=True, null=True)
-    post_return_intent = models.IntegerField(blank=True, null=True)
+    # The 1-5 star answers. NULL = skipped / not answered yet.
+    pre_confidence = models.IntegerField(blank=True, null=True, validators=STAR_VALIDATORS)
+    pre_return_intent = models.IntegerField(blank=True, null=True, validators=STAR_VALIDATORS)
+    post_confidence = models.IntegerField(blank=True, null=True, validators=STAR_VALIDATORS)
+    post_return_intent = models.IntegerField(blank=True, null=True, validators=STAR_VALIDATORS)
 
     # Server-computed delta (post_confidence - pre_confidence); NULL when
     # either side is missing. Makes the OBJ-01 gain visible at a glance.
     confidence_gain = models.IntegerField(blank=True, null=True)
 
-    # CHANGED (stars-only): replaces fit_like_dislike. On-avatar fit
-    # visualization satisfaction, 1-5 stars (4-5 = approval, Criterion 9).
-    fit_rating_score = models.PositiveSmallIntegerField(
-        blank=True, null=True,
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-    )
+    # SADD field name: fit_rating (1..5 stars, 4-5 = approval).
+    fit_rating = models.IntegerField(blank=True, null=True, validators=STAR_VALIDATORS)
 
     # Context snapshots (tried-on catalog ids + avatar state at submit time).
     equipped_item_ids = models.JSONField(default=list, blank=True)
@@ -187,6 +174,18 @@ class FittingStudioSurvey(models.Model):
     class Meta:
         db_table = 'accounts_fittingstudiosurvey'
         ordering = ['-submitted_at']
+        # GAP 2 (concurrency-safe upsert key): this declaration MUST match the
+        # AlterUniqueTogether already applied by migration 0011. Without it the
+        # autodetector sees "model has no unique_together" and generates a
+        # migration that DROPS the unique index, silently undoing DB-level
+        # one-document-per-visit. Never delete this line without a CCB note.
+        # FORM: a LIST/TUPLE of tuples. Modern Django rejects the legacy set
+        # form {('user', 'session_id')} with models.E010 (that shape only
+        # survives inside historical migration operations). Do not "tidy" this
+        # back into a set. Same convention as ratings.Rating.unique_together.
+        # The view always substitutes a uuid4 hex for an empty session_id, so
+        # the blank default can never collide two visits for the same user.
+        unique_together = [('user', 'session_id')]
         indexes = [
             models.Index(fields=['user', 'submitted_at'], name='acct_fss_user_time'),
         ]

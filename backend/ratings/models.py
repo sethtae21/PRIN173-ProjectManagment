@@ -19,29 +19,25 @@ UAT_VALUE_MAX = 5
 
 class Rating(models.Model):
     """
-    In-app rating for recommended items & fit visualizations (SRS FR-7.5).
+    In-app STAR rating (SRS FR-7.5 / Scope Criteria 9-11).
 
-    REGISTERED USERS ONLY: guests have no rating rights. Guest clicks are
-    refused server-side (403) and only ever show the sign-up/login prompt in
-    the UI; no guest reaction is cached or persisted (FR-1.9).
+    STAR-ONLY BASELINE:
+      * score is a REQUIRED integer 1..5. 4-5 = Approval, 1-3 = Not approval.
+      * There is NO vote / like / dislike dimension anywhere (model, API,
+        summary, KPI). Legacy vote-only rows were dropped by migration 0003.
+      * REGISTERED SHOPPERS ONLY. Guests are refused server-side (403) and
+        nothing is cached or persisted for them (FR-1.9). Sellers are refused
+        too — ratings are a shopper surface.
 
-    Two INDEPENDENT dimensions (so stars never masquerade as likes):
-      - score : 1..5 star rating  -> feeds average / score_count only
-      - vote  : like | dislike    -> feeds like_count / dislike_count only
-    Either or both may be set on a single (user, target, source) row.
-
-    `source` tags which UI surface produced the rating so UAT KPI reports can
-    cleanly separate:
-      * recommendation_panel  -> OBJ-05 / Criterion 10 (recommendation approval)
-      * fit_visualization     -> OBJ-01 / Criterion 9  (fit confidence like)
-      * product_page          -> product review (context only)
-      * order_history         -> post-purchase (context only)
-      * '' (empty)            -> legacy rows written before the field existed
+    `source` tags the UI surface so UAT KPI reports separate cleanly:
+      * recommendation_panel -> OBJ-05 / Criterion 10 (per recommended item)
+      * fit_visualization    -> OBJ-01 / Criterion 9  (on-avatar + checkout
+                                fit-accuracy)
+      * product_page         -> product review (context only)
+      * order_history        -> post-purchase (context only)
     """
     TARGET_CHOICES = [('item', 'Catalog Item'), ('fit', 'Fit Visualization')]
-    VOTE_CHOICES = [('like', 'Like'), ('dislike', 'Dislike')]
     SOURCE_CHOICES = [
-        ('', 'Unspecified'),
         ('recommendation_panel', 'Recommendation Panel'),
         ('fit_visualization', 'Fit Visualization'),
         ('product_page', 'Product Page'),
@@ -53,13 +49,11 @@ class Rating(models.Model):
     target_type = models.CharField(max_length=10, choices=TARGET_CHOICES)
     target_id = models.CharField(max_length=50)  # ObjectId stored as string
 
-    score = models.PositiveSmallIntegerField(
-        null=True, blank=True,
+    # REQUIRED, non-null, strict 1..5 stars.
+    score = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)])
-    vote = models.CharField(max_length=10, choices=VOTE_CHOICES, null=True, blank=True)
 
-    source = models.CharField(
-        max_length=32, choices=SOURCE_CHOICES, blank=True, default='')
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -74,15 +68,9 @@ class Rating(models.Model):
         ordering = ['-updated_at']
 
     def __str__(self):
-        bits = []
-        if self.score is not None:
-            bits.append(f"{self.score}★")
-        if self.vote:
-            bits.append(self.vote)
-        source_label = self.source or 'unspecified'
         return (
             f"{self.user} -> {self.target_type}:{self.target_id} "
-            f"[{', '.join(bits) or 'empty'}] ({source_label})"
+            f"[{self.score}★] ({self.source})"
         )
 
 

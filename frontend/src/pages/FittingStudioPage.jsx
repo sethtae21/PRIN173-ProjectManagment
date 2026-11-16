@@ -24,9 +24,8 @@ import {
   FIT_RATING_COPY,
   PRE_CHECK_COPY,
   POST_CHECK_COPY,
-  GUEST_RATING_CTA,
-  GUEST_PENDING_RATING_KEY,
-  panelOverallTargetId,
+  GUEST_RATING_PROMPT,
+  SURVEY_FIT_RATING_KEY,
 } from "../services/uat";
 import RatingModal from "../components/RatingControl";
 import AvatarCanvas from "./Shopper/AvatarCanvas";
@@ -1341,11 +1340,12 @@ function FittingStudioPage({ isGuest = false }) {
   const [uatThankYouVisible, setUatThankYouVisible] = useState(false);
 
   // ------------------------------------------------------------------
-  // NEW (rating redesign): button-triggered star modals. NO auto popups,
-  // NO navigation interception, NO idle timers. One shared modal state
-  // drives all four surfaces (recommendations / fit / pre / post).
-  // Guests: payload held in sessionStorage + sign-up/login modal; the DB
-  // write is blocked (FR-7.5 / FR-1.9).
+  // RATING REDESIGN (star-only, button-triggered).
+  // CHANGED (audit fixes):
+  //   * Recommendation ratings are PER ITEM (real catalog target_id).
+  //   * Guests are blocked at the STAR CLICK: nothing is cached anywhere
+  //     (no sessionStorage hold) and the exact sign-up/login prompt opens.
+  //   * Stars rehydrate from /ratings/mine/ so they survive reload/logout.
   // ------------------------------------------------------------------
   const [studioSessionId] = useState(
     () =>
@@ -1353,10 +1353,12 @@ function FittingStudioPage({ isGuest = false }) {
         .toString(36)
         .slice(2, 10)}`
   );
-  const [ratingModal, setRatingModal] = useState(null); // { kind, values }
+  const [ratingModal, setRatingModal] = useState(null); // { kind, values, item }
   const [ratingSaving, setRatingSaving] = useState(false);
   const [ratingError, setRatingError] = useState("");
   const [guestRatingPromptOpen, setGuestRatingPromptOpen] = useState(false);
+  const [myRecommendationRatings, setMyRecommendationRatings] = useState({});
+  const [myFitRatings, setMyFitRatings] = useState({});
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -1550,6 +1552,53 @@ function FittingStudioPage({ isGuest = false }) {
     setUatAfterAnswers(readUatPhaseAnswers(uatCurrentProductId, "after"));
   }, [uatCurrentProductId]);
 
+  /* NEW (audit fix — rehydration): prefill stars from the SERVER (/ratings/mine/)
+     so a rating survives reload / logout / login. Guests skip the call entirely
+     (IsAuthenticated would 401). Surfaces are kept separate so a fit rating can
+     never masquerade as a recommendation approval (OBJ-05 integrity). */
+  useEffect(() => {
+    if (isGuest) {
+      setMyRecommendationRatings({});
+      setMyFitRatings({});
+      return undefined;
+    }
+    let active = true;
+
+    async function loadMyRatings() {
+      try {
+        const list = await ratingsApi.mine();
+        if (!active) return;
+        const recMap = {};
+        const fitMap = {};
+        (Array.isArray(list) ? list : []).forEach((entry) => {
+          if (!entry || entry.score == null) return;
+          if (
+            entry.target_type === RATING_TARGET_TYPES.ITEM &&
+            entry.source === RATING_SOURCES.RECOMMENDATION_PANEL
+          ) {
+            recMap[String(entry.target_id)] = Number(entry.score);
+          } else if (
+            entry.target_type === RATING_TARGET_TYPES.FIT &&
+            entry.source === RATING_SOURCES.FIT_VISUALIZATION
+          ) {
+            fitMap[String(entry.target_id)] = Number(entry.score);
+          }
+        });
+        setMyRecommendationRatings(recMap);
+        setMyFitRatings(fitMap);
+      } catch (error) {
+        console.warn("Unable to load your saved ratings:", error?.message || error);
+      }
+    }
+
+    loadMyRatings();
+    window.addEventListener("fitfusion-rating-updated", loadMyRatings);
+    return () => {
+      active = false;
+      window.removeEventListener("fitfusion-rating-updated", loadMyRatings);
+    };
+  }, [isGuest]);
+
   // Pending item hand-off (product page / saved outfits -> studio).
   useEffect(() => {
     const key = pendingKey(isGuest);
@@ -1648,9 +1697,18 @@ function FittingStudioPage({ isGuest = false }) {
   // ------------------------------------------------------------------
   // Rating modal plumbing (stars only, button-triggered).
   // ------------------------------------------------------------------
-  function openRatingModal(kind) {
+  function openRatingModal(kind, item = null) {
     setRatingError("");
-    setRatingModal({ kind, values: {} });
+    const values = {};
+    if (kind === "recommendations" && item) {
+      const saved = myRecommendationRatings[String(item.id)];
+      if (saved) values.score = saved;
+    } else if (kind === "fit") {
+      const firstId = equippedItemsArray[0] ? String(equippedItemsArray[0].id) : "";
+      const saved = firstId ? myFitRatings[firstId] : 0;
+      if (saved) values.score = saved;
+    }
+    setRatingModal({ kind, values, item });
   }
 
   function closeRatingModal() {
@@ -1658,7 +1716,14 @@ function FittingStudioPage({ isGuest = false }) {
     setRatingError("");
   }
 
+  // CHANGED (guest-block rule): a Guest star click blocks IMMEDIATELY, writes
+  // NOTHING to any storage, and opens the exact sign-up/login prompt.
   function setRatingValue(key, score) {
+    if (isGuest) {
+      closeRatingModal();
+      setGuestRatingPromptOpen(true);
+      return;
+    }
     setRatingModal((current) =>
       current
         ? { ...current, values: { ...current.values, [key]: score } }
@@ -1666,25 +1731,16 @@ function FittingStudioPage({ isGuest = false }) {
     );
   }
 
-  // Guest hold: sessionStorage ONLY (dies with the tab/session, FR-1.9), then
-  // the sign-up/login modal. No network write ever happens for guests.
-  function holdGuestRating(kind, values) {
-    try {
-      sessionStorage.setItem(
-        GUEST_PENDING_RATING_KEY,
-        JSON.stringify({ kind, values, session_id: studioSessionId })
-      );
-    } catch {
-      // storage unavailable: the prompt still opens; nothing is persisted
-    }
-    closeRatingModal();
-    setGuestRatingPromptOpen(true);
-  }
-
   async function handleRatingPrimary() {
     if (!ratingModal) return;
-    const { kind, values } = ratingModal;
+    const { kind, values, item } = ratingModal;
     const config = RATING_COPY_BY_KIND[kind];
+
+    if (isGuest) {
+      closeRatingModal();
+      setGuestRatingPromptOpen(true);
+      return;
+    }
 
     const missing = config.questions.some((q) => values[q.key] == null);
     if (missing) {
@@ -1692,19 +1748,18 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    if (isGuest) {
-      holdGuestRating(kind, values);
-      return;
-    }
-
     setRatingSaving(true);
     setRatingError("");
     try {
       if (kind === "recommendations") {
-        // ONE rating for the OVERALL recommendation set (Criterion 10).
+        // PER-ITEM rating with the REAL catalog id (Criterion 10 / OBJ-05).
+        if (!item) {
+          setRatingError("This recommendation is missing a catalog id.");
+          return;
+        }
         await ratingsApi.submit({
           target_type: RATING_TARGET_TYPES.ITEM,
-          target_id: panelOverallTargetId(studioSessionId),
+          target_id: String(item.id),
           score: values.score,
           source: RATING_SOURCES.RECOMMENDATION_PANEL,
         });
@@ -1713,8 +1768,8 @@ function FittingStudioPage({ isGuest = false }) {
       } else if (kind === "fit") {
         // On-avatar look: one fit_visualization row per equipped garment so
         // the OBJ-01 user+product join keeps working, plus the visit survey's
-        // fit_rating_score (Criterion 9).
-        const ids = equippedItemsArray.map((item) => String(item.id));
+        // fit_rating (SADD field name, Criterion 9).
+        const ids = equippedItemsArray.map((entry) => String(entry.id));
         await Promise.all(
           ids.map((targetId) =>
             ratingsApi.submit({
@@ -1727,7 +1782,7 @@ function FittingStudioPage({ isGuest = false }) {
         );
         await authApi.submitFittingStudioSurvey({
           session_id: studioSessionId,
-          fit_rating_score: values.score,
+          [SURVEY_FIT_RATING_KEY]: values.score,
           equipped_item_ids: ids,
           avatar_context: avatarContextSnapshot(),
         });
@@ -1738,7 +1793,7 @@ function FittingStudioPage({ isGuest = false }) {
           session_id: studioSessionId,
           pre_confidence: values.confidence,
           pre_return_intent: values.return_intent,
-          equipped_item_ids: equippedItemsArray.map((item) => String(item.id)),
+          equipped_item_ids: equippedItemsArray.map((entry) => String(entry.id)),
           avatar_context: avatarContextSnapshot(),
         });
         displayNotification("Pre-session check saved.");
@@ -1747,7 +1802,7 @@ function FittingStudioPage({ isGuest = false }) {
           session_id: studioSessionId,
           post_confidence: values.confidence,
           post_return_intent: values.return_intent,
-          equipped_item_ids: equippedItemsArray.map((item) => String(item.id)),
+          equipped_item_ids: equippedItemsArray.map((entry) => String(entry.id)),
           avatar_context: avatarContextSnapshot(),
         });
         displayNotification("Post-session check saved.");
@@ -2695,8 +2750,8 @@ function FittingStudioPage({ isGuest = false }) {
               <div className="studio-recommendations-panel">
                 <p className="studio-recommendation-note">
                   Select Try Item to preview clothing on your avatar. Select
-                  View Match Reasons to review its recommendation details. Click
-                  a catalog product name to view its listing.
+                  View Match Reasons to review its recommendation details. Rate
+                  each recommendation with its own button (1–5 stars).
                 </p>
 
                 <p
@@ -2749,6 +2804,11 @@ function FittingStudioPage({ isGuest = false }) {
                           Size {item.size} {item.size_cm}
                         </small>
                       )}
+                      {myRecommendationRatings[String(item.id)] ? (
+                        <small style={{ display: "block", color: "#8e641f" }}>
+                          Your rating: {myRecommendationRatings[String(item.id)]}/5
+                        </small>
+                      ) : null}
                     </div>
 
                     {item.total_score !== undefined &&
@@ -2795,6 +2855,18 @@ function FittingStudioPage({ isGuest = false }) {
                       aria-label={`View match reasons for ${item.name}`}
                     >
                       View Match Reasons
+                    </button>
+
+                    {/* CHANGED (audit fix): PER-ITEM recommendation rating with
+                        the REAL catalog target_id — the synthetic panel-overall
+                        target is gone. */}
+                    <button
+                      type="button"
+                      className="studio-recommendation-match-button"
+                      onClick={() => openRatingModal("recommendations", item)}
+                      aria-label={`Rate recommendation ${item.name}`}
+                    >
+                      {RECOMMENDATION_RATING_COPY.buttonLabel}
                     </button>
                   </article>
                 ))}
@@ -2866,18 +2938,6 @@ function FittingStudioPage({ isGuest = false }) {
                     </button>
                   </div>
                 )}
-
-                {/* NEW (rating redesign): ONE button rating the OVERALL
-                    recommendation set — not per-item stars. */}
-                <div className="studio-rating-actions">
-                  <button
-                    type="button"
-                    className="studio-rate-button"
-                    onClick={() => openRatingModal("recommendations")}
-                  >
-                    {RECOMMENDATION_RATING_COPY.buttonLabel}
-                  </button>
-                </div>
               </div>
             )}
           </section>
@@ -2925,9 +2985,8 @@ function FittingStudioPage({ isGuest = false }) {
               </div>
             </div>
 
-            {/* NEW (rating redesign): canvas-side rating buttons. The fit
-                button stays disabled until at least one garment is equipped;
-                the pre/post checks are always available and optional. */}
+            {/* Canvas-side rating buttons. The fit button stays disabled until
+                at least one garment is equipped; pre/post checks are optional. */}
             <div className="studio-rating-actions studio-rating-actions-canvas">
               <button
                 type="button"
@@ -3066,9 +3125,7 @@ function FittingStudioPage({ isGuest = false }) {
         </div>
       </div>
 
-      {/* NEW (rating redesign): the single shared star modal for all four
-          button-triggered surfaces. Guests get the sign-up CTA as the primary
-          button; their payload is held in sessionStorage only. */}
+      {/* Shared star modal for all four button-triggered surfaces. */}
       {ratingModal && activeRatingConfig && (
         <RatingModal
           config={activeRatingConfig}
@@ -3076,13 +3133,14 @@ function FittingStudioPage({ isGuest = false }) {
           onChange={setRatingValue}
           onPrimary={handleRatingPrimary}
           onClose={closeRatingModal}
-          primaryLabel={isGuest ? GUEST_RATING_CTA : activeRatingConfig.submitLabel}
+          primaryLabel={activeRatingConfig.submitLabel}
           saving={ratingSaving}
           error={ratingError}
         />
       )}
 
-      {/* NEW (rating redesign): guest hold prompt (FR-7.5 / FR-1.9). */}
+      {/* CHANGED (guest-block rule): exact SRS prompt + Sign Up / Log In /
+          Cancel. NOTHING is cached for guests — no sessionStorage hold. */}
       {guestRatingPromptOpen && (
         <div
           className="studio-modal-backdrop"
@@ -3107,14 +3165,11 @@ function FittingStudioPage({ isGuest = false }) {
               ×
             </button>
             <div className="studio-modal-icon">★</div>
-            <p className="studio-modal-label">RATING HELD FOR THIS SESSION</p>
-            <h2 id="guest-rating-title">
-              Sign up or Log in to save your rating
-            </h2>
+            <p className="studio-modal-label">RATING REQUIRES AN ACCOUNT</p>
+            <h2 id="guest-rating-title">{GUEST_RATING_PROMPT}</h2>
             <p className="studio-modal-description">
-              Your rating is held in this browser session only and is discarded
-              when the session ends. Create an account or log in to save it to
-              your profile.
+              Guests cannot save ratings. Nothing you clicked was stored. Create
+              an account or log in, then rate again to save it to your profile.
             </p>
             <div className="studio-modal-actions">
               <button
@@ -3122,7 +3177,7 @@ function FittingStudioPage({ isGuest = false }) {
                 className="studio-modal-primary"
                 onClick={() => navigate("/signup")}
               >
-                Create Account
+                Sign Up
               </button>
               <button
                 type="button"
@@ -3137,7 +3192,7 @@ function FittingStudioPage({ isGuest = false }) {
               className="studio-modal-continue"
               onClick={() => setGuestRatingPromptOpen(false)}
             >
-              Maybe later
+              Cancel
             </button>
           </section>
         </div>

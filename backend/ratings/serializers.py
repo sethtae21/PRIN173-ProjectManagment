@@ -3,50 +3,53 @@ from rest_framework import serializers
 from .models import Rating, UATResponse, UATSession
 
 
+class StrictStarField(serializers.IntegerField):
+    """
+    STRICT 1..5 integer stars (SRS FR-7.5 star-only baseline).
+
+    DRF's IntegerField happily coerces "5", 5.0 and True into 5. The baseline
+    requires an actual integer, so every non-int (including bool, which is an
+    int subclass in Python) is rejected with 400 instead of being coerced.
+    """
+
+    def to_internal_value(self, data):
+        if isinstance(data, bool) or not isinstance(data, int):
+            self.fail('invalid')
+        return super().to_internal_value(data)
+
+
 class RatingSerializer(serializers.ModelSerializer):
     """
-    Accepts score (1-5) and/or vote (like/dislike) independently.
-    At least one must be present on CREATE. Neither is folded into the other.
-    Accepts optional `source` to tag the UI surface that produced the rating.
+    STAR-ONLY payload: { target_type, target_id, score (int 1..5), source }.
+    `score` and `source` are REQUIRED. There is no vote/like/dislike field.
 
-    CHANGED (Fitting Studio pre/post popups — OBJ-01 / FR-7.5): the source
-    vocabulary gains 'fitting_studio_popup'. The page-level confidence popups
-    persist through this serializer; the dedicated tag keeps those rows out of
-    every charter KPI join (OBJ-01/05 filter on fit_visualization /
-    recommendation_panel explicitly), preserving evidence integrity.
+    HARDENING (defense-in-depth): legacy `vote` / `like` / `dislike` keys in
+    the request body are EXPLICITLY REJECTED (400), not silently dropped.
+    Without this guard, a stale client sending `{"score": 5, "vote": "like"}`
+    would still save the score and the vote would vanish — masking the
+    client-side drift from the terminal.
     """
     id = serializers.CharField(read_only=True)
     user = serializers.CharField(read_only=True, source='user_id')
 
-    score = serializers.IntegerField(required=False, allow_null=True,
-                                     min_value=1, max_value=5)
-    vote = serializers.ChoiceField(choices=['like', 'dislike'],
-                                   required=False, allow_null=True, allow_blank=True)
-    source = serializers.ChoiceField(
-        choices=['', 'recommendation_panel', 'fit_visualization',
-                 'product_page', 'order_history', 'fitting_studio_popup'],
-        required=False, allow_blank=True, default='',
-    )
+    score = StrictStarField(min_value=1, max_value=5)
+    source = serializers.ChoiceField(choices=Rating.SOURCE_CHOICES)
 
     class Meta:
         model = Rating
-        fields = ['id', 'user', 'target_type', 'target_id', 'score', 'vote',
+        fields = ['id', 'user', 'target_type', 'target_id', 'score',
                   'source', 'created_at', 'updated_at']
         read_only_fields = ['user', 'created_at', 'updated_at']
 
-    def validate(self, attrs):
-        # Normalize blank vote -> None so it doesn't count as a reaction
-        if attrs.get('vote') == '':
-            attrs['vote'] = None
-
-        has_score = attrs.get('score') is not None
-        has_vote = attrs.get('vote') is not None
-
-        # On CREATE require at least one real signal; on PARTIAL UPDATE allow either/none
-        if self.instance is None and not (has_score or has_vote):
-            raise serializers.ValidationError(
-                {'detail': 'Provide score (1-5) and/or vote (like/dislike).'})
-        return attrs
+    def to_internal_value(self, data):
+        if hasattr(data, 'keys'):
+            legacy = {'vote', 'like', 'dislike'}.intersection(data.keys())
+            if legacy:
+                raise serializers.ValidationError({
+                    key: 'Like/dislike voting is no longer supported; submit a 1-5 star score instead.'
+                    for key in sorted(legacy)
+                })
+        return super().to_internal_value(data)
 
 
 class UATSessionSerializer(serializers.ModelSerializer):
@@ -59,9 +62,6 @@ class UATSessionSerializer(serializers.ModelSerializer):
 
 
 class UATResponseSerializer(serializers.ModelSerializer):
-    # FIX: removed redundant `source='session_id'` which caused DRF to raise
-    # an AssertionError during binding. The model's FK auto-creates a 
-    # `session_id` attribute that holds the UATSession's PK (a 32-char hex string).
     session_id = serializers.CharField(read_only=True)
 
     class Meta:
@@ -71,20 +71,11 @@ class UATResponseSerializer(serializers.ModelSerializer):
 
 
 class RatingSummarySerializer(serializers.Serializer):
-    """Read-only aggregate payload for GET /ratings/summary/."""
+    """Read-only STAR aggregate for GET /ratings/summary/ (no vote counts)."""
     target_type = serializers.CharField()
     target_id = serializers.CharField()
     source = serializers.CharField(allow_blank=True)
-    # Star dimension (score only)
     score_count = serializers.IntegerField()
     average = serializers.FloatField()
     star_counts = serializers.DictField(child=serializers.IntegerField())
-    # Reaction dimension (like/dislike only)
-    like_count = serializers.IntegerField()
-    dislike_count = serializers.IntegerField()
-    # Guest per-session aggregates (FR-1.9). Guests can no longer submit
-    # ratings, so these always read 0; kept for contract stability.
-    guest_session_score_count = serializers.IntegerField()
-    guest_session_average = serializers.FloatField()
-    guest_session_like_count = serializers.IntegerField()
-    guest_session_dislike_count = serializers.IntegerField()
+    approval_count = serializers.IntegerField()

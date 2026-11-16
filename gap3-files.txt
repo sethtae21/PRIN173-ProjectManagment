@@ -1,0 +1,1390 @@
+﻿
+===== backend/ratings\views.py =====
+import csv
+import logging
+
+from django.core.cache import cache
+from django.db.models import Count
+from django.http import HttpResponse
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import Rating, UATResponse, UATSession, UAT_VALUE_MIN, UAT_VALUE_MAX
+from .serializers import (
+    RatingSerializer,
+    RatingSummarySerializer,
+    UATResponseSerializer,
+)
+# Single source of truth for charter KPIs. build_uat_workbook_rows is re-exported
+# here on purpose: ratings/management/commands/export_uat_workbook.py and
+# UATExportCSVView import it from this module.
+from .uat_kpis import (
+    APPROVAL_MIN_SCORE,
+    KNOWN_QUESTION_KEYS,
+    build_uat_workbook_rows,
+)
+
+logger = logging.getLogger(__name__)
+
+# STAR-ONLY baseline: exactly the four SADD sources. The undocumented
+# 'fitting_studio_popup' tag and the empty legacy tag are GONE.
+VALID_SOURCES = {
+    'recommendation_panel', 'fit_visualization',
+    'product_page', 'order_history',
+}
+
+SHOPPER_ONLY_DETAIL = 'Only registered shoppers can submit ratings.'
+
+
+def _guest_index_key(session_key):
+    return f'guest_rating_keys:{session_key}'
+
+
+def _legacy_guest_keys(request):
+    """Read-only lookup of LEGACY guest cache keys so they can be DELETED.
+    Nothing is ever written to the cache for a guest (FR-1.9)."""
+    session_key = request.session.session_key
+    if not session_key:
+        return []
+    index_key = _guest_index_key(session_key)
+    return [*(cache.get(index_key) or []), index_key]
+
+
+def _is_shopper(user):
+    return getattr(user, 'role', None) == 'shopper'
+
+
+class RatingSubmitView(APIView):
+    """
+    POST /ratings/ â€” REGISTERED SHOPPERS ONLY, STAR-ONLY (1..5 integer).
+
+    * Guest  -> 403 + signup/login prompt; NOTHING cached or persisted.
+    * Seller -> 403 (ratings are a shopper surface).
+    * Shopper-> upsert the (user, target_type, target_id, source) row's score.
+
+    permission_classes stays AllowAny on purpose so guests get a clean 403
+    (DRF IsAuthenticated would answer 401, which the frontend token lifecycle
+    interprets as a session reset).
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            logger.info("Guest rating attempt refused (403): no rating rights.")
+            return Response({
+                'detail': 'Registration is required to rate items.',
+                'prompt': 'signup_login',
+                'persisted': False,
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        if not _is_shopper(request.user):
+            return Response(
+                {'detail': SHOPPER_ONLY_DETAIL, 'persisted': False},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = RatingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        source = vd['source']
+        if source not in VALID_SOURCES:
+            return Response(
+                {'detail': f'Invalid source "{source}". '
+                           f'Allowed: {sorted(VALID_SOURCES)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rating, created = Rating.objects.get_or_create(
+            user=request.user,
+            target_type=vd['target_type'],
+            target_id=vd['target_id'],
+            source=source,
+            defaults={'score': vd['score']},
+        )
+        if not created:
+            rating.score = vd['score']
+            rating.save(update_fields=['score', 'updated_at'])
+
+        return Response({
+            'persisted': True,
+            'created': created,
+            'rating': RatingSerializer(rating).data,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class RatingSummaryView(APIView):
+    """
+    GET /ratings/summary/?target_type=&target_id=[&source=]
+    Public STAR aggregate. 4-5 stars = approval (approval_count).
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        target_type = request.query_params.get('target_type')
+        target_id = request.query_params.get('target_id')
+        if not target_type or not target_id:
+            return Response({'error': 'target_type and target_id are required'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        source = request.query_params.get('source', '')
+        if source and source not in VALID_SOURCES:
+            return Response(
+                {'error': f'Invalid source "{source}". '
+                          f'Allowed: {sorted(VALID_SOURCES)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Rating.objects.filter(target_type=target_type, target_id=target_id)
+        if source:
+            qs = qs.filter(source=source)
+
+        scores = [s for s in qs.values_list('score', flat=True) if s is not None]
+        score_count = len(scores)
+        average = round(sum(scores) / score_count, 2) if score_count else 0.0
+
+        star_counts = {str(i): 0 for i in range(1, 6)}
+        for row in qs.values('score').annotate(count=Count('id')):
+            if row['score'] is not None:
+                star_counts[str(row['score'])] = row['count']
+
+        approval_count = sum(1 for s in scores if s >= APPROVAL_MIN_SCORE)
+
+        return Response(RatingSummarySerializer({
+            'target_type': target_type,
+            'target_id': target_id,
+            'source': source or 'all',
+            'score_count': score_count,
+            'average': average,
+            'star_counts': star_counts,
+            'approval_count': approval_count,
+        }).data)
+
+
+class GuestSessionClearView(APIView):
+    """POST /ratings/guest-session/clear/ â€” deletes any LEGACY guest cache
+    aggregates and flushes the guest session (FR-1.9 housekeeping).
+    Never writes anything."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            return Response({'cleared': False}, status=status.HTTP_200_OK)
+        keys = _legacy_guest_keys(request)
+        if keys:
+            cache.delete_many(keys)
+        if request.session.session_key:
+            request.session.flush()
+        return Response({'cleared': True}, status=status.HTTP_200_OK)
+
+
+class MyRatingsView(APIView):
+    """GET /ratings/mine/ â€” the caller's persisted stars (server truth used by
+    the UI to rehydrate ratings after reload / logout / login)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = Rating.objects.filter(user=request.user)
+        return Response(RatingSerializer(qs, many=True).data)
+
+
+class RatingDetailView(APIView):
+    """PATCH / DELETE /ratings/<id>/ â€” owner-only, shopper-only.
+
+    CHANGED (audit fix #8a): delete now also requires `_is_shopper`. Previously
+    create required shopper but delete only required ownership, which left a
+    symmetry gap (a seller couldn't create but could delete their own, and a
+    seller who somehow got a row into the table could remove it).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_own(self, request, pk):
+        return Rating.objects.filter(user=request.user, id=pk).first()
+
+    def patch(self, request, pk):
+        rating = self._get_own(request, pk)
+        if rating is None:
+            return Response({'error': 'Rating not found'}, status=status.HTTP_404_NOT_FOUND)
+        if not _is_shopper(request.user):
+            return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
+        serializer = RatingSerializer(rating, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if 'score' in serializer.validated_data:
+            rating.score = serializer.validated_data['score']
+            rating.save(update_fields=['score', 'updated_at'])
+        return Response(RatingSerializer(rating).data)
+
+    def delete(self, request, pk):
+        if not _is_shopper(request.user):
+            return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
+        rating = self._get_own(request, pk)
+        if rating is None:
+            return Response({'error': 'Rating not found'}, status=status.HTTP_404_NOT_FOUND)
+        rating.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UATSessionCreateView(APIView):
+    """POST /ratings/uat/session/ â€” start a tester session.
+
+    FIX (OBJ-01 join): persist product_id from the payload. The OBJ-01 KPI
+    joins fit-visualization ratings to sessions by (user, product).
+
+    CHANGED (audit fix #8b): REGISTERED SHOPPERS ONLY. A seller logging a UAT
+    session would contaminate the OBJ-01 / OBJ-05 / OBJ-06 evidence denominators.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not _is_shopper(request.user):
+            return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
+
+        role = request.data.get('role', request.user.role)
+        if role not in {'shopper', 'seller'}:
+            return Response({'detail': 'Invalid UAT role.'}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role != role:
+            return Response({'detail': 'Role mismatch for this tester session.'}, status=status.HTTP_403_FORBIDDEN)
+
+        product_id = str(request.data.get('product_id') or '').strip()
+        session = UATSession.objects.create(
+            user=request.user, role=role, status='active', product_id=product_id)
+        return Response({
+            'session_id': session.session_id,
+            'status': session.status,
+            'role': session.role,
+            'product_id': session.product_id,
+        }, status=status.HTTP_201_CREATED)
+
+
+class UATResponseSubmitView(APIView):
+    """POST /ratings/uat/response/ â€” save one survey answer.
+
+    `value == 0` is LEGAL (style_discovery "No"). Fractions are refused, not
+    truncated. Unknown question keys are rejected against KNOWN_QUESTION_KEYS.
+    Sessions stay 'active' so the server-side commerce hook can still record
+    cart_created / checkout_completed.
+
+    CHANGED (audit fix #8b): REGISTERED SHOPPERS ONLY. A seller logging a UAT
+    response would contaminate the charter evidence paired-answer calculations.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not _is_shopper(request.user):
+            return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
+
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({'detail': 'session_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session = UATSession.objects.filter(session_id=session_id, user=request.user).first()
+        if session is None:
+            return Response({'detail': 'UAT session not found or not owned by this account.'}, status=status.HTTP_404_NOT_FOUND)
+
+        product_id = str(request.data.get('product_id') or '').strip()
+        question_key = str(request.data.get('question_key') or request.data.get('key') or '').strip()
+        phase = str(request.data.get('phase') or 'before').strip()
+        if not question_key:
+            return Response({'detail': 'question_key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not product_id:
+            return Response({'detail': 'product_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if question_key not in KNOWN_QUESTION_KEYS:
+            return Response(
+                {'detail': f"Unknown UAT question '{question_key}'. "
+                           f'Allowed: {", ".join(sorted(KNOWN_QUESTION_KEYS))}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        value = request.data.get('value')
+        if value is None or value == '':
+            return Response({'detail': 'value is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if isinstance(value, bool):
+            return Response({'detail': 'value must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+        if isinstance(value, float):
+            if not value.is_integer():
+                return Response({'detail': 'value must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+            numeric_value = int(value)
+        elif isinstance(value, int):
+            numeric_value = value
+        elif isinstance(value, str):
+            if '.' in value:
+                return Response({'detail': 'value must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                numeric_value = int(value)
+            except ValueError:
+                return Response({'detail': 'value must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'detail': 'value must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not UAT_VALUE_MIN <= numeric_value <= UAT_VALUE_MAX:
+            return Response(
+                {'detail': f'value must be between {UAT_VALUE_MIN} and {UAT_VALUE_MAX}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj, created = UATResponse.objects.update_or_create(
+            session=session,
+            product_id=product_id,
+            question_key=question_key,
+            phase=phase,
+            defaults={'value': numeric_value},
+        )
+        return Response({
+            'created': created,
+            'response': UATResponseSerializer(obj).data,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class UATExportCSVView(APIView):
+    """GET /ratings/uat/export/ â€” staff-only CSV of the charter KPI workbook."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, 'is_staff', False):
+            return Response({'detail': 'Staff access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="fitfusion_uat_results.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'KPI', 'Charter objective', 'Target', 'Actual result', 'Sample size',
+            'Status', 'Evidence reference', 'Numerator', 'Denominator'
+        ])
+        for row in build_uat_workbook_rows():
+            writer.writerow([
+                row['kpi'], row['objective'], row['target'], row['actual_result'],
+                row['sample_size'], row['status'], row['evidence_reference'],
+                row['numerator'], row['denominator'],
+            ])
+        return response
+
+===== backend/ratings\models.py =====
+import uuid
+
+from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import models
+
+
+def generate_uat_session_id():
+    return uuid.uuid4().hex
+
+
+# ---------------------------------------------------------------------------
+# UAT survey value envelope. "No" on a Yes/No question encodes as 0, so the
+# lower bound MUST be 0 (not 1). Locked by CharterThresholdLockTests.
+# ---------------------------------------------------------------------------
+UAT_VALUE_MIN = 0
+UAT_VALUE_MAX = 5
+
+
+class Rating(models.Model):
+    """
+    In-app STAR rating (SRS FR-7.5 / Scope Criteria 9-11).
+
+    STAR-ONLY BASELINE:
+      * score is a REQUIRED integer 1..5. 4-5 = Approval, 1-3 = Not approval.
+      * There is NO vote / like / dislike dimension anywhere (model, API,
+        summary, KPI). Legacy vote-only rows were dropped by migration 0003.
+      * REGISTERED SHOPPERS ONLY. Guests are refused server-side (403) and
+        nothing is cached or persisted for them (FR-1.9). Sellers are refused
+        too â€” ratings are a shopper surface.
+
+    `source` tags the UI surface so UAT KPI reports separate cleanly:
+      * recommendation_panel -> OBJ-05 / Criterion 10 (per recommended item)
+      * fit_visualization    -> OBJ-01 / Criterion 9  (on-avatar + checkout
+                                fit-accuracy)
+      * product_page         -> product review (context only)
+      * order_history        -> post-purchase (context only)
+    """
+    TARGET_CHOICES = [('item', 'Catalog Item'), ('fit', 'Fit Visualization')]
+    SOURCE_CHOICES = [
+        ('recommendation_panel', 'Recommendation Panel'),
+        ('fit_visualization', 'Fit Visualization'),
+        ('product_page', 'Product Page'),
+        ('order_history', 'Order History'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ratings')
+    target_type = models.CharField(max_length=10, choices=TARGET_CHOICES)
+    target_id = models.CharField(max_length=50)  # ObjectId stored as string
+
+    # REQUIRED, non-null, strict 1..5 stars.
+    score = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)])
+
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'accounts_rating'
+        unique_together = ('user', 'target_type', 'target_id', 'source')
+        indexes = [
+            models.Index(fields=['target_type', 'target_id']),
+            models.Index(fields=['source']),
+        ]
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return (
+            f"{self.user} -> {self.target_type}:{self.target_id} "
+            f"[{self.score}â˜…] ({self.source})"
+        )
+
+
+class UATSession(models.Model):
+    role = models.CharField(max_length=10, choices=[('shopper', 'Shopper'), ('seller', 'Seller')], default='shopper')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='uat_sessions')
+    session_id = models.CharField(max_length=32, primary_key=True, default=generate_uat_session_id, editable=False)
+    product_id = models.CharField(max_length=50, blank=True, default='')
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=[('active', 'Active'), ('completed', 'Completed')], default='active')
+    notes = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'uat_session'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['product_id']),
+        ]
+
+    def __str__(self):
+        return f"UAT {self.session_id} ({self.role})"
+
+
+class UATResponse(models.Model):
+    PHASE_CHOICES = [('before', 'Before'), ('after', 'After'), ('supplementary', 'Supplementary')]
+    question_key = models.CharField(max_length=80)
+    phase = models.CharField(max_length=20, choices=PHASE_CHOICES, default='before')
+    product_id = models.CharField(max_length=50)
+    value = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(UAT_VALUE_MIN), MaxValueValidator(UAT_VALUE_MAX)])
+    session = models.ForeignKey(UATSession, on_delete=models.CASCADE, related_name='responses')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'uat_response'
+        unique_together = ('session', 'product_id', 'question_key', 'phase')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['session', 'product_id']),
+            models.Index(fields=['question_key', 'phase']),
+        ]
+
+    def __str__(self):
+        return f"{self.session_id} {self.phase}:{self.question_key}={self.value}"
+
+===== backend/ratings\serializers.py =====
+from rest_framework import serializers
+
+from .models import Rating, UATResponse, UATSession
+
+
+class StrictStarField(serializers.IntegerField):
+    """
+    STRICT 1..5 integer stars (SRS FR-7.5 star-only baseline).
+
+    DRF's IntegerField happily coerces "5", 5.0 and True into 5. The baseline
+    requires an actual integer, so every non-int (including bool, which is an
+    int subclass in Python) is rejected with 400 instead of being coerced.
+    """
+
+    def to_internal_value(self, data):
+        if isinstance(data, bool) or not isinstance(data, int):
+            self.fail('invalid')
+        return super().to_internal_value(data)
+
+
+class RatingSerializer(serializers.ModelSerializer):
+    """
+    STAR-ONLY payload: { target_type, target_id, score (int 1..5), source }.
+    `score` and `source` are REQUIRED. There is no vote/like/dislike field.
+
+    HARDENING (defense-in-depth): legacy `vote` / `like` / `dislike` keys in
+    the request body are EXPLICITLY REJECTED (400), not silently dropped.
+    Without this guard, a stale client sending `{"score": 5, "vote": "like"}`
+    would still save the score and the vote would vanish â€” masking the
+    client-side drift from the terminal.
+    """
+    id = serializers.CharField(read_only=True)
+    user = serializers.CharField(read_only=True, source='user_id')
+
+    score = StrictStarField(min_value=1, max_value=5)
+    source = serializers.ChoiceField(choices=Rating.SOURCE_CHOICES)
+
+    class Meta:
+        model = Rating
+        fields = ['id', 'user', 'target_type', 'target_id', 'score',
+                  'source', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'keys'):
+            legacy = {'vote', 'like', 'dislike'}.intersection(data.keys())
+            if legacy:
+                raise serializers.ValidationError({
+                    key: 'Like/dislike voting is no longer supported; submit a 1-5 star score instead.'
+                    for key in sorted(legacy)
+                })
+        return super().to_internal_value(data)
+
+
+class UATSessionSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(read_only=True, source='user_id')
+
+    class Meta:
+        model = UATSession
+        fields = ['session_id', 'user', 'role', 'product_id', 'status', 'started_at', 'completed_at']
+        read_only_fields = ['session_id', 'user', 'started_at', 'completed_at']
+
+
+class UATResponseSerializer(serializers.ModelSerializer):
+    session_id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = UATResponse
+        fields = ['session_id', 'product_id', 'question_key', 'phase', 'value', 'created_at', 'updated_at']
+        read_only_fields = ['session_id', 'created_at', 'updated_at']
+
+
+class RatingSummarySerializer(serializers.Serializer):
+    """Read-only STAR aggregate for GET /ratings/summary/ (no vote counts)."""
+    target_type = serializers.CharField()
+    target_id = serializers.CharField()
+    source = serializers.CharField(allow_blank=True)
+    score_count = serializers.IntegerField()
+    average = serializers.FloatField()
+    star_counts = serializers.DictField(child=serializers.IntegerField())
+    approval_count = serializers.IntegerField()
+
+===== backend/ratings\tests_uat_charter.py =====
+"""
+accounts/tests_archive_retention.py â€” FR-1.4 / RA 10173 end-of-retention proof.
+
+Companion to accounts.tests.AccountManagementTests, which proves the FIRST half
+of the lifecycle (DELETE /profile/ -> 200 archive, data RETAINED, login blocked).
+This suite proves the SECOND half: the prune sweep relocates the profile to
+accounts_archiveduser and erases/pseudonymizes the active collections.
+
+Chain covered end-to-end:
+  active --DELETE /profile/--> archived in accounts_user (grace window)
+         --prune sweep-------> accounts_archiveduser + active data erased
+
+Includes the forward eligibility math (due = archived_at + ARCHIVE_GRACE_DAYS),
+the legacy NULL-stamp branch, --force, the preview (moves nothing), PSEUDONYMIZED
+cold-copy idempotency (FR-1.4: no direct identifiers or credentials at rest),
+the legacy-row backfill command, the order pseudonymization + buyer-cart detach
+cascade, and sweep resilience (one bad row never stalls the rest).
+
+Run: python manage.py test accounts.tests_archive_retention -v 2
+"""
+from datetime import timedelta
+from unittest.mock import patch
+
+from django.core.management import call_command
+from django.test import TestCase
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from accounts.archive import (
+    ARCHIVE_GRACE_DAYS,
+    archive_due_date,
+    describe_archive_schedule,
+    prune_expired_archived_users,
+)
+from accounts.models import ArchivedUser, FittingStudioSurvey, User
+from accounts.pseudonymization import pseudonym_for, pseudonymous_profile_fields
+from catalog.models import CatalogItem
+from commerce.models import Cart, CartItem, Order
+from outfits.models import AvatarPreset, Outfit
+from ratings.models import Rating
+
+PASSWORD = 'Test123!@#'
+
+
+def _user(email, role='shopper', **extra):
+    return User.objects.create_user(
+        email=email,
+        full_name=email.split('@')[0].replace('.', ' ').title(),
+        password=PASSWORD,
+        role=role,
+        **extra,
+    )
+
+
+def _archive(user, days_ago=0, stamp=True):
+    """Mirror ProfileView.destroy's archive write, then back-date the clock."""
+    user.status = 'archive'
+    user.is_active = False
+    user.archived_at = (timezone.now() - timedelta(days=days_ago)) if stamp else None
+    user.save(update_fields=['status', 'is_active', 'archived_at'])
+    # Reload so assertions use the DB's stored precision (BSON dates are
+    # millisecond-precision; comparing against the in-memory value is flaky).
+    user.refresh_from_db()
+    return user
+
+
+def _listing(owner, name='Blue Jacket'):
+    return CatalogItem.objects.create(
+        name=name,
+        description='Retention test item.',
+        category='tops',
+        size='M',
+        color='Blue',
+        color_description='Navy blue',
+        color_family='blue',
+        price='49.95',
+        seller=owner,
+        store_name=owner.store_name or 'Retention Store',
+        status='active',
+    )
+
+
+def _order(user, number):
+    return Order.objects.create(
+        user=user,
+        order_number=number,
+        status='paid',
+        recipient_name='Acct User',
+        recipient_email=user.email,
+        contact_number='09123456789',
+        shipping_address='123 Sample Street, Makati',
+        payment_method='Cash on Delivery',
+        total_amount='250.00',
+    )
+
+
+class ArchiveEligibilityMathTests(TestCase):
+    """The forward grace-window rule, asserted literally."""
+
+    def test_due_date_is_archived_at_plus_grace_days(self):
+        user = _archive(_user('math@test.com'), days_ago=3)
+        expected = user.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
+        self.assertEqual(archive_due_date(user), expected)
+        # The User property must mirror the module helper exactly.
+        self.assertEqual(user.archive_due_date, expected)
+
+    def test_custom_window_is_honoured(self):
+        user = _archive(_user('window@test.com'), days_ago=3)
+        self.assertEqual(
+            archive_due_date(user, days=30),
+            user.archived_at + timedelta(days=30),
+        )
+
+    def test_legacy_null_stamp_has_no_due_date(self):
+        user = _archive(_user('legacy-math@test.com'), stamp=False)
+        self.assertIsNone(archive_due_date(user))
+        self.assertIsNone(user.archive_due_date)
+
+    def test_fresh_archive_is_not_relocated(self):
+        user = _archive(_user('fresh@test.com'), days_ago=0)
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+        self.assertFalse(ArchivedUser.objects.filter(closed_account_id=str(user.pk)).exists())
+
+    def test_overdue_archive_is_relocated(self):
+        user = _archive(_user('overdue@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=uid).exists())
+
+    def test_legacy_null_stamp_is_relocated_immediately(self):
+        user = _archive(_user('legacy-now@test.com'), stamp=False)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+
+    def test_force_relocates_a_fresh_archive(self):
+        user = _archive(_user('forced@test.com'), days_ago=0)
+        uid = str(user.pk)
+        self.assertEqual(prune_expired_archived_users(force=True), 1)
+        self.assertFalse(User.objects.filter(pk=uid).exists())
+
+    def test_active_accounts_are_never_relocated(self):
+        active = _user('active@test.com')
+        active.archived_at = timezone.now() - timedelta(days=ARCHIVE_GRACE_DAYS + 30)
+        active.save(update_fields=['archived_at'])
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertEqual(prune_expired_archived_users(force=True), 0)
+        self.assertTrue(User.objects.filter(pk=active.pk).exists())
+
+
+class ArchiveSchedulePreviewTests(TestCase):
+    """--preview must explain the math and move NOTHING."""
+
+    def setUp(self):
+        self.fresh = _archive(_user('preview-fresh@test.com'), days_ago=0)
+        self.overdue = _archive(
+            _user('preview-overdue@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+
+    def test_preview_reports_schedule_and_moves_nothing(self):
+        rows = describe_archive_schedule()
+        self.assertEqual(len(rows), 2)
+        by_email = {row['email']: row for row in rows}
+
+        fresh_row = by_email[self.fresh.email]
+        self.assertFalse(fresh_row['eligible'])
+        self.assertIn('day(s)', fresh_row['remaining'])
+        self.assertEqual(
+            fresh_row['due_date'],
+            self.fresh.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS),
+        )
+
+        overdue_row = by_email[self.overdue.email]
+        self.assertTrue(overdue_row['eligible'])
+
+        # Preview is read-only.
+        self.assertEqual(ArchivedUser.objects.count(), 0)
+        self.assertTrue(User.objects.filter(pk=self.fresh.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.overdue.pk).exists())
+
+    def test_preview_force_marks_every_row_eligible(self):
+        rows = describe_archive_schedule(force=True)
+        self.assertTrue(all(row['eligible'] for row in rows))
+        fresh_row = next(r for r in rows if r['email'] == self.fresh.email)
+        self.assertIn('(forced)', fresh_row['remaining'])
+        self.assertEqual(ArchivedUser.objects.count(), 0)
+
+    def test_preview_lists_legacy_rows_as_immediate(self):
+        _archive(_user('preview-legacy@test.com'), stamp=False)
+        rows = describe_archive_schedule()
+        legacy = next(r for r in rows if r['email'] == 'preview-legacy@test.com')
+        self.assertIsNone(legacy['due_date'])
+        self.assertTrue(legacy['eligible'])
+        self.assertIn('legacy', legacy['remaining'])
+
+
+class ColdCopyTests(TestCase):
+    """accounts_archiveduser content, idempotency, and timestamp semantics.
+
+    CHANGED (FR-1.4 audit fix): the cold copy is PSEUDONYMIZED, not intact.
+    Direct identifiers and credentials must never be written at rest.
+    """
+
+    def test_cold_copy_is_pseudonymized_and_idempotent(self):
+        user = _user('cold@test.com', mobile='09123456789', city='Makati City')
+        raw_hash = user.password
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        uid = str(user.pk)
+
+        first = ArchivedUser.from_user(user)
+        second = ArchivedUser.from_user(user)  # crash-retry path
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(ArchivedUser.objects.filter(closed_account_id=uid).count(), 1)
+
+        # FR-1.4: synthetic identity, cleared contact data, empty credential.
+        expected = pseudonymous_profile_fields(uid)
+        for name, value in expected.items():
+            self.assertEqual(getattr(first, name), value, name)
+        self.assertEqual(first.password, '')
+        self.assertNotEqual(first.password, raw_hash)
+        self.assertNotEqual(first.email, user.email)
+        self.assertNotEqual(first.full_name, user.full_name)
+        for raw in ('cold@test.com', '09123456789', 'Makati City'):
+            self.assertNotIn(raw, str(first.__dict__))
+
+        # Retention-purpose fields survive.
+        self.assertEqual(first.role, user.role)
+        self.assertEqual(first.closed_account_id, uid)
+        self.assertEqual(first.status, 'archive')
+        self.assertFalse(first.is_active)
+
+    def test_seller_store_identity_is_cleared(self):
+        seller = _user('cold-seller@test.com', role='seller', store_name='Cold Store')
+        _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(seller)
+        self.assertEqual(cold.store_name, '')
+        self.assertEqual(cold.role, 'seller')
+        self.assertNotIn('Cold Store', str(cold.__dict__))
+
+    def test_from_user_heals_a_legacy_intact_row(self):
+        """A row written BEFORE the fix is healed on re-touch, not duplicated."""
+        user = _user('heal@test.com', mobile='09123456789')
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        ArchivedUser.objects.filter(pk=cold.pk).update(
+            email=user.email, full_name=user.full_name,
+            mobile='09123456789', password=user.password,
+        )
+        healed = ArchivedUser.from_user(user)
+        self.assertEqual(healed.pk, cold.pk)
+        self.assertEqual(
+            ArchivedUser.objects.filter(closed_account_id=str(user.pk)).count(), 1)
+        healed.refresh_from_db()
+        self.assertEqual(
+            healed.email, pseudonymous_profile_fields(str(user.pk))['email'])
+        self.assertEqual(healed.password, '')
+        self.assertEqual(healed.mobile, '')
+
+    def test_cold_moved_at_stores_the_scheduled_due_date(self):
+        """DOCUMENTED BEHAVIOUR (not the relocation instant).
+
+        ArchivedUser.from_user() writes archived_at + ARCHIVE_GRACE_DAYS into
+        cold_moved_at, so this field audits the SCHEDULE, not the wall-clock
+        move. See the corrected archive.py docstring and the open RA 10173
+        audit-trail item in the sprint notes.
+        """
+        user = _archive(_user('scheduled@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        expected = user.archived_at + timedelta(days=ARCHIVE_GRACE_DAYS)
+        self.assertLess(abs((cold.cold_moved_at - expected).total_seconds()), 1)
+        # ...and it is demonstrably NOT "now".
+        self.assertGreater(abs((cold.cold_moved_at - timezone.now()).total_seconds()), 3600)
+
+    def test_cold_moved_at_falls_back_to_now_for_legacy_rows(self):
+        user = _archive(_user('legacy-cold@test.com'), stamp=False)
+        before = timezone.now()
+        cold = ArchivedUser.from_user(user)
+        self.assertIsNotNone(cold.cold_moved_at)
+        self.assertGreaterEqual(cold.cold_moved_at, before - timedelta(seconds=1))
+        self.assertLess(abs((cold.cold_moved_at - timezone.now()).total_seconds()), 60)
+
+
+class ColdArchiveBackfillTests(TestCase):
+    """The repeatable cleanup for rows archived BEFORE the pseudonymization fix."""
+
+    def setUp(self):
+        self.legacy = ArchivedUser.objects.create(
+            closed_account_id='legacy0001',
+            email='legacy@test.com',
+            full_name='Legacy Person',
+            role='seller',
+            status='archive',
+            store_name='Legacy Store',
+            mobile='09181234567',
+            street='1 Old St',
+            barangay='Old Brgy',
+            city='Old City',
+            province='Old Province',
+            postal_code='0000',
+            password='pbkdf2_sha256$legacyhash',
+            is_active=False,
+            is_staff=True,
+            last_login=timezone.now(),
+            date_joined=timezone.now(),
+            archived_at=timezone.now() - timedelta(days=120),
+            cold_moved_at=timezone.now() - timedelta(days=30),
+        )
+
+    def test_preview_writes_nothing(self):
+        call_command('pseudonymize_archived_users')
+        self.legacy.refresh_from_db()
+        self.assertEqual(self.legacy.email, 'legacy@test.com')
+        self.assertEqual(self.legacy.password, 'pbkdf2_sha256$legacyhash')
+
+    def test_apply_pseudonymizes_and_is_repeatable(self):
+        call_command('pseudonymize_archived_users', '--apply')
+        self.legacy.refresh_from_db()
+        expected = pseudonymous_profile_fields('legacy0001')
+        for name, value in expected.items():
+            self.assertEqual(getattr(self.legacy, name), value, name)
+        self.assertEqual(self.legacy.email,
+                         f"archived-{pseudonym_for('legacy0001')}@archive.invalid")
+        # Retention-purpose fields are untouched.
+        self.assertEqual(self.legacy.role, 'seller')
+        self.assertEqual(self.legacy.closed_account_id, 'legacy0001')
+        self.assertIsNotNone(self.legacy.cold_moved_at)
+        # Second run is a guaranteed no-op.
+        before = self.legacy.email
+        call_command('pseudonymize_archived_users', '--apply')
+        self.legacy.refresh_from_db()
+        self.assertEqual(self.legacy.email, before)
+
+
+class RetentionErasureTests(TestCase):
+    """RA 10173: after the window, active collections hold no personal data."""
+
+    def setUp(self):
+        self.user = _user('erase@test.com')
+        self.preset = AvatarPreset.objects.create(
+            user=self.user, name='P', gender='female',
+            height=165, weight=55, skin_tone='#d9aa82',
+        )
+        self.outfit = Outfit.objects.create(user=self.user, name='My Outfit')
+        self.cart = Cart.objects.create(user=self.user)
+        self.rating = Rating.objects.create(
+            user=self.user, target_type='item', target_id='erase-target',
+            score=5, source='recommendation_panel',
+        )
+        self.survey = FittingStudioSurvey.objects.create(
+            user=self.user, session_id='studio-erase-0001',
+            pre_confidence=2, post_confidence=4, fit_rating=5,
+        )
+        self.order = _order(self.user, 'FF-ERASE-0001')
+        _archive(self.user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        self.uid = str(self.user.pk)
+
+    def test_relocation_erases_active_personal_data(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
+
+        self.assertFalse(User.objects.filter(pk=self.uid).exists())
+        self.assertFalse(AvatarPreset.objects.filter(pk=self.preset.pk).exists())
+        self.assertFalse(Outfit.objects.filter(pk=self.outfit.pk).exists())
+        self.assertFalse(Cart.objects.filter(pk=self.cart.pk).exists())
+        self.assertFalse(Rating.objects.filter(pk=self.rating.pk).exists())
+        self.assertFalse(FittingStudioSurvey.objects.filter(pk=self.survey.pk).exists())
+        self.assertFalse(FittingStudioSurvey.objects.filter(user_email='erase@test.com').exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=self.uid).exists())
+        # The cold row itself carries no direct identifiers or credentials.
+        cold = ArchivedUser.objects.get(closed_account_id=self.uid)
+        self.assertNotEqual(cold.email, 'erase@test.com')
+        self.assertEqual(cold.password, '')
+
+    def test_orders_survive_but_are_pseudonymized(self):
+        order_id = self.order.pk
+        self.assertEqual(prune_expired_archived_users(), 1)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.pk, order_id)      # record retained
+        self.assertIsNone(self.order.user)             # personal link dropped
+        self.assertEqual(self.order.recipient_name, '')
+        self.assertEqual(self.order.contact_number, '')
+        self.assertEqual(self.order.recipient_email, '')
+        self.assertEqual(self.order.shipping_address, '')
+        self.assertEqual(str(self.order.total_amount), '250.00')  # business data kept
+
+    def test_login_blocked_after_relocation(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
+        client = APIClient()
+        res = client.post('/auth/login/',
+                          {'email': 'erase@test.com', 'password': PASSWORD},
+                          format='json')
+        self.assertEqual(res.status_code, 400)
+
+    def test_second_sweep_is_a_noop(self):
+        self.assertEqual(prune_expired_archived_users(), 1)
+        self.assertEqual(prune_expired_archived_users(), 0)
+        self.assertEqual(ArchivedUser.objects.filter(closed_account_id=self.uid).count(), 1)
+
+
+class SellerDetachTests(TestCase):
+    """A deleted seller must never leave a buyer's cart pointing at a dead item."""
+
+    def test_buyer_cart_items_are_detached_not_deleted(self):
+        seller = _user('seller-erase@test.com', role='seller', store_name='Retention Store')
+        buyer = _user('buyer-keep@test.com')
+        item = _listing(seller)
+        item_id = str(item.pk)
+        buyer_cart = Cart.objects.create(user=buyer)
+        cart_item = CartItem.objects.create(cart=buyer_cart, item=item, quantity=2)
+
+        _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        self.assertEqual(prune_expired_archived_users(), 1)
+
+        self.assertFalse(CatalogItem.objects.filter(pk=item_id).exists())
+        self.assertTrue(Cart.objects.filter(pk=buyer_cart.pk).exists())
+
+        cart_item.refresh_from_db()
+        self.assertIsNone(cart_item.item)
+        self.assertEqual(cart_item.catalog_item_id, item_id)
+        self.assertEqual(cart_item.item_name, 'Blue Jacket')
+        self.assertEqual(cart_item.store_name, 'Retention Store')
+        self.assertTrue(cart_item.seller_account_deleted)
+        self.assertTrue(cart_item.unavailable_reason)
+        self.assertEqual(cart_item.quantity, 2)
+
+        # The buyer's own account is untouched.
+        self.assertTrue(User.objects.filter(pk=buyer.pk).exists())
+
+
+class SweepResilienceTests(TestCase):
+    """One bad row must never stall the whole sweep."""
+
+    def test_failure_on_one_row_is_logged_and_skipped(self):
+        bad = _archive(_user('bad@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        good = _archive(_user('good@test.com'), days_ago=ARCHIVE_GRACE_DAYS + 2)
+        bad_id, good_id = str(bad.pk), str(good.pk)
+
+        original = ArchivedUser.from_user
+
+        def flaky(user):
+            if user.email == 'bad@test.com':
+                raise RuntimeError('simulated cold-copy failure')
+            return original(user)
+
+        with patch.object(ArchivedUser, 'from_user', side_effect=flaky):
+            with self.assertLogs('accounts.archive', level='ERROR') as logs:
+                moved = prune_expired_archived_users()
+
+        self.assertEqual(moved, 1)
+        self.assertTrue(any('Failed to cold-archive' in m for m in logs.output))
+        # Bad row survived untouched; good row completed the whole cascade.
+        self.assertTrue(User.objects.filter(pk=bad_id).exists())
+        self.assertFalse(User.objects.filter(pk=good_id).exists())
+        self.assertTrue(ArchivedUser.objects.filter(closed_account_id=good_id).exists())
+        self.assertFalse(ArchivedUser.objects.filter(closed_account_id=bad_id).exists())
+
+===== backend/ratings\tests.py =====
+"""KAN-101 / FR-7.5 rating endpoint tests â€” STAR-ONLY baseline.
+
+CHANGED (audit fix): the previous suite asserted that vote-only ('like' /
+'dislike') submissions succeed and that summary exposes like/dislike counts.
+The star-only baseline removed the vote dimension (ratings migration 0005),
+so those expectations are replaced by strict star-type / boundary tests,
+source-contract tests, shopper-only RBAC, guest ephemerality, and upsert /
+uniqueness coverage.
+
+REGISTERED SHOPPERS ONLY: guests get 403 + prompt and nothing is cached or
+persisted (FR-1.9); sellers get 403 (ratings are a shopper surface).
+"""
+from django.contrib.sessions.models import Session
+from django.test import TestCase
+from rest_framework.test import APIClient
+
+from accounts.models import User
+from .models import Rating
+
+
+class RatingAPITests(TestCase):
+    """Star-only rating contract (FR-7.5, Scope Criteria 9-11)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        # FIX: role must be a real ROLE_CHOICES member ('shopper'); the old
+        # suite used role='user', which the shopper-only RBAC now rejects.
+        self.user = User.objects.create_user(
+            email='rater@test.com', password='Test123!@#',
+            full_name='Test Rater', role='shopper')
+        self.other = User.objects.create_user(
+            email='other@test.com', password='Test123!@#',
+            full_name='Other User', role='shopper')
+        self.seller = User.objects.create_user(
+            email='seller@test.com', password='Test123!@#',
+            full_name='Seller User', role='seller', store_name='Test Store')
+        self.t = {
+            'target_type': 'item',
+            'target_id': '6ab52dc83c8d812f8b7ee414',
+            'source': 'recommendation_panel',
+        }
+
+    # ---- stars persist ----------------------------------------------------
+    def test_star_persists(self):
+        self.client.force_authenticate(self.user)
+        res = self.client.post('/ratings/', {**self.t, 'score': 5}, format='json')
+        self.assertEqual(res.status_code, 201)
+        self.assertTrue(res.data['persisted'])
+        self.assertEqual(res.data['rating']['score'], 5)
+        self.assertNotIn('vote', res.data['rating'])
+
+    def test_model_has_no_vote_field(self):
+        self.assertNotIn('vote', [f.name for f in Rating._meta.get_fields()])
+
+    # ---- strict integer typing / bounds ----------------------------------
+    def test_score_zero_rejected(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', {**self.t, 'score': 0}, format='json').status_code, 400)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_score_six_rejected(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', {**self.t, 'score': 6}, format='json').status_code, 400)
+
+    def test_numeric_string_rejected_not_coerced(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', {**self.t, 'score': '5'}, format='json').status_code, 400)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_boolean_rejected(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', {**self.t, 'score': True}, format='json').status_code, 400)
+
+    def test_float_rejected(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', {**self.t, 'score': 4.0}, format='json').status_code, 400)
+
+    def test_missing_score_rejected(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(
+            self.client.post('/ratings/', self.t, format='json').status_code, 400)
+
+    # ---- no vote dimension ------------------------------------------------
+    def test_vote_payload_rejected(self):
+        self.client.force_authenticate(self.user)
+        body = {k: v for k, v in self.t.items()}
+        res = self.client.post('/ratings/', {**body, 'vote': 'like'}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_vote_only_payload_rejected(self):
+        self.client.force_authenticate(self.user)
+        res = self.client.post(
+            '/ratings/',
+            {'target_type': 'item', 'target_id': self.t['target_id'],
+             'source': 'recommendation_panel', 'vote': 'dislike'},
+            format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_score_plus_vote_rejected_not_silently_dropped(self):
+        """A valid star score must NOT let a legacy `vote` key through.
+
+        DRF serializers normally ignore unknown input keys; without the
+        serializer-level `to_internal_value` guard this payload would save
+        the star and silently drop the vote, masking client drift.
+        """
+        self.client.force_authenticate(self.user)
+        res = self.client.post(
+            '/ratings/',
+            {**self.t, 'score': 5, 'vote': 'like'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('vote', res.data)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_score_plus_like_or_dislike_keys_rejected(self):
+        """Legacy boolean-style reaction keys are also rejected."""
+        self.client.force_authenticate(self.user)
+        for key in ('like', 'dislike'):
+            res = self.client.post(
+                '/ratings/',
+                {**self.t, 'score': 4, key: True},
+                format='json',
+            )
+            self.assertEqual(res.status_code, 400, f"payload with {key} leaked through")
+            self.assertIn(key, res.data)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    # ---- source contract --------------------------------------------------
+    def test_source_required(self):
+        self.client.force_authenticate(self.user)
+        body = {k: v for k, v in self.t.items() if k != 'source'}
+        self.assertEqual(
+            self.client.post('/ratings/', {**body, 'score': 5}, format='json').status_code, 400)
+
+    def test_undocumented_or_empty_source_rejected(self):
+        self.client.force_authenticate(self.user)
+        for bad in ('fitting_studio_popup', '', 'order-history'):
+            res = self.client.post('/ratings/', {**self.t, 'score': 5, 'source': bad}, format='json')
+            self.assertEqual(res.status_code, 400, bad)
+
+    def test_source_field_allows_multi_surface_ratings(self):
+        self.client.force_authenticate(self.user)
+        res1 = self.client.post('/ratings/', {**self.t, 'score': 5}, format='json')
+        self.assertEqual(res1.status_code, 201)
+        res2 = self.client.post(
+            '/ratings/',
+            {**self.t, 'score': 4, 'target_type': 'fit', 'source': 'fit_visualization'},
+            format='json')
+        self.assertEqual(res2.status_code, 201)
+        self.assertEqual(Rating.objects.filter(user=self.user).count(), 2)
+        self.assertEqual(
+            Rating.objects.get(user=self.user, source='recommendation_panel').score, 5)
+        self.assertEqual(
+            Rating.objects.get(user=self.user, source='fit_visualization').score, 4)
+
+    # ---- upsert / uniqueness ---------------------------------------------
+    def test_upsert_same_user_target_source_keeps_one_row(self):
+        self.client.force_authenticate(self.user)
+        self.client.post('/ratings/', {**self.t, 'score': 4}, format='json')
+        res = self.client.post('/ratings/', {**self.t, 'score': 2}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(Rating.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Rating.objects.get(user=self.user).score, 2)
+
+    def test_unique_together_declared(self):
+        self.assertIn(
+            ('user', 'target_type', 'target_id', 'source'),
+            Rating._meta.unique_together,
+        )
+
+    # ---- summary ----------------------------------------------------------
+    def test_summary_filters_by_source_and_counts_approvals(self):
+        self.client.force_authenticate(self.user)
+        self.client.post('/ratings/', {**self.t, 'score': 5}, format='json')
+        self.client.post(
+            '/ratings/',
+            {**self.t, 'score': 3, 'target_type': 'fit', 'source': 'fit_visualization'},
+            format='json')
+
+        res_all = self.client.get('/ratings/summary/', {
+            'target_type': self.t['target_type'], 'target_id': self.t['target_id']})
+        self.assertEqual(res_all.data['score_count'], 1)
+        self.assertEqual(res_all.data['average'], 5.0)
+        self.assertEqual(res_all.data['approval_count'], 1)
+        self.assertNotIn('like_count', res_all.data)
+        self.assertNotIn('dislike_count', res_all.data)
+
+        res_rec = self.client.get('/ratings/summary/', {
+            'target_type': self.t['target_type'],
+            'target_id': self.t['target_id'],
+            'source': 'recommendation_panel'})
+        self.assertEqual(res_rec.data['score_count'], 1)
+        self.assertEqual(res_rec.data['source'], 'recommendation_panel')
+
+    def test_summary_approval_threshold_is_four(self):
+        self.client.force_authenticate(self.user)
+        self.client.post('/ratings/', {**self.t, 'score': 3}, format='json')
+        res = self.client.get('/ratings/summary/', {
+            'target_type': self.t['target_type'], 'target_id': self.t['target_id']})
+        self.assertEqual(res.data['approval_count'], 0)
+
+    # ---- RBAC / guest ephemerality ---------------------------------------
+    def test_guest_submit_rejected_and_not_persisted(self):
+        """Guest rating attempts are rejected with 403, nothing is persisted
+        to the DB, and the cache is never written to (FR-1.9 ephemeral guests)."""
+        from unittest.mock import patch
+        from django.core.cache import cache
+
+        with patch.object(cache, 'set') as cache_set, \
+             patch.object(cache, 'add') as cache_add:
+            res = self.client.post('/ratings/', {**self.t, 'score': 5}, format='json')
+        
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.data['prompt'], 'signup_login')
+        self.assertFalse(res.data['persisted'])
+        self.assertEqual(Rating.objects.count(), 0)
+        self.assertEqual(Session.objects.count(), 0)
+        self.assertNotIn('session_aggregate', res.data)
+        # Cache-spy: nothing was ever written for a guest
+        cache_set.assert_not_called()
+        cache_add.assert_not_called()
+
+    def test_seller_submit_rejected_and_not_persisted(self):
+        self.client.force_authenticate(self.seller)
+        res = self.client.post('/ratings/', {**self.t, 'score': 5}, format='json')
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(Rating.objects.count(), 0)
+
+    def test_guest_session_clear_still_safe(self):
+        res = self.client.post('/ratings/guest-session/clear/')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.data['cleared'])
+        self.assertEqual(Rating.objects.count(), 0)
+        self.assertEqual(Session.objects.count(), 0)
+
+    # ---- ownership / optionality / rehydration ---------------------------
+    def test_owner_only_update_delete(self):
+        self.client.force_authenticate(self.user)
+        rid = self.client.post('/ratings/', {**self.t, 'score': 3}, format='json').data['rating']['id']
+        self.client.force_authenticate(self.other)
+        self.assertEqual(
+            self.client.patch(f'/ratings/{rid}/', {'score': 1}, format='json').status_code, 404)
+        self.assertEqual(self.client.delete(f'/ratings/{rid}/').status_code, 404)
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.delete(f'/ratings/{rid}/').status_code, 204)
+
+    def test_seller_cannot_delete_any_rating(self):
+        """Shopper-only RBAC closes the create/delete asymmetry.
+
+        The patch guard on `RatingDetailView.delete` ensures a seller can
+        neither create a rating nor remove another user's. The row survives
+        the attempted delete.
+        """
+        self.client.force_authenticate(self.user)
+        rid = self.client.post(
+            '/ratings/', {**self.t, 'score': 3}, format='json').data['rating']['id']
+
+        self.client.force_authenticate(self.seller)
+        self.assertEqual(
+            self.client.delete(f'/ratings/{rid}/').status_code,
+            403,
+            "seller could delete another user's rating",
+        )
+        self.assertTrue(Rating.objects.filter(id=rid).exists())
+
+    def test_mine_returns_only_own_stars(self):
+        Rating.objects.create(user=self.user, target_type='item', target_id='a',
+                              score=4, source='order_history')
+        Rating.objects.create(user=self.other, target_type='item', target_id='b',
+                              score=5, source='order_history')
+        self.client.force_authenticate(self.user)
+        res = self.client.get('/ratings/mine/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['target_id'], 'a')
+
+    def test_rating_never_required_for_core_flow(self):
+        self.assertEqual(self.client.get('/catalog/').status_code, 200)
+        self.assertEqual(Rating.objects.count(), 0)
+
+
+class UATEndpointRBACTests(TestCase):
+    """OBJ-01 / OBJ-05 evidence integrity: UAT survey writes are shopper-only.
+
+    A seller logging a UAT session or response would contaminate the paired
+    pre/post evidence (OBJ-01 / OBJ-06) and the recommendation-approval
+    denominator (OBJ-05). Both endpoints must refuse sellers with 403;
+    shoppers still succeed.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.shopper = User.objects.create_user(
+            email='uat-shopper@test.com', password='Test123!@#',
+            full_name='UAT Shopper', role='shopper',
+        )
+        self.seller = User.objects.create_user(
+            email='uat-seller@test.com', password='Test123!@#',
+            full_name='UAT Seller', role='seller', store_name='UAT Store',
+        )
+        self.session_payload = {
+            'role': 'shopper',
+            'product_id': '6ab52dc83c8d812f8b7ee414',
+        }
+
+    def test_uat_session_shopper_allowed(self):
+        self.client.force_authenticate(self.shopper)
+        res = self.client.post('/ratings/uat/session/', self.session_payload, format='json')
+        self.assertEqual(res.status_code, 201)
+
+    def test_uat_session_seller_rejected(self):
+        self.client.force_authenticate(self.seller)
+        res = self.client.post('/ratings/uat/session/', self.session_payload, format='json')
+        self.assertEqual(res.status_code, 403)
+        from .models import UATSession
+        self.assertEqual(UATSession.objects.count(), 0)
+
+    def test_uat_response_seller_rejected(self):
+        """A seller must not be able to log survey answers into any session."""
+        # Create a session as the shopper first so there's a valid target.
+        self.client.force_authenticate(self.shopper)
+        session = self.client.post(
+            '/ratings/uat/session/', self.session_payload, format='json').data
+
+        # Now try to log a response as the seller.
+        self.client.force_authenticate(self.seller)
+        res = self.client.post(
+            '/ratings/uat/response/',
+            {
+                'session_id': session['session_id'],
+                'product_id': self.session_payload['product_id'],
+                'phase': 'before',
+                'question_key': 'fit_confidence',
+                'value': 3,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, 403)
+        from .models import UATResponse
+        self.assertEqual(UATResponse.objects.count(), 0)
+
+===== backend/accounts\permissions.py =====
+from rest_framework import permissions
+
+class IsSeller(permissions.BasePermission):
+    """
+    Allows access only to authenticated users with the 'seller' role.
+    """
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            getattr(request.user, 'role', None) == 'seller'
+        )
+
