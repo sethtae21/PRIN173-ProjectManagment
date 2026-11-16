@@ -1,0 +1,2755 @@
+openapi: 3.0.3
+info:
+  title: FitFusion AI API
+  version: 1.0.0
+  description: Seller catalog upload and management API
+paths:
+  /api/recommendations/:
+    get:
+      operationId: api_recommendations_retrieve
+      description: |-
+        GET /api/recommendations/ - ranked, explainable recommendations.
+
+        Query params: undertone (warm|cool|neutral), height_cm, body_shape
+        (top-heavy|bottom-heavy|balanced), styles (csv), occasions (csv), limit.
+
+        Response includes, per item: total_score, max_score, the four baselined
+        FR-7.2 rules (fired or not, with reasons) AND the catalog metadata the
+        Fitting Studio renders (id, store, category, size, cm reference, color,
+        price, front image).
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/recommendations/{item_id}/match-reasons/:
+    get:
+      operationId: api_recommendations_match_reasons_retrieve
+      description: |-
+        GET /api/recommendations/<item_id>/match-reasons/ - explain one item.
+
+        Returns the four-rule breakdown plus 'weights' so the UI can show
+        score/maxScore per rule, plus the item metadata for the selected-item
+        header.
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/change-password/:
+    post:
+      operationId: auth_change_password_create
+      description: 'FR-1.3: change password with current-password verification.'
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChange'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PasswordChange'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PasswordChange'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordChange'
+          description: ''
+  /auth/check-registration/:
+    post:
+      operationId: auth_check_registration_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/deactivate/:
+    post:
+      operationId: auth_deactivate_create
+      description: |-
+        FR-1.4 soft-delete: Sets is_active=False; retains records.
+        NOTE: the UI deactivate button has been REMOVED from both the shopper
+        and seller account pages. This endpoint is kept alive so any future
+        support/admin tooling can still deactivate accounts.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /auth/login/:
+    post:
+      operationId: auth_login_create
+      description: API endpoint for user login
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Login'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Login'
+          description: ''
+  /auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: 'Server-side logout: blacklists the refresh token in MongoDB (RA
+        10173).'
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /auth/register/:
+    post:
+      operationId: auth_register_create
+      description: API endpoint for user registration
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Registration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Registration'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+          description: ''
+  /auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Token refresh with MongoDB blacklist check (Option B).
+        Rejects blacklisted/rotated tokens; blacklists the consumed refresh token.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /auth/user/profile/:
+    get:
+      operationId: auth_user_profile_retrieve
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: auth_user_profile_update
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: auth_user_profile_partial_update
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: auth_user_profile_destroy
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /cart/:
+    get:
+      operationId: cart_list
+      description: Return the current user's cart, creating it when necessary.
+      tags:
+      - cart
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cart'
+          description: ''
+  /cart/add_item/:
+    post:
+      operationId: cart_add_item_create
+      description: Add a catalog item, increasing its quantity if already present.
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+  /cart/clear/:
+    post:
+      operationId: cart_clear_create
+      description: Remove every item from the current user's cart.
+      tags:
+      - cart
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+    delete:
+      operationId: cart_clear_destroy
+      description: Remove every item from the current user's cart.
+      tags:
+      - cart
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /cart/remove_item/:
+    post:
+      operationId: cart_remove_item_create
+      description: Remove a catalog item from the current user's cart.
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddToCart'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+    delete:
+      operationId: cart_remove_item_destroy
+      description: Remove a catalog item from the current user's cart.
+      tags:
+      - cart
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /cart/remove_selected/:
+    post:
+      operationId: cart_remove_selected_create
+      description: Remove selected catalog items from the current user's cart.
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveSelectedCartItems'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoveSelectedCartItems'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoveSelectedCartItems'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+  /cart/update_quantity/:
+    put:
+      operationId: cart_update_quantity_update
+      description: Set the quantity for an item already in the current user's cart.
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItem'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+    patch:
+      operationId: cart_update_quantity_partial_update
+      description: Set the quantity for an item already in the current user's cart.
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItem'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+  /catalog/:
+    get:
+      operationId: catalog_list
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItem'
+          description: ''
+    post:
+      operationId: catalog_create
+      tags:
+      - catalog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/{id}/:
+    get:
+      operationId: catalog_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this catalog item.
+        required: true
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+    put:
+      operationId: catalog_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this catalog item.
+        required: true
+      tags:
+      - catalog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+    patch:
+      operationId: catalog_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this catalog item.
+        required: true
+      tags:
+      - catalog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+    delete:
+      operationId: catalog_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this catalog item.
+        required: true
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /catalog/batch-report/:
+    get:
+      operationId: catalog_batch_report_retrieve
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/download-package/:
+    get:
+      operationId: catalog_download_package_retrieve
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/download-template/:
+    get:
+      operationId: catalog_download_template_retrieve
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/my-listings/:
+    get:
+      operationId: catalog_my_listings_retrieve
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/my-listings/{item_id}/:
+    get:
+      operationId: catalog_my_listings_retrieve_2
+      description: GET details, PUT/PATCH update (with optional image replacement),
+        or DELETE a specific catalog item.
+      summary: Manage a specific seller listing
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        description: Item ID
+        required: true
+      tags:
+      - Seller Listings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: catalog_my_listings_update
+      description: GET details, PUT/PATCH update (with optional image replacement),
+        or DELETE a specific catalog item.
+      summary: Manage a specific seller listing
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        description: Item ID
+        required: true
+      tags:
+      - Seller Listings
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItem'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: catalog_my_listings_partial_update
+      description: GET details, PUT/PATCH update (with optional image replacement),
+        or DELETE a specific catalog item.
+      summary: Manage a specific seller listing
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        description: Item ID
+        required: true
+      tags:
+      - Seller Listings
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCatalogItem'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: catalog_my_listings_destroy
+      description: GET details, PUT/PATCH update (with optional image replacement),
+        or DELETE a specific catalog item.
+      summary: Manage a specific seller listing
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        description: Item ID
+        required: true
+      tags:
+      - Seller Listings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /catalog/my_listings/:
+    get:
+      operationId: catalog_my_listings_retrieve_3
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+          description: ''
+  /catalog/upload/:
+    post:
+      operationId: catalog_upload_create
+      summary: Upload catalog items via CSV and images
+      tags:
+      - Catalog Upload
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CSVUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /checkout/:
+    post:
+      operationId: checkout_create
+      description: Create an order only after the mock gateway approves payment.
+      tags:
+      - checkout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '402':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /orders/:
+    get:
+      operationId: orders_list
+      description: |-
+        Read-only order history scoped to the authenticated owner.
+
+        FIX (cancelled order reverted to Processing): the history/details pages
+        could only cancel client-side, so the server row never changed and the
+        next sync overwrote the local "Cancelled" status. A shopper-facing cancel
+        action is now exposed; the DefaultRouter registers it automatically as
+        POST /orders/<pk>/cancel/ (no urls.py change required).
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+          description: ''
+  /orders/{id}/:
+    get:
+      operationId: orders_retrieve
+      description: |-
+        Read-only order history scoped to the authenticated owner.
+
+        FIX (cancelled order reverted to Processing): the history/details pages
+        could only cancel client-side, so the server row never changed and the
+        next sync overwrote the local "Cancelled" status. A shopper-facing cancel
+        action is now exposed; the DefaultRouter registers it automatically as
+        POST /orders/<pk>/cancel/ (no urls.py change required).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /orders/{id}/cancel/:
+    post:
+      operationId: orders_cancel_create
+      description: Cancel a not-yet-shipped order owned by the authenticated shopper.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /outfits/:
+    get:
+      operationId: outfits_list
+      tags:
+      - outfits
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Outfit'
+          description: ''
+    post:
+      operationId: outfits_create
+      tags:
+      - outfits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+          description: ''
+  /outfits/{id}/:
+    get:
+      operationId: outfits_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - outfits
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+          description: ''
+    put:
+      operationId: outfits_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - outfits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+          description: ''
+    patch:
+      operationId: outfits_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - outfits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOutfit'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOutfit'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOutfit'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+          description: ''
+    delete:
+      operationId: outfits_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - outfits
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /presets/:
+    get:
+      operationId: presets_list
+      description: |-
+        CRUD operations for avatar presets.
+        - list:   GET  /api/presets/
+        - create: POST /api/presets/
+        - read:   GET  /api/presets/{id}/
+        - update: PUT/PATCH /api/presets/{id}/
+        - delete: DELETE /api/presets/{id}/
+      tags:
+      - presets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvatarPreset'
+          description: ''
+    post:
+      operationId: presets_create
+      description: |-
+        CRUD operations for avatar presets.
+        - list:   GET  /api/presets/
+        - create: POST /api/presets/
+        - read:   GET  /api/presets/{id}/
+        - update: PUT/PATCH /api/presets/{id}/
+        - delete: DELETE /api/presets/{id}/
+      tags:
+      - presets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarPreset'
+          description: ''
+  /presets/{id}/:
+    get:
+      operationId: presets_retrieve
+      description: |-
+        CRUD operations for avatar presets.
+        - list:   GET  /api/presets/
+        - create: POST /api/presets/
+        - read:   GET  /api/presets/{id}/
+        - update: PUT/PATCH /api/presets/{id}/
+        - delete: DELETE /api/presets/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - presets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarPreset'
+          description: ''
+    put:
+      operationId: presets_update
+      description: |-
+        CRUD operations for avatar presets.
+        - list:   GET  /api/presets/
+        - create: POST /api/presets/
+        - read:   GET  /api/presets/{id}/
+        - update: PUT/PATCH /api/presets/{id}/
+        - delete: DELETE /api/presets/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - presets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AvatarPreset'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarPreset'
+          description: ''
+    patch:
+      operationId: presets_partial_update
+      description: |-
+        CRUD operations for avatar presets.
+        - list:   GET  /api/presets/
+        - create: POST /api/presets/
+        - read:   GET  /api/presets/{id}/
+        - update: PUT/PATCH /api/presets/{id}/
+        - delete: DELETE /api/presets/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - presets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAvatarPreset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAvatarPreset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAvatarPreset'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarPreset'
+          description: ''
+    delete:
+      operationId: presets_destroy
+      description: 'FR-2.10: Ensure users can only delete their own presets.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - presets
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /profile/:
+    get:
+      operationId: profile_retrieve
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: profile_update
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: profile_partial_update
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: profile_destroy
+      description: |-
+        FR-1.2 / FR-1.3: Get and update the authenticated user's profile.
+
+        GET  /api/profile/         → returns full user data (including address fields)
+        PATCH /api/profile/        → updates editable profile fields
+        DELETE /api/profile/       → ARCHIVE (grace window): status='archive',
+                                     is_active=False, archived_at=now. ALL linked
+                                     data is retained so support can restore within
+                                     90 days; the prune sweep (accounts/archive.py)
+                                     relocates the profile to accounts_archiveduser
+                                     after the window closes.
+      tags:
+      - profile
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /profile/fitting-studio-survey/:
+    get:
+      operationId: profile_fitting_studio_survey_retrieve
+      description: |-
+        POST /profile/fitting-studio-survey/
+            Create one flat survey document AND mirror it onto the account.
+            Payload: { "survey": { session_id, pre_confidence, pre_return_intent,
+                                   post_confidence, post_return_intent,
+                                   fit_like_dislike,
+                                   equipped_item_ids: [...],
+                                   avatar_context: {...} } }
+            `user`, `user_email`, `user_type`, `confidence_gain`, `submitted_at`
+            are SERVER-derived so clients cannot forge evidence.
+
+        GET /profile/fitting-studio-survey/
+            List the authenticated account's survey visits (newest first) plus the
+            on-account mirror.
+      tags:
+      - profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: profile_fitting_studio_survey_create
+      description: |-
+        POST /profile/fitting-studio-survey/
+            Create one flat survey document AND mirror it onto the account.
+            Payload: { "survey": { session_id, pre_confidence, pre_return_intent,
+                                   post_confidence, post_return_intent,
+                                   fit_like_dislike,
+                                   equipped_item_ids: [...],
+                                   avatar_context: {...} } }
+            `user`, `user_email`, `user_type`, `confidence_gain`, `submitted_at`
+            are SERVER-derived so clients cannot forge evidence.
+
+        GET /profile/fitting-studio-survey/
+            List the authenticated account's survey visits (newest first) plus the
+            on-account mirror.
+      tags:
+      - profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /ratings/:
+    post:
+      operationId: ratings_create
+      description: |-
+        POST /ratings/ — REGISTERED USERS ONLY. Guests have no rating rights:
+        unauthenticated submissions are refused with 403 + a signup/login prompt
+        payload (FR-7.5). Nothing is cached or persisted for guests (FR-1.9).
+
+        Registered user -> upsert the (user, target, source) row, updating ONLY the
+        dimensions present in the payload (stars never overwrite a like, etc).
+        The row's `user` FK points at the account document in the accounts_user
+        collection, so every popup rating is stored per registered user.
+
+        NOTE: permission_classes stays AllowAny on purpose so we can answer a clean
+        403; DRF's IsAuthenticated would answer 401, which the frontend's token
+        lifecycle interprets as a session reset for guests.
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /ratings/{id}/:
+    patch:
+      operationId: ratings_partial_update
+      description: PATCH / DELETE /ratings/<id>/ — owner-only (everyone else gets
+        404).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: ratings_destroy
+      description: PATCH / DELETE /ratings/<id>/ — owner-only (everyone else gets
+        404).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /ratings/guest-session/clear/:
+    post:
+      operationId: ratings_guest_session_clear_create
+      description: |-
+        POST /ratings/guest-session/clear/ — discards any legacy guest cache
+        aggregates and flushes the guest session (FR-1.9 housekeeping).
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /ratings/mine/:
+    get:
+      operationId: ratings_mine_retrieve
+      description: GET /ratings/mine/ — list own persisted ratings.
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /ratings/summary/:
+    get:
+      operationId: ratings_summary_retrieve
+      description: |-
+        GET /ratings/summary/?target_type=&target_id=[&source=]
+        Public aggregate. Optional `source` filter restricts the counts to one UI
+        surface (e.g. ?source=recommendation_panel for UAT OBJ-05 evidence).
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /ratings/uat/export/:
+    get:
+      operationId: ratings_uat_export_retrieve
+      description: |-
+        GET /ratings/uat/export/ — staff-only CSV download of the charter-aligned
+        UAT KPI workbook (rows built by ratings/uat_kpis.build_uat_workbook_rows).
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /ratings/uat/response/:
+    post:
+      operationId: ratings_uat_response_create
+      description: |-
+        POST /ratings/uat/response/ — save one survey answer.
+
+        FIX (charter-aligned UAT): `value == 0` is a LEGAL answer (the
+        style_discovery Yes/No question encodes "No" as 0); only None/empty is
+        rejected. Fractional payloads (1.5) are refused instead of being silently
+        truncated by int(). Unknown question keys are rejected against the fixed
+        UAT questionnaire (ratings/uat_kpis.KNOWN_QUESTION_KEYS).
+
+        FIX (OBJ-07 tracking): submitting a survey answer no longer flips the
+        session to 'completed'. Sessions stay 'active' so the server-side commerce
+        hook (commerce/views.py -> record_uat_commerce_event) can still record
+        cart_created / checkout_completed; the hook itself completes the session
+        when the mock checkout succeeds.
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /ratings/uat/session/:
+    post:
+      operationId: ratings_uat_session_create
+      description: |-
+        POST /ratings/uat/session/ — start a tester session.
+
+        FIX (OBJ-01 join): persist product_id from the payload. The OBJ-01 KPI
+        joins fit-visualization ratings to sessions by (user, product); without
+        this stamp every session matched nothing and OBJ-01 under-counted.
+      tags:
+      - ratings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    AddToCart:
+      type: object
+      description: Validate a catalog item and quantity for adding to a cart.
+      properties:
+        catalog_item:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+      required:
+      - catalog_item
+    AvatarPreset:
+      type: object
+      description: |-
+        Avatar preset serializer (FR-2.5, FR-2.7, FR-2.8-2.10).
+        - id rendered as ObjectId-safe string
+        - user assigned server-side only (owner-only, RBAC)
+        - cup_size: female-only rule (FR-2.7), but null/blank ACCEPTED and normalized
+        - height/weight ranges enforced per checklist confirmation (120-230cm, 30-200)
+        - ADDED: style_focus (4 options) + body_build_cm (86-112 cm slider)
+      properties:
+        id:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        cup_size:
+          type: string
+          nullable: true
+          maxLength: 5
+        name:
+          type: string
+          maxLength: 100
+        gender:
+          $ref: '#/components/schemas/GenderEnum'
+        height:
+          type: number
+          format: double
+          description: Height in cm (decimal preserved)
+        weight:
+          type: number
+          format: double
+          description: Weight in kg (decimal preserved)
+        skin_tone:
+          type: string
+          maxLength: 32
+        undertone:
+          $ref: '#/components/schemas/UndertoneEnum'
+        shoulder:
+          $ref: '#/components/schemas/ShoulderEnum'
+        waist:
+          $ref: '#/components/schemas/WaistEnum'
+        hip:
+          $ref: '#/components/schemas/HipEnum'
+        thigh:
+          $ref: '#/components/schemas/ThighEnum'
+        style_focus:
+          $ref: '#/components/schemas/StyleFocusEnum'
+        body_build_cm:
+          type: number
+          format: double
+          description: Body build (chest girth) in cm, 86-112 (decimal preserved)
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - gender
+      - height
+      - id
+      - name
+      - updated_at
+      - user
+      - weight
+    CSVUpload:
+      type: object
+      properties:
+        csv_file:
+          type: string
+          format: uri
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+          writeOnly: true
+          maxItems: 20
+      required:
+      - csv_file
+      - images
+    Cart:
+      type: object
+      description: Cart contents with a total based on current catalog prices.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+          readOnly: true
+        total_amount:
+          type: string
+          readOnly: true
+        item_count:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - item_count
+      - items
+      - total_amount
+      - updated_at
+    CartItem:
+      type: object
+      description: |-
+        Current catalog details for a cart entry.
+
+        KAN-FIX: the Side view was permanently removed, so CatalogItem has NO
+        side_image field. The old side_image_url attribute read raised
+        AttributeError on every cart render ("The cart was updated but could not
+        be rendered"). Side image is fully removed; remaining images are read via
+        getattr so a missing column degrades to null instead of crashing.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        catalog_item:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        store_name:
+          type: string
+          readOnly: true
+        price:
+          type: string
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        available:
+          type: string
+          readOnly: true
+        unavailable_reason:
+          type: string
+          readOnly: true
+        seller_account_deleted:
+          type: boolean
+          readOnly: true
+        front_image_url:
+          type: string
+          readOnly: true
+        rear_image_url:
+          type: string
+          readOnly: true
+      required:
+      - available
+      - catalog_item
+      - front_image_url
+      - id
+      - name
+      - price
+      - quantity
+      - rear_image_url
+      - seller_account_deleted
+      - store_name
+      - unavailable_reason
+    CatalogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        seller:
+          type: string
+          readOnly: true
+        batch:
+          type: string
+          readOnly: true
+          nullable: true
+        size_cm:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        size:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          maxLength: 100
+        color_description:
+          type: string
+        color_family:
+          type: string
+          maxLength: 100
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        style_tags: {}
+        occasion_tags:
+          readOnly: true
+        compatible_color_palette_tags: {}
+        store_name:
+          type: string
+          readOnly: true
+        front_image:
+          type: string
+          format: uri
+          nullable: true
+        rear_image:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CatalogItemStatusEnum'
+          readOnly: true
+        rejection_reasons:
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - batch
+      - category
+      - color
+      - color_description
+      - color_family
+      - created_at
+      - description
+      - id
+      - name
+      - occasion_tags
+      - price
+      - rejection_reasons
+      - seller
+      - size
+      - size_cm
+      - status
+      - store_name
+      - updated_at
+    CatalogItemStatusEnum:
+      enum:
+      - active
+      - rejected
+      - processing
+      type: string
+      description: |-
+        * `active` - Active
+        * `rejected` - Rejected
+        * `processing` - Processing
+    CategoryEnum:
+      enum:
+      - tops
+      - bottoms
+      - dresses
+      - outerwear
+      type: string
+      description: |-
+        * `tops` - Tops
+        * `bottoms` - Bottoms
+        * `dresses` - Dresses
+        * `outerwear` - Outerwear
+    Checkout:
+      type: object
+      description: Validate the customer-provided shipping and payment details.
+      properties:
+        recipient_name:
+          type: string
+          maxLength: 255
+        recipient_email:
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        contact_number:
+          type: string
+          maxLength: 32
+        shipping_address:
+          type: string
+        payment_method:
+          type: string
+          maxLength: 32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutItem'
+      required:
+      - payment_method
+      - shipping_address
+    CheckoutItem:
+      type: object
+      description: Validate selected cart product options to snapshot on the order.
+      properties:
+        catalog_item:
+          type: string
+        size:
+          type: string
+          maxLength: 32
+        color:
+          type: string
+          maxLength: 64
+      required:
+      - catalog_item
+    GenderEnum:
+      enum:
+      - male
+      - female
+      type: string
+      description: |-
+        * `male` - Male
+        * `female` - Female
+    HipEnum:
+      enum:
+      - slim
+      - average
+      - wide
+      type: string
+      description: |-
+        * `slim` - Slim
+        * `average` - Average
+        * `wide` - Wide
+    Login:
+      type: object
+      description: Serializer for user login — accepts email (case-insensitive).
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password
+    Order:
+      type: object
+      description: Read-only order representation, including purchase-time item snapshots.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        order_number:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/OrderStatusEnum'
+          readOnly: true
+        recipient_name:
+          type: string
+          readOnly: true
+        recipient_email:
+          type: string
+          format: email
+          readOnly: true
+        contact_number:
+          type: string
+          readOnly: true
+        shipping_address:
+          type: string
+          readOnly: true
+        payment_method:
+          type: string
+          readOnly: true
+        transaction_ref:
+          type: string
+          readOnly: true
+          description: Mock gateway reference
+        shipping_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+      required:
+      - contact_number
+      - created_at
+      - id
+      - items
+      - order_number
+      - payment_method
+      - recipient_email
+      - recipient_name
+      - shipping_address
+      - shipping_fee
+      - status
+      - total_amount
+      - transaction_ref
+    OrderItem:
+      type: object
+      description: Immutable item details captured at purchase time.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        catalog_item:
+          type: string
+          readOnly: true
+          nullable: true
+        item_name:
+          type: string
+          readOnly: true
+        store_name:
+          type: string
+          readOnly: true
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        size:
+          type: string
+          readOnly: true
+        color:
+          type: string
+          readOnly: true
+      required:
+      - catalog_item
+      - color
+      - id
+      - item_name
+      - quantity
+      - size
+      - store_name
+      - unit_price
+    OrderStatusEnum:
+      enum:
+      - pending
+      - paid
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `paid` - Paid
+        * `cancelled` - Cancelled
+    Outfit:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        items:
+          type: array
+          items:
+            type: integer
+        occasion:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+        avatar_preset:
+          type: integer
+          nullable: true
+        avatar_view:
+          type: string
+          maxLength: 8
+        avatar:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - avatar
+      - created_at
+      - id
+      - name
+      - updated_at
+      - user
+    PasswordChange:
+      type: object
+      description: 'FR-1.3: change password with current-password verification.'
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        new_password_confirm:
+          type: string
+          writeOnly: true
+      required:
+      - new_password
+      - new_password_confirm
+      - old_password
+    PatchedAvatarPreset:
+      type: object
+      description: |-
+        Avatar preset serializer (FR-2.5, FR-2.7, FR-2.8-2.10).
+        - id rendered as ObjectId-safe string
+        - user assigned server-side only (owner-only, RBAC)
+        - cup_size: female-only rule (FR-2.7), but null/blank ACCEPTED and normalized
+        - height/weight ranges enforced per checklist confirmation (120-230cm, 30-200)
+        - ADDED: style_focus (4 options) + body_build_cm (86-112 cm slider)
+      properties:
+        id:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        cup_size:
+          type: string
+          nullable: true
+          maxLength: 5
+        name:
+          type: string
+          maxLength: 100
+        gender:
+          $ref: '#/components/schemas/GenderEnum'
+        height:
+          type: number
+          format: double
+          description: Height in cm (decimal preserved)
+        weight:
+          type: number
+          format: double
+          description: Weight in kg (decimal preserved)
+        skin_tone:
+          type: string
+          maxLength: 32
+        undertone:
+          $ref: '#/components/schemas/UndertoneEnum'
+        shoulder:
+          $ref: '#/components/schemas/ShoulderEnum'
+        waist:
+          $ref: '#/components/schemas/WaistEnum'
+        hip:
+          $ref: '#/components/schemas/HipEnum'
+        thigh:
+          $ref: '#/components/schemas/ThighEnum'
+        style_focus:
+          $ref: '#/components/schemas/StyleFocusEnum'
+        body_build_cm:
+          type: number
+          format: double
+          description: Body build (chest girth) in cm, 86-112 (decimal preserved)
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedCatalogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        seller:
+          type: string
+          readOnly: true
+        batch:
+          type: string
+          readOnly: true
+          nullable: true
+        size_cm:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        size:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          maxLength: 100
+        color_description:
+          type: string
+        color_family:
+          type: string
+          maxLength: 100
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        style_tags: {}
+        occasion_tags:
+          readOnly: true
+        compatible_color_palette_tags: {}
+        store_name:
+          type: string
+          readOnly: true
+        front_image:
+          type: string
+          format: uri
+          nullable: true
+        rear_image:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CatalogItemStatusEnum'
+          readOnly: true
+        rejection_reasons:
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedOutfit:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        items:
+          type: array
+          items:
+            type: integer
+        occasion:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+        avatar_preset:
+          type: integer
+          nullable: true
+        avatar_view:
+          type: string
+          maxLength: 8
+        avatar:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedUpdateCartItem:
+      type: object
+      description: Validate the item and replacement quantity for a cart entry.
+      properties:
+        catalog_item:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+    PatchedUser:
+      type: object
+      description: |-
+        Serializer for reading/updating the authenticated user's profile.
+
+        NOTE (avatar refactor): skin_tone / height / weight / body_proportions are
+        NO LONGER exposed here. Body & skin data live exclusively on the avatar
+        preset (outfits.AvatarPreset, served by /presets/). Any client still
+        sending them in a PATCH /profile/ payload will have them silently ignored
+        by DRF, so old frontend builds degrade gracefully.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          maxLength: 255
+        role:
+          allOf:
+          - $ref: '#/components/schemas/UserRoleEnum'
+          readOnly: true
+        store_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/UserStatusEnum'
+          readOnly: true
+        mobile:
+          type: string
+          nullable: true
+          maxLength: 20
+        street:
+          type: string
+          nullable: true
+          maxLength: 255
+        barangay:
+          type: string
+          nullable: true
+          maxLength: 255
+        city:
+          type: string
+          nullable: true
+          maxLength: 255
+        province:
+          type: string
+          nullable: true
+          maxLength: 255
+        postal_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        is_active:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+    Registration:
+      type: object
+      description: Serializer for user registration (shopper or seller).
+      properties:
+        id:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          maxLength: 255
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password_confirm:
+          type: string
+          writeOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RegistrationRoleEnum'
+          default: shopper
+        store_name:
+          type: string
+        mobile:
+          type: string
+        street:
+          type: string
+        barangay:
+          type: string
+        city:
+          type: string
+        province:
+          type: string
+        postal_code:
+          type: string
+      required:
+      - email
+      - full_name
+      - id
+      - mobile
+      - password
+      - password_confirm
+    RegistrationRoleEnum:
+      enum:
+      - shopper
+      - seller
+      type: string
+      description: |-
+        * `shopper` - shopper
+        * `seller` - seller
+    RemoveSelectedCartItems:
+      type: object
+      description: Validate catalog item identifiers selected for removal.
+      properties:
+        catalog_items:
+          type: array
+          items:
+            type: string
+      required:
+      - catalog_items
+    ShoulderEnum:
+      enum:
+      - narrow
+      - average
+      - broad
+      type: string
+      description: |-
+        * `narrow` - Narrow
+        * `average` - Average
+        * `broad` - Broad
+    StyleFocusEnum:
+      enum:
+      - casual
+      - formal
+      - sporty
+      - glamorous
+      type: string
+      description: |-
+        * `casual` - Casual
+        * `formal` - Formal
+        * `sporty` - Sporty
+        * `glamorous` - Glamorous
+    ThighEnum:
+      enum:
+      - slim
+      - average
+      - thick
+      type: string
+      description: |-
+        * `slim` - Slim
+        * `average` - Average
+        * `thick` - Thick
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    UndertoneEnum:
+      enum:
+      - warm
+      - cool
+      - neutral
+      type: string
+      description: |-
+        * `warm` - Warm
+        * `cool` - Cool
+        * `neutral` - Neutral
+    UpdateCartItem:
+      type: object
+      description: Validate the item and replacement quantity for a cart entry.
+      properties:
+        catalog_item:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+      required:
+      - catalog_item
+    User:
+      type: object
+      description: |-
+        Serializer for reading/updating the authenticated user's profile.
+
+        NOTE (avatar refactor): skin_tone / height / weight / body_proportions are
+        NO LONGER exposed here. Body & skin data live exclusively on the avatar
+        preset (outfits.AvatarPreset, served by /presets/). Any client still
+        sending them in a PATCH /profile/ payload will have them silently ignored
+        by DRF, so old frontend builds degrade gracefully.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          maxLength: 255
+        role:
+          allOf:
+          - $ref: '#/components/schemas/UserRoleEnum'
+          readOnly: true
+        store_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/UserStatusEnum'
+          readOnly: true
+        mobile:
+          type: string
+          nullable: true
+          maxLength: 20
+        street:
+          type: string
+          nullable: true
+          maxLength: 255
+        barangay:
+          type: string
+          nullable: true
+          maxLength: 255
+        city:
+          type: string
+          nullable: true
+          maxLength: 255
+        province:
+          type: string
+          nullable: true
+          maxLength: 255
+        postal_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        is_active:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_joined
+      - email
+      - full_name
+      - id
+      - is_active
+      - role
+      - status
+    UserRoleEnum:
+      enum:
+      - shopper
+      - seller
+      type: string
+      description: |-
+        * `shopper` - Shopper
+        * `seller` - Seller
+    UserStatusEnum:
+      enum:
+      - active
+      - archive
+      type: string
+      description: |-
+        * `active` - Active
+        * `archive` - Archive
+    WaistEnum:
+      enum:
+      - slim
+      - average
+      - curvy
+      type: string
+      description: |-
+        * `slim` - Slim
+        * `average` - Average
+        * `curvy` - Curvy
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

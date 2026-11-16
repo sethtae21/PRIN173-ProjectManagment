@@ -1,0 +1,133 @@
+# Blocked OpenAPI artifact
+
+- Command: `python manage.py spectacular --file ..\docs\evidence\KAN-41\api-schema.yml`
+- UTC: `2026-11-16T01:32:18.440Z`
+- Commit: `389a0deccfb3677fa2b374098dfbdaa746e72885`
+- Result: exit code 0, but the generator summary reports 25 warnings and 63 errors; operations are omitted.
+- Generated artifact: `docs/evidence/KAN-41/api-schema.yml`
+- Full command output: `docs/evidence/KAN-41/spectacular.log`
+
+## Complete captured diagnostics
+
+```text
+python : C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\recommendations\views.py:160: Error 
+[RecommendationListView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using 
+GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class 
+(or method). Ignoring view for now.
+At line:2 char:562
++ ... oding UTF8; python manage.py spectacular --file ..\docs\evidence\KAN- ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\seth\D...g view for now.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\recommendations\views.py:196: Error [MatchReasonsView]: 
+unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view 
+base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring 
+view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\auth_views.py:69: Error 
+[RegistrationContactCheckView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider 
+using GenericAPIView as view base class, if view is under your control. Either way you may want to add a 
+serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\auth_views.py:250: Error 
+[DeactivateAccountView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using 
+GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class 
+(or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\auth_views.py:215: Error [LogoutView]: unable 
+to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base 
+class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for 
+now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_catalog_item". Consider using a 
+type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_name". Consider using a type hint 
+or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_store_name". Consider using a type 
+hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_price". Consider using a type hint 
+or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_available". Consider using a type 
+hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_unavailable_reason". Consider 
+using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_front_image_url". Consider using a 
+type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > 
+CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_rear_image_url". Consider using a 
+type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:101: Warning [CartViewSet > 
+CartSerializer]: unable to resolve type hint for function "get_total_amount". Consider using a type hint or 
+@extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:101: Warning [CartViewSet > 
+CartSerializer]: unable to resolve type hint for function "get_item_count". Consider using a type hint or 
+@extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\serializers.py:8: Warning [CatalogViewSet > 
+CatalogItemSerializer]: unable to resolve type hint for function "get_size_cm". Consider using a type hint or 
+@extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\views.py:367: Warning [OrderViewSet]: could not 
+derive type of path parameter "id" because it is untyped and obtaining queryset from the viewset failed. Consider 
+adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to "string".
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\outfits\serializers.py:149: Warning [OutfitViewSet > 
+OutfitSerializer]: unable to resolve type hint for function "get_avatar". Consider using a type hint or 
+@extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\outfits\views.py:15: Warning [OutfitViewSet]: could not 
+derive type of path parameter "id" because it is untyped and obtaining queryset from the viewset failed. Consider 
+adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to "string".
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\preset_views.py:15: Warning 
+[AvatarPresetViewSet]: could not derive type of path parameter "id" because it is untyped and obtaining queryset from 
+the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with 
+@extend_schema. Defaulting to "string".
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\core.py:160: Error [FittingStudioSurveyView]: 
+unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view 
+base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring 
+view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:54: Error [RatingSubmitView]: unable to 
+guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, 
+if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:214: Error [RatingDetailView]: unable to 
+guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, 
+if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:187: Error [GuestSessionClearView]: unable 
+to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base 
+class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for 
+now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:205: Error [MyRatingsView]: unable to guess 
+serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view 
+is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:117: Error [RatingSummaryView]: unable to 
+guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, 
+if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:353: Error [UATExportCSVView]: unable to 
+guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, 
+if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:270: Error [UATResponseSubmitView]: unable 
+to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base 
+class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for 
+now.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\ratings\views.py:243: Error [UATSessionCreateView]: unable to 
+guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, 
+if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+Warning: operationId "catalog_my_listings_retrieve" has collisions [('/catalog/my-listings/', 'get'), 
+('/catalog/my-listings/{item_id}/', 'get'), ('/catalog/my_listings/', 'get')]. resolving with numeral suffixes.
+
+Schema generation summary:
+Warnings: 25 (16 unique)
+Errors:   63 (14 unique)
+
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+```
