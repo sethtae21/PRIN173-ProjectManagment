@@ -132,6 +132,39 @@ function ProductDetailsPage({ isGuest = false }) {
   const [userRating, setUserRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
 
+  // REQUIREMENT-4 FIX (persistence / rehydration): show the caller's ALREADY-SAVED
+  // star for THIS product on load. /ratings/mine/ is the server truth for
+  // rehydration (see MyRatingsView docstring in ratings/views.py).
+  // Guests and token-less visitors stay at 0 and keep the signup prompt;
+  // this effect only READS — it never writes a rating or touches the cache.
+  useEffect(() => {
+    let active = true;
+
+    if (guestMode || !getAccessToken()) {
+      setUserRating(0);
+      return () => { active = false; };
+    }
+
+    async function loadMyRating() {
+      try {
+        const mine = await ratingsApi.mine();
+        if (!active) return;
+        const row = (Array.isArray(mine) ? mine : []).find(
+          (entry) =>
+            entry?.target_type === "item" &&
+            entry?.source === RATING_SOURCES.PRODUCT_PAGE &&
+            String(entry?.target_id) === String(productId)
+        );
+        setUserRating(Number(row?.score) || 0);
+      } catch (error) {
+        console.warn("Unable to load your saved product rating:", error?.message || error);
+      }
+    }
+
+    loadMyRating();
+    return () => { active = false; };
+  }, [guestMode, productId]);
+
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
