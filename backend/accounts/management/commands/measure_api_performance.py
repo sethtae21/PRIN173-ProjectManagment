@@ -65,7 +65,6 @@ class Command(BaseCommand):
                 color_family='red',
                 price=Decimal('19.99'),
                 style_tags=['casual'],
-                occasion_tags=['everyday'],
                 seller=user,
                 store_name='API Performance Fixture Store',
                 status='active',
@@ -80,7 +79,7 @@ class Command(BaseCommand):
             }))
             measure('recommendations', lambda: client.get('/api/recommendations/', {
                 'undertone': 'warm', 'height_cm': '170', 'body_shape': 'balanced',
-                'styles': 'casual', 'occasions': 'everyday', 'limit': '10',
+                'styles': 'casual', 'limit': '10',
             }))
             measure('cart_read', lambda: client.get('/cart/'))
             measure('cart_add', lambda: client.post('/cart/add_item/', {

@@ -26,10 +26,8 @@ const MAX_PRODUCTS = 10;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-// KAN-FIX: occasion_tags removed from the upload pipeline entirely (template,
-// guidelines, validation). The approved style_tags vocabulary is now EXACTLY
-// the four shopper Style-Focus options (casual, smart, formal, sporty), which
-// is also the vocabulary the backend CSV validator enforces.
+// The approved style_tags vocabulary is exactly the four shopper Style-Focus
+// options (casual, smart, formal, sporty), matching backend CSV validation.
 const TAG_OPTIONS = {
   style_tags: ["casual", "smart", "formal", "sporty"],
 };

@@ -54,13 +54,12 @@
 // /api/recommendations/ and /api/recommendations/<id>/match-reasons/.
 // Traceability: SRS FR-7.2, FR-7.3, FR-7.4 | Scope WBS 1.3.5 | OBJ-05.
 //
-// FIX (style_occasion always 0 / max 6/7) + KAN-FIX (occasion_tags removal):
+// FIX (style rule always 0 / max 6/7):
 // the scorer's style rule fires ONLY when the avatar profile's STYLE tag set
 // overlaps the item's style tag set (recommendations/scoring.py _rule_style;
-// occasion tags were removed from the whole pipeline — CSV, template,
-// validation, scoring). The backend query serializer accepts a `styles` CSV
-// param, but this client never sent it, so the avatar tag set was ALWAYS empty
-// and the rule could never fire (ceiling 6/7). The shopper's "dressing for"
+// the backend query serializer accepts a `styles` CSV param, but this client
+// never sent it, so the avatar tag set was ALWAYS empty and the rule could
+// never fire (ceiling 6/7). The shopper's "dressing for"
 // context is now a first-class avatar field (styleFocus) mapped 1:1 to the
 // APPROVED seller style vocabulary — exactly the four CSV-allowed tags
 // (casual, smart, formal, sporty) — and is sent on every recommendation +
@@ -682,8 +681,7 @@ const DEFAULT_WEIGHTS = {
 };
 
 // ----------------------------------------------------------------------------
-// STYLE FOCUS — FIX (style_occasion always 0, ceiling 6/7) + KAN-FIX
-// (occasion_tags removal + 4-tag vocabulary):
+// STYLE FOCUS — FIX (style_occasion always 0, ceiling 6/7):
 // The scorer's style rule fires ONLY on overlap between the avatar's style tag
 // set and the item's style tag set. The backend query serializer accepts a
 // `styles` CSV param, but this client never sent it, so the avatar set was
@@ -691,17 +689,15 @@ const DEFAULT_WEIGHTS = {
 // KAN-FIX: the approved seller style vocabulary is now EXACTLY the four
 // Style-Focus options (the same list the CSV validator enforces):
 // casual / smart / formal / sporty. Each Style-Focus button maps 1:1 to its
-// lowercase tag, and the `occasions` param is GONE (occasion tags were removed
-// from the CSV template, the upload validation and the scoring rule).
-// No weights / knowledge tables changed -> KAN-103 freeze untouched.
+// lowercase tag. No weights / knowledge tables changed -> KAN-103 freeze untouched.
 // ----------------------------------------------------------------------------
 export const STYLE_FOCUS_OPTIONS = ['Casual', 'Smart', 'Formal', 'Sporty'];
 
 export const STYLE_FOCUS_TAGS = {
-  Casual: { styles: ['casual'], occasions: [] },
-  Smart: { styles: ['smart'], occasions: [] },
-  Formal: { styles: ['formal'], occasions: [] },
-  Sporty: { styles: ['sporty'], occasions: [] },
+  Casual: { styles: ['casual'] },
+  Smart: { styles: ['smart'] },
+  Formal: { styles: ['formal'] },
+  Sporty: { styles: ['sporty'] },
 };
 
 export function styleFocusTags(focus) {
@@ -733,8 +729,6 @@ export function avatarQueryParams(avatar) {
     ),
     body_shape: bodyShapeForAvatar(avatar),
     // FIX: supply the shopper's style context so the style rule can fire.
-    // KAN-FIX: occasions param removed — the pipeline no longer has occasion
-    // tags; the rule overlaps style tags only.
     styles: focus.styles.join(','),
   };
 }

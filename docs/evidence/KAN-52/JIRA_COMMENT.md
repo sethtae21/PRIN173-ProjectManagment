@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: not stated in ticket
-- Method: `python manage.py test accounts -v 2` (PYTHONIOENCODING=utf-8 set).
-- Result: BLOCKED - accounts: 20 tests; 15 passed; 6 failures; 0 errors; see captured failure output.
-- Tests proving this ticket: `No registration/JWT assignment test found in backend/accounts/tests.py`; `accounts.tests.AccountManagementTests.test_password_change_success_and_login (FAIL)`
-- Artifact: `docs/evidence/_runs/20261116T012828Z-accounts.log; docs/evidence/KAN-52/DEFECT_KAN-52.md`
-- Commit: `389a0de`  Verified: `2026-11-16`
-- Limitations: No registration or role-assignment test was present; login after password change returned 404.
+- Method: `python manage.py test accounts -v 2`
+- Result: PASS - 1 ticket test passed / 0 failed; 0 skipped across accounts.
+- Tests proving this ticket: `accounts.tests.RegistrationAndJWTTests.test_registration_assigns_role_and_issues_user_bound_jwt`
+- Artifact: docs/evidence/_runs/20261117T101912Z-accounts.log
+- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
+- Limitations: Added registration coverage for shopper/seller assignment, user-bound tokens, and login; the audit middleware logs a request-body-read warning during login tests.

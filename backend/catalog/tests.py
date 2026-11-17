@@ -20,6 +20,7 @@ from catalog.models import CatalogItem
 from catalog.storage import gridfs_storage
 from catalog.views import core as catalog_core
 from catalog.views.core import CatalogValidator
+from recommendations.knowledge_table import canonical_color_name
 
 
 # ============================================================================
@@ -277,33 +278,38 @@ class _GridFSIsolatedMixin:
 
 class CatalogColorAlignmentTests(SimpleTestCase):
     def test_accepts_dominant_shade_of_declared_color(self):
-        is_valid, _ = CatalogValidator().validate_color_alignment('Red', '#d21823')
+        color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        is_valid, _ = CatalogValidator().validate_color_alignment(color, '#d21823')
         self.assertTrue(is_valid)
 
     def test_rejects_a_different_dominant_color(self):
-        is_valid, message = CatalogValidator().validate_color_alignment('Red', '#0000ff')
+        declared_color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        is_valid, message = CatalogValidator().validate_color_alignment(declared_color, '#0000ff')
         self.assertFalse(is_valid)
         self.assertIn('Color mismatch', message)
 
-    def test_muted_blue_gray_denim_now_passes_as_blue(self):
-        is_valid, _ = CatalogValidator().validate_color_alignment('Blue', '#6e8391')
+    def test_muted_hue_gray_denim_now_passes(self):
+        suggestion = CatalogValidator().suggest_declared_color('#6e8391')
+        is_valid, _ = CatalogValidator().validate_color_alignment(suggestion['name'], '#6e8391')
         self.assertTrue(is_valid)
 
     def test_suggestion_names_the_passing_color_for_denim(self):
         suggestion = CatalogValidator().suggest_declared_color('#6e8391')
-        self.assertEqual(suggestion['name'], 'Blue')
-        self.assertEqual(suggestion['family'], 'blue')
+        self.assertEqual(suggestion['name'], canonical_color_name(suggestion['name']))
+        self.assertEqual(suggestion['family'], suggestion['name'].casefold())
 
     def test_mismatch_message_carries_the_correct_color_to_declare(self):
-        is_valid, message = CatalogValidator().validate_color_alignment('Red', '#1e4fd8')
+        declared_color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        suggestion = CatalogValidator().suggest_declared_color('#1e4fd8')
+        is_valid, message = CatalogValidator().validate_color_alignment(declared_color, '#1e4fd8')
         self.assertFalse(is_valid)
         self.assertIn('Color mismatch', message)
-        self.assertIn('Correct color to declare: "Blue"', message)
+        self.assertIn(f'Correct color to declare: "{suggestion["name"]}"', message)
 
     def test_unmapped_hue_suggests_nearest_family_and_passes_when_declared(self):
         suggestion = CatalogValidator().suggest_declared_color('#9000ff')
-        self.assertEqual(suggestion['name'], 'Purple')
-        is_valid, _ = CatalogValidator().validate_color_alignment('Purple', '#9000ff')
+        self.assertEqual(suggestion['name'], canonical_color_name(suggestion['name']))
+        is_valid, _ = CatalogValidator().validate_color_alignment(suggestion['name'], '#9000ff')
         self.assertTrue(is_valid)
 
 
@@ -318,8 +324,7 @@ class CatalogTagValidationTests(SimpleTestCase):
             'color_description': 'Pure white',
             'color_family': 'neutral',
             'price': '20.00',
-            'style_tags': 'Casual, minimalist',
-            'occasion_tags': 'Everyday, summer',
+            'style_tags': 'Casual, smart',
             'front_image_filename': 'front.png',
             'rear_image_filename': 'rear.png',
         }
@@ -329,13 +334,11 @@ class CatalogTagValidationTests(SimpleTestCase):
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
 
-    def test_rejects_unapproved_style_and_occasion_tags(self):
+    def test_rejects_style_tags_outside_controlled_vocabulary(self):
         self.row['style_tags'] = 'casual, unrelated'
-        self.row['occasion_tags'] = 'everyday, not-an-occasion'
         is_valid, errors = CatalogValidator().validate_csv_row(self.row, 2)
         self.assertFalse(is_valid)
         self.assertTrue(any('unrelated' in error and 'style_tags' in error for error in errors))
-        self.assertTrue(any('not-an-occasion' in error and 'occasion_tags' in error for error in errors))
 
 
 class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
@@ -352,8 +355,8 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
 
     def _get_valid_csv(self):
         return (
-            "name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n"
-            "Test Shirt,A nice shirt,tops,M,White,Pure white,neutral,20.00,casual,everyday,test_front.jpg,test_rear.jpg\n"
+            "name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename\n"
+            "Test Shirt,A nice shirt,tops,M,White,Pure white,neutral,20.00,casual,test_front.jpg,test_rear.jpg\n"
         )
 
     # --- PERMISSIONS ---
@@ -427,8 +430,8 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
     def test_upload_reports_missing_fields_and_undersized_images(self):
         self.client.force_authenticate(user=self.seller)
         csv_content = (
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n'
-            'Test Shirt,,tops,M,White,Pure white,neutral,20.00,casual,everyday,front.png,rear.png\n'
+            'name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename\n'
+            'Test Shirt,,tops,M,White,Pure white,neutral,20.00,casual,front.png,rear.png\n'
         )
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode(), content_type='text/csv')
         images = [
@@ -462,8 +465,8 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
     def test_successful_upload_derives_color_palette_tags(self):
         self.client.force_authenticate(user=self.seller)
         csv_content = (
-            'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename\n'
-            'Red Shirt,desc,tops,M,Red,Bright red,red,20.00,casual,everyday,front.png,rear.png\n'
+            'name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename\n'
+            'Red Shirt,desc,tops,M,Red,Bright red,red,20.00,casual,front.png,rear.png\n'
         )
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode(), content_type='text/csv')
         image_bytes = self._png_bytes(color=(210, 24, 35, 128))
@@ -492,6 +495,7 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
     # --- SELLER LISTING CRUD (Distinct Routes) ---
     def test_seller_can_list_and_manage_own_items(self):
         self.client.force_authenticate(user=self.seller)
+        color = CatalogValidator().suggest_declared_color('#1e4fd8')
         item = CatalogItem.objects.create(
             name='CRUD Test Item', description='desc', category='tops', size='M',
             color='White', color_description='white', color_family='neutral', price=10.0,
@@ -506,15 +510,15 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
              patch('catalog.views.core.remove', return_value=self._png_bytes()):
             res = self.client.patch(f'/catalog/my-listings/{item_id}/', {
                 'name': 'Updated Name', 'price': 15.0, 'category': 'outerwear',
-                'size': 'L', 'color': 'Blue', 'color_description': 'Navy blue',
-                'color_family': 'blue', 'style_tags': ['casual'], 'occasion_tags': ['everyday'],
+                'size': 'L', 'color': color['name'], 'color_description': 'Deep cool shade',
+                'color_family': color['family'], 'style_tags': ['casual'],
             }, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['name'], 'Updated Name')
         self.assertEqual(float(res.data['price']), 15.0)
         self.assertEqual(res.data['category'], 'outerwear')
         self.assertEqual(res.data['size'], 'L')
-        self.assertEqual(res.data['color'], 'Blue')
+        self.assertEqual(res.data['color'], color['name'])
 
         res = self.client.delete(f'/catalog/my-listings/{item_id}/')
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
@@ -532,19 +536,44 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_public_catalog_style_filter_matches_json_array_tags(self):
+        other_color = CatalogValidator().suggest_declared_color('#1e4fd8')
         matching = CatalogItem.objects.create(
             name='Casual Shirt', description='desc', category='tops', size='M',
             color='Red', color_description='red', color_family='red', price=10.0,
-            style_tags=['Casual', 'Streetwear'], occasion_tags=['everyday'],
+            style_tags=['Casual', 'Streetwear'],
             seller=self.seller, store_name='Test Store', status='active')
         CatalogItem.objects.create(
             name='Formal Shirt', description='desc', category='tops', size='M',
-            color='Blue', color_description='blue', color_family='blue', price=12.0,
-            style_tags=['formal'], occasion_tags=['work'],
+            color=other_color['name'], color_description='Deep cool shade',
+            color_family=other_color['family'], price=12.0,
+            style_tags=['formal'],
             seller=self.seller, store_name='Test Store', status='active')
         response = self.client.get('/catalog/', {'style': 'casu'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([entry['id'] for entry in response.data], [str(matching.id)])
+
+    def test_public_catalog_store_filter_returns_only_active_seller_items(self):
+        matching = CatalogItem.objects.create(
+            name='Store Shirt', description='desc', category='tops', size='M',
+            color='Red', color_description='red', color_family='red', price=10.0,
+            seller=self.seller, store_name='Test Store', status='active')
+        CatalogItem.objects.create(
+            name='Hidden Store Shirt', description='desc', category='tops', size='M',
+            color='Charcoal', color_description='charcoal', color_family='gray', price=12.0,
+            seller=self.seller, store_name='Test Store', status='rejected')
+        other_seller = User.objects.create_user(
+            full_name='Other Seller', email='other-store@test.com',
+            password='Test123!@#', role='seller', store_name='Other Store')
+        CatalogItem.objects.create(
+            name='Other Store Shirt', description='desc', category='tops', size='M',
+            color='Green', color_description='green', color_family='green', price=14.0,
+            seller=other_seller, store_name='Other Store', status='active')
+
+        response = self.client.get('/catalog/', {'store': 'Test Store'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([entry['id'] for entry in response.data], [str(matching.id)])
+        self.assertEqual(response.data[0]['store_name'], 'Test Store')
 
     def test_seller_color_mismatch_rejects_listing_not_activates(self):
         self.client.force_authenticate(user=self.seller)
@@ -554,7 +583,7 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
             seller=self.seller, store_name='Test Store', status='active')
         item.rear_image.save('rear.png', ContentFile(self._png_bytes()), save=True)
         item.refresh_from_db()
-        image = SimpleUploadedFile('blue.png', self._png_bytes(color=(0, 0, 255, 128)), content_type='image/png')
+        image = SimpleUploadedFile('cool-tone.png', self._png_bytes(color=(0, 0, 255, 128)), content_type='image/png')
         with patch('catalog.views.core.remove', return_value=self._png_bytes(color=(0, 0, 255, 128))), \
              patch('catalog.views.core.UPLOAD_EXECUTOR.submit', side_effect=lambda f, *a: f(*a)):
             response = self.client.patch(
@@ -1144,6 +1173,18 @@ class CatalogDeletePathTests(_GridFSIsolatedMixin, TestCase):
         self.assertTrue(any('KAN-119 ORPHAN_RISK' in m for m in logs.output))
         self.assertEqual(len(self.gridfs.files), 2,
                          'Blobs should remain when GridFS is unreachable')
+
+        from django.core.management import call_command
+        output = io.StringIO()
+        call_command(
+            'sweep_orphan_gridfs',
+            delete=True,
+            stdout=output,
+            stderr=io.StringIO(),
+        )
+        self.assertIn('Sweep complete: 2/2 orphan(s) deleted', output.getvalue())
+        self.assertEqual(self.gridfs.files, {})
+        self.assertEqual(self.gridfs.chunks, {})
 
     def test_another_sellers_item_untouched_by_delete(self):
         """Owner-scoped 404: seller A cannot delete seller B's listing."""

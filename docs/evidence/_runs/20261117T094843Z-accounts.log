@@ -1,0 +1,199 @@
+Creating test database for alias 'default' ('test_fitfusion')...
+Found 67 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying accounts.0008_replace_fit_vote_with_score... OK
+  Applying accounts.0009_fit_rating_and_validators... OK
+  Applying accounts.0010_remove_survey_user_type... OK
+  Applying accounts.0011_unique_fitting_survey_session... OK
+  Applying accounts.0012_pseudonymize_archiveduser... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying catalog.0005_alter_catalogitem_category... OK
+  Applying catalog.0006_remove_catalogitem_occasion_tags... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying ratings.0005_star_only_ratings... OK
+  Applying sessions.0001_initial...test_delete_account_archives_and_blocks_login (accounts.tests.AccountManagementTests.test_delete_account_archives_and_blocks_login)
+FR-1.4 BASELINED grace window (replaces the old hard-delete test). ...  OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] DELETE /profile/ -> token owner=acct@test.com role=shopper id=6afc230bed9a5331d3b11cfa | HTTP 204
+[IDENTITY] LOGIN /auth/login/ -> HTTP 400 submitted=acct@test.com issued=<no token>
+ok
+test_guest_cannot_view_profile (accounts.tests.AccountManagementTests.test_guest_cannot_view_profile) ... ok
+test_password_change_success_and_login (accounts.tests.AccountManagementTests.test_password_change_success_and_login) ... [IDENTITY] POST /auth/change-password/ -> token owner=acct@test.com role=shopper id=6afc2311ed9a5331d3b11d26 | HTTP 200
+[IDENTITY] LOGIN /auth/login/ -> HTTP 200 submitted=acct@test.com issued=acct@test.com
+ok
+test_password_change_wrong_current_rejected (accounts.tests.AccountManagementTests.test_password_change_wrong_current_rejected) ... [IDENTITY] POST /auth/change-password/ -> token owner=acct@test.com role=shopper id=6afc2315ed9a5331d3b11d3a | HTTP 400
+ok
+test_profile_payload_excludes_body_fields (accounts.tests.AccountManagementTests.test_profile_payload_excludes_body_fields)
+Avatar refactor regression: body/skin data must NOT leak from /profile/. ... [IDENTITY] GET /profile/ -> token owner=acct@test.com role=shopper id=6afc2319ed9a5331d3b11d4e | HTTP 200
+ok
+test_update_profile (accounts.tests.AccountManagementTests.test_update_profile) ... [IDENTITY] PATCH /profile/ -> token owner=acct@test.com role=shopper id=6afc231bed9a5331d3b11d62 | HTTP 200
+ok
+test_update_profile_ignores_legacy_body_fields (accounts.tests.AccountManagementTests.test_update_profile_ignores_legacy_body_fields)
+Legacy clients sending body fields get them silently ignored (no crash). ... [IDENTITY] PATCH /profile/ -> token owner=acct@test.com role=shopper id=6afc231eed9a5331d3b11d76 | HTTP 200
+ok
+test_view_profile (accounts.tests.AccountManagementTests.test_view_profile) ... [IDENTITY] GET /profile/ -> token owner=acct@test.com role=shopper id=6afc2320ed9a5331d3b11d8a | HTTP 200
+ok
+test_create_preset (accounts.tests.AvatarPresetCRUDTests.test_create_preset) ... [IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6afc2323ed9a5331d3b11d9e | HTTP 201
+[IDENTITY-AUDIT] Test traffic detected (force_authenticate, no /auth/login/): SWAP SUSPECT banners suppressed — they would be false positives. Per-token [IDENTITY] lines remain.
+ok
+test_guest_rejected (accounts.tests.AvatarPresetCRUDTests.test_guest_rejected) ... ok
+test_list_returns_only_own_presets (accounts.tests.AvatarPresetCRUDTests.test_list_returns_only_own_presets) ... [IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6afc2329ed9a5331d3b11dc9 | HTTP 201
+[IDENTITY] GET /presets/ -> token owner=other@test.com role=shopper id=6afc2329ed9a5331d3b11dca | HTTP 200
+ok
+test_male_with_cup_size_rejected (accounts.tests.AvatarPresetCRUDTests.test_male_with_cup_size_rejected) ... [IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6afc232ced9a5331d3b11ddf | HTTP 400
+ok
+test_other_user_cannot_update_or_delete (accounts.tests.AvatarPresetCRUDTests.test_other_user_cannot_update_or_delete) ... [IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6afc232fed9a5331d3b11df4 | HTTP 201
+[IDENTITY] PATCH /presets/6afc232fed9a5331d3b11df6/ -> token owner=other@test.com role=shopper id=6afc232fed9a5331d3b11df5 | HTTP 404
+[IDENTITY] DELETE /presets/6afc232fed9a5331d3b11df6/ -> token owner=other@test.com role=shopper id=6afc232fed9a5331d3b11df5 | HTTP 404
+ok
+test_seller_password_change_is_persisted (accounts.tests.PasswordChangePersistenceTests.test_seller_password_change_is_persisted) ... [IDENTITY] POST /auth/change-password/ -> token owner=password-seller@test.com role=seller id=6afc2332ed9a5331d3b11e0a | HTTP 200
+ok
+test_shopper_password_change_is_persisted (accounts.tests.PasswordChangePersistenceTests.test_shopper_password_change_is_persisted) ... [IDENTITY] POST /auth/change-password/ -> token owner=password-shopper@test.com role=shopper id=6afc2336ed9a5331d3b11e1e | HTTP 200
+ok
+test_active_accounts_are_never_relocated (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_active_accounts_are_never_relocated) ... ok
+test_custom_window_is_honoured (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_custom_window_is_honoured) ... ok
+test_due_date_is_archived_at_plus_grace_days (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_due_date_is_archived_at_plus_grace_days) ... ok
+test_force_relocates_a_fresh_archive (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_force_relocates_a_fresh_archive) ... ok
+test_fresh_archive_is_not_relocated (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_fresh_archive_is_not_relocated) ... ok
+test_legacy_null_stamp_has_no_due_date (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_legacy_null_stamp_has_no_due_date) ... ok
+test_legacy_null_stamp_is_relocated_immediately (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_legacy_null_stamp_is_relocated_immediately) ... ok
+test_overdue_archive_is_relocated (accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_overdue_archive_is_relocated) ... ok
+test_preview_force_marks_every_row_eligible (accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_force_marks_every_row_eligible) ... ok
+test_preview_lists_legacy_rows_as_immediate (accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_lists_legacy_rows_as_immediate) ... ok
+test_preview_reports_schedule_and_moves_nothing (accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_reports_schedule_and_moves_nothing) ... ok
+test_cold_copy_is_pseudonymized_and_idempotent (accounts.tests_archive_retention.ColdCopyTests.test_cold_copy_is_pseudonymized_and_idempotent) ... ok
+test_cold_copy_never_copies_the_password_hash (accounts.tests_archive_retention.ColdCopyTests.test_cold_copy_never_copies_the_password_hash) ... ok
+test_cold_moved_at_falls_back_to_now_for_legacy_rows (accounts.tests_archive_retention.ColdCopyTests.test_cold_moved_at_falls_back_to_now_for_legacy_rows) ... ok
+test_cold_moved_at_stores_the_scheduled_due_date (accounts.tests_archive_retention.ColdCopyTests.test_cold_moved_at_stores_the_scheduled_due_date)
+DOCUMENTED BEHAVIOUR (not the relocation instant). ... ok
+test_from_user_heals_a_legacy_intact_copy (accounts.tests_archive_retention.ColdCopyTests.test_from_user_heals_a_legacy_intact_copy) ... ok
+test_seller_store_identity_is_cleared (accounts.tests_archive_retention.ColdCopyTests.test_seller_store_identity_is_cleared)
+FR-1.4 names store identity explicitly. A SELLER's real store_name ... ok
+test_backfill_handles_a_synthetic_legacy_closed_account_id (accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_backfill_handles_a_synthetic_legacy_closed_account_id)
+Legacy rows keyed by a non-ObjectId closed_account_id still get a ... ok
+test_command_pseudonymizes_and_is_repeatable (accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_command_pseudonymizes_and_is_repeatable) ... ok
+test_dry_run_writes_nothing (accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_dry_run_writes_nothing) ... ok
+test_prune_sanitize_existing_flag_heals_legacy_rows (accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_prune_sanitize_existing_flag_heals_legacy_rows) ... ok
+test_prune_sanitize_existing_preview_is_dry (accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_prune_sanitize_existing_preview_is_dry) ... ok
+test_cold_archive_holds_no_direct_identifiers (accounts.tests_archive_retention.RetentionErasureTests.test_cold_archive_holds_no_direct_identifiers) ... ok
+test_login_blocked_after_relocation (accounts.tests_archive_retention.RetentionErasureTests.test_login_blocked_after_relocation) ... [IDENTITY] LOGIN /auth/login/ -> HTTP 400 submitted=erase@test.com issued=<no token>
+ok
+test_orders_survive_but_are_pseudonymized (accounts.tests_archive_retention.RetentionErasureTests.test_orders_survive_but_are_pseudonymized) ... ok
+test_relocation_erases_active_personal_data (accounts.tests_archive_retention.RetentionErasureTests.test_relocation_erases_active_personal_data) ... ok
+test_second_sweep_is_a_noop (accounts.tests_archive_retention.RetentionErasureTests.test_second_sweep_is_a_noop) ... ok
+test_buyer_cart_items_are_detached_not_deleted (accounts.tests_archive_retention.SellerDetachTests.test_buyer_cart_items_are_detached_not_deleted) ... ok
+test_failure_on_one_row_is_logged_and_skipped (accounts.tests_archive_retention.SweepResilienceTests.test_failure_on_one_row_is_logged_and_skipped) ... ok
+test_empty_survey_rejected (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_empty_survey_rejected) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc2390ed9a5331d3b120b1 | HTTP 400
+ok
+test_get_returns_own_rows_and_mirror (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_get_returns_own_rows_and_mirror) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc2393ed9a5331d3b120c6 | HTTP 201
+[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc2393ed9a5331d3b120c6 | HTTP 200
+ok
+test_guest_rejected_and_no_row_written (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_guest_rejected_and_no_row_written)
+Guest survey attempts are rejected and nothing is cached or persisted. ... ok
+test_legacy_reaction_keys_rejected (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_legacy_reaction_keys_rejected)
+HARDENING (audit fix): legacy like/dislike keys are refused with 400 ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc2399ed9a5331d3b120f1 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc2399ed9a5331d3b120f1 | HTTP 400
+ok
+test_schema_uses_fit_rating_and_has_no_legacy_fields (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_schema_uses_fit_rating_and_has_no_legacy_fields) ... ok
+test_seller_rejected_and_no_row_written (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_seller_rejected_and_no_row_written) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_seller@test.com role=seller id=6afc23a2ed9a5331d3b1211c | HTTP 403
+ok
+test_strict_star_types_rejected (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_strict_star_types_rejected) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23a5ed9a5331d3b12130 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23a5ed9a5331d3b12130 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23a5ed9a5331d3b12130 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23a5ed9a5331d3b12130 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23a5ed9a5331d3b12130 | HTTP 400
+ok
+test_two_phase_upsert_one_row_and_gain (accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_two_phase_upsert_one_row_and_gain) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23aaed9a5331d3b12145 | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6afc23aaed9a5331d3b12145 | HTTP 200
+ok
+test_apply_false_is_a_dry_run (accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_apply_false_is_a_dry_run) ... ok
+test_helper_is_a_noop_on_clean_data (accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_helper_is_a_noop_on_clean_data) ... ok
+test_migration_call_shape_apply_keyword_is_supported (accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_migration_call_shape_apply_keyword_is_supported)
+REGRESSION: migration 0011 calls dedupe_fitting_studio_surveys(apply=True). ... ok
+test_positional_bool_is_treated_as_apply (accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_positional_bool_is_treated_as_apply) ... ok
+test_confidence_gain_is_server_computed_not_client_supplied (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_confidence_gain_is_server_computed_not_client_supplied) ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6afc23bbed9a5331d3b121ac | HTTP 201
+ok
+test_db_rejects_duplicate_user_session (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_db_rejects_duplicate_user_session)
+The index itself refuses a second document for the same visit. ... ok
+test_lost_create_race_resolves_to_the_existing_row (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_lost_create_race_resolves_to_the_existing_row)
+Simulate losing the insert race: get_or_create raises IntegrityError, ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6afc23c4ed9a5331d3b121d9 | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6afc23c4ed9a5331d3b121d9 | HTTP 200
+ok
+test_meta_declares_the_unique_key (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_meta_declares_the_unique_key)
+Guards the drift: without this declaration makemigrations generates ... ok
+test_same_session_id_allowed_for_different_users (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_same_session_id_allowed_for_different_users) ... ok
+test_stale_phase_snapshot_cannot_clobber_the_other_phase (accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_stale_phase_snapshot_cannot_clobber_the_other_phase)
+Lost-update regression. A phase-2 writer holding a snapshot taken ... [IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6afc23d2ed9a5331d3b1221b | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6afc23d2ed9a5331d3b1221b | HTTP 200
+ok
+test_ping_result_never_contains_the_connection_uri (accounts.tests.DatabasePingRedactionTests.test_ping_result_never_contains_the_connection_uri) ... ok
+test_delete_falls_back_to_filename_for_non_object_id_keys (accounts.tests.GridFSStorageDeletionTests.test_delete_falls_back_to_filename_for_non_object_id_keys) ... ok
+test_delete_finds_object_id_backed_image_fields (accounts.tests.GridFSStorageDeletionTests.test_delete_finds_object_id_backed_image_fields) ... ok
+test_delete_is_a_noop_when_the_file_is_already_absent (accounts.tests.GridFSStorageDeletionTests.test_delete_is_a_noop_when_the_file_is_already_absent) ... ok
+test_delete_propagates_failure_when_gridfs_is_unavailable (accounts.tests.GridFSStorageDeletionTests.test_delete_propagates_failure_when_gridfs_is_unavailable) ... ok
+
+----------------------------------------------------------------------
+Ran 67 tests in 203.650s
+
+OK
+Destroying test database for alias 'default' ('test_fitfusion')...

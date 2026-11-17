@@ -1,2 +1,2 @@
-name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename
-Classic White Tee,"A comfortable, breathable cotton t-shirt perfect for daily wear.",Tops,M,White,Pure White,Neutral,599.00,"Casual, Minimalist","Everyday, Summer",white_tee_front.png,white_tee_rear.png
+name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename
+Classic White Tee,"A comfortable, breathable cotton t-shirt perfect for daily wear.",Tops,M,White,Pure White,Neutral,599.00,"Casual",white_tee_front.png,white_tee_rear.png

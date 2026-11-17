@@ -1,0 +1,64 @@
+{
+  "suite": "commerce",
+  "command": "python manage.py test commerce -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T10:00:00.377931Z",
+  "finished_utc": "2026-11-17T10:01:08.482533Z",
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 10,
+    "passed": 10,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "log": "docs/evidence/_runs/20261117T100000Z-commerce.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "commerce.tests.CommerceAPITests.test_cart_crud_round_trip",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_checkout_approval_snapshots_and_clears_cart",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_checkout_completes_when_fit_accuracy_popup_is_skipped",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_checkout_decline_keeps_cart_and_creates_no_order",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_checkout_persists_selected_items_and_leaves_unselected_cart_items",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_checkout_rejects_empty_cart",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_guest_rejected_from_cart_and_checkout",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_post_checkout_fit_rating_is_separate_star_only_write",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_remove_selected_items_only_removes_current_users_selection",
+      "result": "ok"
+    },
+    {
+      "name": "commerce.tests.CommerceAPITests.test_user_cannot_read_another_users_order",
+      "result": "ok"
+    }
+  ]
+}

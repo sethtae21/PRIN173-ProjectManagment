@@ -1,0 +1,33 @@
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_catalog_item". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_name". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_store_name". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_price". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_available". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_unavailable_reason". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_front_image_url". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:47: Warning [CartViewSet > CartSerializer > CartItemSerializer]: unable to resolve type hint for function "get_rear_image_url". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:101: Warning [CartViewSet > CartSerializer]: unable to resolve type hint for function "get_total_amount". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\serializers.py:101: Warning [CartViewSet > CartSerializer]: unable to resolve type hint for function "get_item_count". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\serializers.py:8: Warning [CatalogViewSet > CatalogItemSerializer]: unable to resolve type hint for function "get_size_cm". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\commerce\views.py:367: Warning [OrderViewSet]: could not derive type of path parameter "id" because it is untyped and obtaining queryset from the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to "string".
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\outfits\serializers.py:149: Warning [OutfitViewSet > OutfitSerializer]: unable to resolve type hint for function "get_avatar". Consider using a type hint or @extend_schema_field. Defaulting to string.
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\outfits\views.py:15: Warning [OutfitViewSet]: could not derive type of path parameter "id" because it is untyped and obtaining queryset from the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to "string".
+C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\accounts\views\preset_views.py:15: Warning [AvatarPresetViewSet]: could not derive type of path parameter "id" because it is untyped and obtaining queryset from the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to "string".
+Warning: operationId "catalog_my_listings_retrieve" has collisions [('/catalog/my-listings/', 'get'), ('/catalog/my-listings/{item_id}/', 'get'), ('/catalog/my_listings/', 'get')]. resolving with numeral suffixes.
+
+Schema generation summary:
+Warnings: 25 (16 unique)
+Errors:   0 (0 unique)
+
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+

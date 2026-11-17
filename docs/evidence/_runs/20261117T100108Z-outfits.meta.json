@@ -1,0 +1,64 @@
+{
+  "suite": "outfits",
+  "command": "python manage.py test outfits -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T10:01:08.493926Z",
+  "finished_utc": "2026-11-17T10:01:59.577643Z",
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 10,
+    "passed": 10,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "log": "docs/evidence/_runs/20261117T100108Z-outfits.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "outfits.tests.OutfitAPITests.test_account_deletion_cascades_outfits",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_cannot_add_inactive_item_on_create",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_create_returns_id_list_and_binds_user",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_create_with_no_items_allowed",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_delete_204_then_gone",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_guest_rejected_401",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_inactive_existing_item_does_not_lock_out_edit",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_list_is_owner_only_and_foreign_retrieve_404",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_persists_across_sessions_server_side",
+      "result": "ok"
+    },
+    {
+      "name": "outfits.tests.OutfitAPITests.test_update_name_and_items",
+      "result": "ok"
+    }
+  ]
+}

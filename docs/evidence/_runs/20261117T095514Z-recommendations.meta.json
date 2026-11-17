@@ -1,0 +1,208 @@
+{
+  "suite": "recommendations",
+  "command": "python manage.py test recommendations -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T09:55:14.841806Z",
+  "finished_utc": "2026-11-17T09:56:41.371409Z",
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 46,
+    "passed": 45,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 1,
+    "exit_code": 0
+  },
+  "log": "docs/evidence/_runs/20261117T095514Z-recommendations.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_patch_accepts_extended_sizes_and_rejects_legacy_formats",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_mismatch_is_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestActiveItemFilter.test_only_active_catalog_items_are_recommended",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestEndpointSmoke.test_response_shape",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestRecommendationQueryValidation.test_caps_style_tag_count",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_limit_bounds",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_or_out_of_range_height",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_unknown_enums",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_muted_hue_gray_denim_now_passes",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogSizePolicyTests.test_accepts_all_standard_clothing_sizes",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogSizePolicyTests.test_rejects_footwear_category",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogSizePolicyTests.test_rejects_measured_and_nonstandard_sizes",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests.CatalogTagValidationTests.test_rejects_unapproved_style_tags",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestDeterminism.test_each_rule_points_is_zero_or_its_weight",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestDeterminism.test_rank_is_repeatable",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestDeterminism.test_tie_break_is_by_name",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestDeterminism.test_total_equals_sum_of_rule_points",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_are_positive_integers",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_has_exactly_the_four_rules",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_match_the_baselined_fr_7_2_values",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_version_present",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestLiteralFreeze.test_exact_scores_and_order",
+      "result": "skipped"
+    },
+    {
+      "name": "recommendations.tests_weights.TestSensitivity.test_plus_minus_one_does_not_invert",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestSensitivity.test_precondition_gap_ge_two",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestSuiteNonVacuous.test_at_least_two_profiles_built",
+      "result": "ok"
+    },
+    {
+      "name": "recommendations.tests_weights.TestSuiteNonVacuous.test_sensitivity_actually_exercised",
+      "result": "ok"
+    }
+  ]
+}

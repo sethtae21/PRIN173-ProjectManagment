@@ -12,23 +12,23 @@ Why this module exists
 ----------------------
 The original HSV rule set left a *saturation dead zone*: muted-but-clearly
 hued garments (light-wash denim, slate blue-gray, dusty rose) fell between the
-achromatic ceiling (gray/white required s <= 0.2) and the chromatic floors
-(blue required s >= 0.3, red s >= 0.35, green/brown s >= 0.25). A pixel in that
-band matched NO rule, so EVERY mapped declaration was rejected and the seller
-had no valid color to type — exactly the "#6e8391 declared Blue -> mismatch"
-false rejection. Two fixes live here:
+achromatic ceiling and the chromatic floors. A pixel in that band matched NO
+rule, so EVERY mapped declaration was rejected and the seller had no valid
+color to type. Two fixes live here:
 
 1. Contiguous thresholds. Every chromatic rule now uses s >= 0.2 and the
    achromatic rules use s <= 0.2, tiling the (s, v) plane with no gap, so any
-   muted color resolves to its true hue family (denim -> Blue).
+   muted color resolves to its true hue family.
 2. A total-cover classifier. suggest_declared_color() returns, for ANY hex, a
    color name that the validator will ACCEPT — first by strict rule, else by
-   the nearest hue family (Orange/Yellow/Cyan/Purple/Pink), which passes via
+   the nearest hue family, which passes via
    the documented "unmapped declaration is trusted" rule. The mismatch message
    embeds this suggestion so the seller always sees the correct color to use.
 """
 
 import colorsys
+
+from recommendations.knowledge_table import canonical_color_name
 
 # Ordered strict rules (priority matters where two bands overlap, e.g. dark
 # orange is Brown before Red). Predicates receive normalized HSV (0..1).
@@ -55,15 +55,15 @@ _ACHROMATIC = {"black", "white", "gray"}
 # HSV_COLOR_RULES, so a seller declaring it passes via the unmapped-trust rule
 # while still describing the image truthfully.
 _FALLBACK_HUE_BANDS = (
-    (0.00, 0.06, "Red"),
-    (0.06, 0.16, "Orange"),
-    (0.16, 0.20, "Yellow"),
-    (0.20, 0.45, "Green"),
-    (0.45, 0.54, "Cyan"),
-    (0.54, 0.72, "Blue"),
-    (0.72, 0.86, "Purple"),
-    (0.86, 0.95, "Pink"),
-    (0.95, 1.00, "Red"),
+    (0.00, 0.06, "red"),
+    (0.06, 0.16, "orange"),
+    (0.16, 0.20, "yellow"),
+    (0.20, 0.45, "green"),
+    (0.45, 0.54, "cyan"),
+    (0.54, 0.72, "blue"),
+    (0.72, 0.86, "purple"),
+    (0.86, 0.95, "pink"),
+    (0.95, 1.00, "red"),
 )
 
 
@@ -92,14 +92,14 @@ def classify_color(dominant_hex):
     h, s, v = _parse_hsv(dominant_hex)
     for name in _RULE_PRIORITY:
         if HSV_COLOR_RULES[name](h, s, v):
-            return name
+            return canonical_color_name(name)
     # No strict rule matched -> nearest hue family (covers yellow/cyan/purple/
     # pink/bright-orange gaps). s>0.2 here because s<=0.2 always hits an
     # achromatic strict rule, and v<=0.22 always hits black.
     for low, high, name in _FALLBACK_HUE_BANDS:
         if low <= h < high:
-            return name
-    return "Gray"  # defensive; unreachable because the bands tile [0, 1).
+            return canonical_color_name(name)
+    return canonical_color_name("gray")  # defensive; bands tile [0, 1).
 
 
 def suggest_declared_color(dominant_hex):

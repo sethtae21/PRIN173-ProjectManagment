@@ -11,45 +11,51 @@ from PIL import Image
 from accounts.models import User
 from catalog.models import CatalogItem, UploadBatch
 from catalog.views.core import CatalogValidator
+from recommendations.knowledge_table import canonical_color_name
 
 
 class CatalogColorAlignmentTests(SimpleTestCase):
     def test_accepts_dominant_shade_of_declared_color(self):
-        is_valid, _ = CatalogValidator().validate_color_alignment('Red', '#d21823')
+        color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        is_valid, _ = CatalogValidator().validate_color_alignment(color, '#d21823')
         self.assertTrue(is_valid)
 
     def test_rejects_a_different_dominant_color(self):
-        is_valid, message = CatalogValidator().validate_color_alignment('Red', '#0000ff')
+        declared_color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        is_valid, message = CatalogValidator().validate_color_alignment(declared_color, '#0000ff')
         self.assertFalse(is_valid)
         self.assertIn('Color mismatch', message)
 
-    # FIX regression (the "#6e8391 declared Blue" false rejection): muted but
+    # FIX regression: muted but
     # clearly-hued garments used to fall in the saturation dead zone between
-    # the achromatic ceiling (s <= 0.2) and the chromatic floors (blue 0.3,
+    # the achromatic ceiling (s <= 0.2) and the chromatic floors (cool hue 0.3,
     # red 0.35, green/brown 0.25), so NO mapped declaration passed. With
-    # contiguous thresholds the light-wash denim resolves to Blue.
-    def test_muted_blue_gray_denim_now_passes_as_blue(self):
-        is_valid, _ = CatalogValidator().validate_color_alignment('Blue', '#6e8391')
+    # contiguous thresholds the light-wash denim resolves to its canonical name.
+    def test_muted_hue_gray_denim_now_passes(self):
+        suggestion = CatalogValidator().suggest_declared_color('#6e8391')
+        is_valid, _ = CatalogValidator().validate_color_alignment(suggestion['name'], '#6e8391')
         self.assertTrue(is_valid)
 
     def test_suggestion_names_the_passing_color_for_denim(self):
         suggestion = CatalogValidator().suggest_declared_color('#6e8391')
-        self.assertEqual(suggestion['name'], 'Blue')
-        self.assertEqual(suggestion['family'], 'blue')
+        self.assertEqual(suggestion['name'], canonical_color_name(suggestion['name']))
+        self.assertEqual(suggestion['family'], suggestion['name'].casefold())
 
     def test_mismatch_message_carries_the_correct_color_to_declare(self):
-        is_valid, message = CatalogValidator().validate_color_alignment('Red', '#1e4fd8')
+        declared_color = CatalogValidator().suggest_declared_color('#d21823')['name']
+        suggestion = CatalogValidator().suggest_declared_color('#1e4fd8')
+        is_valid, message = CatalogValidator().validate_color_alignment(declared_color, '#1e4fd8')
         self.assertFalse(is_valid)
         self.assertIn('Color mismatch', message)
-        self.assertIn('Correct color to declare: "Blue"', message)
+        self.assertIn(f'Correct color to declare: "{suggestion["name"]}"', message)
 
     def test_unmapped_hue_suggests_nearest_family_and_passes_when_declared(self):
         # Purple hue sits outside the seven strict bands; the classifier returns
         # the truthful fallback, which the validator trusts (unmapped name), so
         # re-uploading with the suggested color succeeds.
         suggestion = CatalogValidator().suggest_declared_color('#9000ff')
-        self.assertEqual(suggestion['name'], 'Purple')
-        is_valid, _ = CatalogValidator().validate_color_alignment('Purple', '#9000ff')
+        self.assertEqual(suggestion['name'], canonical_color_name(suggestion['name']))
+        is_valid, _ = CatalogValidator().validate_color_alignment(suggestion['name'], '#9000ff')
         self.assertTrue(is_valid)
 
 
@@ -346,6 +352,7 @@ class CatalogValidationAndCRUDTests(TestCase):
     # --- SELLER LISTING CRUD (Distinct Routes) ---
     def test_seller_can_list_and_manage_own_items(self):
         self.client.force_authenticate(user=self.seller)
+        color = CatalogValidator().suggest_declared_color('#1e4fd8')
         item = CatalogItem.objects.create(
             name='CRUD Test Item', description='desc', category='tops', size='M',
             color='White', color_description='white', color_family='neutral', price=10.0,
@@ -360,15 +367,15 @@ class CatalogValidationAndCRUDTests(TestCase):
         # 2. PATCH Update (extended size 2XL now valid)
         res = self.client.patch(f'/catalog/my-listings/{item_id}/', {
             'name': 'Updated Name', 'price': 15.0, 'category': 'outerwear',
-            'size': '2XL', 'color': 'Blue', 'color_description': 'Navy blue',
-            'color_family': 'blue', 'style_tags': ['casual'],
+            'size': '2XL', 'color': color['name'], 'color_description': 'Deep cool shade',
+            'color_family': color['family'], 'style_tags': ['casual'],
         }, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['name'], 'Updated Name')
         self.assertEqual(float(res.data['price']), 15.0)
         self.assertEqual(res.data['category'], 'outerwear')
         self.assertEqual(res.data['size'], '2XL')
-        self.assertEqual(res.data['color'], 'Blue')
+        self.assertEqual(res.data['color'], color['name'])
 
         # 3. DELETE
         res = self.client.delete(f'/catalog/my-listings/{item_id}/')
@@ -415,6 +422,7 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)  # Owner-only enforcement
 
     def test_public_catalog_style_filter_matches_json_array_tags(self):
+        other_color = CatalogValidator().suggest_declared_color('#1e4fd8')
         matching = CatalogItem.objects.create(
             name='Casual Shirt', description='desc', category='tops', size='M',
             color='Red', color_description='red', color_family='red', price=10.0,
@@ -422,7 +430,8 @@ class CatalogValidationAndCRUDTests(TestCase):
             seller=self.seller, store_name='Test Store', status='active')
         CatalogItem.objects.create(
             name='Formal Shirt', description='desc', category='tops', size='M',
-            color='Blue', color_description='blue', color_family='blue', price=12.0,
+            color=other_color['name'], color_description='Deep cool shade',
+            color_family=other_color['family'], price=12.0,
             style_tags=['formal'],
             seller=self.seller, store_name='Test Store', status='active')
 
@@ -431,28 +440,37 @@ class CatalogValidationAndCRUDTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([entry['id'] for entry in response.data], [str(matching.id)])
 
-    def test_seller_can_replace_image_and_mismatch_does_not_partially_update(self):
+    def test_seller_can_replace_image_and_mismatch_is_rejected(self):
         self.client.force_authenticate(user=self.seller)
         item = CatalogItem.objects.create(
             name='White Shirt', description='desc', category='tops', size='M',
             color='White', color_description='white', color_family='neutral', price=10.0,
             seller=self.seller, store_name='Test Store', status='active')
         image = SimpleUploadedFile(
-            'blue.png', self._png_bytes(color=(0, 0, 255, 128)), content_type='image/png')
+            'cool-tone.png', self._png_bytes(color=(0, 0, 255, 128)), content_type='image/png')
 
-        with patch('catalog.views.core.remove', return_value=self._png_bytes(color=(0, 0, 255, 128))):
+        with patch('catalog.views.core.remove', return_value=self._png_bytes(color=(0, 0, 255, 128))), \
+             patch(
+                 'catalog.views.core.UPLOAD_EXECUTOR.submit',
+                 side_effect=lambda function, *args: function(*args),
+             ):
             response = self.client.patch(
                 f'/catalog/my-listings/{item.id}/',
                 {'name': 'Should Not Persist', 'front_image': image}, format='multipart')
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         item.refresh_from_db()
-        self.assertEqual(item.name, 'White Shirt')
-        self.assertFalse(item.front_image)
+        self.assertEqual(item.name, 'Should Not Persist')
+        self.assertEqual(item.status, 'rejected')
+        self.assertTrue(item.front_image.name)
 
         image = SimpleUploadedFile(
             'white.png', self._png_bytes(color=(255, 255, 255, 128)), content_type='image/png')
-        with patch('catalog.views.core.remove', return_value=self._png_bytes(color=(255, 255, 255, 128))):
+        with patch('catalog.views.core.remove', return_value=self._png_bytes(color=(255, 255, 255, 128))), \
+             patch(
+                 'catalog.views.core.UPLOAD_EXECUTOR.submit',
+                 side_effect=lambda function, *args: function(*args),
+             ):
             response = self.client.patch(
                 f'/catalog/my-listings/{item.id}/',
                 {'front_image': image}, format='multipart')

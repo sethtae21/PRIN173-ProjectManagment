@@ -8,6 +8,8 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from .models import Rating, UATResponse, UATSession, UAT_VALUE_MIN, UAT_VALUE_MAX
 from .serializers import (
@@ -68,6 +70,15 @@ class RatingSubmitView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=RatingSerializer,
+        responses={
+            200: OpenApiTypes.OBJECT,
+            201: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+        },
+    )
     def post(self, request):
         if not request.user.is_authenticated:
             logger.info("Guest rating attempt refused (403): no rating rights.")
@@ -119,6 +130,14 @@ class RatingSummaryView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter('target_type', OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter('target_id', OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter('source', OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+        ],
+        responses={200: RatingSummarySerializer, 400: OpenApiTypes.OBJECT},
+    )
     def get(self, request):
         target_type = request.query_params.get('target_type')
         target_id = request.query_params.get('target_id')
@@ -166,6 +185,7 @@ class GuestSessionClearView(APIView):
     Never writes anything."""
     permission_classes = [AllowAny]
 
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
     def post(self, request):
         if request.user.is_authenticated:
             return Response({'cleared': False}, status=status.HTTP_200_OK)
@@ -182,6 +202,7 @@ class MyRatingsView(APIView):
     the UI to rehydrate ratings after reload / logout / login)."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses=RatingSerializer(many=True))
     def get(self, request):
         qs = Rating.objects.filter(user=request.user)
         return Response(RatingSerializer(qs, many=True).data)
@@ -200,6 +221,15 @@ class RatingDetailView(APIView):
     def _get_own(self, request, pk):
         return Rating.objects.filter(user=request.user, id=pk).first()
 
+    @extend_schema(
+        request=RatingSerializer,
+        responses={
+            200: RatingSerializer,
+            400: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+        },
+    )
     def patch(self, request, pk):
         rating = self._get_own(request, pk)
         if rating is None:
@@ -213,6 +243,7 @@ class RatingDetailView(APIView):
             rating.save(update_fields=['score', 'updated_at'])
         return Response(RatingSerializer(rating).data)
 
+    @extend_schema(responses={204: None, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT})
     def delete(self, request, pk):
         if not _is_shopper(request.user):
             return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
@@ -234,6 +265,10 @@ class UATSessionCreateView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT},
+    )
     def post(self, request):
         if not _is_shopper(request.user):
             return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
@@ -268,6 +303,16 @@ class UATResponseSubmitView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses={
+            200: OpenApiTypes.OBJECT,
+            201: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+        },
+    )
     def post(self, request):
         if not _is_shopper(request.user):
             return Response({'detail': SHOPPER_ONLY_DETAIL}, status=status.HTTP_403_FORBIDDEN)
@@ -339,6 +384,7 @@ class UATExportCSVView(APIView):
     """GET /ratings/uat/export/ — staff-only CSV of the charter KPI workbook."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: OpenApiTypes.BINARY, 403: OpenApiTypes.OBJECT})
     def get(self, request):
         if not getattr(request.user, 'is_staff', False):
             return Response({'detail': 'Staff access required.'}, status=status.HTTP_403_FORBIDDEN)

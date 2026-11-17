@@ -9,13 +9,8 @@ Size-policy revision: the height_contrast rule no longer uses petite/average/
 tall bands; it uses the 120-218 cm range midpoint split exposed by
 knowledge_table.height_zone / knowledge_table.allowed_contrast.
 
-KAN-FIX (occasion_tags removal): the style_occasion rule now overlaps STYLE
-TAGS ONLY. The rule id intentionally remains "style_occasion" so WEIGHTS /
-MAX_SCORE and the KAN-103 freeze stay untouched; only the overlap inputs and
-the human-readable reason changed ("shared style tags: ..."). The UI label
-rename ("Style match") is handled frontend-side. AvatarProfile.occasion_tags
-and ItemProfile.occasion_tags are kept as ignored legacy fields so existing
-callers (recommendations view, query params) keep working.
+The style_occasion rule scores overlap in controlled style tags only. Its
+existing rule id remains stable for the baselined weights and API consumers.
 
 Footwear removal: the footwear category was permanently removed from the
 catalog and from knowledge_table.CATEGORY_GROUPS / PROPORTION_SHADING. No
@@ -40,8 +35,6 @@ class AvatarProfile:
     height_cm: float
     body_shape: str = "balanced"   # "top-heavy" | "bottom-heavy" | "balanced"
     style_tags: tuple = ()
-    # LEGACY (ignored by every rule since the occasion_tags removal):
-    occasion_tags: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -51,8 +44,6 @@ class ItemProfile:
     color_family: tuple = ()
     color_description: str = ""
     style_tags: tuple = ()
-    # LEGACY (ignored by every rule since the occasion_tags removal):
-    occasion_tags: tuple = ()
     contrast_level: str = ""       # optional; inferred from description if empty
     shade: str = ""                # optional; inferred from description if empty
 
@@ -131,9 +122,7 @@ def _rule_shading(avatar, item, weights):
 
 
 def _rule_style(avatar, item, weights):
-    """KAN-FIX: STYLE-TAG overlap only (occasion tags removed from the pipeline).
-    Rule id stays "style_occasion" for weight/freeze continuity; the reason
-    text and the frontend label now say "style"."""
+    """Score overlap in controlled style tags."""
     item_tags = _norm(item.style_tags)
     avatar_tags = _norm(avatar.style_tags)
     hit = item_tags & avatar_tags

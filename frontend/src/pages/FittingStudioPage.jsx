@@ -88,9 +88,8 @@ const BUILD_BMI = {
   Curve: 32,
 };
 
-// KAN-FIX: The rule id "styleOccasion" is kept to map to the frozen backend
-// rule id (style_occasion / WEIGHTS untouched), but the UI label is now
-// "Style match" since occasion_tags were removed from the pipeline.
+// The rule id "styleOccasion" maps to the baselined backend rule identifier;
+// the UI label is "Style match" because this rule evaluates style-tag overlap.
 const MATCH_CATEGORIES = [
   { key: "colorCompatibility", label: "Color compatibility" },
   { key: "heightContrast", label: "Height contrast" },

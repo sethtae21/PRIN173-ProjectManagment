@@ -1,0 +1,273 @@
+﻿# FITFUSION AI — DEFENSE EVIDENCE
+Issue: KAN-49 — 1.3.5 Rule-Based Recommendation Engine
+Traceability: WBS 1.3.5 from Jira title; FR/RTM/Criterion not explicit in exported row
+Command: python manage.py test ratings -v 2
+Working dir: C:\Users\seth\Documents\PRIN173-ProjectManagment\backend / Environment: Windows; backend .venv; Python 3.13.15; Django 6.0.8
+Executed: 2026-11-11T17:31:46.2589580+08:00 by seth
+Result: FAIL (exit code 1)
+--- raw output below ---
+Creating test database for alias 'default' ('test_fitfusion')...
+Found 28 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying sessions.0001_initial...test_guest_session_clear_still_safe (ratings.tests.RatingAPITests.test_guest_session_clear_still_safe) ... ok
+test_guest_submit_rejected_and_not_persisted (ratings.tests.RatingAPITests.test_guest_submit_rejected_and_not_persisted) ... ok
+test_like_persists_as_vote_only (ratings.tests.RatingAPITests.test_like_persists_as_vote_only) ...  OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af4363d0edd91dc835b0f87 | HTTP 201
+ok
+test_owner_only_update_delete (ratings.tests.RatingAPITests.test_owner_only_update_delete) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436480edd91dc835b0f9d | HTTP 201
+[IDENTITY] PATCH /ratings/6af4364a0edd91dc835b0f9f/ -> token owner=other@test.com role=user id=6af436490edd91dc835b0f9e | HTTP 404
+[IDENTITY] DELETE /ratings/6af4364a0edd91dc835b0f9f/ -> token owner=other@test.com role=user id=6af436490edd91dc835b0f9e | HTTP 404
+[IDENTITY] DELETE /ratings/6af4364a0edd91dc835b0f9f/ -> token owner=rater@test.com role=user id=6af436480edd91dc835b0f9d | HTTP 204
+ok
+test_rating_never_required_for_core_flow (ratings.tests.RatingAPITests.test_rating_never_required_for_core_flow) ... ok
+test_source_field_allows_multi_surface_ratings (ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436600edd91dc835b0fc8 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436600edd91dc835b0fc8 | HTTP 201
+ok
+test_source_field_allows_multi_surface_ratings (ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings) ... ERROR
+test_star_persists_as_score_only (ratings.tests.RatingAPITests.test_star_persists_as_score_only) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436700edd91dc835b0fcc | HTTP 201
+ok
+test_summary_filters_by_source (ratings.tests.RatingAPITests.test_summary_filters_by_source) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af4367b0edd91dc835b0fe2 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af4367b0edd91dc835b0fe2 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6af4367b0edd91dc835b0fe2 | HTTP 200
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6af4367b0edd91dc835b0fe2 | HTTP 200
+ok
+test_summary_separates_counts (ratings.tests.RatingAPITests.test_summary_separates_counts) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436860edd91dc835b0ff9 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436860edd91dc835b0ff9 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6af436860edd91dc835b0ff9 | HTTP 200
+ok
+test_upsert_keeps_both_dimensions (ratings.tests.RatingAPITests.test_upsert_keeps_both_dimensions) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436900edd91dc835b1010 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af436900edd91dc835b1010 | HTTP 200
+ok
+test_validation_bounds_and_empty_payload (ratings.tests.RatingAPITests.test_validation_bounds_and_empty_payload) ... [IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af4369a0edd91dc835b1026 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6af4369a0edd91dc835b1026 | HTTP 400
+ok
+test_obj01_counts_percent_of_eligible_sessions_including_fit_rating (ratings.tests_uat_charter.UATCharterKPITests.test_obj01_counts_percent_of_eligible_sessions_including_fit_rating) ... ok
+test_obj05_measures_recommendation_panel_approval_not_style_discovery (ratings.tests_uat_charter.UATCharterKPITests.test_obj05_measures_recommendation_panel_approval_not_style_discovery) ... ok
+test_obj06_requires_both_confidence_gain_and_return_intent_drop (ratings.tests_uat_charter.UATCharterKPITests.test_obj06_requires_both_confidence_gain_and_return_intent_drop) ... ok
+test_obj07_counts_completed_checkouts_over_created_carts (ratings.tests_uat_charter.UATCharterKPITests.test_obj07_counts_completed_checkouts_over_created_carts) ... ok
+test_zero_no_answer_counts_in_style_discovery_context_row (ratings.tests_uat_charter.UATCharterKPITests.test_zero_no_answer_counts_in_style_discovery_context_row) ... ok
+test_hook_requires_active_session_and_completes_on_checkout (ratings.tests_uat_charter.UATCommerceHookTests.test_hook_requires_active_session_and_completes_on_checkout) ... ok
+test_empty_string_answer_is_rejected (ratings.tests_uat_charter.UATResponseZeroValueTests.test_empty_string_answer_is_rejected) ... [IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6af437050edd91dc835b1119 | HTTP 400
+ok
+test_fractional_answer_is_rejected_not_truncated (ratings.tests_uat_charter.UATResponseZeroValueTests.test_fractional_answer_is_rejected_not_truncated) ... [IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6af4370d0edd91dc835b112e | HTTP 400
+ok
+test_null_answer_is_still_rejected (ratings.tests_uat_charter.UATResponseZeroValueTests.test_null_answer_is_still_rejected) ... [IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6af437160edd91dc835b1143 | HTTP 400
+ok
+test_unknown_question_key_rejected (ratings.tests_uat_charter.UATResponseZeroValueTests.test_unknown_question_key_rejected) ... [IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6af4371f0edd91dc835b1158 | HTTP 400
+ok
+test_zero_answer_is_saved_not_dropped (ratings.tests_uat_charter.UATResponseZeroValueTests.test_zero_answer_is_saved_not_dropped) ... [IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6af437280edd91dc835b116d | HTTP 201
+ok
+test_session_create_stores_product_id_for_obj01_join (ratings.tests_uat_charter.UATSessionCreateTests.test_session_create_stores_product_id_for_obj01_join) ... [IDENTITY] POST /ratings/uat/session/ -> token owner=uat_session_create@example.com role=shopper id=6af437310edd91dc835b1183 | HTTP 201
+ok
+test_empty_database_reports_not_run_with_zero_samples (ratings.tests_uat_charter.UATWorkbookEmptyTests.test_empty_database_reports_not_run_with_zero_samples) ... ok
+test_no_proposed_targets_remain (ratings.tests_uat_charter.UATWorkbookEmptyTests.test_no_proposed_targets_remain) ... ok
+test_subjective_surveys_are_labelled_context_not_charter_evidence (ratings.tests_uat_charter.UATWorkbookEmptyTests.test_subjective_surveys_are_labelled_context_not_charter_evidence) ... ok
+test_charter_numbers_are_locked (ratings.tests_uat_charter.CharterThresholdLockTests.test_charter_numbers_are_locked) ... ok
+test_question_contract_and_rating_sources (ratings.tests_uat_charter.CharterThresholdLockTests.test_question_contract_and_rating_sources) ... ok
+
+======================================================================
+ERROR: test_source_field_allows_multi_surface_ratings (ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 446, in receive_message
+    return receive_message(self, request_id, self.max_message_size)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\network_layer.py", line 777, in receive_message
+    length, _, response_to, op_code = _UNPACK_HEADER(receive_data(conn, 16, deadline))
+                                                     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\network_layer.py", line 344, in receive_data
+    wait_for_read(conn, deadline)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\network_layer.py", line 323, in wait_for_read
+    raise socket.timeout("timed out")
+TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\management\commands\flush.py", line 71, in handle
+    connection.ops.execute_sql_flush(sql_list)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django_mongodb_backend\operations.py", line 264, in execute_sql_flush
+    collection.delete_many({})
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1684, in delete_many
+    self._delete_retryable(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        filter,
+        ^^^^^^^
+    ...<6 lines>...
+        comment=comment,
+        ^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1560, in _delete_retryable
+    return self._database.client._retryable_write(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        (write_concern or self.write_concern).acknowledged and not multi,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        operation=_Op.DELETE,
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2099, in _retryable_write
+    return self._retry_with_session(retryable, func, s, bulk, operation, operation_id)
+           ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1969, in _retry_with_session
+    return self._retry_internal(
+           ~~~~~~~~~~~~~~~~~~~~^
+        func=func,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        operation_id=operation_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\_csot.py", line 126, in csot_wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2022, in _retry_internal
+    ).run()
+      ~~~^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2890, in run
+    res = self._read() if self._is_read else self._write()
+                                             ~~~~~~~~~~~^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 3103, in _write
+    return self._func(self._session, conn, self._retryable)  # type: ignore
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1545, in _delete
+    return self._delete(
+           ~~~~~~~~~~~~^
+        conn,
+        ^^^^^
+    ...<10 lines>...
+        comment=comment,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1515, in _delete
+    result = conn.command(
+        self._database.name,
+    ...<5 lines>...
+        retryable_write=retryable_write,
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\helpers.py", line 51, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 421, in command
+    self._raise_connection_failure(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 567, in _raise_connection_failure
+    raise error
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 396, in command
+    return run_command(
+        self,
+    ...<17 lines>...
+        write_concern=write_concern,
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\command_runner.py", line 440, in run_command
+    docs, _, _ = _run_command(
+                 ~~~~~~~~~~~~^
+        conn,
+        ^^^^^
+    ...<16 lines>...
+        set_conn_more_to_come=True,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\command_runner.py", line 192, in _run_command
+    reply = conn.receive_message(request_id)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 449, in receive_message
+    self._raise_connection_failure(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\synchronous\pool.py", line 565, in _raise_connection_failure
+    _raise_connection_failure(self.address, error, timeout_details=details)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\pymongo\pool_shared.py", line 166, in _raise_connection_failure
+    raise NetworkTimeout(msg) from error
+pymongo.errors.NetworkTimeout: ac-vxrqytw-shard-00-02.zrnfpru.mongodb.net:27017: timed out (configured timeouts: socketTimeoutMS: 10000.0ms, connectTimeoutMS: 5000.0ms)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\management\__init__.py", line 195, in call_command
+    return command.execute(*args, **defaults)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\management\base.py", line 464, in execute
+    output = self.handle(*args, **options)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\management\commands\flush.py", line 73, in handle
+    raise CommandError(
+    ...<7 lines>...
+    ) from exc
+django.core.management.base.CommandError: Database test_fitfusion couldn't be flushed. Possible reasons:
+  * The database isn't running or isn't configured correctly.
+  * At least one of the expected database tables doesn't exist.
+  * The SQL was invalid.
+Hint: Look at the output of 'django-admin sqlflush'. That's the SQL this command wasn't able to run.
+
+----------------------------------------------------------------------
+Ran 28 tests in 304.498s
+
+FAILED (errors=1)
+Destroying test database for alias 'default' ('test_fitfusion')...

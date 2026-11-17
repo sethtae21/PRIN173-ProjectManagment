@@ -1,0 +1,167 @@
+Command: python manage.py test ratings -v 2
+UTC start: 2026-11-16T01:39:22.375Z
+Commit: 389a0deccfb3677fa2b374098dfbdaa746e72885
+Python: Python 3.13.15
+Django: 6.0.8
+--- Full raw command output ---
+python : Creating test database for alias 'default' ('test_fitfusion')...
+At line:2 char:1002
++ ... global:LASTEXITCODE = 0; python manage.py test $app -v 2 2>&1 | Tee-O ...
++                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Creating test d..._fitfusion')...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+Found 28 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying catalog.0005_alter_catalogitem_category... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+test_guest_session_clear_still_safe (ratings.tests.RatingAPITests.test_guest_session_clear_still_safe) ... ok
+test_guest_submit_rejected_and_not_persisted 
+(ratings.tests.RatingAPITests.test_guest_submit_rejected_and_not_persisted) ... ok
+  Applying sessions.0001_initial... OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5ef490f34834f64958ba | HTTP 201
+test_like_persists_as_vote_only (ratings.tests.RatingAPITests.test_like_persists_as_vote_only) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5efa90f34834f64958d0 | HTTP 201
+[IDENTITY] PATCH /ratings/6afa5efb90f34834f64958d2/ -> token owner=other@test.com role=user id=6afa5efb90f34834f64958d1 | HTTP 404
+[IDENTITY] DELETE /ratings/6afa5efb90f34834f64958d2/ -> token owner=other@test.com role=user id=6afa5efb90f34834f64958d1 | HTTP 404
+[IDENTITY] DELETE /ratings/6afa5efb90f34834f64958d2/ -> token owner=rater@test.com role=user id=6afa5efa90f34834f64958d0 | HTTP 204
+test_owner_only_update_delete (ratings.tests.RatingAPITests.test_owner_only_update_delete) ... ok
+test_rating_never_required_for_core_flow (ratings.tests.RatingAPITests.test_rating_never_required_for_core_flow) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f0990f34834f64958fb | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f0990f34834f64958fb | HTTP 201
+test_source_field_allows_multi_surface_ratings 
+(ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f1090f34834f6495912 | HTTP 201
+test_star_persists_as_score_only (ratings.tests.RatingAPITests.test_star_persists_as_score_only) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f1790f34834f6495928 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f1790f34834f6495928 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6afa5f1790f34834f6495928 | HTTP 200
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6afa5f1790f34834f6495928 | HTTP 200
+test_summary_filters_by_source (ratings.tests.RatingAPITests.test_summary_filters_by_source) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f1f90f34834f649593f | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f1f90f34834f649593f | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=user id=6afa5f1f90f34834f649593f | HTTP 200
+test_summary_separates_counts (ratings.tests.RatingAPITests.test_summary_separates_counts) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f2690f34834f6495956 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f2690f34834f6495956 | HTTP 200
+test_upsert_keeps_both_dimensions (ratings.tests.RatingAPITests.test_upsert_keeps_both_dimensions) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f2e90f34834f649596c | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=user id=6afa5f2e90f34834f649596c | HTTP 400
+test_validation_bounds_and_empty_payload (ratings.tests.RatingAPITests.test_validation_bounds_and_empty_payload) ... ok
+test_obj01_counts_percent_of_eligible_sessions_including_fit_rating 
+(ratings.tests_uat_charter.UATCharterKPITests.test_obj01_counts_percent_of_eligible_sessions_including_fit_rating) ... 
+ok
+test_obj05_measures_recommendation_panel_approval_not_style_discovery 
+(ratings.tests_uat_charter.UATCharterKPITests.test_obj05_measures_recommendation_panel_approval_not_style_discovery) 
+... ok
+test_obj06_requires_both_confidence_gain_and_return_intent_drop 
+(ratings.tests_uat_charter.UATCharterKPITests.test_obj06_requires_both_confidence_gain_and_return_intent_drop) ... ok
+test_obj07_counts_completed_checkouts_over_created_carts 
+(ratings.tests_uat_charter.UATCharterKPITests.test_obj07_counts_completed_checkouts_over_created_carts) ... ok
+test_zero_no_answer_counts_in_style_discovery_context_row 
+(ratings.tests_uat_charter.UATCharterKPITests.test_zero_no_answer_counts_in_style_discovery_context_row) ... ok
+test_hook_requires_active_session_and_completes_on_checkout 
+(ratings.tests_uat_charter.UATCommerceHookTests.test_hook_requires_active_session_and_completes_on_checkout) ... ok
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6afa5f8490f34834f6495a5f | HTTP 400
+test_empty_string_answer_is_rejected 
+(ratings.tests_uat_charter.UATResponseZeroValueTests.test_empty_string_answer_is_rejected) ... ok
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6afa5f8b90f34834f6495a74 | HTTP 400
+test_fractional_answer_is_rejected_not_truncated 
+(ratings.tests_uat_charter.UATResponseZeroValueTests.test_fractional_answer_is_rejected_not_truncated) ... ok
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6afa5f9190f34834f6495a89 | HTTP 400
+test_null_answer_is_still_rejected 
+(ratings.tests_uat_charter.UATResponseZeroValueTests.test_null_answer_is_still_rejected) ... ok
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6afa5f9790f34834f6495a9e | HTTP 400
+test_unknown_question_key_rejected 
+(ratings.tests_uat_charter.UATResponseZeroValueTests.test_unknown_question_key_rejected) ... ok
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat_zero@example.com role=shopper id=6afa5f9d90f34834f6495ab3 | HTTP 201
+test_zero_answer_is_saved_not_dropped 
+(ratings.tests_uat_charter.UATResponseZeroValueTests.test_zero_answer_is_saved_not_dropped) ... ok
+[IDENTITY] POST /ratings/uat/session/ -> token owner=uat_session_create@example.com role=shopper id=6afa5fa390f34834f6495ac9 | HTTP 201
+test_session_create_stores_product_id_for_obj01_join 
+(ratings.tests_uat_charter.UATSessionCreateTests.test_session_create_stores_product_id_for_obj01_join) ... ok
+test_empty_database_reports_not_run_with_zero_samples 
+(ratings.tests_uat_charter.UATWorkbookEmptyTests.test_empty_database_reports_not_run_with_zero_samples) ... ok
+test_no_proposed_targets_remain (ratings.tests_uat_charter.UATWorkbookEmptyTests.test_no_proposed_targets_remain) ... 
+ok
+test_subjective_surveys_are_labelled_context_not_charter_evidence 
+(ratings.tests_uat_charter.UATWorkbookEmptyTests.test_subjective_surveys_are_labelled_context_not_charter_evidence) 
+... ok
+test_charter_numbers_are_locked (ratings.tests_uat_charter.CharterThresholdLockTests.test_charter_numbers_are_locked) 
+... ok
+test_question_contract_and_rating_sources 
+(ratings.tests_uat_charter.CharterThresholdLockTests.test_question_contract_and_rating_sources) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 213.981s
+
+OK
+Destroying test database for alias 'default' ('test_fitfusion')...
+
+
+Exit code: 0
+Run summary: 
+

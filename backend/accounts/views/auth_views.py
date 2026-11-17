@@ -13,6 +13,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 
 from ..serializers.auth_serializers import RegistrationContactSerializer
 from accounts.serializers import RegistrationSerializer, LoginSerializer, UserSerializer, PasswordChangeSerializer
@@ -69,6 +71,10 @@ def logout_view(request):
 class RegistrationContactCheckView(APIView):
     permission_classes = (AllowAny,)
 
+    @extend_schema(
+        request=RegistrationContactSerializer,
+        responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+    )
     def post(self, request):
         serializer = RegistrationContactSerializer(data=request.data)
         if not serializer.is_valid():
@@ -173,10 +179,7 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         user.archived_at = timezone.now()  # start the 90-day window
         user.save(update_fields=['status', 'is_active', 'archived_at'])
 
-        return Response({
-            'success': True,
-            'message': 'Your account has been archived. All your data is retained.',
-        }, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -218,6 +221,10 @@ class LogoutView(APIView):
     """
     permission_classes = (IsAuthenticated,)
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def post(self, request):
         refresh_raw = request.data.get('refresh')
         if refresh_raw:
@@ -256,6 +263,10 @@ class DeactivateAccountView(APIView):
     """
     permission_classes = (IsAuthenticated,)
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def post(self, request):
         user = request.user
         reason = str(request.data.get('reason', '')).strip()

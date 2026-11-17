@@ -77,7 +77,6 @@ function mapCatalogItem(item) {
     sellerName: item.store_name || "Independent Store",
     image: mediaUrl(item.front_image),
     styleTags: Array.isArray(item.style_tags) ? item.style_tags : [],
-    occasionTags: Array.isArray(item.occasion_tags) ? item.occasion_tags : [],
     status: item.status || "active",
   };
 }

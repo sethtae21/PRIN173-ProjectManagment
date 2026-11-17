@@ -42,7 +42,7 @@ class OutfitAPITests(TestCase):
         return CatalogItem.objects.create(
             name=name, description='desc', category='tops', size='M',
             color='White', color_description='pure white', color_family='neutral',
-            price=10.0, style_tags=['casual'], occasion_tags=['everyday'],
+            price=10.0, style_tags=['casual'],
             seller=seller, store_name=getattr(seller, 'store_name', None) or 'Store',
             batch=batch, status=status)
 

@@ -108,7 +108,7 @@ class Command(BaseCommand):
         writer.writerow([
             'name', 'description', 'category', 'size', 'color',
             'color_description', 'color_family', 'price',
-            'style_tags', 'occasion_tags',
+            'style_tags',
             'front_image_filename', 'rear_image_filename',
         ])
         for i in range(1, item_count + 1):
@@ -116,7 +116,7 @@ class Command(BaseCommand):
                 f'Timing Product {i:02d}',
                 f'Automated test product {i} for Criterion 4 / OBJ-08.',
                 'tops', 'M', 'Red', 'Bright Red', 'red', '599.00',
-                'casual, minimalist', 'everyday, summer',
+                'casual, minimalist',
                 'timing_front.jpg', 'timing_rear.jpg',
             ])
         return output.getvalue().encode('utf-8')
@@ -165,7 +165,6 @@ class Command(BaseCommand):
                 color_family=row.get('color_family', ''),
                 price=row.get('price', '0.00'),
                 style_tags=[t.strip() for t in row.get('style_tags', '').split(',') if t.strip()],
-                occasion_tags=[t.strip() for t in row.get('occasion_tags', '').split(',') if t.strip()],
                 seller=seller,
                 store_name=seller.store_name or TIMING_STORE,
                 batch=batch,

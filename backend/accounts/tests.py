@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.test import SimpleTestCase
 from unittest.mock import Mock, patch
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from accounts.archive import ARCHIVE_GRACE_DAYS
 from accounts.models import User
 from commerce.models import Cart, Order
@@ -81,8 +81,8 @@ class AccountManagementTests(TestCase):
       * Password change lives at POST /auth/change-password/ with
         old_password / new_password / new_password_confirm. The old
         /profile/password/ + current_password contract no longer exists (404).
-      * DELETE /profile/ is the baselined FR-1.4 ARCHIVE grace window (200),
-        not a hard delete (204). Linked data is RETAINED for
+      * DELETE /profile/ is the baselined FR-1.4 ARCHIVE grace window (204),
+        not a hard delete. Linked data is RETAINED for
         ARCHIVE_GRACE_DAYS and only relocated/purged by accounts/archive.py.
     """
 
@@ -175,7 +175,7 @@ class AccountManagementTests(TestCase):
     def test_delete_account_archives_and_blocks_login(self, mock_blacklist):
         """FR-1.4 BASELINED grace window (replaces the old hard-delete test).
 
-        DELETE /profile/ archives the account: HTTP 200, status='archive',
+        DELETE /profile/ archives the account: HTTP 204, status='archive',
         is_active=False, archived_at stamped, refresh token blacklisted, and
         login blocked. EVERY linked record is RETAINED untouched for
         ARCHIVE_GRACE_DAYS so support can restore; the RA 10173 erasure /
@@ -204,7 +204,8 @@ class AccountManagementTests(TestCase):
 
         # Archive the account, blacklisting the supplied refresh token.
         res = self.client.delete('/profile/', {'refresh': str(refresh)}, format='json')
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 204)
+        self.assertEqual(res.content, b'')
         mock_blacklist.assert_called_once()
 
         # The account row is RETAINED (cold-relocation happens later).
@@ -237,6 +238,52 @@ class AccountManagementTests(TestCase):
                                  {'email': 'acct@test.com', 'password': 'OldPass123!@#'},
                                  format='json')
         self.assertEqual(login.status_code, 400)
+
+
+class RegistrationAndJWTTests(TestCase):
+    def test_registration_assigns_role_and_issues_user_bound_jwt(self):
+        registrations = (
+            {
+                'email': 'new-shopper@test.com',
+                'full_name': 'New Shopper',
+                'password': 'Test123!@#',
+                'password_confirm': 'Test123!@#',
+                'mobile': '09123456780',
+            },
+            {
+                'email': 'new-seller@test.com',
+                'full_name': 'New Seller',
+                'password': 'Test123!@#',
+                'password_confirm': 'Test123!@#',
+                'role': 'seller',
+                'store_name': 'New Seller Store',
+                'mobile': '09123456781',
+            },
+        )
+
+        for payload, expected_role in zip(registrations, ('shopper', 'seller')):
+            with self.subTest(role=expected_role):
+                response = self.client.post('/auth/register/', payload, format='json')
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertEqual(response.data['user']['role'], expected_role)
+                user = User.objects.get(email=payload['email'])
+
+                tokens = response.data['tokens']
+                self.assertTrue(tokens['access'])
+                self.assertTrue(tokens['refresh'])
+                access_token = AccessToken(tokens['access'])
+                self.assertEqual(str(access_token['user_id']), str(user.pk))
+
+                login = self.client.post(
+                    '/auth/login/',
+                    {'email': payload['email'], 'password': payload['password']},
+                    format='json',
+                )
+                self.assertEqual(login.status_code, 200, login.data)
+                self.assertEqual(login.data['user']['role'], expected_role)
+                self.assertTrue(login.data['tokens']['access'])
+                self.assertTrue(login.data['tokens']['refresh'])
+                self.assertEqual(user.role, expected_role)
 
 
 class PasswordChangePersistenceTests(TestCase):

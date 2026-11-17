@@ -1,0 +1,485 @@
+﻿# FITFUSION AI — DEFENSE EVIDENCE
+Issue: KAN-104 — Shopper catalog read API with store filter
+Traceability: SRS FR-3.3; WBS 1.3.3; RT-03
+Command: python manage.py test catalog -v 2
+Working dir: C:\Users\seth\Documents\PRIN173-ProjectManagment\backend / Environment: Windows; backend .venv; Python 3.13.15; Django 6.0.8
+Executed: 2026-11-11T17:28:14.7681110+08:00 by seth
+Result: FAIL (exit code 1)
+--- raw output below ---
+Creating test database for alias 'default' ('test_fitfusion')...
+Found 23 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying sessions.0001_initial...test_download_package_contains_template_and_image_guidelines (catalog.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines) ... FAIL
+test_download_template_contains_header_and_single_example_row (catalog.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row) ... FAIL
+test_guest_cannot_upload (catalog.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload) ... ok
+test_public_catalog_style_filter_matches_json_array_tags (catalog.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags) ... ok
+test_regular_user_cannot_upload (catalog.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload) ...  OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6af43580f294ae0af519dbff | HTTP 403
+[IDENTITY-AUDIT] logging error: 'charmap' codec can't encode characters in position 82-83: character maps to <undefined>
+ok
+test_rejects_missing_view_images (catalog.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af43588f294ae0af519dc13 | HTTP 400
+ok
+test_rejects_opaque_background_removal_output (catalog.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output) ... ok
+test_rejects_oversized_image (catalog.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af4359cf294ae0af519dc3d | HTTP 400
+ok
+test_seller_can_list_and_manage_own_items (catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items) ... [IDENTITY] GET /catalog/my-listings/6af435a7f294ae0af519dc54/ -> token owner=seller@test.com role=seller id=6af435a5f294ae0af519dc52 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6af435a7f294ae0af519dc54/ -> token owner=seller@test.com role=seller id=6af435a5f294ae0af519dc52 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6af435a7f294ae0af519dc54/ -> token owner=seller@test.com role=seller id=6af435a5f294ae0af519dc52 | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6af435a7f294ae0af519dc54/ -> token owner=seller@test.com role=seller id=6af435a5f294ae0af519dc52 | HTTP 404
+ok
+test_seller_can_replace_image_and_mismatch_does_not_partially_update (catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_mismatch_does_not_partially_update) ... [IDENTITY] PATCH /catalog/my-listings/6af435b1f294ae0af519dc6a/ -> token owner=seller@test.com role=seller id=6af435b0f294ae0af519dc68 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6af435b1f294ae0af519dc6a/ -> token owner=seller@test.com role=seller id=6af435b0f294ae0af519dc68 | HTTP 200
+ok
+test_seller_cannot_manage_other_sellers_items (catalog.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items) ... [IDENTITY] GET /catalog/my-listings/6af435c1f294ae0af519dc84/ -> token owner=seller@test.com role=seller id=6af435bef294ae0af519dc81 | HTTP 404
+ok
+test_successful_upload_derives_color_palette_tags (catalog.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags) ... 
+============================================================
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af435ccf294ae0af519dc98 | HTTP 500
+ERROR
+test_upload_recognizes_header_after_template_instruction_rows (catalog.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows) ... [IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6af435dff294ae0af519dcb3 | HTTP 200
+
+============================================================
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af435dff294ae0af519dcb3 | HTTP 500
+ERROR
+test_upload_reports_csv_filename_mismatch (catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch) ... 
+============================================================
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af435eaf294ae0af519dcca | HTTP 500
+ERROR
+test_upload_reports_missing_fields_and_undersized_images (catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images) ... 
+============================================================
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6af435f4f294ae0af519dce1 | HTTP 500
+ERROR
+test_accepts_dominant_shade_of_declared_color (catalog.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color) ... ok
+test_mismatch_message_carries_the_correct_color_to_declare (catalog.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare) ... FAIL
+test_muted_blue_gray_denim_now_passes_as_blue (catalog.tests.CatalogColorAlignmentTests.test_muted_blue_gray_denim_now_passes_as_blue) ... ok
+test_rejects_a_different_dominant_color (catalog.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color) ... ok
+test_suggestion_names_the_passing_color_for_denim (catalog.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim) ... FAIL
+test_unmapped_hue_suggests_nearest_family_and_passes_when_declared (catalog.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared) ... ok
+test_accepts_approved_comma_separated_tags_case_insensitively (catalog.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively) ... FAIL
+test_rejects_unapproved_style_and_occasion_tags (catalog.tests.CatalogTagValidationTests.test_rejects_unapproved_style_and_occasion_tags) ... FAIL
+
+======================================================================
+ERROR: test_successful_upload_derives_color_palette_tags (catalog.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 295, in test_successful_upload_derives_color_palette_tags
+    response = self.client.post(
+        '/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart'
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 302, in post
+    response = super().post(
+        path, data=data, format=format, content_type=content_type, **extra)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 216, in post
+    return self.generic('POST', path, data, content_type, **extra)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 240, in generic
+    return super().generic(
+           ~~~~~~~~~~~~~~~^
+        method, path, data, content_type, secure, **extra)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 671, in generic
+    return self.request(**r)
+           ~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 292, in request
+    return super().request(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 244, in request
+    request = super().request(**kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 1090, in request
+    self.check_exception(response)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 805, in check_exception
+    raise exc_value
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\viewsets.py", line 124, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 526, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 474, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 485, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 523, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 763, in upload
+    UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1240, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 290, in <lambda>
+    side_effect=lambda function, *args: function(*args),
+                                        ~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 427, in process_batch_background
+    print(f"\U0001f680 Starting batch {batch_id} processing...")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 0: character maps to <undefined>
+
+======================================================================
+ERROR: test_upload_recognizes_header_after_template_instruction_rows (catalog.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 206, in test_upload_recognizes_header_after_template_instruction_rows
+    response = self.client.post(
+        '/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart'
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 302, in post
+    response = super().post(
+        path, data=data, format=format, content_type=content_type, **extra)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 216, in post
+    return self.generic('POST', path, data, content_type, **extra)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 240, in generic
+    return super().generic(
+           ~~~~~~~~~~~~~~~^
+        method, path, data, content_type, secure, **extra)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 671, in generic
+    return self.request(**r)
+           ~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 292, in request
+    return super().request(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 244, in request
+    request = super().request(**kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 1090, in request
+    self.check_exception(response)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 805, in check_exception
+    raise exc_value
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\viewsets.py", line 124, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 526, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 474, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 485, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 523, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 763, in upload
+    UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1240, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 204, in <lambda>
+    side_effect=lambda function, *args: function(*args),
+                                        ~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 427, in process_batch_background
+    print(f"\U0001f680 Starting batch {batch_id} processing...")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 0: character maps to <undefined>
+
+======================================================================
+ERROR: test_upload_reports_csv_filename_mismatch (catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 261, in test_upload_reports_csv_filename_mismatch
+    response = self.client.post(
+        '/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart'
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 302, in post
+    response = super().post(
+        path, data=data, format=format, content_type=content_type, **extra)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 216, in post
+    return self.generic('POST', path, data, content_type, **extra)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 240, in generic
+    return super().generic(
+           ~~~~~~~~~~~~~~~^
+        method, path, data, content_type, secure, **extra)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 671, in generic
+    return self.request(**r)
+           ~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 292, in request
+    return super().request(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 244, in request
+    request = super().request(**kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 1090, in request
+    self.check_exception(response)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 805, in check_exception
+    raise exc_value
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\viewsets.py", line 124, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 526, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 474, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 485, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 523, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 763, in upload
+    UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1240, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 259, in <lambda>
+    side_effect=lambda function, *args: function(*args),
+                                        ~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 427, in process_batch_background
+    print(f"\U0001f680 Starting batch {batch_id} processing...")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 0: character maps to <undefined>
+
+======================================================================
+ERROR: test_upload_reports_missing_fields_and_undersized_images (catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 234, in test_upload_reports_missing_fields_and_undersized_images
+    response = self.client.post(
+        '/catalog/upload/', {'csv_file': csv_file, 'images': images}, format='multipart'
+    )
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 302, in post
+    response = super().post(
+        path, data=data, format=format, content_type=content_type, **extra)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 216, in post
+    return self.generic('POST', path, data, content_type, **extra)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 240, in generic
+    return super().generic(
+           ~~~~~~~~~~~~~~~^
+        method, path, data, content_type, secure, **extra)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 671, in generic
+    return self.request(**r)
+           ~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 292, in request
+    return super().request(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\test.py", line 244, in request
+    request = super().request(**kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 1090, in request
+    self.check_exception(response)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\test\client.py", line 805, in check_exception
+    raise exc_value
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\viewsets.py", line 124, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 526, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 474, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 485, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\.venv\Lib\site-packages\rest_framework\views.py", line 523, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 763, in upload
+    UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\unittest\mock.py", line 1240, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 232, in <lambda>
+    side_effect=lambda function, *args: function(*args),
+                                        ~~~~~~~~^^^^^^^
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\views\core.py", line 427, in process_batch_background
+    print(f"\U0001f680 Starting batch {batch_id} processing...")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\seth\AppData\Local\Python\pythoncore-3.13-64\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 0: character maps to <undefined>
+
+======================================================================
+FAIL: test_download_package_contains_template_and_image_guidelines (catalog.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 172, in test_download_package_contains_template_and_image_guidelines
+    self.assertIn('Use style_tags from: casual, minimalist', template)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Use style_tags from: casual, minimalist' not found in '"\U0001f4dd HOW TO UPLOAD: Replace the example row with your product details and matching Front and Rear image filenames. Use style_tags from: casual, smart, formal, sporty. Separate multiple tags with commas. SIZE RULE: clothing sizes are S, M, or L ONLY - cm measurements are rejected; the product page shows the cm range bracket automatically. Footwear: regional sizes with a region prefix (e.g., ""US 9"", ""EU 40"", ""UK 7""); all three region equivalents are displayed on the product page.",,,,,,,,,,\n\nname,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename\nExample Product,Replace with a product description.,tops,M,White,Pure White,neutral,599.00,casual,front.jpg,rear.jpg\n'
+
+======================================================================
+FAIL: test_download_template_contains_header_and_single_example_row (catalog.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 185, in test_download_template_contains_header_and_single_example_row
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        lines[2],
+        ^^^^^^^^^
+        'name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 'name[73 chars]le_tags,front_image_filename,rear_image_filename' != 'name[73 chars]le_tags,occasion_tags,front_image_filename,rear_image_filename'
+- name,description,category,size,color,color_description,color_family,price,style_tags,front_image_filename,rear_image_filename
++ name,description,category,size,color,color_description,color_family,price,style_tags,occasion_tags,front_image_filename,rear_image_filename
+?                                                                                      ++++++++++++++
+
+
+======================================================================
+FAIL: test_mismatch_message_carries_the_correct_color_to_declare (catalog.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 44, in test_mismatch_message_carries_the_correct_color_to_declare
+    self.assertIn('Correct color to declare: "Blue"', message)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Correct color to declare: "Blue"' not found in 'Color mismatch: declared \'Red\' but the image\'s dominant color is #1e4fd8. Correct color to declare: "blue" (color family: blue).'
+
+======================================================================
+FAIL: test_suggestion_names_the_passing_color_for_denim (catalog.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 37, in test_suggestion_names_the_passing_color_for_denim
+    self.assertEqual(suggestion['name'], 'Blue')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'blue' != 'Blue'
+- blue
+? ^
++ Blue
+? ^
+
+
+======================================================================
+FAIL: test_accepts_approved_comma_separated_tags_case_insensitively (catalog.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 76, in test_accepts_approved_comma_separated_tags_case_insensitively
+    self.assertTrue(is_valid)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_rejects_unapproved_style_and_occasion_tags (catalog.tests.CatalogTagValidationTests.test_rejects_unapproved_style_and_occasion_tags)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\seth\Documents\PRIN173-ProjectManagment\backend\catalog\tests.py", line 87, in test_rejects_unapproved_style_and_occasion_tags
+    self.assertTrue(any('not-an-occasion' in error and 'occasion_tags' in error for error in errors))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 23 tests in 166.374s
+
+FAILED (failures=6, errors=4)
+Destroying test database for alias 'default' ('test_fitfusion')...

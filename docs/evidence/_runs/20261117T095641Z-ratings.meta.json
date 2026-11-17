@@ -1,0 +1,252 @@
+{
+  "suite": "ratings",
+  "command": "python manage.py test ratings -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T09:56:41.379657Z",
+  "finished_utc": "2026-11-17T10:00:00.363583Z",
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 57,
+    "passed": 53,
+    "failed": 3,
+    "errors": 1,
+    "skipped": 0,
+    "exit_code": 1
+  },
+  "log": "docs/evidence/_runs/20261117T095641Z-ratings.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "ratings.tests.RatingAPITests.test_boolean_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_float_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_guest_session_clear_still_safe",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_guest_submit_rejected_and_not_persisted",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_mine_returns_only_own_stars",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_missing_score_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_model_has_no_vote_field",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_numeric_string_rejected_not_coerced",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_owner_only_update_delete",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_rating_never_required_for_core_flow",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_score_plus_like_or_dislike_keys_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_score_plus_vote_rejected_not_silently_dropped",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_score_six_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_score_zero_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_seller_cannot_delete_any_rating",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_seller_submit_rejected_and_not_persisted",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_source_required",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_star_persists",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_summary_approval_threshold_is_four",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_summary_filters_by_source_and_counts_approvals",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_undocumented_or_empty_source_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_unique_together_declared",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_upsert_same_user_target_source_keeps_one_row",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_vote_only_payload_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.RatingAPITests.test_vote_payload_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATEndpointRBACTests.test_uat_response_seller_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATEndpointRBACTests.test_uat_session_seller_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATEndpointRBACTests.test_uat_session_shopper_allowed",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATGuestDenialTests.test_guest_cannot_create_uat_session",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATGuestDenialTests.test_guest_cannot_export_uat_workbook",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATGuestDenialTests.test_guest_cannot_submit_uat_response_into_a_real_shopper_session",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests.UATGuestDenialTests.test_guest_cannot_submit_uat_response_with_a_fabricated_session_id",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_active_accounts_are_never_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_custom_window_is_honoured",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_due_date_is_archived_at_plus_grace_days",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_force_relocates_a_fresh_archive",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_fresh_archive_is_not_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_legacy_null_stamp_has_no_due_date",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_legacy_null_stamp_is_relocated_immediately",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveEligibilityMathTests.test_overdue_archive_is_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveSchedulePreviewTests.test_preview_force_marks_every_row_eligible",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveSchedulePreviewTests.test_preview_lists_legacy_rows_as_immediate",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ArchiveSchedulePreviewTests.test_preview_reports_schedule_and_moves_nothing",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdArchiveBackfillTests.test_apply_pseudonymizes_and_is_repeatable",
+      "result": "ERROR"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdArchiveBackfillTests.test_preview_writes_nothing",
+      "result": "FAIL"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdCopyTests.test_cold_copy_is_pseudonymized_and_idempotent",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdCopyTests.test_cold_moved_at_falls_back_to_now_for_legacy_rows",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdCopyTests.test_cold_moved_at_stores_the_scheduled_due_date",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdCopyTests.test_from_user_heals_a_legacy_intact_row",
+      "result": "FAIL"
+    },
+    {
+      "name": "ratings.tests_uat_charter.ColdCopyTests.test_seller_store_identity_is_cleared",
+      "result": "FAIL"
+    },
+    {
+      "name": "ratings.tests_uat_charter.RetentionErasureTests.test_login_blocked_after_relocation",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.RetentionErasureTests.test_orders_survive_but_are_pseudonymized",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.RetentionErasureTests.test_relocation_erases_active_personal_data",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.RetentionErasureTests.test_second_sweep_is_a_noop",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.SellerDetachTests.test_buyer_cart_items_are_detached_not_deleted",
+      "result": "ok"
+    },
+    {
+      "name": "ratings.tests_uat_charter.SweepResilienceTests.test_failure_on_one_row_is_logged_and_skipped",
+      "result": "ok"
+    }
+  ]
+}

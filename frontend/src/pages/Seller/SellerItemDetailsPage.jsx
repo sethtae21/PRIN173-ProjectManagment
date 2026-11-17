@@ -123,7 +123,6 @@ function SellerItemDetailsPage() {
     colorFamily: "",
     price: "",
     styleTags: "",
-    occasionTags: "",
   });
 
   useEffect(() => {
@@ -166,7 +165,6 @@ function SellerItemDetailsPage() {
             colorFamily: data.color_family || "",
             price: String(data.price || ""),
             styleTags: Array.isArray(data.style_tags) ? data.style_tags.join(", ") : (data.style_tags || ""),
-            occasionTags: Array.isArray(data.occasion_tags) ? data.occasion_tags.join(", ") : (data.occasion_tags || ""),
           });
         }
       } catch (err) {
@@ -232,7 +230,6 @@ function SellerItemDetailsPage() {
       colorFamily: product.color_family || "",
       price: String(product.price || ""),
       styleTags: Array.isArray(product.style_tags) ? product.style_tags.join(", ") : (product.style_tags || ""),
-      occasionTags: Array.isArray(product.occasion_tags) ? product.occasion_tags.join(", ") : (product.occasion_tags || ""),
     });
     setShowEditModal(true);
   }
@@ -263,7 +260,6 @@ function SellerItemDetailsPage() {
         color_family: editForm.colorFamily.trim(),
         price: Number(editForm.price) || 0,
         style_tags: (editForm.styleTags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
-        occasion_tags: (editForm.occasionTags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
       };
 
       console.log("Saving changes with payload:", payload);
@@ -466,7 +462,6 @@ function SellerItemDetailsPage() {
               <EditField label="Color Family" name="colorFamily" value={editForm.colorFamily} onChange={handleEditChange} required />
               <EditField label="Price" name="price" type="number" value={editForm.price} onChange={handleEditChange} min="1" step="0.01" required />
               <EditField label="Style Tags" name="styleTags" value={editForm.styleTags} onChange={handleEditChange} placeholder="Classic, Minimal" fullWidth required />
-              <EditField label="Occasion Tags" name="occasionTags" value={editForm.occasionTags} onChange={handleEditChange} placeholder="Work, Casual" fullWidth required />
             </div>
 
             <div className="seller-item-modal-actions">
@@ -519,7 +514,6 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
   ];
 
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
-  const occasionTags = Array.isArray(product.occasion_tags) ? product.occasion_tags : [];
 
   return (
     <>
@@ -600,7 +594,6 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
           <MetadataRow label="Color family" value={product.color_family} />
           <MetadataRow label="Price" value={formatPrice(product.price)} />
           <MetadataRow label="Style tags" value={styleTags.join(", ")} />
-          <MetadataRow label="Occasion tags" value={occasionTags.join(", ")} />
           <MetadataRow label="Status" value={product.status} />
 
           <div className="seller-item-management-actions">
@@ -619,7 +612,6 @@ function SellerMode({ product, sizeDisplay, formatPrice, onEdit, onDelete }) {
 
 function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, viewInformation, formatPrice }) {
   const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
-  const occasionTags = Array.isArray(product.occasion_tags) ? product.occasion_tags : [];
 
   const viewPaths = {
     front: product.front_image,
@@ -726,7 +718,7 @@ function ShopperPreview({ product, sizeDisplay, selectedView, setSelectedView, v
           </div>
 
           <div className="shopper-preview-tags">
-            {[...styleTags, ...occasionTags].map((tag, i) => (
+            {styleTags.map((tag, i) => (
               <span key={i}>{tag}</span>
             ))}
           </div>

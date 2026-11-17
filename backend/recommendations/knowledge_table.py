@@ -46,6 +46,16 @@ COLOR_COMPATIBILITY = {
                 "beige", "blue", "purple", "green", "teal", "pink", "magenta",
                 "gray", "silver"},
 }
+COLOR_DISPLAY_NAMES = {
+    name: name.title()
+    for name in set().union(*COLOR_COMPATIBILITY.values()) | {"black", "white", "cyan"}
+}
+
+
+def canonical_color_name(name):
+    """Return the canonical display casing for a supported color name."""
+    normalized = str(name).strip().casefold()
+    return COLOR_DISPLAY_NAMES.get(normalized, str(name).strip().title())
 
 # --- Body ranges (single source of truth) ------------------------------------
 HEIGHT_RANGE = (120.0, 218.0)      # cm, inclusive

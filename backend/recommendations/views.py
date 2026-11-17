@@ -17,6 +17,8 @@ from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 
 from catalog.models import CatalogItem
 
@@ -67,7 +69,6 @@ class RecommendationQuerySerializer(serializers.Serializer):
         default='balanced', required=False,
     )
     styles = serializers.CharField(required=False, allow_blank=True, max_length=500, default='')
-    occasions = serializers.CharField(required=False, allow_blank=True, max_length=500, default='')
     limit = serializers.IntegerField(min_value=1, max_value=50, default=10, required=False)
 
     def validate_height_cm(self, value):
@@ -86,17 +87,12 @@ class RecommendationQuerySerializer(serializers.Serializer):
     def validate_styles(self, value):
         return self._validate_tags(value, 'style')
 
-    def validate_occasions(self, value):
-        return self._validate_tags(value, 'occasion')
-
-
 def _avatar_profile(values) -> AvatarProfile:
     return AvatarProfile(
         undertone=values['undertone'],
         height_cm=values['height_cm'],
         body_shape=values['body_shape'],
         style_tags=values['styles'],
-        occasion_tags=values['occasions'],
     )
 
 
@@ -108,7 +104,6 @@ def _item_profile(item) -> ItemProfile:
         color_family=_as_tuple(getattr(item, "color_family", ())),
         color_description=getattr(item, "color_description", "") or "",
         style_tags=_as_tuple(getattr(item, "style_tags", ())),
-        occasion_tags=_as_tuple(getattr(item, "occasion_tags", ())),
     )
 
 
@@ -138,7 +133,6 @@ def _item_metadata(item) -> dict:
         "price": float(item.price),
         "front_image": _image_url(item),
         "style_tags": list(item.style_tags or []),
-        "occasion_tags": list(item.occasion_tags or []),
     }
 
 
@@ -161,7 +155,7 @@ class RecommendationListView(APIView):
     """GET /api/recommendations/ - ranked, explainable recommendations.
 
     Query params: undertone (warm|cool|neutral), height_cm, body_shape
-    (top-heavy|bottom-heavy|balanced), styles (csv), occasions (csv), limit.
+    (top-heavy|bottom-heavy|balanced), styles (csv), limit.
 
     Response includes, per item: total_score, max_score, the four baselined
     FR-7.2 rules (fired or not, with reasons) AND the catalog metadata the
@@ -170,6 +164,10 @@ class RecommendationListView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        parameters=[RecommendationQuerySerializer],
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request):
         query = RecommendationQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
@@ -185,7 +183,6 @@ class RecommendationListView(APIView):
                 "height_cm": avatar.height_cm,
                 "body_shape": avatar.body_shape,
                 "style_tags": list(avatar.style_tags),
-                "occasion_tags": list(avatar.occasion_tags),
             },
             "recommendations": _ranked_recommendations(
                 avatar, queryset, values['limit']
@@ -202,6 +199,10 @@ class MatchReasonsView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        parameters=[RecommendationQuerySerializer],
+        responses=OpenApiTypes.OBJECT,
+    )
     def get(self, request, item_id):
         query = RecommendationQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
@@ -220,7 +221,6 @@ class MatchReasonsView(APIView):
                 "height_cm": avatar.height_cm,
                 "body_shape": avatar.body_shape,
                 "style_tags": list(avatar.style_tags),
-                "occasion_tags": list(avatar.occasion_tags),
             },
             "match_reasons": breakdown["rules"],
         }

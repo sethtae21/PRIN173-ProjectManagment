@@ -234,7 +234,7 @@ class ColdCopyTests(TestCase):
         seller = _user('cold-seller@test.com', role='seller', store_name='Cold Store')
         _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
         cold = ArchivedUser.from_user(seller)
-        self.assertEqual(cold.store_name, '')
+        self.assertIsNone(cold.store_name)
         self.assertEqual(cold.role, 'seller')
         self.assertNotIn('Cold Store', str(cold.__dict__))
 
@@ -255,7 +255,7 @@ class ColdCopyTests(TestCase):
         self.assertEqual(
             healed.email, pseudonymous_profile_fields(str(user.pk))['email'])
         self.assertEqual(healed.password, '')
-        self.assertEqual(healed.mobile, '')
+        self.assertIsNone(healed.mobile)
 
     def test_cold_moved_at_stores_the_scheduled_due_date(self):
         """DOCUMENTED BEHAVIOUR (not the relocation instant).
@@ -308,15 +308,15 @@ class ColdArchiveBackfillTests(TestCase):
         )
 
     def test_preview_writes_nothing(self):
-        call_command('pseudonymize_archived_users')
+        call_command('pseudonymize_archived_users', '--dry-run')
         self.legacy.refresh_from_db()
         self.assertEqual(self.legacy.email, 'legacy@test.com')
         self.assertEqual(self.legacy.password, 'pbkdf2_sha256$legacyhash')
 
     def test_apply_pseudonymizes_and_is_repeatable(self):
-        call_command('pseudonymize_archived_users', '--apply')
+        call_command('pseudonymize_archived_users')
         self.legacy.refresh_from_db()
-        expected = pseudonymous_profile_fields('legacy0001')
+        expected = pseudonymous_profile_fields('legacy0001', role='seller')
         for name, value in expected.items():
             self.assertEqual(getattr(self.legacy, name), value, name)
         self.assertEqual(self.legacy.email,
@@ -327,7 +327,7 @@ class ColdArchiveBackfillTests(TestCase):
         self.assertIsNotNone(self.legacy.cold_moved_at)
         # Second run is a guaranteed no-op.
         before = self.legacy.email
-        call_command('pseudonymize_archived_users', '--apply')
+        call_command('pseudonymize_archived_users')
         self.legacy.refresh_from_db()
         self.assertEqual(self.legacy.email, before)
 

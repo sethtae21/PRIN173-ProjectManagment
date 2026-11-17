@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: not stated in ticket
-- Method: Artifact check for `docs/evidence/KAN-75/team-working-agreement-signed.pdf`.
-- Result: NEEDS-CAPTURE - No signed Team Working Agreement was present in the repository inventory.
-- Tests proving this ticket: N/A (manual or artifact evidence; not a backend test).
-- Artifact: `Expected: docs/evidence/KAN-75/team-working-agreement-signed.pdf`
-- Commit: `389a0de`  Verified: `2026-11-16`
-- Limitations: No signed Team Working Agreement was present in the repository inventory.
+- Method: docs/evidence/KAN-75/team-working-agreement-signed.pdf
+- Result: NEEDS-CAPTURE - expected artifact missing or not verifiable: docs/evidence/KAN-75/team-working-agreement-signed.pdf.
+- Tests proving this ticket: N/A (manual or artifact evidence; no ticket-specific backend test executed).
+- Artifact: docs/evidence/KAN-75/team-working-agreement-signed.pdf
+- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
+- Limitations: A signed Team Working Agreement scan is human-provided evidence and is not in the repository.

@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: not stated in ticket
-- Method: Artifact/version check at `docs/evidence/KAN-74/Scope-Baseline-v1.0.md`.
-- Result: NEEDS-CAPTURE - The present v1.1 Scope Baseline does not satisfy the Jira ticket for v1.0.
-- Tests proving this ticket: N/A (manual or artifact evidence; not a backend test).
-- Artifact: `Expected: docs/evidence/KAN-74/Scope-Baseline-v1.0.md; found: docs/Papers/Scope (3).md (v1.1)`
-- Commit: `389a0de`  Verified: `2026-11-16`
-- Limitations: The present v1.1 Scope Baseline does not satisfy the Jira ticket for v1.0.
+- Method: docs/evidence/KAN-74/Scope-Baseline-v1.0.md
+- Result: NEEDS-CAPTURE - expected artifact missing or not verifiable: docs/evidence/KAN-74/Scope-Baseline-v1.0.md.
+- Tests proving this ticket: N/A (manual or artifact evidence; no ticket-specific backend test executed).
+- Artifact: docs/evidence/KAN-74/Scope-Baseline-v1.0.md
+- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
+- Limitations: Git history contains Scope Baseline v1.1 only; no v1.0 commit or file was found.

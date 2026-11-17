@@ -1,0 +1,102 @@
+﻿# FITFUSION AI — DEFENSE EVIDENCE
+Issue: KAN-118 — 1.3.6 Mock E-Commerce Module (backend)
+Traceability: SRS FR-6.1-FR-6.9; remaining traceability not stated in Jira export
+Command: python manage.py test commerce -v 2
+Working dir: C:\Users\seth\Documents\PRIN173-ProjectManagment\backend / Environment: Windows; backend .venv; Python 3.13.15; Django 6.0.8
+Executed: 2026-11-11T17:25:34.4385470+08:00 by seth
+Result: PASS (exit code 0)
+--- raw output below ---
+Creating test database for alias 'default' ('test_fitfusion')...
+Found 8 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying sessions.0001_initial...test_cart_crud_round_trip (commerce.tests.CommerceAPITests.test_cart_crud_round_trip) ...  OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] GET /cart/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+[IDENTITY] PATCH /cart/update_quantity/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+[IDENTITY] POST /cart/remove_item/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+[IDENTITY] DELETE /cart/clear/ -> token owner=shopper@example.com role=shopper id=6af434b82ff8ad9842cd121b | HTTP 200
+ok
+test_checkout_approval_snapshots_and_clears_cart (commerce.tests.CommerceAPITests.test_checkout_approval_snapshots_and_clears_cart) ... [IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6af434c82ff8ad9842cd1234 | HTTP 201
+ok
+test_checkout_decline_keeps_cart_and_creates_no_order (commerce.tests.CommerceAPITests.test_checkout_decline_keeps_cart_and_creates_no_order) ... [IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6af434d32ff8ad9842cd124e | HTTP 402
+ok
+test_checkout_persists_selected_items_and_leaves_unselected_cart_items (commerce.tests.CommerceAPITests.test_checkout_persists_selected_items_and_leaves_unselected_cart_items) ... [IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6af434dd2ff8ad9842cd1266 | HTTP 201
+ok
+test_checkout_rejects_empty_cart (commerce.tests.CommerceAPITests.test_checkout_rejects_empty_cart) ... [IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6af434e82ff8ad9842cd1282 | HTTP 400
+ok
+test_guest_rejected_from_cart_and_checkout (commerce.tests.CommerceAPITests.test_guest_rejected_from_cart_and_checkout) ... ok
+test_remove_selected_items_only_removes_current_users_selection (commerce.tests.CommerceAPITests.test_remove_selected_items_only_removes_current_users_selection) ... [IDENTITY] POST /cart/remove_selected/ -> token owner=shopper@example.com role=shopper id=6af434fc2ff8ad9842cd12af | HTTP 200
+ok
+test_user_cannot_read_another_users_order (commerce.tests.CommerceAPITests.test_user_cannot_read_another_users_order) ... [IDENTITY] GET /orders/6af435082ff8ad9842cd12ce/ -> token owner=shopper@example.com role=shopper id=6af435072ff8ad9842cd12cb | HTTP 404
+[IDENTITY] GET /orders/ -> token owner=shopper@example.com role=shopper id=6af435072ff8ad9842cd12cb | HTTP 200
+ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 88.768s
+
+OK
+Destroying test database for alias 'default' ('test_fitfusion')...

@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: SRS Sections 5.2 to 5.3; acceptance per WBS Dictionary 1.2.2.
-- Method: python manage.py spectacular --file ..\docs\evidence\KAN-41\api-schema.yml
-- Result: BLOCKED - schema command exited 0, but reported 25 warnings and 63 errors.
-- Tests proving this ticket: N/A (manual or artifact evidence; not a backend test).
-- Artifact: `docs/evidence/KAN-41/api-schema.yml; docs/evidence/KAN-41/spectacular.log`
-- Commit: `389a0de`  Verified: `2026-11-16`
-- Limitations: Command exited 0, but the schema summary reports 25 warnings and 63 errors; operations are omitted.
+- Method: docs/evidence/KAN-41/api-schema.yml; docs/evidence/KAN-41/20261117T093410Z-spectacular.log
+- Result: PASS - artifact present at docs/evidence/KAN-41/api-schema.yml, docs/evidence/KAN-41/20261117T093410Z-spectacular.log.
+- Tests proving this ticket: N/A (manual or artifact evidence; no ticket-specific backend test executed).
+- Artifact: docs/evidence/KAN-41/api-schema.yml; docs/evidence/KAN-41/20261117T093410Z-spectacular.log
+- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
+- Limitations: Changed schema annotations to produce 69 operations with zero errors; 25 warnings remain.

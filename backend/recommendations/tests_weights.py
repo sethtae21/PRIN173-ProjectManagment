@@ -39,8 +39,8 @@ apply PLUS CCB routing as a baselined change.
 import unittest
 
 from recommendations.knowledge_table import (
-    CATEGORY_GROUPS, COLOR_COMPATIBILITY, CONTRAST_BY_HEIGHT,
-    PROPORTION_SHADING, WEIGHTS, WEIGHTS_VERSION, height_band,
+    CATEGORY_GROUPS, COLOR_COMPATIBILITY, PROPORTION_SHADING, WEIGHTS,
+    WEIGHTS_VERSION, allowed_contrast, height_zone,
 )
 from recommendations.scoring import (
     AvatarProfile, ItemProfile, score_item, rank_items, RULE_ORDER,
@@ -78,13 +78,13 @@ def _pick_color():
 
 
 def _pick_contrast():
-    """(height_cm, band, winning_contrast, losing_contrast) or Nones."""
+    """(height_cm, zone, winning_contrast, losing_contrast) or Nones."""
     try:
         for h in (150.0, 160.0, 170.0, 180.0, 190.0):
-            band = height_band(h)
-            rec = CONTRAST_BY_HEIGHT.get(band, set())
+            zone = height_zone(h)
+            rec = allowed_contrast(h)
             if rec:
-                return h, band, sorted(rec)[0], _nonmember(rec)
+                return h, zone, sorted(rec)[0], _nonmember(rec)
     except Exception:
         pass
     return None, None, None, None
@@ -111,11 +111,11 @@ def _pick_shading():
     return None, None, None, None
 
 
-def _off_item(name, *, style=(), occasion=()):
-    """A candidate that fires ONLY style_occasion (and only on tag overlap)."""
+def _off_item(name, *, style=()):
+    """A candidate that fires ONLY the style-tag rule on overlap."""
     return ItemProfile(
         name=name, category="tops", color_family=(), color_description="",
-        style_tags=tuple(style), occasion_tags=tuple(occasion),
+        style_tags=tuple(style),
         contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE,
     )
 
@@ -137,12 +137,12 @@ def _build_canonical_profiles():
         profiles.append((
             "P1_color_focus",
             AvatarProfile(undertone=ut, height_cm=170.0, body_shape="balanced",
-                          style_tags=("casual",), occasion_tags=("everyday",)),
+                          style_tags=("casual",)),
             [
                 ItemProfile("P1 Winner", "tops", (win_color,), "", ("casual",),
-                            ("everyday",), contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
+                            contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
                 ItemProfile("P1 Runner", "tops", (lose_color,), "", ("casual",),
-                            ("everyday",), contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
+                            contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
                 _off_item("P1 Decoy"),
             ],
             "P1 Winner",
@@ -152,12 +152,12 @@ def _build_canonical_profiles():
         profiles.append((
             "P4_style_focus",
             AvatarProfile(undertone=ut, height_cm=170.0, body_shape="balanced",
-                          style_tags=("streetwear", "bold"), occasion_tags=("party",)),
+                          style_tags=("streetwear", "bold")),
             [
                 ItemProfile("P4 Winner", "tops", (win_color,), "", ("streetwear", "bold"),
-                            ("party",), contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
+                            contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
                 ItemProfile("P4 Runner", "tops", (lose_color,), "", ("office",),
-                            ("work",), contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
+                            contrast_level=_OFF_CONTRAST, shade=_OFF_SHADE),
                 _off_item("P4 Decoy"),
             ],
             "P4 Winner",
@@ -167,12 +167,12 @@ def _build_canonical_profiles():
         profiles.append((
             "P2_contrast_focus",
             AvatarProfile(undertone=ut, height_cm=h_c, body_shape="balanced",
-                          style_tags=("smart",), occasion_tags=("work",)),
+                          style_tags=("smart",)),
             [
                 ItemProfile("P2 Winner", "tops", (win_color,), "", ("smart",),
-                            ("work",), contrast_level=win_contrast, shade=_OFF_SHADE),
+                            contrast_level=win_contrast, shade=_OFF_SHADE),
                 ItemProfile("P2 Runner", "tops", (win_color,), "", ("smart",),
-                            ("work",), contrast_level=lose_contrast, shade=_OFF_SHADE),
+                            contrast_level=lose_contrast, shade=_OFF_SHADE),
                 _off_item("P2 Decoy"),
             ],
             "P2 Winner",
@@ -182,12 +182,12 @@ def _build_canonical_profiles():
         profiles.append((
             "P3_shading_focus",
             AvatarProfile(undertone=ut, height_cm=170.0, body_shape=sh_shape,
-                          style_tags=("minimalist",), occasion_tags=("everyday",)),
+                          style_tags=("minimalist",)),
             [
                 ItemProfile("P3 Winner", sh_cat, (win_color,), "", ("minimalist",),
-                            ("everyday",), contrast_level=_OFF_CONTRAST, shade=win_shade),
+                            contrast_level=_OFF_CONTRAST, shade=win_shade),
                 ItemProfile("P3 Runner", sh_cat, (lose_color,), "", ("minimalist",),
-                            ("everyday",), contrast_level=_OFF_CONTRAST, shade=lose_shade),
+                            contrast_level=_OFF_CONTRAST, shade=lose_shade),
                 _off_item("P3 Decoy"),
             ],
             "P3 Winner",
@@ -292,6 +292,17 @@ class TestKnowledgeTableIntegrity(unittest.TestCase):
     def test_weights_has_exactly_the_four_rules(self):
         self.assertEqual(set(WEIGHTS.keys()), set(RULE_ORDER))
 
+    def test_weights_match_the_baselined_fr_7_2_values(self):
+        self.assertEqual(
+            WEIGHTS,
+            {
+                "color_compatibility": 3,
+                "height_contrast": 2,
+                "proportion_shading": 1,
+                "style_occasion": 1,
+            },
+        )
+
     def test_weights_are_positive_integers(self):
         for k, v in WEIGHTS.items():
             self.assertIsInstance(v, int)
@@ -347,10 +358,48 @@ class TestEndpointSmoke(TestCase):
         self.assertIsInstance(res.data["recommendations"], list)
 
 
+class TestRecommendationQueryValidation(TestCase):
+    def _get(self, **params):
+        return APIClient().get("/api/recommendations/", params)
+
+    def test_rejects_invalid_limit_bounds(self):
+        for limit in (0, 51):
+            with self.subTest(limit=limit):
+                response = self._get(limit=limit)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("limit", response.data)
+
+    def test_rejects_unknown_enums(self):
+        for params, field in (
+            ({"undertone": "warmmm"}, "undertone"),
+            ({"body_shape": "topheavy"}, "body_shape"),
+        ):
+            with self.subTest(field=field):
+                response = self._get(**params)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
+
+    def test_rejects_invalid_or_out_of_range_height(self):
+        for height in ("not-a-number", 251):
+            with self.subTest(height=height):
+                response = self._get(height_cm=height)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("height_cm", response.data)
+
+    def test_caps_style_tag_count(self):
+        response = self._get(styles=",".join(["casual"] * 21))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("styles", response.data)
+
+
 class TestActiveItemFilter(TestCase):
     def test_only_active_catalog_items_are_recommended(self):
         seller = User.objects.create_user(
-            username="kan111-seller", password="Test123!@#", role="seller"
+            email="kan111-seller@test.com",
+            full_name="KAN-111 Seller",
+            password="Test123!@#",
+            role="seller",
+            store_name="KAN-111 Test Store",
         )
         item_fields = {
             "description": "Recommendation filter regression fixture.",

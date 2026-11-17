@@ -13,6 +13,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import generics
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -63,10 +65,7 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
         user.archived_at = timezone.now()
         user.save(update_fields=['status', 'is_active', 'archived_at'])
 
-        return Response({
-            'success': True,
-            'message': 'Your account has been archived. All your data is retained.',
-        }, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +170,7 @@ class FittingStudioSurveyView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         rows = FittingStudioSurvey.objects.filter(user=request.user)
         return Response({
@@ -180,6 +180,7 @@ class FittingStudioSurveyView(APIView):
             'surveys': [_survey_payload(row) for row in rows],
         }, status=status.HTTP_200_OK)
 
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     def post(self, request):
         # RBAC: surveys are a REGISTERED SHOPPER surface. Sellers out.
         if getattr(request.user, 'role', None) != 'shopper':

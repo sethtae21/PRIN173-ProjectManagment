@@ -1,0 +1,124 @@
+Command: python manage.py test outfits -v 2
+UTC start: 2026-11-16T01:45:09.085Z
+Commit: 389a0deccfb3677fa2b374098dfbdaa746e72885
+Python: Python 3.13.15
+Django: 6.0.8
+--- Full raw command output ---
+python : Creating test database for alias 'default' ('test_fitfusion')...
+At line:2 char:1002
++ ... global:LASTEXITCODE = 0; python manage.py test $app -v 2 2>&1 | Tee-O ...
++                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Creating test d..._fitfusion')...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+Found 10 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying catalog.0005_alter_catalogitem_category... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying sessions.0001_initial... OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa603f616bf39054c097a8 | HTTP 201
+test_account_deletion_cascades_outfits (outfits.tests.OutfitAPITests.test_account_deletion_cascades_outfits) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa6047616bf39054c097c1 | HTTP 400
+test_cannot_add_inactive_item_on_create (outfits.tests.OutfitAPITests.test_cannot_add_inactive_item_on_create) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa604e616bf39054c097d8 | HTTP 201
+test_create_returns_id_list_and_binds_user (outfits.tests.OutfitAPITests.test_create_returns_id_list_and_binds_user) 
+... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa6056616bf39054c097f4 | HTTP 201
+test_create_with_no_items_allowed (outfits.tests.OutfitAPITests.test_create_with_no_items_allowed) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa605c616bf39054c0980a | HTTP 201
+[IDENTITY] DELETE /outfits/6afa605e616bf39054c0980e/ -> token owner=alice@t.com role=shopper id=6afa605c616bf39054c0980a | HTTP 204
+[IDENTITY] GET /outfits/6afa605e616bf39054c0980e/ -> token owner=alice@t.com role=shopper id=6afa605c616bf39054c0980a | HTTP 404
+test_delete_204_then_gone (outfits.tests.OutfitAPITests.test_delete_204_then_gone) ... ok
+test_guest_rejected_401 (outfits.tests.OutfitAPITests.test_guest_rejected_401) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa606b616bf39054c09838 | HTTP 201
+[IDENTITY] PATCH /outfits/6afa606d616bf39054c0983e/ -> token owner=alice@t.com role=shopper id=6afa606b616bf39054c09838 | HTTP 200
+[IDENTITY] PATCH /outfits/6afa606d616bf39054c0983e/ -> token owner=alice@t.com role=shopper id=6afa606b616bf39054c09838 | HTTP 200
+[IDENTITY] PATCH /outfits/6afa606d616bf39054c0983e/ -> token owner=alice@t.com role=shopper id=6afa606b616bf39054c09838 | HTTP 400
+test_inactive_existing_item_does_not_lock_out_edit 
+(outfits.tests.OutfitAPITests.test_inactive_existing_item_does_not_lock_out_edit) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa6074616bf39054c09856 | HTTP 201
+[IDENTITY] GET /outfits/ -> token owner=bob@t.com role=shopper id=6afa6074616bf39054c09857 | HTTP 200
+[IDENTITY] GET /outfits/6afa6075616bf39054c0985a/ -> token owner=bob@t.com role=shopper id=6afa6074616bf39054c09857 | HTTP 404
+test_list_is_owner_only_and_foreign_retrieve_404 
+(outfits.tests.OutfitAPITests.test_list_is_owner_only_and_foreign_retrieve_404) ... ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa607b616bf39054c0986f | HTTP 201
+[IDENTITY] GET /outfits/6afa607b616bf39054c09873/ -> token owner=alice@t.com role=shopper id=6afa607b616bf39054c0986f | HTTP 200
+test_persists_across_sessions_server_side (outfits.tests.OutfitAPITests.test_persists_across_sessions_server_side) ... 
+ok
+[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6afa6082616bf39054c09888 | HTTP 201
+[IDENTITY] PATCH /outfits/6afa6083616bf39054c0988e/ -> token owner=alice@t.com role=shopper id=6afa6082616bf39054c09888 | HTTP 200
+test_update_name_and_items (outfits.tests.OutfitAPITests.test_update_name_and_items) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 75.115s
+
+OK
+Destroying test database for alias 'default' ('test_fitfusion')...
+
+
+Exit code: 0
+Run summary: 
+

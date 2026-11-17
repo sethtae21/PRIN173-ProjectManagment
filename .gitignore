@@ -36,6 +36,10 @@ staticfiles/
 *.pyc
 backend/backups/
 
+# Timestamped Jira evidence logs are deliverables.
+!docs/evidence/_runs/*.log
+!docs/evidence/KAN-*/*.log
+
 # Repo hygiene: generated background-removal cache must not be tracked
 backend/rembg_cache/
 Backend/rembg_cache/

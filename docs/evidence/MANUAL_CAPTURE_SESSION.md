@@ -64,12 +64,10 @@ are not mistaken for completed captures:
 
 | Ticket | Missing artifact to capture |
 |---|---|
-| KAN-41 | The generated `docs/evidence/KAN-41/api-schema.yml` omits operations: the captured run reported 25 warnings and 63 schema errors. Resolve the generator diagnostics and regenerate the schema. |
-| KAN-62 | `docs/evidence/KAN-62/seller-template-instructions.zip` |
-| KAN-71 | `docs/evidence/KAN-71/project-idea-document.pdf`, `docs/evidence/KAN-71/SRS-v1.0.md`, `docs/evidence/KAN-71/Scope-Baseline-v1.0.md`, and `docs/evidence/KAN-71/team-working-agreement-signed.pdf`. The repository has SRS and Scope Baseline v1.1, not the v1.0 versions requested by Jira. |
-| KAN-72 | `docs/evidence/KAN-72/project-idea-document.pdf` |
-| KAN-73 | `docs/evidence/KAN-73/SRS-v1.0.md` (the existing `docs/Papers/SRS (5).md` is v1.1). |
-| KAN-74 | `docs/evidence/KAN-74/Scope-Baseline-v1.0.md` (the existing `docs/Papers/Scope (3).md` is v1.1). |
+| KAN-71 | `docs/evidence/KAN-71/project-idea-document.pdf`, `docs/evidence/KAN-71/SRS-v1.0.md`, `docs/evidence/KAN-71/Scope-Baseline-v1.0.md`, and `docs/evidence/KAN-71/team-working-agreement-signed.pdf`. No Project Idea Document was found in `docs/Papers` or Git history; Git history contains only SRS and Scope Baseline v1.1, not v1.0. |
+| KAN-72 | `docs/evidence/KAN-72/project-idea-document.pdf`. No Project Idea Document was found in `docs/Papers` or Git history. |
+| KAN-73 | `docs/evidence/KAN-73/SRS-v1.0.md`. Git history contains SRS v1.1 only; no v1.0 commit or file was found. |
+| KAN-74 | `docs/evidence/KAN-74/Scope-Baseline-v1.0.md`. Git history contains Scope Baseline v1.1 only; no v1.0 commit or file was found. |
 | KAN-75 | `docs/evidence/KAN-75/team-working-agreement-signed.pdf` |
 | KAN-79 | `docs/evidence/KAN-79/weekly-sprint-reports.pdf` |
 

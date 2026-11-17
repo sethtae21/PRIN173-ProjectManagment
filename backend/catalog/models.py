@@ -60,7 +60,6 @@ class CatalogItem(models.Model):
     color_family = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     style_tags = models.JSONField(default=list, blank=True)
-    occasion_tags = models.JSONField(default=list, blank=True)
     compatible_color_palette_tags = models.JSONField(default=list, blank=True)
     seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='catalog_items')
     store_name = models.CharField(max_length=255)

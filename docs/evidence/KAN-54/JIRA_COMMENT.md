@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: not stated in ticket
-- Method: `python manage.py test accounts -v 2` (PYTHONIOENCODING=utf-8 set).
-- Result: BLOCKED - accounts: 20 tests; 15 passed; 6 failures; 0 errors; see captured failure output.
-- Tests proving this ticket: `accounts.tests.AccountManagementTests.test_guest_cannot_view_profile`
-- Artifact: `docs/evidence/_runs/20261116T012828Z-accounts.log; docs/evidence/KAN-54/DEFECT_KAN-54.md`
-- Commit: `389a0de`  Verified: `2026-11-16`
-- Limitations: This test checks profile access only; no dedicated guest-data ephemerality test was found in accounts/tests.py.
+- Method: `python manage.py test accounts -v 2`; `python manage.py test commerce -v 2`; `python manage.py test ratings -v 2`
+- Result: PASS - 4 ticket tests passed / 0 failed; 0 skipped across accounts, commerce, ratings.
+- Tests proving this ticket: `accounts.tests.AccountManagementTests.test_guest_cannot_view_profile`; `accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_guest_rejected_and_no_row_written`; `ratings.tests.RatingAPITests.test_guest_submit_rejected_and_not_persisted`; `commerce.tests.CommerceAPITests.test_guest_rejected_from_cart_and_checkout`
+- Artifact: docs/evidence/_runs/20261117T101912Z-accounts.log; docs/evidence/_runs/20261117T100000Z-commerce.log; docs/evidence/_runs/20261117T100832Z-ratings.log
+- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
+- Limitations: Backend suite evidence does not verify browser behavior, production traffic, or manual usability checks.

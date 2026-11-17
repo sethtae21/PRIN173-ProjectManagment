@@ -1,0 +1,292 @@
+{
+  "suite": "accounts",
+  "command": "python manage.py test accounts -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T09:43:18Z",
+  "finished_utc": null,
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 67,
+    "passed": 67,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "log": "docs/evidence/_runs/20261117T094318Z-accounts.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "accounts.tests.AccountManagementTests.test_delete_account_archives_and_blocks_login",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_guest_cannot_view_profile",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_password_change_success_and_login",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_password_change_wrong_current_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_profile_payload_excludes_body_fields",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_update_profile",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_update_profile_ignores_legacy_body_fields",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AccountManagementTests.test_view_profile",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AvatarPresetCRUDTests.test_create_preset",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AvatarPresetCRUDTests.test_guest_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AvatarPresetCRUDTests.test_list_returns_only_own_presets",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AvatarPresetCRUDTests.test_male_with_cup_size_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.AvatarPresetCRUDTests.test_other_user_cannot_update_or_delete",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.PasswordChangePersistenceTests.test_seller_password_change_is_persisted",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.PasswordChangePersistenceTests.test_shopper_password_change_is_persisted",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_active_accounts_are_never_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_custom_window_is_honoured",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_due_date_is_archived_at_plus_grace_days",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_force_relocates_a_fresh_archive",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_fresh_archive_is_not_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_legacy_null_stamp_has_no_due_date",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_legacy_null_stamp_is_relocated_immediately",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveEligibilityMathTests.test_overdue_archive_is_relocated",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_force_marks_every_row_eligible",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_lists_legacy_rows_as_immediate",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ArchiveSchedulePreviewTests.test_preview_reports_schedule_and_moves_nothing",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_cold_copy_is_pseudonymized_and_idempotent",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_cold_copy_never_copies_the_password_hash",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_cold_moved_at_falls_back_to_now_for_legacy_rows",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_cold_moved_at_stores_the_scheduled_due_date",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_from_user_heals_a_legacy_intact_copy",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.ColdCopyTests.test_seller_store_identity_is_cleared",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_backfill_handles_a_synthetic_legacy_closed_account_id",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_command_pseudonymizes_and_is_repeatable",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_dry_run_writes_nothing",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_prune_sanitize_existing_flag_heals_legacy_rows",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.LegacyArchiveBackfillTests.test_prune_sanitize_existing_preview_is_dry",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.RetentionErasureTests.test_cold_archive_holds_no_direct_identifiers",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.RetentionErasureTests.test_login_blocked_after_relocation",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.RetentionErasureTests.test_orders_survive_but_are_pseudonymized",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.RetentionErasureTests.test_relocation_erases_active_personal_data",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.RetentionErasureTests.test_second_sweep_is_a_noop",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.SellerDetachTests.test_buyer_cart_items_are_detached_not_deleted",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_archive_retention.SweepResilienceTests.test_failure_on_one_row_is_logged_and_skipped",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_empty_survey_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_get_returns_own_rows_and_mirror",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_guest_rejected_and_no_row_written",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_legacy_reaction_keys_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_schema_uses_fit_rating_and_has_no_legacy_fields",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_seller_rejected_and_no_row_written",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_strict_star_types_rejected",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.FittingStudioSurveyTests.test_two_phase_upsert_one_row_and_gain",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_apply_false_is_a_dry_run",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_helper_is_a_noop_on_clean_data",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_migration_call_shape_apply_keyword_is_supported",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyDedupeHelperTests.test_positional_bool_is_treated_as_apply",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_confidence_gain_is_server_computed_not_client_supplied",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_db_rejects_duplicate_user_session",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_lost_create_race_resolves_to_the_existing_row",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_meta_declares_the_unique_key",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_same_session_id_allowed_for_different_users",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests_fitting_studio_survey.SurveyUpsertKeyConcurrencyTests.test_stale_phase_snapshot_cannot_clobber_the_other_phase",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.DatabasePingRedactionTests.test_ping_result_never_contains_the_connection_uri",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.GridFSStorageDeletionTests.test_delete_falls_back_to_filename_for_non_object_id_keys",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.GridFSStorageDeletionTests.test_delete_finds_object_id_backed_image_fields",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.GridFSStorageDeletionTests.test_delete_is_a_noop_when_the_file_is_already_absent",
+      "result": "ok"
+    },
+    {
+      "name": "accounts.tests.GridFSStorageDeletionTests.test_delete_propagates_failure_when_gridfs_is_unavailable",
+      "result": "ok"
+    }
+  ]
+}

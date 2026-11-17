@@ -1,0 +1,158 @@
+Creating test database for alias 'default' ('test_fitfusion')...
+Found 46 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying accounts.0008_replace_fit_vote_with_score... OK
+  Applying accounts.0009_fit_rating_and_validators... OK
+  Applying accounts.0010_remove_survey_user_type... OK
+  Applying accounts.0011_unique_fitting_survey_session... OK
+  Applying accounts.0012_pseudonymize_archiveduser... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying catalog.0005_alter_catalogitem_category... OK
+  Applying catalog.0006_remove_catalogitem_occasion_tags... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying ratings.0005_star_only_ratings... OK
+  Applying sessions.0001_initial...test_download_package_contains_template_and_image_guidelines (recommendations.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines) ... ok
+test_download_template_contains_header_and_single_example_row (recommendations.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row) ... ok
+test_guest_cannot_upload (recommendations.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload) ... ok
+test_patch_accepts_extended_sizes_and_rejects_legacy_formats (recommendations.tests.CatalogValidationAndCRUDTests.test_patch_accepts_extended_sizes_and_rejects_legacy_formats) ...  OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afc249d6136da574bd6a7e4/ -> token owner=seller@test.com role=seller id=6afc249c6136da574bd6a7e2 | HTTP 400
+ok
+test_public_catalog_style_filter_matches_json_array_tags (recommendations.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags) ... ok
+test_regular_user_cannot_upload (recommendations.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload) ... [IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6afc24a46136da574bd6a810 | HTTP 403
+ok
+test_rejects_missing_view_images (recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24a66136da574bd6a824 | HTTP 400
+ok
+test_rejects_opaque_background_removal_output (recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output) ... ok
+test_rejects_oversized_image (recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24ac6136da574bd6a84e | HTTP 400
+ok
+test_seller_can_list_and_manage_own_items (recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items) ... [IDENTITY] GET /catalog/my-listings/6afc24af6136da574bd6a865/ -> token owner=seller@test.com role=seller id=6afc24af6136da574bd6a863 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc24af6136da574bd6a865/ -> token owner=seller@test.com role=seller id=6afc24af6136da574bd6a863 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6afc24af6136da574bd6a865/ -> token owner=seller@test.com role=seller id=6afc24af6136da574bd6a863 | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6afc24af6136da574bd6a865/ -> token owner=seller@test.com role=seller id=6afc24af6136da574bd6a863 | HTTP 404
+ok
+test_seller_can_replace_image_and_mismatch_is_rejected (recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_mismatch_is_rejected) ... [IDENTITY] PATCH /catalog/my-listings/6afc24b36136da574bd6a87b/ -> token owner=seller@test.com role=seller id=6afc24b36136da574bd6a879 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afc24b36136da574bd6a87b/ -> token owner=seller@test.com role=seller id=6afc24b36136da574bd6a879 | HTTP 200
+ok
+test_seller_cannot_manage_other_sellers_items (recommendations.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items) ... [IDENTITY] GET /catalog/my-listings/6afc24b96136da574bd6a89b/ -> token owner=seller@test.com role=seller id=6afc24b86136da574bd6a898 | HTTP 404
+ok
+test_successful_upload_derives_color_palette_tags (recommendations.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24bb6136da574bd6a8af | HTTP 202
+ok
+test_upload_recognizes_header_after_template_instruction_rows (recommendations.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows) ... [IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6afc24c06136da574bd6a8ce | HTTP 200
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24c06136da574bd6a8ce | HTTP 202
+ok
+test_upload_reports_csv_filename_mismatch (recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24c36136da574bd6a8e5 | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afc24c36136da574bd6a8e5 | HTTP 200
+ok
+test_upload_reports_missing_fields_and_undersized_images (recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images) ... [IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afc24c76136da574bd6a8fc | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afc24c76136da574bd6a8fc | HTTP 200
+ok
+test_only_active_catalog_items_are_recommended (recommendations.tests_weights.TestActiveItemFilter.test_only_active_catalog_items_are_recommended) ... ok
+test_response_shape (recommendations.tests_weights.TestEndpointSmoke.test_response_shape) ... ok
+test_caps_style_tag_count (recommendations.tests_weights.TestRecommendationQueryValidation.test_caps_style_tag_count) ... ok
+test_rejects_invalid_limit_bounds (recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_limit_bounds) ... ok
+test_rejects_invalid_or_out_of_range_height (recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_or_out_of_range_height) ... ok
+test_rejects_unknown_enums (recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_unknown_enums) ... ok
+test_accepts_dominant_shade_of_declared_color (recommendations.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color) ... ok
+test_mismatch_message_carries_the_correct_color_to_declare (recommendations.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare) ... ok
+test_muted_hue_gray_denim_now_passes (recommendations.tests.CatalogColorAlignmentTests.test_muted_hue_gray_denim_now_passes) ... ok
+test_rejects_a_different_dominant_color (recommendations.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color) ... ok
+test_suggestion_names_the_passing_color_for_denim (recommendations.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim) ... ok
+test_unmapped_hue_suggests_nearest_family_and_passes_when_declared (recommendations.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared) ... ok
+test_accepts_all_standard_clothing_sizes (recommendations.tests.CatalogSizePolicyTests.test_accepts_all_standard_clothing_sizes) ... ok
+test_rejects_footwear_category (recommendations.tests.CatalogSizePolicyTests.test_rejects_footwear_category) ... ok
+test_rejects_measured_and_nonstandard_sizes (recommendations.tests.CatalogSizePolicyTests.test_rejects_measured_and_nonstandard_sizes) ... ok
+test_accepts_approved_comma_separated_tags_case_insensitively (recommendations.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively) ... ok
+test_rejects_unapproved_style_tags (recommendations.tests.CatalogTagValidationTests.test_rejects_unapproved_style_tags) ... ok
+test_each_rule_points_is_zero_or_its_weight (recommendations.tests_weights.TestDeterminism.test_each_rule_points_is_zero_or_its_weight) ... ok
+test_rank_is_repeatable (recommendations.tests_weights.TestDeterminism.test_rank_is_repeatable) ... ok
+test_tie_break_is_by_name (recommendations.tests_weights.TestDeterminism.test_tie_break_is_by_name) ... ok
+test_total_equals_sum_of_rule_points (recommendations.tests_weights.TestDeterminism.test_total_equals_sum_of_rule_points) ... ok
+test_weights_are_positive_integers (recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_are_positive_integers) ... ok
+test_weights_has_exactly_the_four_rules (recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_has_exactly_the_four_rules) ... ok
+test_weights_match_the_baselined_fr_7_2_values (recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_match_the_baselined_fr_7_2_values) ... ok
+test_weights_version_present (recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_version_present) ... ok
+test_exact_scores_and_order (recommendations.tests_weights.TestLiteralFreeze.test_exact_scores_and_order) ... skipped 'Phase-2 literal freeze not captured yet — run the §Capture command in docs/WEIGHTS_VALIDATION_REPORT.md, then paste into LITERAL_FREEZE. Phase-1 invariants + ±1 sweep already cover FR-7.2.'
+test_plus_minus_one_does_not_invert (recommendations.tests_weights.TestSensitivity.test_plus_minus_one_does_not_invert) ... ok
+test_precondition_gap_ge_two (recommendations.tests_weights.TestSensitivity.test_precondition_gap_ge_two) ... ok
+test_at_least_two_profiles_built (recommendations.tests_weights.TestSuiteNonVacuous.test_at_least_two_profiles_built) ... ok
+test_sensitivity_actually_exercised (recommendations.tests_weights.TestSuiteNonVacuous.test_sensitivity_actually_exercised) ... ok
+
+----------------------------------------------------------------------
+Ran 46 tests in 68.251s
+
+OK (skipped=1)
+Destroying test database for alias 'default' ('test_fitfusion')...

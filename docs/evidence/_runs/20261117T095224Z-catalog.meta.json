@@ -1,0 +1,240 @@
+{
+  "suite": "catalog",
+  "command": "python manage.py test catalog -v 2",
+  "cwd": "backend",
+  "executable": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe",
+  "started_utc": "2026-11-17T09:52:24.722187Z",
+  "finished_utc": "2026-11-17T09:55:14.831404Z",
+  "git_rev_parse_head": "cbb6eab779dd61025214f68102867c342acd6351",
+  "worktree_dirty": true,
+  "python_version": "3.13.15",
+  "django_version": "6.0.8",
+  "counts": {
+    "ran": 54,
+    "passed": 54,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "log": "docs/evidence/_runs/20261117T095224Z-catalog.log",
+  "inventory_complete": true,
+  "tests": [
+    {
+      "name": "catalog.tests.CatalogBatchGuardTests.test_batch_commit_persists_processed_image_names",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogBatchGuardTests.test_batch_deferred_purge_failure_is_attributable_to_the_listing",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogBatchGuardTests.test_delete_during_batch_processing_does_not_resurrect_item",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogDeletePathTests.test_another_sellers_item_untouched_by_delete",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogDeletePathTests.test_delete_with_gridfs_unreachable_succeeds_and_logs_error",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogDeletePathTests.test_queryset_delete_removes_both_blobs_and_detach_intact",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogDeletePathTests.test_seller_cascade_removes_both_blobs",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogGridFSBackupTests.test_backup_excludes_referenced_blobs",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogGridFSBackupTests.test_backup_then_sweep_then_restore_round_trip",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogGridFSBackupTests.test_backup_with_no_orphans_writes_nothing",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogGridFSBackupTests.test_restore_is_idempotent",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogSweepOrphanTests.test_sweep_delete_removes_orphans_only",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogSweepOrphanTests.test_sweep_dry_run_does_not_delete",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogSweepOrphanTests.test_sweep_ignores_non_catalog_prefixes",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogSweepOrphanTests.test_sweep_is_idempotent",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_delete_between_processing_and_commit_purges_new_images",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_delete_during_revalidation_does_not_resurrect_item",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_delete_refused_when_gridfs_unreachable_leaves_listing_intact",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_delete_without_images_still_succeeds_when_gridfs_unreachable",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_deleting_listing_leaves_order_item_snapshots_intact",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_deleting_listing_removes_both_stored_images",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_edited_rejected_listing_stays_processing_until_pipeline_passes",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_old_image_cleanup_failure_does_not_strand_processing",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_partial_replacement_write_is_compensated",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_pipeline_submission_failure_does_not_leave_item_processing",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_public_catalog_store_filter_returns_only_active_seller_items",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_rejected_listing_with_missing_assets_cannot_be_promoted",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_repeated_replace_then_delete_leaves_no_orphaned_lineage",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_replacement_storage_failure_does_not_strand_processing",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_replacing_image_deletes_old_gridfs_object",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_it_revalidates",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_seller_color_mismatch_rejects_listing_not_activates",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_muted_hue_gray_denim_now_passes",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively",
+      "result": "ok"
+    },
+    {
+      "name": "catalog.tests.CatalogTagValidationTests.test_rejects_style_tags_outside_controlled_vocabulary",
+      "result": "ok"
+    }
+  ]
+}
