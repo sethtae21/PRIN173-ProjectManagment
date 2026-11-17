@@ -832,12 +832,23 @@
   margin-top: 25px;
 }
 
+/* CHANGED: explicit padding + fixed 12px label size (matching the page's
+   other action buttons). The longer "Use Existing Avatar Preset" / "Create
+   New Avatar Preset" labels wrap to two lines at the modal's 440px width;
+   text-wrap: balance keeps that wrap even (e.g. "Create New / Avatar
+   Preset") and the grid stretches both buttons to the same height.
+   NOTE: font-size/line-height must come AFTER the `font: inherit`
+   shorthand or they get reset. */
 .guest-product-modal-actions button {
   min-height: 47px;
+  padding: 10px 12px;
   border: 1px solid #b57e20;
   border-radius: 8px;
   font: inherit;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
+  text-wrap: balance;
   cursor: pointer;
   transition: all 0.2s ease;
 }

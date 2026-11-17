@@ -316,10 +316,14 @@ function ProductDetailsPage({ isGuest = false }) {
     setShowTryOnModal(true);
   }
 
-  // CHANGED: both choices open Avatar Presets (premade pre-selects the
-  // standard avatar, custom pre-selects your first saved custom avatar).
-  // Pressing Use there continues to the Fitting Studio, which equips the
-  // staged garment via the pending-item handshake.
+  // CHANGED (create-path redirect): "Use Existing Avatar Preset" still opens
+  // Avatar Presets with FitFusion Standard pre-selected — pressing Use there
+  // continues to the Fitting Studio. "Create New Avatar Preset" now goes
+  // STRAIGHT to the Fitting Studio customize page (same destination as the
+  // "Create Custom Avatar" button on Avatar Presets). Both paths stage the
+  // garment first, so the studio equips it via the pending-item handshake;
+  // on the create path the shopper customizes the body and saves it with
+  // "Save Avatar Preset".
   function chooseTryOnPath(mode) {
     if (!product) return;
 
@@ -341,8 +345,15 @@ function ProductDetailsPage({ isGuest = false }) {
 
     setShowTryOnModal(false);
 
+    // NEW: create path -> straight into the Fitting Studio; the pending-item
+    // key written above makes the studio equip this garment on arrival.
+    if (mode === "custom") {
+      navigate(`${basePath}/fitting-studio/customize`);
+      return;
+    }
+
     navigate(`${basePath}/avatar-presets`, {
-      state: { presetKind: mode === "premade" ? "premade" : "custom" },
+      state: { presetKind: "premade" },
     });
   }
 
@@ -723,21 +734,26 @@ function ProductDetailsPage({ isGuest = false }) {
               staged for your session and will be equipped automatically when
               the Fitting Studio opens.
             </span>
+            {/* CHANGED: labels are now "Use Existing Avatar Preset" / "Create
+                New Avatar Preset". The create path ("custom") redirects
+                straight to the Fitting Studio customize page; the existing
+                path ("premade") still opens Avatar Presets. */}
             <div className="guest-product-modal-actions">
               <button
                 type="button"
                 onClick={() => chooseTryOnPath("premade")}
               >
-                Premade Avatar
+                Use Existing Avatar Preset
               </button>
               <button
                 type="button"
                 onClick={() => chooseTryOnPath("custom")}
               >
-                Customize Avatar
+                Create New Avatar Preset
               </button>
             </div>
-            {/* FIX: proper breathing room below the buttons (was glued). */}
+            {/* FIX: proper breathing room below the buttons (was glued).
+                CHANGED: helper copy matches the new labels + create redirect. */}
             <p
               style={{
                 margin: "14px 0 12px",
@@ -746,11 +762,12 @@ function ProductDetailsPage({ isGuest = false }) {
                 lineHeight: 1.6,
               }}
             >
-              <strong>Premade Avatar</strong> opens Avatar Presets with
-              FitFusion Standard selected. <strong>Customize Avatar</strong>{" "}
-              opens Avatar Presets so you can choose one of your saved custom
-              avatars. Press <strong>Use</strong> to continue to the Fitting
-              Studio with this garment equipped.
+              <strong>Use Existing Avatar Preset</strong> opens Avatar Presets
+              with FitFusion Standard selected. Press <strong>Use</strong>{" "}
+              there to continue to the Fitting Studio with this garment
+              equipped. <strong>Create New Avatar Preset</strong> opens the
+              Fitting Studio right away with this garment equipped, so you
+              can customize your avatar and save it as a new preset.
             </p>
             <button
               type="button"
