@@ -160,11 +160,21 @@ SIMPLE_JWT = {
 # ==========================================
 # CORS Configuration (React Frontend Integration)
 # ==========================================
+# CHANGED (dev port 5173 -> 8443): the Vite dev server now runs on 8443
+# (frontend/vite.config.js, strictPort). The 8443 http+https origins lead the
+# default list; legacy 5173/3000 entries are kept so anyone still on the old
+# port isn't broken mid-transition. NOTE: with DEBUG=True the block at the
+# bottom opens ALL origins anyway — this list is what protects staging
+# (DEBUG=False).
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
-        'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000'
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:8443,http://127.0.0.1:8443,'
+        'https://localhost:8443,https://127.0.0.1:8443,'
+        'http://localhost:5173,http://localhost:3000,'
+        'http://127.0.0.1:5173,http://127.0.0.1:3000'
     ).split(',')
     if origin.strip()
 ]
@@ -194,6 +204,22 @@ CORS_ALLOW_METHODS = [
 # Allow all origins only in local development (for easier debugging)
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+
+# CHANGED (port 8443): Django 4+ rejects unsafe requests (POST/PUT/DELETE)
+# whose Origin header is an unlisted HTTPS URL. This matters for session/
+# cookie flows — Django admin login and the template test pages — when they
+# are reached through the https://localhost:8443 staging proxy
+# (local_staging_server.mjs). JWT-authenticated DRF calls are CSRF-exempt,
+# so the API itself is unaffected either way.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'https://localhost:8443,https://127.0.0.1:8443,'
+        'http://localhost:8443,http://127.0.0.1:8443'
+    ).split(',')
+    if origin.strip()
+]
 
 SECURE_SSL_REDIRECT = os.environ.get(
     'SECURE_SSL_REDIRECT', 'False' if DEBUG else 'True'
