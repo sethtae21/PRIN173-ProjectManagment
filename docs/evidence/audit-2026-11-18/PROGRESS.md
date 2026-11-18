@@ -17,3 +17,13 @@ Logs: 20261118T135032Z-six-suites-coverage-final.log (267 tests, exit 0);
 20261118T140756Z-playwright-evidence-screens.log (5 passed).
 Result: all core files >=80% (min 82%); Playwright exit 0; index row PASS.
 Next: Phase 3 — seed staging, write staging-phase-a.spec.ts, run E2E.
+
+## Phase 3 — KAN-115 staging E2E + client validation — DONE
+Files: frontend/e2e/staging-phase-a.spec.ts (new), docs/evidence/KAN-115/
+(JIRA_COMMENT.md, seed/build/run logs + meta, 11 screenshots),
+docs/evidence/EVIDENCE_INDEX.md.
+Seed: seller CSV upload accepted 1/1 and auto-activated (Classic White Tee,
+Seed Store cbd72b57); SEED_RESULT PASS.
+Run: staging-phase-a.spec.ts 8 tests exit 0 (20261118T142852Z log).
+Limitation recorded: KAN-87 live UAT walkthrough still outstanding.
+Next: Phase 4 — assemble KAN-100 handover package.

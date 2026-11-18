@@ -1,0 +1,9 @@
+{
+    "run":  "20261118T142852Z",
+    "exit_code":  0,
+    "ticket":  "KAN-115",
+    "api_base_url":  "http://127.0.0.1:8000",
+    "app_base_url":  "https://localhost:8443",
+    "spec":  "frontend/e2e/staging-phase-a.spec.ts",
+    "log":  "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\docs\\evidence\\KAN-115\\20261118T142852Z-staging-phase-a.log"
+}
