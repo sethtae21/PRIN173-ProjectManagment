@@ -971,6 +971,79 @@ class CatalogValidationAndCRUDTests(_GridFSIsolatedMixin, TestCase):
         self.assertEqual(self.gridfs.files, {})
         self.assertEqual(self.gridfs.chunks, {})
 
+    # --- KAN-120: server-side price sort and range filters ---
+    def _create_price_item(self, name, price, size='M', store='Test Store', status='active'):
+        return CatalogItem.objects.create(
+            name=name, description='desc', category='tops', size=size,
+            color='White', color_description='white', color_family='neutral',
+            price=price, seller=self.seller, store_name=store, status=status)
+
+    def test_public_catalog_sort_price_asc_and_desc(self):
+        low = self._create_price_item('Low Shirt', 10.0)
+        mid = self._create_price_item('Mid Shirt', 20.0)
+        high = self._create_price_item('High Shirt', 30.0)
+
+        asc = self.client.get('/catalog/', {'sort': 'price_asc'})
+        self.assertEqual(asc.status_code, status.HTTP_200_OK)
+        self.assertEqual([entry['id'] for entry in asc.data],
+                         [str(low.id), str(mid.id), str(high.id)])
+
+        desc = self.client.get('/catalog/', {'sort': 'price_desc'})
+        self.assertEqual(desc.status_code, status.HTTP_200_OK)
+        self.assertEqual([entry['id'] for entry in desc.data],
+                         [str(high.id), str(mid.id), str(low.id)])
+
+    def test_public_catalog_price_range_filter(self):
+        self._create_price_item('Below Range', 5.0)
+        in_range = self._create_price_item('In Range', 25.0)
+        self._create_price_item('Above Range', 50.0)
+
+        response = self.client.get('/catalog/', {'min_price': '20', 'max_price': '30'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([entry['id'] for entry in response.data], [str(in_range.id)])
+
+    def test_public_catalog_sort_composes_with_size_filter(self):
+        small_high = self._create_price_item('Small High', 40.0, size='S')
+        small_low = self._create_price_item('Small Low', 15.0, size='S')
+        self._create_price_item('Medium Low', 5.0, size='M')
+
+        response = self.client.get('/catalog/', {'size': 'S', 'sort': 'price_asc'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([entry['id'] for entry in response.data],
+                         [str(small_low.id), str(small_high.id)])
+
+    def test_public_catalog_store_listing_unchanged_with_and_without_sort(self):
+        first = self._create_price_item('Store A', 10.0, store='Test Store')
+        second = self._create_price_item('Store B', 30.0, store='Test Store')
+        self._create_price_item('Other Store C', 20.0, store='Other Store')
+
+        unsorted = self.client.get('/catalog/', {'store': 'Test Store'})
+        sorted_response = self.client.get(
+            '/catalog/', {'store': 'Test Store', 'sort': 'price_desc'})
+
+        self.assertEqual(unsorted.status_code, status.HTTP_200_OK)
+        self.assertEqual(sorted_response.status_code, status.HTTP_200_OK)
+        self.assertEqual({entry['id'] for entry in unsorted.data},
+                         {str(first.id), str(second.id)})
+        self.assertEqual({entry['id'] for entry in sorted_response.data},
+                         {str(first.id), str(second.id)})
+        self.assertEqual([entry['id'] for entry in sorted_response.data],
+                         [str(second.id), str(first.id)])
+
+    def test_public_catalog_invalid_sort_and_price_params_return_400(self):
+        cases = [
+            {'sort': 'price_sideways'},
+            {'min_price': '-1'},
+            {'max_price': 'not-a-number'},
+            {'min_price': '50', 'max_price': '10'},
+        ]
+        for params in cases:
+            with self.subTest(params=params):
+                response = self.client.get('/catalog/', params)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class CatalogBatchGuardTests(_GridFSIsolatedMixin, TestCase):
     """KAN-119: the batch worker must not resurrect a deleted listing, and its

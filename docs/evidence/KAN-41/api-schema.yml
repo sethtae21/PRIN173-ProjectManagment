@@ -631,8 +631,30 @@ paths:
   /catalog/:
     get:
       operationId: catalog_list
+      summary: List active catalog items
+      parameters:
+      - in: query
+        name: max_price
+        schema:
+          type: number
+          format: double
+        description: Only include items priced at or below this non-negative value.
+      - in: query
+        name: min_price
+        schema:
+          type: number
+          format: double
+        description: Only include items priced at or above this non-negative value.
+      - in: query
+        name: sort
+        schema:
+          type: string
+          enum:
+          - price_asc
+          - price_desc
+        description: Sort active listings by price (ascending or descending).
       tags:
-      - catalog
+      - Catalog
       security:
       - jwtAuth: []
       - {}

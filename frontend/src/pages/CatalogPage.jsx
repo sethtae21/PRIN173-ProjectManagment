@@ -133,6 +133,15 @@ function CatalogPage({ isGuest = false }) {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [modalAction, setModalAction] = useState("");
 
+  // KAN-120: price ordering is applied by the API (sort=price_asc|price_desc),
+  // not by re-sorting the array on the client.
+  const sortParam =
+    filterOption === "price-low"
+      ? "price_asc"
+      : filterOption === "price-high"
+      ? "price_desc"
+      : "";
+
   // === picker-mode state (only populated when launched from the editor) ====
   const [editMode, setEditMode] = useState(false);
   const [editOutfit, setEditOutfit] = useState(null);
@@ -144,7 +153,9 @@ function CatalogPage({ isGuest = false }) {
 
     async function fetchProducts() {
       try {
-        const data = await catalogAPI.list();
+        const data = await catalogAPI.list(
+          sortParam ? { sort: sortParam } : {}
+        );
         if (isMounted) {
           const normalized = Array.isArray(data)
             ? data.map((p) => ({
@@ -172,7 +183,7 @@ function CatalogPage({ isGuest = false }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [sortParam]);
 
   // === consume the editor's one-shot mode key on mount =====================
   useEffect(() => {
@@ -241,11 +252,7 @@ function CatalogPage({ isGuest = false }) {
       return matchesSearch && matchesCategory && matchesSize;
     });
 
-    return [...filtered].sort((a, b) => {
-      if (filterOption === "price-low") return a.price - b.price;
-      if (filterOption === "price-high") return b.price - a.price;
-      return 0;
-    });
+    return filtered;
   }, [products, searchText, selectedCategory, filterOption]);
 
   function showGuestRestriction(action) {

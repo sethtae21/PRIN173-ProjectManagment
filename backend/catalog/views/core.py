@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from rest_framework import status, viewsets, parsers, serializers
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from accounts.permissions import IsSeller
@@ -696,8 +697,34 @@ class CatalogViewSet(viewsets.ModelViewSet):
     serializer_class = CatalogItemSerializer
     permission_classes = [IsSeller]
 
+    PRICE_SORTS = ('price_asc', 'price_desc')
+
+    def _price_query_param(self, name):
+        """Return a validated non-negative Decimal for min_price/max_price."""
+        raw = self.request.query_params.get(name)
+        if raw in (None, ''):
+            return None
+        try:
+            value = Decimal(str(raw))
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValidationError({name: 'Must be a valid decimal number.'})
+        if not value.is_finite() or value < 0:
+            raise ValidationError({name: 'Must be a non-negative decimal.'})
+        return value
+
     def get_queryset(self):
         queryset = CatalogItem.objects.filter(status='active')
+
+        sort = self.request.query_params.get('sort')
+        if sort and sort not in self.PRICE_SORTS:
+            raise ValidationError(
+                {'sort': f"Unsupported sort '{sort}'. Use one of: {', '.join(self.PRICE_SORTS)}."})
+
+        min_price = self._price_query_param('min_price')
+        max_price = self._price_query_param('max_price')
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise ValidationError({'min_price': 'min_price must be less than or equal to max_price.'})
+
         if category := self.request.query_params.get('category'):
             queryset = queryset.filter(category=category)
         if color := self.request.query_params.get('color'):
@@ -706,6 +733,10 @@ class CatalogViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(size__icontains=size)
         if store := self.request.query_params.get('store'):
             queryset = queryset.filter(store_name__icontains=store)
+        if min_price is not None:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price is not None:
+            queryset = queryset.filter(price__lte=max_price)
         if style := self.request.query_params.get('style'):
             style_query = style.strip().casefold()
             queryset = [
@@ -713,7 +744,36 @@ class CatalogViewSet(viewsets.ModelViewSet):
                 if isinstance(item.style_tags, list)
                 and any(style_query in str(tag).casefold() for tag in item.style_tags)
             ]
+        if sort == 'price_asc':
+            if isinstance(queryset, list):
+                queryset.sort(key=lambda item: item.price)
+            else:
+                queryset = queryset.order_by('price', 'id')
+        elif sort == 'price_desc':
+            if isinstance(queryset, list):
+                queryset.sort(key=lambda item: item.price, reverse=True)
+            else:
+                queryset = queryset.order_by('-price', 'id')
         return queryset
+
+    @extend_schema(
+        summary="List active catalog items",
+        parameters=[
+            OpenApiParameter(
+                'sort', OpenApiTypes.STR, OpenApiParameter.QUERY,
+                enum=['price_asc', 'price_desc'],
+                description='Sort active listings by price (ascending or descending).'),
+            OpenApiParameter(
+                'min_price', OpenApiTypes.DECIMAL, OpenApiParameter.QUERY,
+                description='Only include items priced at or above this non-negative value.'),
+            OpenApiParameter(
+                'max_price', OpenApiTypes.DECIMAL, OpenApiParameter.QUERY,
+                description='Only include items priced at or below this non-negative value.'),
+        ],
+        tags=['Catalog'],
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='download-template')
     def download_template(self, request):
