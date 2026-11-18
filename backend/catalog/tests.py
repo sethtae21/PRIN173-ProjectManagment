@@ -20,6 +20,7 @@ from catalog.models import CatalogItem
 from catalog.storage import gridfs_storage
 from catalog.views import core as catalog_core
 from catalog.views.core import CatalogValidator
+from catalog import validators as legacy_validators
 from recommendations.knowledge_table import canonical_color_name
 
 
@@ -1429,3 +1430,96 @@ class CatalogGridFSBackupTests(_GridFSIsolatedMixin, TestCase):
     def test_backup_with_no_orphans_writes_nothing(self):
         out, _ = self._call('backup_gridfs_orphans', out=self._temp_path())
         self.assertIn('No orphans found', out)
+class CatalogLegacyValidatorCoverageTests(SimpleTestCase):
+    """Focused coverage for the retained catalog/validators.py compatibility module."""
+
+    @staticmethod
+    def _image_bytes(size=(600, 600), color=(200, 30, 30), mode='RGB'):
+        image = Image.new(mode, size, color)
+        output = io.BytesIO()
+        image.save(output, format='PNG')
+        return output.getvalue()
+
+    def test_validate_csv_row_accepts_valid_and_reports_errors(self):
+        validator = legacy_validators.CatalogValidator()
+        row = {
+            'name': 'Shirt', 'description': 'desc', 'category': 'tops',
+            'size': 'M', 'color': 'Red', 'color_description': 'red',
+            'color_family': 'red', 'price': '10.00',
+            'front_image_filename': 'front.png', 'rear_image_filename': 'rear.png'}
+        valid, errors = validator.validate_csv_row(row, 1)
+        self.assertTrue(valid)
+        self.assertEqual(errors, [])
+
+        valid, errors = validator.validate_csv_row({'price': '-1', 'category': 'footwear'}, 2)
+        self.assertFalse(valid)
+        self.assertTrue(any('Price must be positive' in error for error in errors))
+        self.assertTrue(any('Invalid category' in error for error in errors))
+        self.assertTrue(any("Missing required field 'name'" in error for error in errors))
+
+        _, errors = validator.validate_csv_row({'price': 'abc'}, 3)
+        self.assertTrue(any('Invalid price format' in error for error in errors))
+
+    def test_validate_image_dimensions_mode_and_corruption(self):
+        validator = legacy_validators.CatalogValidator()
+        good = SimpleUploadedFile('front.png', self._image_bytes(), content_type='image/png')
+        self.assertEqual(validator.validate_image(good, 'front.png', 1, 'front'), [])
+
+        mismatch = SimpleUploadedFile('other.png', self._image_bytes(size=(10, 10)),
+                                      content_type='image/png')
+        errors = validator.validate_image(mismatch, 'front.png', 1, 'front')
+        self.assertTrue(any('filename mismatch' in error for error in errors))
+        self.assertTrue(any('too small' in error for error in errors))
+
+        oversized = SimpleUploadedFile(
+            'front.png', self._image_bytes(size=(5000, 10)), content_type='image/png')
+        errors = validator.validate_image(oversized, 'front.png', 1, 'front')
+        self.assertTrue(any('too large' in error for error in errors))
+
+        palette = SimpleUploadedFile(
+            'front.png', self._image_bytes(color=1, mode='P'), content_type='image/png')
+        errors = validator.validate_image(palette, 'front.png', 1, 'front')
+        self.assertTrue(any('invalid color mode' in error for error in errors))
+
+        corrupt = SimpleUploadedFile('front.png', b'not-an-image', content_type='image/png')
+        errors = validator.validate_image(corrupt, 'front.png', 1, 'front')
+        self.assertTrue(any('corrupted or invalid' in error for error in errors))
+
+    def test_process_image_with_rembg_success_and_failure(self):
+        validator = legacy_validators.CatalogValidator()
+        image = SimpleUploadedFile('front.png', self._image_bytes(), content_type='image/png')
+        with patch('catalog.validators.remove', return_value=self._image_bytes(mode='RGB')):
+            result = validator.process_image_with_rembg(image)
+        self.assertEqual(Image.open(result).mode, 'RGBA')
+
+        image = SimpleUploadedFile('front.png', self._image_bytes(), content_type='image/png')
+        with patch('catalog.validators.remove', side_effect=RuntimeError('boom')):
+            with self.assertRaises(Exception) as context:
+                validator.process_image_with_rembg(image)
+        self.assertIn('Background removal failed', str(context.exception))
+
+    def test_extract_dominant_color_handles_rgb_transparency_and_bad_input(self):
+        validator = legacy_validators.CatalogValidator()
+        red = self._image_bytes(size=(20, 20), color=(255, 0, 0))
+        self.assertEqual(validator.extract_dominant_color(io.BytesIO(red)), '#ff0000')
+
+        transparent = self._image_bytes(size=(20, 20), color=(10, 20, 30, 0), mode='RGBA')
+        self.assertEqual(validator.extract_dominant_color(io.BytesIO(transparent)), '#000000')
+
+        self.assertEqual(validator.extract_dominant_color(io.BytesIO(b'bad')), '#000000')
+
+    def test_color_alignment_and_palette_tags(self):
+        validator = legacy_validators.CatalogValidator()
+        suggestion = validator.suggest_declared_color('#1e4fd8')
+        is_valid, _ = validator.validate_color_alignment(suggestion['name'], '#1e4fd8')
+        self.assertTrue(is_valid)
+
+        self.assertEqual(
+            validator.generate_color_palette_tags('#ff0000', 'Red'),
+            ['warm-tone', 'vibrant', 'light', 'red-family'])
+        self.assertEqual(
+            validator.generate_color_palette_tags('#334455', 'Blue'),
+            ['cool-tone', 'muted', 'dark', 'blue-family'])
+        self.assertEqual(
+            validator.generate_color_palette_tags('#808080', ''),
+            ['warm-tone', 'neutral', 'medium'])

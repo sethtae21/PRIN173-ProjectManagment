@@ -3,10 +3,23 @@ from datetime import timedelta
 from django.test import TestCase
 from django.test import SimpleTestCase
 from unittest.mock import Mock, patch
-from rest_framework.test import APIClient
+from types import SimpleNamespace
+from rest_framework import serializers as drf_serializers
+from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from accounts.archive import ARCHIVE_GRACE_DAYS
 from accounts.models import User
+from accounts.serializers import AvatarPresetSerializer
+from accounts.serializers.auth_serializers import (
+    LoginSerializer,
+    RegistrationContactSerializer,
+    RegistrationSerializer,
+    validate_email_format,
+    validate_password_strength,
+)
+from accounts.validators import validate_mobile_number, validate_postal_code
+from accounts.views import auth_views
+from accounts.views.preset_views import AvatarPresetViewSet
 from commerce.models import Cart, Order
 from outfits.models import AvatarPreset, Outfit
 from accounts.storage import GridFSStorage
@@ -432,3 +445,251 @@ class DatabasePingRedactionTests(SimpleTestCase):
         self.assertTrue(result['ok'])
         self.assertNotIn('uri', result)
         self.assertNotIn('secret', str(result))
+class AuthValidationCoverageTests(TestCase):
+    """Focused coverage for auth serializers/validators and legacy auth views."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            full_name='Coverage User', email='coverage@test.com',
+            password='Test123!@#', role='user')
+
+    def test_password_policy_rejects_each_weak_case(self):
+        weak = {
+            'short': 'Aa1!',
+            'no_upper': 'lowercase1!',
+            'no_lower': 'UPPERCASE1!',
+            'no_number': 'NoNumber!',
+            'no_special': 'NoSpecial1',
+        }
+        for label, password in weak.items():
+            with self.subTest(case=label):
+                with self.assertRaises(drf_serializers.ValidationError):
+                    validate_password_strength(password)
+        self.assertEqual(validate_password_strength('Strong123!'), 'Strong123!')
+
+    def test_email_format_helper_rejects_invalid_address(self):
+        self.assertEqual(validate_email_format('ok@test.com'), 'ok@test.com')
+        with self.assertRaises(drf_serializers.ValidationError):
+            validate_email_format('not-an-email')
+
+    def test_contact_serializer_rejects_duplicates_and_bad_values(self):
+        User.objects.create_seller(
+            full_name='Taken Seller', email='taken@test.com',
+            store_name='Taken Store', password='Test123!@#',
+            role='seller', mobile='09123456789')
+
+        duplicate = RegistrationContactSerializer(data={
+            'email': 'TAKEN@test.com', 'mobile': '09123456789',
+            'store_name': 'taken store'})
+        self.assertFalse(duplicate.is_valid())
+        for field in ('email', 'mobile', 'store_name'):
+            self.assertIn(field, duplicate.errors)
+
+        short_mobile = RegistrationContactSerializer(data={
+            'email': 'short@test.com', 'mobile': '0912345678'})
+        self.assertFalse(short_mobile.is_valid())
+
+        wrong_prefix = RegistrationContactSerializer(data={
+            'email': 'prefix@test.com', 'mobile': '08123456789'})
+        self.assertFalse(wrong_prefix.is_valid())
+
+        blank_store = RegistrationContactSerializer(data={
+            'email': 'blank-store@test.com', 'mobile': '09123456780',
+            'store_name': '   '})
+        self.assertTrue(blank_store.is_valid(), blank_store.errors)
+
+    def test_registration_serializer_rejects_name_mismatch_and_seller_without_store(self):
+        base = {
+            'email': 'valid@test.com', 'full_name': 'Valid Name',
+            'password': 'Test123!@#', 'password_confirm': 'Test123!@#',
+            'mobile': '09123456780'}
+
+        short_name = RegistrationSerializer(data={**base, 'full_name': 'Solo'})
+        self.assertFalse(short_name.is_valid())
+        self.assertIn('full_name', short_name.errors)
+
+        mismatch = RegistrationSerializer(data={**base, 'password_confirm': 'Different1!'})
+        self.assertFalse(mismatch.is_valid())
+        self.assertIn('password_confirm', mismatch.errors)
+
+        seller_no_store = RegistrationSerializer(
+            data={**base, 'role': 'seller', 'store_name': ''})
+        self.assertFalse(seller_no_store.is_valid())
+        self.assertIn('store_name', seller_no_store.errors)
+
+    def test_login_serializer_rejects_missing_deactivated_and_archived(self):
+        missing = LoginSerializer(data={'email': '', 'password': ''})
+        self.assertFalse(missing.is_valid())
+
+        deactivated = SimpleNamespace(is_active=False, status='active')
+        with patch('accounts.serializers.auth_serializers.authenticate',
+                   return_value=deactivated):
+            serializer = LoginSerializer(data={'email': 'x@test.com', 'password': 'Test123!@#'})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('deactivated', str(serializer.errors))
+
+        archived = SimpleNamespace(is_active=True, status='archive')
+        with patch('accounts.serializers.auth_serializers.authenticate',
+                   return_value=archived):
+            serializer = LoginSerializer(data={'email': 'x@test.com', 'password': 'Test123!@#'})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('archived', str(serializer.errors))
+
+    def test_preset_serializer_aliases_and_range_validation(self):
+        base = {
+            'name': 'Coverage Preset', 'gender': 'female', 'height': 170,
+            'weight': 60, 'skin_tone': 'medium', 'undertone': 'neutral',
+            'shoulder': 'average', 'waist': 'average', 'hip': 'average',
+            'thigh': 'average', 'style_focus': 'casual', 'body_build_cm': 95}
+
+        alias_payload = {
+            key: value for key, value in base.items()
+            if key not in ('skin_tone', 'style_focus', 'body_build_cm')
+        }
+        alias_payload.update({
+            'skinTone': ' Fair ', 'bodyBuildCm': '95.5',
+            'styleFocus': 'Formal', 'cupSize': 'b'})
+        aliased = AvatarPresetSerializer(data=alias_payload)
+        self.assertTrue(aliased.is_valid(), aliased.errors)
+        self.assertEqual(aliased.validated_data['skin_tone'], 'Fair')
+        self.assertEqual(aliased.validated_data['style_focus'], 'formal')
+        self.assertEqual(aliased.validated_data['cup_size'], 'B')
+
+        no_cup = AvatarPresetSerializer(data={**base, 'cup_size': None})
+        self.assertTrue(no_cup.is_valid(), no_cup.errors)
+
+        invalid_cases = {
+            'height': {**base, 'height': 119},
+            'weight': {**base, 'weight': 29},
+            'cup_size': {**base, 'cup_size': 'Z'},
+            'body_build_cm': {**base, 'body_build_cm': 85},
+        }
+        for field, payload in invalid_cases.items():
+            with self.subTest(field=field):
+                serializer = AvatarPresetSerializer(data=payload)
+                self.assertFalse(serializer.is_valid())
+                self.assertIn(field, serializer.errors)
+
+    def test_preset_destroy_rejects_non_owner_branch(self):
+        owner = User.objects.create_user(
+            full_name='Preset Owner', email='owner@test.com',
+            password='Test123!@#', role='user')
+        preset = AvatarPreset.objects.create(
+            user=owner, name='Owner Preset', gender='male', height=170,
+            weight=65, body_build_cm=95)
+        view = AvatarPresetViewSet()
+        view.request = SimpleNamespace(user=self.user)
+        with patch.object(view, 'get_object', return_value=preset):
+            response = view.destroy(view.request, pk=str(preset.id))
+        self.assertEqual(response.status_code, 403)
+
+    def test_legacy_html_views_render(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.test import RequestFactory
+
+        factory = RequestFactory()
+        request = factory.get('/')
+        request.session = SessionStore()
+        request.user = AnonymousUser()
+        self.assertEqual(auth_views.home(request).status_code, 200)
+
+        from django.template import TemplateDoesNotExist
+        for view in (auth_views.register_view, auth_views.login_view):
+            request = factory.get('/')
+            request.session = SessionStore()
+            request.user = AnonymousUser()
+            with self.assertRaises(TemplateDoesNotExist):
+                view(request)
+
+        dashboard_request = factory.get('/seller-dashboard/')
+        dashboard_request.user = self.user
+        with self.assertRaises(TemplateDoesNotExist):
+            auth_views.seller_dashboard(dashboard_request)
+
+        logout_request = factory.get('/logout/')
+        logout_request.session = SessionStore()
+        logout_request.user = self.user
+        self.assertEqual(auth_views.logout_view(logout_request).status_code, 302)
+
+    def test_legacy_profile_view_crud(self):
+        factory = APIRequestFactory()
+        view = auth_views.ProfileView.as_view()
+
+        request = factory.get('/profile/')
+        force_authenticate(request, user=self.user)
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['email'], 'coverage@test.com')
+
+        request = factory.patch('/profile/', {'full_name': 'Updated Coverage'}, format='json')
+        force_authenticate(request, user=self.user)
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['full_name'], 'Updated Coverage')
+
+        request = factory.delete('/profile/', {
+            'refresh': str(RefreshToken.for_user(self.user))}, format='json')
+        force_authenticate(request, user=self.user)
+        with patch('accounts.views.auth_views.blacklist_refresh_token') as blacklist:
+            response = view(request)
+        self.assertEqual(response.status_code, 204)
+        blacklist.assert_called_once()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.status, 'archive')
+        self.assertFalse(self.user.is_active)
+
+    def test_token_refresh_blacklist_rotation_and_logout_and_deactivate(self):
+        refresh = str(RefreshToken.for_user(self.user))
+
+        with patch('accounts.views.auth_views.blacklist_refresh_token') as blacklist, \
+             patch('accounts.views.auth_views.is_token_blacklisted', return_value=False):
+            response = self.client.post('/auth/token/refresh/', {'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['access'])
+        blacklist.assert_called_once()
+
+        with patch('accounts.views.auth_views.is_token_blacklisted', return_value=True):
+            response = self.client.post('/auth/token/refresh/', {'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post('/auth/token/refresh/', {'refresh': 'not-a-token'}, format='json')
+        self.assertEqual(response.status_code, 401)
+
+        self.client.force_authenticate(user=self.user)
+        with patch('accounts.views.auth_views.blacklist_refresh_token') as blacklist:
+            response = self.client.post('/auth/logout/', {'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, 200)
+        blacklist.assert_called_once()
+
+        response = self.client.post('/auth/logout/', {}, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        with patch('accounts.views.auth_views.blacklist_refresh_token'):
+            response = self.client.post(
+                '/auth/deactivate/', {'reason': 'coverage', 'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+
+
+class AccountValidatorCoverageTests(SimpleTestCase):
+    def test_mobile_number_validator(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        self.assertEqual(validate_mobile_number('09123456789'), '09123456789')
+        self.assertEqual(validate_mobile_number('+63 9123456789'), '+63 9123456789')
+        self.assertEqual(validate_mobile_number(''), '')
+        for bad in ('12345', '08123456789'):
+            with self.subTest(value=bad):
+                with self.assertRaises(DjangoValidationError):
+                    validate_mobile_number(bad)
+
+    def test_postal_code_validator(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        self.assertEqual(validate_postal_code('1000'), '1000')
+        self.assertEqual(validate_postal_code(''), '')
+        with self.assertRaises(DjangoValidationError):
+            validate_postal_code('123')
