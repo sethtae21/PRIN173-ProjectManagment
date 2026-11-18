@@ -50,10 +50,10 @@ class Command(BaseCommand):
 
         try:
             user = User.objects.create_user(
-                username=f'api_perf_{suffix}',
                 email=f'api_perf_{suffix}@example.invalid',
+                full_name=f'API Perf {suffix}',
                 password=f'Perf-{suffix}-A1!',
-                role='user',
+                role='shopper',
             )
             item = CatalogItem.objects.create(
                 name=f'API Performance Fixture {suffix}',

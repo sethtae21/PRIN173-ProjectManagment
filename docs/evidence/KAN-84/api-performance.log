@@ -1,0 +1,226 @@
+Command exited with code 0.
+
+Command output:
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /catalog/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /api/recommendations/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /cart/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] POST /cart/add_item/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] POST /checkout/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 201
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+[IDENTITY] GET /orders/ -> token owner=api_perf_cf3e057034fc@example.invalid role=shopper id=6afd5779be5e49d87e52d821 | HTTP 200
+{
+  "target_p95_ms": 1000.0,
+  "samples_per_endpoint": 20,
+  "endpoints": {
+    "catalog_list": {
+      "samples": 20,
+      "p50_ms": 51.06,
+      "p95_ms": 78.67,
+      "max_ms": 105.67
+    },
+    "catalog_filter": {
+      "samples": 20,
+      "p50_ms": 34.94,
+      "p95_ms": 49.58,
+      "max_ms": 290.41
+    },
+    "recommendations": {
+      "samples": 20,
+      "p50_ms": 49.04,
+      "p95_ms": 52.03,
+      "max_ms": 61.0
+    },
+    "cart_read": {
+      "samples": 20,
+      "p50_ms": 93.74,
+      "p95_ms": 121.65,
+      "max_ms": 146.29
+    },
+    "cart_add": {
+      "samples": 20,
+      "p50_ms": 421.25,
+      "p95_ms": 470.82,
+      "max_ms": 474.47
+    },
+    "checkout": {
+      "samples": 20,
+      "p50_ms": 266.89,
+      "p95_ms": 295.59,
+      "max_ms": 303.29
+    },
+    "orders_list": {
+      "samples": 20,
+      "p50_ms": 70.93,
+      "p95_ms": 113.0,
+      "max_ms": 124.7
+    }
+  },
+  "passed": true,
+  "over_target": {}
+}
+

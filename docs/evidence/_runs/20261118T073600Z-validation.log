@@ -1,0 +1,460 @@
+Command exited with code 1.
+
+Command output:
+.\.venv\Scripts\python.exe : Creating test database for alias 'default' ('test_fitfusion')...
+At line:1 char:193
++ ... nt\backend; .\.venv\Scripts\python.exe manage.py test catalog.tests r ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Creating test d..._fitfusion')...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+Found 133 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, drf_spectacular, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: accounts, admin, auth, catalog, commerce, contenttypes, outfits, ratings, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying accounts.0002_remove_user_body_proportions_remove_user_height_and_more... OK
+  Applying accounts.0003_archiveduser_user_archived_at_user_status_and_more... OK
+  Applying accounts.0004_remove_archiveduser_retention_expires_at... OK
+  Applying accounts.0005_user_fitting_studio_surveys... OK
+  Applying accounts.0006_remove_user_fitting_studio_surveys_and_more... OK
+  Applying accounts.0007_user_latest_fitting_studio_survey... OK
+  Applying accounts.0008_replace_fit_vote_with_score... OK
+  Applying accounts.0009_fit_rating_and_validators... OK
+  Applying accounts.0010_remove_survey_user_type... OK
+  Applying accounts.0011_unique_fitting_survey_session... OK
+  Applying accounts.0012_pseudonymize_archiveduser... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying admin.0004_alter_logentry_id... OK
+  Applying auth.0013_alter_group_id_alter_permission_id_alter_user_id... OK
+  Applying catalog.0001_initial... OK
+  Applying catalog.0002_catalogitem_size_max_cm_catalogitem_size_min_cm... OK
+  Applying catalog.0003_remove_catalogitem_size_max_cm_and_more... OK
+  Applying catalog.0004_remove_catalogitem_side_image... OK
+  Applying catalog.0005_alter_catalogitem_category... OK
+  Applying catalog.0006_remove_catalogitem_occasion_tags... OK
+  Applying commerce.0001_initial... OK
+  Applying commerce.0002_order_contact_number_order_recipient_name_and_more... OK
+  Applying commerce.0003_order_recipient_email... OK
+  Applying commerce.0004_order_order_number... OK
+  Applying commerce.0005_order_user_nullable... OK
+  Applying commerce.0006_cartitem_catalog_item_id_cartitem_item_name_and_more... OK
+  Applying contenttypes.0003_alter_contenttype_id... OK
+  Applying outfits.0001_initial... OK
+  Applying outfits.0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more... OK
+  Applying outfits.0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more... OK
+  Applying ratings.0001_initial... OK
+  Applying ratings.0002_alter_rating_unique_together_rating_source_and_more... OK
+  Applying ratings.0003_uatsession_uatresponse... OK
+  Applying ratings.0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more... OK
+  Applying ratings.0005_star_only_ratings... OK
+test_batch_commit_persists_processed_image_names 
+(catalog.tests.CatalogBatchGuardTests.test_batch_commit_persists_processed_image_names)
+  Applying sessions.0001_initial... OK
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6afd5475f8a337fb35f38ff2 | HTTP 202
+Guards the orphan trap: _commit_item must carry the new image names. ... ok
+test_batch_deferred_purge_failure_is_attributable_to_the_listing 
+(catalog.tests.CatalogBatchGuardTests.test_batch_deferred_purge_failure_is_attributable_to_the_listing)
+[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6afd5478f8a337fb35f3900c | HTTP 202
+A failed deferred purge must name the listing, not log item=None. ... ok
+test_delete_during_batch_processing_does_not_resurrect_item 
+(catalog.tests.CatalogBatchGuardTests.test_delete_during_batch_processing_does_not_resurrect_item) ... GridFS delete: 
+file '6afd547cf8a337fb35f3902a' not found.
+GridFS delete: file '6afd547cf8a337fb35f39029' not found.
+[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6afd547cf8a337fb35f39026 | HTTP 202
+ok
+test_another_sellers_item_untouched_by_delete 
+(catalog.tests.CatalogDeletePathTests.test_another_sellers_item_untouched_by_delete)
+[IDENTITY] DELETE /catalog/my-listings/6afd5480f8a337fb35f39043/ -> token owner=del-seller@test.com role=seller id=6afd547ff8a337fb35f39040 | HTTP 404
+Owner-scoped 404: seller A cannot delete seller B's listing. ... ok
+test_delete_with_gridfs_unreachable_succeeds_and_logs_error 
+(catalog.tests.CatalogDeletePathTests.test_delete_with_gridfs_unreachable_succeeds_and_logs_error)
+[IDENTITY] DELETE /catalog/my-listings/6afd5483f8a337fb35f3905a/ -> token owner=del-seller@test.com role=seller id=6afd5483f8a337fb35f39058 | HTTP 204
+GridFS down during post_delete -> row still deleted, ERROR logged, never 500. ... ok
+test_queryset_delete_removes_both_blobs_and_detach_intact 
+(catalog.tests.CatalogDeletePathTests.test_queryset_delete_removes_both_blobs_and_detach_intact)
+QuerySet.delete() -> receiver fires -> both blobs gone, cart detached, outfit through-row gone. ... ok
+test_seller_cascade_removes_both_blobs (catalog.tests.CatalogDeletePathTests.test_seller_cascade_removes_both_blobs)
+Deleting the seller CASCADEs through their listings -> receiver fires. ... ok
+test_backup_excludes_referenced_blobs (catalog.tests.CatalogGridFSBackupTests.test_backup_excludes_referenced_blobs) 
+... ok
+test_backup_then_sweep_then_restore_round_trip 
+(catalog.tests.CatalogGridFSBackupTests.test_backup_then_sweep_then_restore_round_trip) ... ok
+test_backup_with_no_orphans_writes_nothing 
+(catalog.tests.CatalogGridFSBackupTests.test_backup_with_no_orphans_writes_nothing) ... ok
+test_restore_is_idempotent (catalog.tests.CatalogGridFSBackupTests.test_restore_is_idempotent) ... ok
+test_sweep_delete_removes_orphans_only (catalog.tests.CatalogSweepOrphanTests.test_sweep_delete_removes_orphans_only) 
+... ok
+test_sweep_dry_run_does_not_delete (catalog.tests.CatalogSweepOrphanTests.test_sweep_dry_run_does_not_delete) ... ok
+test_sweep_ignores_non_catalog_prefixes (catalog.tests.CatalogSweepOrphanTests.test_sweep_ignores_non_catalog_prefixes)
+A blob under a different upload_to must never be touched. ... ok
+test_sweep_is_idempotent (catalog.tests.CatalogSweepOrphanTests.test_sweep_is_idempotent) ... ok
+test_delete_between_processing_and_commit_purges_new_images 
+(catalog.tests.CatalogValidationAndCRUDTests.test_delete_between_processing_and_commit_purges_new_images)
+Row disappears AFTER the new PNGs are written but BEFORE the commit. ... GridFS delete: file 
+'6afd54a4f8a337fb35f3915d' not found.
+GridFS delete: file '6afd54a4f8a337fb35f3915c' not found.
+[IDENTITY] PATCH /catalog/my-listings/6afd54a4f8a337fb35f3915a/ -> token owner=seller@test.com role=seller id=6afd54a3f8a337fb35f39158 | HTTP 200
+ok
+test_delete_during_revalidation_does_not_resurrect_item 
+(catalog.tests.CatalogValidationAndCRUDTests.test_delete_during_revalidation_does_not_resurrect_item)
+[IDENTITY] PATCH /catalog/my-listings/6afd54a8f8a337fb35f39175/ -> token owner=seller@test.com role=seller id=6afd54a7f8a337fb35f39173 | HTTP 200
+Seller deletes the listing while rembg is still running. ... ok
+[IDENTITY] DELETE /catalog/my-listings/6afd54abf8a337fb35f3918e/ -> token owner=seller@test.com role=seller id=6afd54abf8a337fb35f3918c | HTTP 503
+test_delete_refused_when_gridfs_unreachable_leaves_listing_intact 
+(catalog.tests.CatalogValidationAndCRUDTests.test_delete_refused_when_gridfs_unreachable_leaves_listing_intact) ... ok
+[IDENTITY] DELETE /catalog/my-listings/6afd54aef8a337fb35f391a6/ -> token owner=seller@test.com role=seller id=6afd54aef8a337fb35f391a4 | HTTP 204
+test_delete_without_images_still_succeeds_when_gridfs_unreachable 
+(catalog.tests.CatalogValidationAndCRUDTests.test_delete_without_images_still_succeeds_when_gridfs_unreachable) ... ok
+[IDENTITY] DELETE /catalog/my-listings/6afd54b2f8a337fb35f391bc/ -> token owner=seller@test.com role=seller id=6afd54b1f8a337fb35f391ba | HTTP 204
+test_deleting_listing_leaves_order_item_snapshots_intact 
+(catalog.tests.CatalogValidationAndCRUDTests.test_deleting_listing_leaves_order_item_snapshots_intact) ... ok
+[IDENTITY] DELETE /catalog/my-listings/6afd54b5f8a337fb35f391d4/ -> token owner=seller@test.com role=seller id=6afd54b5f8a337fb35f391d2 | HTTP 204
+test_deleting_listing_removes_both_stored_images 
+(catalog.tests.CatalogValidationAndCRUDTests.test_deleting_listing_removes_both_stored_images) ... ok
+test_download_package_contains_template_and_image_guidelines 
+(catalog.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines) ... ok
+test_download_template_contains_header_and_single_example_row 
+(catalog.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54bff8a337fb35f39216/ -> token owner=seller@test.com role=seller id=6afd54bef8a337fb35f39214 | HTTP 200
+test_edited_rejected_listing_stays_processing_until_pipeline_passes 
+(catalog.tests.CatalogValidationAndCRUDTests.test_edited_rejected_listing_stays_processing_until_pipeline_passes) ... 
+ok
+test_guest_cannot_upload (catalog.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload) ... ok
+test_old_image_cleanup_failure_does_not_strand_processing 
+(catalog.tests.CatalogValidationAndCRUDTests.test_old_image_cleanup_failure_does_not_strand_processing)
+[IDENTITY] PATCH /catalog/my-listings/6afd54c3f8a337fb35f39241/ -> token owner=seller@test.com role=seller id=6afd54c2f8a337fb35f3923f | HTTP 200
+An unreachable bucket during old-image cleanup must not block the pipeline. ... ok
+test_partial_replacement_write_is_compensated 
+(catalog.tests.CatalogValidationAndCRUDTests.test_partial_replacement_write_is_compensated)
+[IDENTITY] PATCH /catalog/my-listings/6afd54c5f8a337fb35f3925c/ -> token owner=seller@test.com role=seller id=6afd54c4f8a337fb35f3925a | HTTP 503
+Front succeeds, rear fails: the new front must be purged, originals kept. ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54c7f8a337fb35f39275/ -> token owner=seller@test.com role=seller id=6afd54c7f8a337fb35f39273 | HTTP 503
+test_pipeline_submission_failure_does_not_leave_item_processing 
+(catalog.tests.CatalogValidationAndCRUDTests.test_pipeline_submission_failure_does_not_leave_item_processing) ... ok
+test_public_catalog_store_filter_returns_only_active_seller_items 
+(catalog.tests.CatalogValidationAndCRUDTests.test_public_catalog_store_filter_returns_only_active_seller_items) ... ok
+test_public_catalog_style_filter_matches_json_array_tags 
+(catalog.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6afd54cef8a337fb35f392bd | HTTP 403
+test_regular_user_cannot_upload (catalog.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload) ... ok
+test_rejected_listing_with_missing_assets_cannot_be_promoted 
+(catalog.tests.CatalogValidationAndCRUDTests.test_rejected_listing_with_missing_assets_cannot_be_promoted)
+[IDENTITY] PATCH /catalog/my-listings/6afd54d0f8a337fb35f392d3/ -> token owner=seller@test.com role=seller id=6afd54d0f8a337fb35f392d1 | HTTP 200
+Acceptance rule: a rejected item with no stored assets stays rejected. ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54d2f8a337fb35f392e7 | HTTP 400
+test_rejects_missing_view_images (catalog.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images) ... ok
+test_rejects_opaque_background_removal_output 
+(catalog.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54d6f8a337fb35f39311 | HTTP 400
+test_rejects_oversized_image (catalog.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54d8f8a337fb35f39328/ -> token owner=seller@test.com role=seller id=6afd54d8f8a337fb35f39326 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54d8f8a337fb35f39328/ -> token owner=seller@test.com role=seller id=6afd54d8f8a337fb35f39326 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54d8f8a337fb35f39328/ -> token owner=seller@test.com role=seller id=6afd54d8f8a337fb35f39326 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6afd54d8f8a337fb35f39328/ -> token owner=seller@test.com role=seller id=6afd54d8f8a337fb35f39326 | HTTP 204
+test_repeated_replace_then_delete_leaves_no_orphaned_lineage 
+(catalog.tests.CatalogValidationAndCRUDTests.test_repeated_replace_then_delete_leaves_no_orphaned_lineage) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54dcf8a337fb35f39349/ -> token owner=seller@test.com role=seller id=6afd54dbf8a337fb35f39347 | HTTP 503
+test_replacement_storage_failure_does_not_strand_processing 
+(catalog.tests.CatalogValidationAndCRUDTests.test_replacement_storage_failure_does_not_strand_processing) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54def8a337fb35f39361/ -> token owner=seller@test.com role=seller id=6afd54ddf8a337fb35f3935f | HTTP 200
+test_replacing_image_deletes_old_gridfs_object 
+(catalog.tests.CatalogValidationAndCRUDTests.test_replacing_image_deletes_old_gridfs_object) ... ok
+[IDENTITY] GET /catalog/my-listings/6afd54e0f8a337fb35f3937c/ -> token owner=seller@test.com role=seller id=6afd54e0f8a337fb35f3937a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54e0f8a337fb35f3937c/ -> token owner=seller@test.com role=seller id=6afd54e0f8a337fb35f3937a | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6afd54e0f8a337fb35f3937c/ -> token owner=seller@test.com role=seller id=6afd54e0f8a337fb35f3937a | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6afd54e0f8a337fb35f3937c/ -> token owner=seller@test.com role=seller id=6afd54e0f8a337fb35f3937a | HTTP 404
+test_seller_can_list_and_manage_own_items 
+(catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54e2f8a337fb35f39392/ -> token owner=seller@test.com role=seller id=6afd54e2f8a337fb35f39390 | HTTP 200
+test_seller_can_replace_image_and_it_revalidates 
+(catalog.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_it_revalidates) ... ok
+[IDENTITY] GET /catalog/my-listings/6afd54e5f8a337fb35f393ad/ -> token owner=seller@test.com role=seller id=6afd54e4f8a337fb35f393aa | HTTP 404
+test_seller_cannot_manage_other_sellers_items 
+(catalog.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54e7f8a337fb35f393c3/ -> token owner=seller@test.com role=seller id=6afd54e7f8a337fb35f393c1 | HTTP 200
+test_seller_color_mismatch_rejects_listing_not_activates 
+(catalog.tests.CatalogValidationAndCRUDTests.test_seller_color_mismatch_rejects_listing_not_activates) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54e9f8a337fb35f393db | HTTP 202
+test_successful_upload_derives_color_palette_tags 
+(catalog.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags) ... ok
+[IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6afd54ecf8a337fb35f393f6 | HTTP 200
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54ecf8a337fb35f393f6 | HTTP 202
+test_upload_recognizes_header_after_template_instruction_rows 
+(catalog.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54eef8a337fb35f3940d | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afd54eef8a337fb35f3940d | HTTP 200
+test_upload_reports_csv_filename_mismatch 
+(catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd54f1f8a337fb35f39424 | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afd54f1f8a337fb35f39424 | HTTP 200
+test_upload_reports_missing_fields_and_undersized_images 
+(catalog.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images) ... ok
+test_download_package_contains_template_and_image_guidelines 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_download_package_contains_template_and_image_guidelines) ... 
+ok
+test_download_template_contains_header_and_single_example_row 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_download_template_contains_header_and_single_example_row) 
+... ok
+test_guest_cannot_upload (recommendations.tests.CatalogValidationAndCRUDTests.test_guest_cannot_upload) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6afd54faf8a337fb35f3947c/ -> token owner=seller@test.com role=seller id=6afd54f9f8a337fb35f3947a | HTTP 400
+test_patch_accepts_extended_sizes_and_rejects_legacy_formats 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_patch_accepts_extended_sizes_and_rejects_legacy_formats) ... 
+ok
+test_public_catalog_style_filter_matches_json_array_tags 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_public_catalog_style_filter_matches_json_array_tags) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6afd54fef8a337fb35f394a8 | HTTP 403
+test_regular_user_cannot_upload (recommendations.tests.CatalogValidationAndCRUDTests.test_regular_user_cannot_upload) 
+... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd5500f8a337fb35f394bc | HTTP 400
+test_rejects_missing_view_images 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_missing_view_images) ... ok
+test_rejects_opaque_background_removal_output 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_opaque_background_removal_output) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd5504f8a337fb35f394e6 | HTTP 400
+test_rejects_oversized_image (recommendations.tests.CatalogValidationAndCRUDTests.test_rejects_oversized_image) ... ok
+[IDENTITY] GET /catalog/my-listings/6afd5506f8a337fb35f394fd/ -> token owner=seller@test.com role=seller id=6afd5506f8a337fb35f394fb | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd5506f8a337fb35f394fd/ -> token owner=seller@test.com role=seller id=6afd5506f8a337fb35f394fb | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6afd5506f8a337fb35f394fd/ -> token owner=seller@test.com role=seller id=6afd5506f8a337fb35f394fb | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6afd5506f8a337fb35f394fd/ -> token owner=seller@test.com role=seller id=6afd5506f8a337fb35f394fb | HTTP 404
+test_seller_can_list_and_manage_own_items 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_list_and_manage_own_items) ... ok
+[IDENTITY] PATCH /catalog/my-listings/6afd5509f8a337fb35f39513/ -> token owner=seller@test.com role=seller id=6afd5508f8a337fb35f39511 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6afd5509f8a337fb35f39513/ -> token owner=seller@test.com role=seller id=6afd5508f8a337fb35f39511 | HTTP 200
+test_seller_can_replace_image_and_mismatch_is_rejected 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_seller_can_replace_image_and_mismatch_is_rejected) ... ok
+[IDENTITY] GET /catalog/my-listings/6afd550ff8a337fb35f39533/ -> token owner=seller@test.com role=seller id=6afd550df8a337fb35f39530 | HTTP 404
+test_seller_cannot_manage_other_sellers_items 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_seller_cannot_manage_other_sellers_items) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd5511f8a337fb35f39547 | HTTP 202
+test_successful_upload_derives_color_palette_tags 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags) ... ok
+[IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6afd5517f8a337fb35f39566 | HTTP 200
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd5517f8a337fb35f39566 | HTTP 202
+test_upload_recognizes_header_after_template_instruction_rows 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_upload_recognizes_header_after_template_instruction_rows) 
+... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd551af8a337fb35f3957d | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afd551af8a337fb35f3957d | HTTP 200
+test_upload_reports_csv_filename_mismatch 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_csv_filename_mismatch) ... ok
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6afd551ef8a337fb35f39594 | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6afd551ef8a337fb35f39594 | HTTP 200
+test_upload_reports_missing_fields_and_undersized_images 
+(recommendations.tests.CatalogValidationAndCRUDTests.test_upload_reports_missing_fields_and_undersized_images) ... ok
+test_only_active_catalog_items_are_recommended 
+(recommendations.tests_weights.TestActiveItemFilter.test_only_active_catalog_items_are_recommended) ... ok
+test_response_shape (recommendations.tests_weights.TestEndpointSmoke.test_response_shape) ... ok
+test_caps_style_tag_count (recommendations.tests_weights.TestRecommendationQueryValidation.test_caps_style_tag_count) 
+... ok
+test_rejects_invalid_limit_bounds 
+(recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_limit_bounds) ... ok
+test_rejects_invalid_or_out_of_range_height 
+(recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_invalid_or_out_of_range_height) ... ok
+test_rejects_unknown_enums 
+(recommendations.tests_weights.TestRecommendationQueryValidation.test_rejects_unknown_enums) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5527f8a337fb35f39621 | HTTP 400
+test_boolean_rejected (ratings.tests.RatingAPITests.test_boolean_rejected) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5529f8a337fb35f39637 | HTTP 400
+test_float_rejected (ratings.tests.RatingAPITests.test_float_rejected) ... ok
+test_guest_session_clear_still_safe (ratings.tests.RatingAPITests.test_guest_session_clear_still_safe) ... ok
+test_guest_submit_rejected_and_not_persisted 
+(ratings.tests.RatingAPITests.test_guest_submit_rejected_and_not_persisted)
+Guest rating attempts are rejected with 403, nothing is persisted ... ok
+[IDENTITY] GET /ratings/mine/ -> token owner=rater@test.com role=shopper id=6afd5532f8a337fb35f39679 | HTTP 200
+test_mine_returns_only_own_stars (ratings.tests.RatingAPITests.test_mine_returns_only_own_stars) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5534f8a337fb35f39691 | HTTP 400
+test_missing_score_rejected (ratings.tests.RatingAPITests.test_missing_score_rejected) ... ok
+test_model_has_no_vote_field (ratings.tests.RatingAPITests.test_model_has_no_vote_field) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5539f8a337fb35f396bd | HTTP 400
+test_numeric_string_rejected_not_coerced (ratings.tests.RatingAPITests.test_numeric_string_rejected_not_coerced) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd553cf8a337fb35f396d3 | HTTP 201
+[IDENTITY] PATCH /ratings/6afd553df8a337fb35f396d6/ -> token owner=other@test.com role=shopper id=6afd553cf8a337fb35f396d4 | HTTP 404
+[IDENTITY] DELETE /ratings/6afd553df8a337fb35f396d6/ -> token owner=other@test.com role=shopper id=6afd553cf8a337fb35f396d4 | HTTP 404
+[IDENTITY] DELETE /ratings/6afd553df8a337fb35f396d6/ -> token owner=rater@test.com role=shopper id=6afd553cf8a337fb35f396d3 | HTTP 204
+test_owner_only_update_delete (ratings.tests.RatingAPITests.test_owner_only_update_delete) ... ok
+test_rating_never_required_for_core_flow (ratings.tests.RatingAPITests.test_rating_never_required_for_core_flow) ... ok
+test_score_plus_like_or_dislike_keys_rejected 
+(ratings.tests.RatingAPITests.test_score_plus_like_or_dislike_keys_rejected)
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5541f8a337fb35f39700 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5541f8a337fb35f39700 | HTTP 400
+Legacy boolean-style reaction keys are also rejected. ... ok
+test_score_plus_vote_rejected_not_silently_dropped 
+(ratings.tests.RatingAPITests.test_score_plus_vote_rejected_not_silently_dropped)
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5544f8a337fb35f39716 | HTTP 400
+A valid star score must NOT let a legacy `vote` key through. ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5547f8a337fb35f3972c | HTTP 400
+test_score_six_rejected (ratings.tests.RatingAPITests.test_score_six_rejected) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5549f8a337fb35f39742 | HTTP 400
+test_score_zero_rejected (ratings.tests.RatingAPITests.test_score_zero_rejected) ... ok
+test_seller_cannot_delete_any_rating (ratings.tests.RatingAPITests.test_seller_cannot_delete_any_rating)
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd554cf8a337fb35f39758 | HTTP 201
+[IDENTITY] DELETE /ratings/6afd554df8a337fb35f3975b/ -> token owner=seller@test.com role=seller id=6afd554df8a337fb35f3975a | HTTP 403
+Shopper-only RBAC closes the create/delete asymmetry. ... ok
+[IDENTITY] POST /ratings/ -> token owner=seller@test.com role=seller id=6afd554ff8a337fb35f39771 | HTTP 403
+test_seller_submit_rejected_and_not_persisted 
+(ratings.tests.RatingAPITests.test_seller_submit_rejected_and_not_persisted) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5551f8a337fb35f39785 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5551f8a337fb35f39785 | HTTP 201
+test_source_field_allows_multi_surface_ratings 
+(ratings.tests.RatingAPITests.test_source_field_allows_multi_surface_ratings) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5553f8a337fb35f3979d | HTTP 400
+test_source_required (ratings.tests.RatingAPITests.test_source_required) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5556f8a337fb35f397b3 | HTTP 201
+test_star_persists (ratings.tests.RatingAPITests.test_star_persists) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5558f8a337fb35f397ca | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6afd5558f8a337fb35f397ca | HTTP 200
+test_summary_approval_threshold_is_four (ratings.tests.RatingAPITests.test_summary_approval_threshold_is_four) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd555bf8a337fb35f397e1 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd555bf8a337fb35f397e1 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6afd555bf8a337fb35f397e1 | HTTP 200
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6afd555bf8a337fb35f397e1 | HTTP 200
+test_summary_filters_by_source_and_counts_approvals 
+(ratings.tests.RatingAPITests.test_summary_filters_by_source_and_counts_approvals) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd555ef8a337fb35f397f9 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd555ef8a337fb35f397f9 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd555ef8a337fb35f397f9 | HTTP 400
+test_undocumented_or_empty_source_rejected (ratings.tests.RatingAPITests.test_undocumented_or_empty_source_rejected) 
+... ok
+test_unique_together_declared (ratings.tests.RatingAPITests.test_unique_together_declared) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5564f8a337fb35f39825 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5564f8a337fb35f39825 | HTTP 200
+test_upsert_same_user_target_source_keeps_one_row 
+(ratings.tests.RatingAPITests.test_upsert_same_user_target_source_keeps_one_row) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5566f8a337fb35f3983c | HTTP 400
+test_vote_only_payload_rejected (ratings.tests.RatingAPITests.test_vote_only_payload_rejected) ... ok
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6afd5569f8a337fb35f39852 | HTTP 400
+test_vote_payload_rejected (ratings.tests.RatingAPITests.test_vote_payload_rejected) ... ok
+test_uat_response_seller_rejected (ratings.tests.UATEndpointRBACTests.test_uat_response_seller_rejected)
+[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-shopper@test.com role=shopper id=6afd556bf8a337fb35f39868 | HTTP 201
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat-seller@test.com role=seller id=6afd556cf8a337fb35f39869 | HTTP 403
+A seller must not be able to log survey answers into any session. ... ok
+[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-seller@test.com role=seller id=6afd556ef8a337fb35f3987f | HTTP 403
+test_uat_session_seller_rejected (ratings.tests.UATEndpointRBACTests.test_uat_session_seller_rejected) ... ok
+[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-shopper@test.com role=shopper id=6afd556ff8a337fb35f39893 | HTTP 201
+test_uat_session_shopper_allowed (ratings.tests.UATEndpointRBACTests.test_uat_session_shopper_allowed) ... ok
+test_guest_cannot_create_uat_session (ratings.tests.UATGuestDenialTests.test_guest_cannot_create_uat_session) ... ok
+test_guest_cannot_export_uat_workbook (ratings.tests.UATGuestDenialTests.test_guest_cannot_export_uat_workbook)
+The charter KPI export is staff-only; a guest must not even reach ... ok
+test_guest_cannot_submit_uat_response_into_a_real_shopper_session 
+(ratings.tests.UATGuestDenialTests.test_guest_cannot_submit_uat_response_into_a_real_shopper_session)
+A valid, shopper-owned session_id must not become a guest write hole. ... ok
+test_guest_cannot_submit_uat_response_with_a_fabricated_session_id 
+(ratings.tests.UATGuestDenialTests.test_guest_cannot_submit_uat_response_with_a_fabricated_session_id) ... ok
+test_accepts_dominant_shade_of_declared_color 
+(catalog.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color) ... ok
+test_mismatch_message_carries_the_correct_color_to_declare 
+(catalog.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare) ... ok
+test_muted_hue_gray_denim_now_passes (catalog.tests.CatalogColorAlignmentTests.test_muted_hue_gray_denim_now_passes) 
+... ok
+test_rejects_a_different_dominant_color 
+(catalog.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color) ... ok
+test_suggestion_names_the_passing_color_for_denim 
+(catalog.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim) ... ok
+test_unmapped_hue_suggests_nearest_family_and_passes_when_declared 
+(catalog.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared) ... ok
+test_accepts_approved_comma_separated_tags_case_insensitively 
+(catalog.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively) ... ok
+test_rejects_style_tags_outside_controlled_vocabulary 
+(catalog.tests.CatalogTagValidationTests.test_rejects_style_tags_outside_controlled_vocabulary) ... ok
+test_accepts_dominant_shade_of_declared_color 
+(recommendations.tests.CatalogColorAlignmentTests.test_accepts_dominant_shade_of_declared_color) ... ok
+test_mismatch_message_carries_the_correct_color_to_declare 
+(recommendations.tests.CatalogColorAlignmentTests.test_mismatch_message_carries_the_correct_color_to_declare) ... ok
+test_muted_hue_gray_denim_now_passes 
+(recommendations.tests.CatalogColorAlignmentTests.test_muted_hue_gray_denim_now_passes) ... ok
+test_rejects_a_different_dominant_color 
+(recommendations.tests.CatalogColorAlignmentTests.test_rejects_a_different_dominant_color) ... ok
+test_suggestion_names_the_passing_color_for_denim 
+(recommendations.tests.CatalogColorAlignmentTests.test_suggestion_names_the_passing_color_for_denim) ... ok
+test_unmapped_hue_suggests_nearest_family_and_passes_when_declared 
+(recommendations.tests.CatalogColorAlignmentTests.test_unmapped_hue_suggests_nearest_family_and_passes_when_declared) 
+... ok
+test_accepts_all_standard_clothing_sizes 
+(recommendations.tests.CatalogSizePolicyTests.test_accepts_all_standard_clothing_sizes) ... ok
+test_rejects_footwear_category (recommendations.tests.CatalogSizePolicyTests.test_rejects_footwear_category) ... ok
+test_rejects_measured_and_nonstandard_sizes 
+(recommendations.tests.CatalogSizePolicyTests.test_rejects_measured_and_nonstandard_sizes) ... ok
+test_accepts_approved_comma_separated_tags_case_insensitively 
+(recommendations.tests.CatalogTagValidationTests.test_accepts_approved_comma_separated_tags_case_insensitively) ... ok
+test_rejects_unapproved_style_tags 
+(recommendations.tests.CatalogTagValidationTests.test_rejects_unapproved_style_tags) ... ok
+test_each_rule_points_is_zero_or_its_weight 
+(recommendations.tests_weights.TestDeterminism.test_each_rule_points_is_zero_or_its_weight) ... ok
+test_rank_is_repeatable (recommendations.tests_weights.TestDeterminism.test_rank_is_repeatable) ... ok
+test_tie_break_is_by_name (recommendations.tests_weights.TestDeterminism.test_tie_break_is_by_name) ... ok
+test_total_equals_sum_of_rule_points 
+(recommendations.tests_weights.TestDeterminism.test_total_equals_sum_of_rule_points) ... ok
+test_weights_are_positive_integers 
+(recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_are_positive_integers) ... ok
+test_weights_has_exactly_the_four_rules 
+(recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_has_exactly_the_four_rules) ... ok
+test_weights_match_the_baselined_fr_7_2_values 
+(recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_match_the_baselined_fr_7_2_values) ... ok
+test_weights_version_present (recommendations.tests_weights.TestKnowledgeTableIntegrity.test_weights_version_present) 
+... ok
+test_exact_scores_and_order (recommendations.tests_weights.TestLiteralFreeze.test_exact_scores_and_order) ... skipped 
+'Phase-2 literal freeze not captured yet — run the §Capture command in docs/WEIGHTS_VALIDATION_REPORT.md, then paste 
+into LITERAL_FREEZE. Phase-1 invariants + ±1 sweep already cover FR-7.2.'
+test_plus_minus_one_does_not_invert 
+(recommendations.tests_weights.TestSensitivity.test_plus_minus_one_does_not_invert) ... ok
+test_precondition_gap_ge_two (recommendations.tests_weights.TestSensitivity.test_precondition_gap_ge_two) ... ok
+test_at_least_two_profiles_built (recommendations.tests_weights.TestSuiteNonVacuous.test_at_least_two_profiles_built) 
+... ok
+test_sensitivity_actually_exercised 
+(recommendations.tests_weights.TestSuiteNonVacuous.test_sensitivity_actually_exercised) ... ok
+
+----------------------------------------------------------------------
+Ran 133 tests in 257.072s
+
+OK (skipped=1)
+Destroying test database for alias 'default' ('test_fitfusion')...
+
+
