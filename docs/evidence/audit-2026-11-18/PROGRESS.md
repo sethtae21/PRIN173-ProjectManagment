@@ -27,3 +27,13 @@ Seed Store cbd72b57); SEED_RESULT PASS.
 Run: staging-phase-a.spec.ts 8 tests exit 0 (20261118T142852Z log).
 Limitation recorded: KAN-87 live UAT walkthrough still outstanding.
 Next: Phase 4 — assemble KAN-100 handover package.
+
+## Phase 4 — KAN-100 handover package — DONE
+Files: docs/evidence/KAN-100/HANDOVER_PACKAGE.md, JIRA_COMMENT.md,
+staging_seed.py, docs/evidence/EVIDENCE_INDEX.md.
+Package: source snapshot (main f67de61, 561 tracked files), docs set,
+DB schema refs (ERD, SADD, KAN-41 OpenAPI), demo assets (sample CSV, seed
+script, KAN-115/113/114/66 screenshots), staging URL https://localhost:8443
+with mkcert TLS notes, setup runbook, verification results, SHA-256 checksums.
+Result: index row KAN-100 PASS; limitation kept for loopback staging and
+outstanding KAN-87 UAT sign-off.
