@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: not stated in ticket
-- Method: Manual capture per docs/evidence/MANUAL_CAPTURE_SESSION.md
-- Result: NEEDS-CAPTURE - expected artifact missing or not verifiable: Expected screenshots under docs/evidence/KAN-66/; instructions: docs/evidence/MANUAL_CAPTURE_SESSION.md.
+- Method: Playwright capture is defined in frontend/e2e/evidence-screens.spec.ts for the authenticated seller dashboard. The spec has not been run.
+- Result: NEEDS-CAPTURE - screenshot not yet captured.
 - Tests proving this ticket: N/A (manual or artifact evidence; no ticket-specific backend test executed).
-- Artifact: docs/evidence/MANUAL_CAPTURE_SESSION.md
-- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
-- Limitations: Automated backend tests do not provide the requested visual or signed artifact evidence.
+- Artifact: docs/evidence/KAN-66/seller-dashboard.png
+- Commit: working tree (not committed)  Verified: 2026-11-18
+- Limitations: Playwright was intentionally not run; this expected screenshot does not yet exist.

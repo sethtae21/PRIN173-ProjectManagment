@@ -1,8 +1,8 @@
 **Verification evidence**
 - Requirement: SRS FR-2.1–2.7, §5.1 · WBS 1.3.2 · RT-02
-- Method: Manual capture per docs/evidence/MANUAL_CAPTURE_SESSION.md
-- Result: NEEDS-CAPTURE - expected artifact missing or not verifiable: Expected: docs/evidence/KAN-57/avatar-creator-save-reload.png and avatar-guest-save-prompt.png; instructions: docs/evidence/MANUAL_CAPTURE_SESSION.md.
+- Method: Playwright capture is defined in frontend/e2e/evidence-screens.spec.ts; the app's authenticated shopper fitting-studio route is used. The spec has not been run.
+- Result: NEEDS-CAPTURE - screenshot not yet captured.
 - Tests proving this ticket: N/A (manual or artifact evidence; no ticket-specific backend test executed).
-- Artifact: docs/evidence/MANUAL_CAPTURE_SESSION.md
-- Commit: `cbb6eab` (working tree dirty)  Verified: 2026-11-17
-- Limitations: Automated backend tests do not provide the requested visual or signed artifact evidence.
+- Artifact: docs/evidence/KAN-57/avatar-creator.png
+- Commit: working tree (not committed)  Verified: 2026-11-18
+- Limitations: Playwright was intentionally not run; this expected screenshot does not yet exist.
