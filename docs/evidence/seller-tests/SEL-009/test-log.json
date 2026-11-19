@@ -1,0 +1,16 @@
+{
+  "test_id": "SEL-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:20.730Z",
+  "duration": "11929ms",
+  "details": {
+    "batch_id": "6afec99b2b7c0da2d0d96053",
+    "batch_status": "completed",
+    "accepted_count": 1,
+    "rejected_count": 1,
+    "report_reasons": [
+      "Color mismatch: declared 'Red' but the image's dominant color is #dcdcdc. Correct color to declare: \"White\" (color family: neutral)."
+    ],
+    "rejected_reason_in_ui": "Color mismatch: declared 'Red' but the image's dominant color is #dcdcdc. Correct color to declare: \"White\" (color family: neutral)."
+  }
+}

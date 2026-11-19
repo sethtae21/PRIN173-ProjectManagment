@@ -1,0 +1,51 @@
+﻿Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Seller - 001,Download CSV Template,Seller logged in,"As a Seller, I want to download the CSV template and instruction sheet.","The system shall provide the template with all required columns (name, style_tags, front_image_filename, rear_image_filename — no occasion_tags) plus the instruction sheet (FR-4.1 v1.1).","1. Open Seller Dashboard
+2. Click Download CSV Template
+3. Verify columns and instruction sheet download",Carlos,PASS,../evidence/seller-tests/SEL-001/
+Seller - 002,Upload Catalog Items (Valid),Seller logged in; valid CSV + images ready,"As a Seller, I want to upload my catalog items.","The system shall process images with rembg, generate transparent PNGs, queue validation, and publish accepted items under the Store Name (FR-4.2).","1. Open Seller Dashboard
+2. Upload CSV
+3. Upload Front/Rear images
+4. Verify rembg processing and validation report",Carlos,PASS,../evidence/seller-tests/SEL-002/
+Seller - 003,Upload Validation (Size),Seller logged in; image file 6 MB prepared,"As a Seller, I want to upload an item. The image exceeds 5 MB.","The system shall reject with ""exceeds 5 MB"" reason (FR-4.7(b)).","1. Upload a CSV item with a 6 MB image
+2. Verify rejection reason in report",Carlos,PASS,../evidence/seller-tests/SEL-003/
+Seller - 004,Upload Validation (Dimensions),Seller logged in; 700×700 px image prepared,"As a Seller, I want to upload an item. The image is below 800×800 px.","The system shall reject with ""below 800×800"" reason (FR-4.7(b)).","1. Upload a CSV item with a 700×700 px image
+2. Verify rejection reason in report",Carlos,PASS,../evidence/seller-tests/SEL-004/
+Seller - 005,Upload Validation (Required Fields),Seller logged in; CSV missing a required field,"As a Seller, I want to upload an item. A required field is missing.","The system shall reject with ""Missing field: [fieldname]"" (FR-4.7(a)).","1. Upload a CSV missing the price field
+2. Verify rejection reason names the missing field",Carlos,PASS,../evidence/seller-tests/SEL-005/
+Seller - 006,Upload Validation (Color Mismatch),"Seller logged in; item declared ""red"" with blue-dominant image","As a Seller, I want to upload an item. The declared color does not match the image.","The system shall reject with ""Image color doesn't match description"" (FR-4.7(e)).","1. Upload an item declared color ""red"" with a blue-dominant image
+2. Verify color-mismatch rejection",Carlos,PASS,../evidence/seller-tests/SEL-006/
+Seller - 007,Upload Validation (Filename Mapping),Seller logged in; CSV filename has no matching uploaded image,"As a Seller, I want to upload an item. The CSV filename doesn't match any uploaded image.",The system shall reject with a filename-mapping reason (FR-4.7(d)).,"1. Upload a CSV referencing a filename not uploaded
+2. Verify filename-mapping rejection",Carlos,PASS,../evidence/seller-tests/SEL-007/
+Seller - 008,Upload Validation (rembg Failure),Seller logged in; image that fails background removal,"As a Seller, I want to upload an item. Background removal failed.","The system shall reject the item with a descriptive rembg failure reason; no partial publish (FR-4.7, FR-4.8).","1. Upload an image that fails rembg
+2. Verify descriptive rejection reason",Carlos,PASS,../evidence/seller-tests/SEL-008/
+Seller - 009,View Validation Report,CSV upload completed,"As a Seller, I want to see which items were accepted and rejected.","The report shall show accepted items, rejected items with reasons, and summary stats (FR-4.8).","1. Upload a mixed valid/invalid CSV
+2. Open the Validation Report
+3. Verify accepted/rejected sections and reasons",Carlos,PASS,../evidence/seller-tests/SEL-009/
+Seller - 010,Upload Batch Cap (11 items),Seller logged in; CSV with 11 items prepared,"As a Seller, I want to upload 11 items in one CSV.",The system shall reject the upload with a max-batch message (UC-16 ext; SRS §4.1: up to 10 items per CSV).,"1. Upload a CSV with 11 items
+2. Verify rejection with max-batch (10 items) message",Carlos,PASS,../evidence/seller-tests/SEL-010/
+Seller - 011,Edit Listing (Revalidation),Seller with an uploaded item,"As a Seller, I want to edit a listing.",The system shall revalidate the updated item and update the catalog entry (UC-19).,"1. Open My Listings
+2. Click Edit on an item
+3. Modify metadata/image
+4. Save
+5. Verify revalidation and catalog update",Carlos,PASS,../evidence/seller-tests/SEL-011/
+Seller - 012,Delete Listing,Seller with an item in an active cart,"As a Seller, I want to delete a listing.","The system shall remove the item from the catalog, warn if in active carts, and retain past-order snapshots (UC-19 ext, FR-6.8).","1. Add the item to a User's cart
+2. As Seller, delete the listing
+3. Verify warning and confirm
+4. Verify catalog removal and order-history snapshot retained",Both,PASS,../evidence/seller-tests/SEL-012/
+Seller - 013,Seller RBAC,Non-seller (Registered User) logged in,"As a Registered User, I attempted to access the Seller Dashboard.",The system shall deny non-sellers access to Seller endpoints server-side (FR-1.7).,"1. Log in as a Registered User
+2. Attempt to open Seller Dashboard/upload
+3. Verify access denied (403)",Carlos,PASS,../evidence/seller-tests/SEL-013/
+Seller - 014,Performance: Pipeline Speed,Seller logged in; 10-item CSV ready,"As a Seller, I want my upload processed quickly.","10-item CSV processes within ≤60 seconds, including rembg and validation (Criterion 4).",1. Upload 10-item CSV + 20 images.<br>2. Start timer.<br>3. Stop timer when validation report appears.,Carlos,PASS,../evidence/seller-tests/SEL-014/
+Seller - 015,UAT: Upload Accuracy,Seller participant; unassisted upload,"As a Seller, I want my items published without manual fixes.",≥80% of CSV-uploaded items publish without manual correction during UAT (Criterion 5).,1. Seller uploads 10 items unassisted.<br>2. Calculate % accepted on first try.,Carlos,PASS,../evidence/seller-tests/SEL-015/
+Seller - 016,Generated PNG Transparency,Seller logged in; valid CSV and Front and Rear source images prepared,"As a Seller, I want the processed Front and Rear images to have valid transparency data.",The system shall generate Front and Rear PNG images with valid alpha channels (FR-4.7(c)).,"1. Upload a valid catalog item with Front and Rear source images.
+2. Wait for image processing to complete.
+3. Inspect the generated Front PNG and verify it has a valid alpha channel.
+4. Inspect the generated Rear PNG and verify it has a valid alpha channel.
+5. Record the result for each image.",Carlos,PASS,../evidence/seller-tests/SEL-016/
+Seller - 017,Derived Color-Palette Tags,Seller logged in; valid item prepared with a color-family value whose knowledge-table mapping is known,"As a Seller, I want compatible color-palette tags to be generated automatically from the item's color-family value.","After successful validation and publishing, the system shall generate the item's compatible color-palette tags from its color-family value using the encoded color-theory knowledge table. The Seller shall not need to provide these tags in the CSV (FR-3.2; FR-4.2; FR-7.1).","1. Prepare a valid item using a color-family value with a known mapping in the knowledge table.
+2. Upload and publish the item without providing color-palette tags in the CSV.
+3. Inspect the item's saved metadata.
+4. Verify the generated color-palette tags match the knowledge-table mapping for that color-family value.
+5. Record the expected and actual tags.",Carlos,PASS,../evidence/seller-tests/SEL-017/
+SEL-018,Upload Validation (File Format),Seller logged in; .xlsx prepared,"As a Seller, I attempted an Excel (.xlsx) upload.","System rejects non-CSV files with ""File must be a CSV""; no batch created (SRS §1.2; FR-4.1).",1. Upload .xlsx 2. Verify rejection message 3. Verify no batch created,Carlos,PASS,../evidence/seller-tests/SEL-018/
+SEL-019,Upload Validation (Style Vocabulary),"Seller logged in; CSV with style_tags ""streetwear""","As a Seller, I used a style tag outside the controlled vocabulary.","Row rejected with invalid style_tags reason listing allowed values: casual, smart, formal, sporty (FR-3.2, FR-4.7(a)).","1. Upload CSV with ""streetwear"" 2. Verify reason names the tag and lists allowed values",Carlos,PASS,../evidence/seller-tests/SEL-019/

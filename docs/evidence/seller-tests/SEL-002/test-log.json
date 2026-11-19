@@ -1,0 +1,24 @@
+{
+  "test_id": "SEL-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:03:43.795Z",
+  "duration": "8115ms",
+  "details": {
+    "batch_id": "6afec97a2b7c0da2d0d9602b",
+    "upload_response_statuses": [
+      "202"
+    ],
+    "batch_status": "completed",
+    "accepted_count": 1,
+    "rejected_count": 0,
+    "published_item": "SEL Valid 8467c2",
+    "store_name": "SEL Test Store c99263c4",
+    "item_status": "active",
+    "rembg_images": [
+      "/media/6afec97d2b7c0da2d0d96031",
+      "/media/6afec97e2b7c0da2d0d96033"
+    ],
+    "pipeline_elapsed_ms": 198,
+    "status_polls": 1
+  }
+}

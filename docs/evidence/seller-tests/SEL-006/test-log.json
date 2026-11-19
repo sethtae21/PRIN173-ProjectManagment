@@ -1,0 +1,12 @@
+{
+  "test_id": "SEL-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:03:57.596Z",
+  "duration": "4621ms",
+  "details": {
+    "batch_id": "6afec9892b7c0da2d0d9603d",
+    "rejection_reasons": [
+      "Color mismatch: declared 'Red' but the image's dominant color is #dcdcdc. Correct color to declare: \"White\" (color family: neutral)."
+    ]
+  }
+}

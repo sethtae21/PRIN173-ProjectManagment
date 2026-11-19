@@ -1,0 +1,13 @@
+{
+  "test_id": "SEL-013",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:45.982Z",
+  "duration": "1787ms",
+  "details": {
+    "ui_redirect": "https://localhost:8443/shopper/dashboard",
+    "upload_status": 403,
+    "report_status": 403,
+    "listings_status": 403,
+    "anonymous_upload_status": 401
+  }
+}

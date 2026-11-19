@@ -1,0 +1,23 @@
+{
+  "test_id": "SEL-016",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:05:33.852Z",
+  "duration": "2329ms",
+  "details": {
+    "listing_id": "6afec9e72b7c0da2d0d9613e",
+    "images": {
+      "front_image": {
+        "mode": "RGBA",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "bytes": 41869
+      },
+      "rear_image": {
+        "mode": "RGBA",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "bytes": 41869
+      }
+    }
+  }
+}

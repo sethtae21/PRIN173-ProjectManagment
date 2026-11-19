@@ -1,0 +1,13 @@
+{
+  "test_id": "SEL-005",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:03:52.013Z",
+  "duration": "1938ms",
+  "details": {
+    "batch_id": "6afec9862b7c0da2d0d9603a",
+    "rejection_reasons": [
+      "Row 2: Missing required field 'price'"
+    ],
+    "missing_field": "price"
+  }
+}

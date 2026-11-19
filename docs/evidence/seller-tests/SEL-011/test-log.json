@@ -1,0 +1,14 @@
+{
+  "test_id": "SEL-011",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:31.594Z",
+  "duration": "4150ms",
+  "details": {
+    "listing_id": "6afec9a72b7c0da2d0d96069",
+    "original_name": "SEL Edit 4ea9ac",
+    "updated_name": "SEL Edit 4ea9ac Updated",
+    "updated_price": "699.00",
+    "final_status": "active",
+    "revalidated": true
+  }
+}

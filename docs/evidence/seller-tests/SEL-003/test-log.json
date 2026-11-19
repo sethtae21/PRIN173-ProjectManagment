@@ -1,0 +1,11 @@
+{
+  "test_id": "SEL-003",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:03:46.186Z",
+  "duration": "1453ms",
+  "details": {
+    "http_status": 400,
+    "rejection": "Image \"front.png\" exceeds the 5 MB maximum file size limit.",
+    "oversized_bytes": 13378492
+  }
+}

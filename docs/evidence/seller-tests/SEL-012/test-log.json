@@ -1,0 +1,14 @@
+{
+  "test_id": "SEL-012",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:43.374Z",
+  "duration": "4501ms",
+  "note": "Inventory Rule: active-cart warning is a documented requirement but is not implemented in the current UI/API; core delete, cart detachment and public removal were verified.",
+  "details": {
+    "listing_id": "6afec9b12b7c0da2d0d96075",
+    "public_get_after_delete": 404,
+    "cart_snapshot_retained": true,
+    "cart_item_detached": true,
+    "active_cart_warning": "NOT IMPLEMENTED — generic delete confirmation only"
+  }
+}

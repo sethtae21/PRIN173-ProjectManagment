@@ -1,0 +1,14 @@
+{
+  "test_id": "SEL-018",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:05:41.684Z",
+  "duration": "2062ms",
+  "note": "Client-side CSV extension guard is the enforced rejection surface; the backend upload serializer validates the same rule but is not invoked by the live view.",
+  "details": {
+    "rejection_message": "Please upload a valid CSV file.",
+    "invalid_file_rejected_before_upload": true,
+    "listings_before": 0,
+    "listings_after": 0,
+    "no_batch_created": true
+  }
+}

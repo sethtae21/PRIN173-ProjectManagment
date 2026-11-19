@@ -1,0 +1,12 @@
+{
+  "test_id": "SEL-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:00.548Z",
+  "duration": "1929ms",
+  "details": {
+    "batch_id": "6afec98f2b7c0da2d0d96048",
+    "rejection_reasons": [
+      "Front: 'does-not-exist.png' not found among uploaded images"
+    ]
+  }
+}

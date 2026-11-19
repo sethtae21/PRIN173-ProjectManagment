@@ -1,0 +1,17 @@
+{
+  "test_id": "SEL-014",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:05:05.797Z",
+  "duration": "18882ms",
+  "details": {
+    "batch_id": "6afec9bf2b7c0da2d0d96084",
+    "total_items": 10,
+    "accepted_count": 10,
+    "rejected_count": 0,
+    "wall_clock_ms": 18282,
+    "pipeline_elapsed_ms": 5233,
+    "status_polls": 8,
+    "target_ms": 60000,
+    "within_target": true
+  }
+}

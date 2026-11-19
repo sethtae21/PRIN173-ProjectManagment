@@ -1,0 +1,14 @@
+{
+  "test_id": "SEL-015",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:05:26.514Z",
+  "duration": "19761ms",
+  "note": "Human UAT population-level KPI (≥80% unassisted across participants) is deferred; this checks the first-try acceptance rate for one unassisted 10-item batch.",
+  "details": {
+    "batch_id": "6afec9d42b7c0da2d0d960e1",
+    "total_items": 10,
+    "accepted_count": 10,
+    "accepted_rate_percent": 100,
+    "human_uat_kpi_deferred": true
+  }
+}

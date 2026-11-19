@@ -1,0 +1,11 @@
+{
+  "test_id": "SEL-010",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:04:22.397Z",
+  "duration": "729ms",
+  "details": {
+    "http_status": 400,
+    "rejection": "Upload exceeds maximum of 10 items.",
+    "attempted_items": 11
+  }
+}

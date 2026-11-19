@@ -1,0 +1,25 @@
+{
+  "test_id": "SEL-017",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:05:38.658Z",
+  "duration": "2318ms",
+  "details": {
+    "listing_id": "6afec9ee2b7c0da2d0d96149",
+    "color_family": "white",
+    "expected_tags": [
+      "neutral",
+      "clean",
+      "fresh",
+      "versatile",
+      "light"
+    ],
+    "actual_tags": [
+      "neutral",
+      "clean",
+      "fresh",
+      "versatile",
+      "light"
+    ],
+    "batch_status": "completed"
+  }
+}

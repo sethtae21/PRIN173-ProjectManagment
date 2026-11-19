@@ -1,0 +1,13 @@
+{
+  "test_id": "SEL-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T10:03:49.133Z",
+  "duration": "2017ms",
+  "details": {
+    "batch_id": "6afec9832b7c0da2d0d96037",
+    "batch_status": "completed",
+    "rejection_reasons": [
+      "Front: Image too small (700x700). Minimum is 800x800."
+    ]
+  }
+}
