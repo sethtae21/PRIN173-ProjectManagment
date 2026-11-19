@@ -1,0 +1,28 @@
+{
+  "test_id": "REC-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T07:17:59.560Z",
+  "duration": "7304ms",
+  "details": {
+    "item": "Dark Indigo Maong Jeans",
+    "rules": [
+      {
+        "label": "Color compatibility",
+        "score": "3/3"
+      },
+      {
+        "label": "Height contrast",
+        "score": "2/2"
+      },
+      {
+        "label": "Proportion shading",
+        "score": "1/1"
+      },
+      {
+        "label": "Style match",
+        "score": "1/1"
+      }
+    ],
+    "reasons_present": true
+  }
+}

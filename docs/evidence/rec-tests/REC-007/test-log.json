@@ -1,0 +1,17 @@
+{
+  "test_id": "REC-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T07:18:37.907Z",
+  "duration": "9535ms",
+  "details": {
+    "item": "Dark Indigo Maong Jeans",
+    "explainable_rules": [
+      "Color compatibility",
+      "Height contrast",
+      "Proportion shading",
+      "Style match"
+    ],
+    "score": 5,
+    "observation_notes": "Automated UAT observation: four weighted match reasons were visible with non-empty explanations and the 1-5 star recommendation rating control accepted a 5-star submission. The >=80% population approval KPI remains deferred to post-deployment per Scope v1.1."
+  }
+}

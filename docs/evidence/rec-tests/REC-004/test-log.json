@@ -1,0 +1,18 @@
+{
+  "test_id": "REC-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T07:18:08.682Z",
+  "duration": "2882ms",
+  "details": {
+    "prompt": "Please sign up or log in to save your rating.",
+    "ratings_network_calls": 0,
+    "rating_storage_before": {
+      "session": [],
+      "local": []
+    },
+    "rating_storage_after": {
+      "session": [],
+      "local": []
+    }
+  }
+}

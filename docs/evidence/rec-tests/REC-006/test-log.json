@@ -1,0 +1,19 @@
+{
+  "test_id": "REC-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T07:18:28.258Z",
+  "duration": "9484ms",
+  "details": {
+    "item": "Dark Indigo Maong Jeans",
+    "equipped_slots": [
+      {
+        "slot": "bottom",
+        "name": "Dark Indigo Maong Jeans"
+      }
+    ],
+    "canvas_redrawn": true,
+    "success_toast": "Thanks! Rating saved.",
+    "fit_rating_persisted": true,
+    "observation_notes": "Automated UAT observation: canvas rendered the equipped garment overlay and changed after try-on; the 1-5 star fit control accepted a 4-star submission. Team physical fit-accuracy comparison and the >=80% population KPI remain deferred to post-deployment per Scope v1.1."
+  }
+}

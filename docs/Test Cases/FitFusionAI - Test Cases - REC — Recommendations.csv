@@ -1,0 +1,22 @@
+Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Recommendations - 001,View Recommendations,Avatar with skin tone/undertone; catalog has items,"As a user, I want to see outfit recommendations for my profile.","The system shall rank items using weighted scoring (color +3, height contrast +2, shading +1, style +1) and display top items with scores (FR-7.1–7.3).","1. Open Recommendation Panel
+2. Verify ranked items display
+3. Verify scores and match indicators shown",Both,PASS,../evidence/rec-tests/REC-001/
+Recommendations - 002,View Match Reasons,Recommendations displayed,"As a user, I want to see why an item was recommended.","The system shall show a detailed breakdown (color, height contrast, shading, style scores) and which rules fired (FR-7.4).","1. Click a recommended item
+2. Select View Match Reasons
+3. Verify the score breakdown",Dein,PASS,../evidence/rec-tests/REC-002/
+Recommendations - 003,View Recommendations,No compatible items for the profile,"As a user, I want recommendations. No compatible items exist for my undertone.","The system shall display ""No recommendations available"" and suggest browsing the catalog (UC-05 ext).","1. Use a profile with no compatible color-family items
+2. Open Recommendation Panel
+3. Verify message and catalog suggestion",Both,PASS,../evidence/rec-tests/REC-003/
+Recommendations - 004,Rate Recommendation (Guest),Guest session; recommendations displayed,"As a Guest, I want to rate a recommendation. I clicked a 1–5 star rating control.","The system shall block the action entirely, record and cache nothing, and show a sign-up/login prompt (FR-7.5).","1. Continue as Guest
+2. Open Recommendation Panel
+3. Click a 1–5 star control
+4. Verify sign-up prompt
+5. Verify nothing was written to DB or cached",Both,PASS,../evidence/rec-tests/REC-004/
+Recommendations - 005,Rate Recommendation (Registered),Registered User; recommendations displayed,"As a Registered User, I want to rate a recommendation.",The system shall persist the rating for Registered Users (FR-7.5).,"1. Log in
+2. Open Recommendation Panel
+3. Give 4 stars (1–5 star scale only per FR-7.5)
+4. Reload and verify rating persists",Both,PASS,../evidence/rec-tests/REC-005/
+Recommendations - 006,UAT: Fit/Style Confidence,Registered User; try-on complete,"As a user, I want to feel confident in the fit visualization.","Panel observes fit visualization and functional 1–5 star rating controls + team physical fit-accuracy comparison log during UAT; ≥80% population-level KPI is deferred to post-deployment (Criterion 9, Scope v1.1).",1. Participant completes a try-on session. 2. Observer verifies the canvas renders the fit visualization correctly. 3. Record observation notes as evidence (KAN-89).,Dein,PASS,../evidence/rec-tests/REC-006/
+Recommendations - 007,UAT: Recommendation Approval,Registered User; recommendations shown,"As a shopper, I want to trust the style recommendations.","Match reasons are visible and explainable, and the 1–5 star recommendation rating control functions per FR-7.5 during UAT; ≥80% population-level approval KPI is deferred to post-deployment (Criterion 10, Scope v1.1).
+",1. Participant opens the Recommendation Panel. 2. Panel reviews ranked items and match reasons. 3. Observer records that reasons are visible and explainable (KAN-89).,Dein,PASS,../evidence/rec-tests/REC-007/
