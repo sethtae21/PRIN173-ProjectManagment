@@ -1,0 +1,25 @@
+{
+  "test_id": "EC-014",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:15:11.779Z",
+  "duration": "0ms",
+  "details": {
+    "runs": [
+      {
+        "duration_ms": 251,
+        "dom_content_loaded_ms": 249
+      },
+      {
+        "duration_ms": 107,
+        "dom_content_loaded_ms": 105
+      },
+      {
+        "duration_ms": 80,
+        "dom_content_loaded_ms": 78
+      }
+    ],
+    "worst_duration_ms": 251,
+    "target_ms": 3000,
+    "target_met": true
+  }
+}

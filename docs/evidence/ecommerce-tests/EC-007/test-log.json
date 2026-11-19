@@ -1,0 +1,16 @@
+{
+  "test_id": "EC-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:27.883Z",
+  "duration": "0ms",
+  "details": {
+    "injected_payment_method": "Mock E-Wallet Decline",
+    "intercepted_checkout_posts": 1,
+    "error_message": "Payment declined.",
+    "orders_before": 1,
+    "orders_after": 1,
+    "cart_item_before": "Navy Formal Blazer",
+    "cart_item_after": "Navy Formal Blazer",
+    "cart_preserved": true
+  }
+}

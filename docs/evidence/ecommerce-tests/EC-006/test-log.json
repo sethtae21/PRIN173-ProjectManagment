@@ -1,0 +1,20 @@
+{
+  "test_id": "EC-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:19.651Z",
+  "duration": "0ms",
+  "details": {
+    "order_id": "6afeafd92b7c0da2d0d95dbf",
+    "order_number": "FF-42685955",
+    "order_status": "pending",
+    "order_total": "3598.00",
+    "created_at": "2026-11-19T08:14:17.587000Z",
+    "item_count": 2,
+    "store_names": [
+      "seth storeeee",
+      "seth storeeee"
+    ],
+    "cart_items_after": 0,
+    "fit_accuracy_popup": "Rate Fit Accuracy (skippable via Skip)"
+  }
+}

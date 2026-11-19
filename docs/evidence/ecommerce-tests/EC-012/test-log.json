@@ -1,0 +1,11 @@
+{
+  "test_id": "EC-012",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:15:04.874Z",
+  "duration": "0ms",
+  "details": {
+    "url": "https://localhost:8443/",
+    "protocol": "https:",
+    "tls_note": "Browser enforces TLS 1.2+ for the HTTPS origin; no plaintext HTTP on the demo URL."
+  }
+}

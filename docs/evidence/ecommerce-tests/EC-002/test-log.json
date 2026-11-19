@@ -1,0 +1,13 @@
+{
+  "test_id": "EC-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:13:41.971Z",
+  "duration": "0ms",
+  "details": {
+    "guest_session_token": null,
+    "guest_user_cache": null,
+    "prompt_heading": "Create an account to continue",
+    "prompt_message": "Guest users may browse the catalog. Please create an account or log in to add products to your cart.",
+    "cart_api_calls_from_guest": 0
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "test_id": "EC-001",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:13:37.735Z",
+  "duration": "0ms",
+  "details": {
+    "product_url": "https://localhost:8443/shopper/products/6af2cb71655abe362412d145",
+    "confirmation": "Navy Formal Blazer was added to your cart.\n×",
+    "cart_item": "Navy Formal Blazer",
+    "cart_quantity": 1,
+    "cart_items_count": 1
+  }
+}

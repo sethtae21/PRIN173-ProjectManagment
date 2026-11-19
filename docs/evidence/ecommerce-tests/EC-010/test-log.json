@@ -1,0 +1,17 @@
+{
+  "test_id": "EC-010",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:41.099Z",
+  "duration": "0ms",
+  "details": {
+    "seller_email": "ec-seller-76a2fa49-9d9@example.test",
+    "upload_batch_id": "6afeafea2b7c0da2d0d95dc4",
+    "delisted_item_id": "6afeafeb2b7c0da2d0d95dc5",
+    "delist_http_status": 204,
+    "public_get_after_delist": 404,
+    "add_http_status": 400,
+    "add_error": "{\"catalog_item\":[\"Catalog item does not exist.\"]}",
+    "ui_message": "Could not load product details.",
+    "item_present_in_cart": false
+  }
+}

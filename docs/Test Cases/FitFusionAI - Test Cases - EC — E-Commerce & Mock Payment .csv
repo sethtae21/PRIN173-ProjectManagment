@@ -1,0 +1,51 @@
+Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+E-Commerce - 001,Add to Cart,Registered User; active catalog,"As a Registered User, I want to add an item to my cart.",The system shall add the item with quantity 1 and show confirmation (FR-6.1).,"1. Log in
+2. Open an item
+3. Click Add to Cart
+4. Verify confirmation",Both,PASS,../evidence/ecommerce-tests/EC-001/
+E-Commerce - 002,Add to Cart (Guest),Guest session,"As a Guest, I want to add an item to a cart.","The system shall block Guests from cart/checkout and prompt registration (FR-1.8, FR-6.1).","1. Continue as Guest
+2. Open an item
+3. Attempt Add to Cart
+4. Verify registration prompt",Both,PASS,../evidence/ecommerce-tests/EC-002/
+E-Commerce - 003,Update Cart Quantity,Registered User; item in cart,"As a Registered User, I want to change an item's quantity.",The system shall recalculate subtotal and total (FR-6.3).,"1. Open Cart
+2. Change quantity
+3. Verify subtotal and total update",Both,PASS,../evidence/ecommerce-tests/EC-003/
+E-Commerce - 004,Remove Item / Clear Cart,Registered User; items in cart,"As a Registered User, I want to remove items or clear my cart.","The system shall remove individual items or clear all, recalculating totals (FR-6.4).","1. Open Cart
+2. Remove one item
+3. Click Clear Cart
+4. Confirm
+5. Verify cart emptied",Both,PASS,../evidence/ecommerce-tests/EC-004/
+E-Commerce - 005,Cart Persistence,Registered User; item in cart,"As a Registered User, I want my cart to persist across sessions.",The cart shall persist across logout/login (FR-6.1).,"1. Add item to cart
+2. Logout
+3. Login
+4. Open Cart and verify item remains",Both,PASS,../evidence/ecommerce-tests/EC-005/
+E-Commerce - 006,Mock Checkout,Registered User; cart has items,"As a Registered User, I want to complete a mock checkout.","The system shall process via the mock gateway, create an order record (items, store names, address, timestamp), clear the cart, and show confirmation (FR-6.5, FR-6.6). and display the optional, skippable Fit-Accuracy Rating pop-up (FR-6.6, FR-7.5).","1. Open Cart
+2. Proceed to Checkout
+3. Enter address and payment method
+4. Place Order
+5. Verify confirmation and order in history                                                                                                                                                                                                                6. Verify the skippable 1–5 star Fit-Accuracy Rating pop-up (""How accurately did the avatar preview show this garment on you?"") appears and can be submitted or skipped.",Both,PASS,../evidence/ecommerce-tests/EC-006/
+E-Commerce - 007,Mock Payment Decline,Registered User; cart has items,"As a Registered User, I want to check out. The mock payment was declined.","The system shall show an error, create no order, and keep the cart intact (UC-12/UC-13 ext).","1. Proceed to Checkout
+2. Trigger a simulated payment decline
+3. Verify error and no order created
+4. Verify cart intact",Carlos,PASS,../evidence/ecommerce-tests/EC-007/
+E-Commerce - 008,View Order History,Registered User with past orders,"As a Registered User, I want to view my order history.","The system shall list orders chronologically with Order ID, date, total, status, item count (FR-6.7).","1. Log in
+2. Open Order History
+3. Verify chronological list",Both,PASS,../evidence/ecommerce-tests/EC-008/
+E-Commerce - 009,View Order Details,Registered User with a past order,"As a Registered User, I want to view a specific order's details.",The system shall show full order details including store name per item (FR-6.8).,"1. Open Order History
+2. Click an order
+3. Verify full details and store names",Both,PASS,../evidence/ecommerce-tests/EC-009/
+E-Commerce - 010,Add Unavailable Item,Registered User; item delisted/deleted by Seller,"As a Registered User, I want to add an item. The item is no longer available.","The system shall show ""Item unavailable"" and prevent adding (UC-11 ext).","1. Delist/delete an item (as Seller)
+2. As User, attempt to add that item
+3. Verify unavailable message and blocked add",Both,PASS,../evidence/ecommerce-tests/EC-010/
+E-Commerce - 011,Performance: API Sweep,Staging under normal load,"As a user, I want the app to feel instant.","95% of catalog, filtering, recommendation, and commerce APIs return ≤500 ms (Criterion 1).",1. Run automated script against API endpoints.<br>2. Compute 95th percentile response time.,Carlos,PASS,../evidence/ecommerce-tests/EC-011/
+E-Commerce - 012,Security: TLS Verification,Staging URL active,"As a user, I want my data encrypted in transit.",Staging traffic uses TLS 1.2+ via local CA; no plaintext HTTP on demo URL (Criterion 7).,1. Open staging URL.<br>2. Inspect browser security certificate and TLS version.,Carlos,PASS,../evidence/ecommerce-tests/EC-012/
+E-Commerce - 013,UAT: Checkout Completion,Registered Users; active carts,"As a user, I want to complete my mock purchase.",≥70% of created carts during UAT complete the simulated mock checkout (Criterion 8).,1. Track carts created vs checkouts completed during UAT.<br>2. Calculate completion percentage.,Both,"PASS (UI Verified, Human UAT Deferred)",../evidence/ecommerce-tests/EC-013/
+ E-Commerce - 014,Performance: Initial Page Load,Staging application available; standard campus Wi-Fi,"As a user, I want the application to load promptly.",The initial application load shall complete in under 3 seconds under the agreed test conditions (SRS §4.1; Scope Criterion 3).,"1. Open the staging application using the agreed browser and campus Wi-Fi.
+2. Measure the initial load time using the agreed measurement method.
+3. Repeat the agreed number of runs.
+4. Record each result and whether the target was met.",Both,PASS,../evidence/ecommerce-tests/EC-014/
+ E-Commerce - 015:,UAT: Purchase Confidence and Return Intent,UAT participant; in-app pre/post confidence and return-intent prompts active," As a shopper, I want to evaluate how a try-on affects my purchase confidence and return intent.","Mock checkout completes, order record is accurate, and optional in-app pre/post confidence/return-intent prompts + Fit-Accuracy pop-up capture responses in-app during UAT; ≥80% population-level KPI is deferred to post-deployment (Criterion 11, Scope v1.1).","1. Complete the optional in-app pre-session confidence and return-intent prompts (1–5 scale).
+2. Complete the virtual try-on and recommendation walkthrough on the avatar.
+3. Complete the optional in-app post-session confidence and return-intent prompts (1–5 scale).
+4. Complete mock checkout and verify the optional, skippable 1–5 star Fit-Accuracy Rating pop-up appears.
+5. Verify responses save in-app for Registered Users (and panel observes functional completion; ≥80% population KPI deferred post-deployment).",Both,"PASS (UI Verified, Human UAT Deferred)",../evidence/ecommerce-tests/EC-015/

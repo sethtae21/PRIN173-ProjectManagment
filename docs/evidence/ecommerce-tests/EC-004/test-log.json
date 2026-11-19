@@ -1,0 +1,12 @@
+{
+  "test_id": "EC-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:01.253Z",
+  "duration": "0ms",
+  "details": {
+    "initial_items": 2,
+    "after_remove": 1,
+    "after_clear": 0,
+    "clear_control": "Select all + Remove Selected"
+  }
+}

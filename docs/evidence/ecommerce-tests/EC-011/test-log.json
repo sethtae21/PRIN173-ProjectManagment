@@ -1,0 +1,27 @@
+{
+  "test_id": "EC-011",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:15:04.020Z",
+  "duration": "0ms",
+  "details": {
+    "iterations": 20,
+    "endpoints": {
+      "/catalog/": {
+        "p95_ms": 219,
+        "max_ms": 226,
+        "under_500ms": true
+      },
+      "/api/recommendations/": {
+        "p95_ms": 211,
+        "max_ms": 219,
+        "under_500ms": true
+      },
+      "/cart/": {
+        "p95_ms": 481,
+        "max_ms": 488,
+        "under_500ms": true
+      }
+    },
+    "criterion": "Criterion 1: 95% of requests <= 500ms"
+  }
+}

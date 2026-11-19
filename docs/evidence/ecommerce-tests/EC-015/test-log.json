@@ -1,0 +1,16 @@
+{
+  "test_id": "EC-015",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:15:14.313Z",
+  "duration": "0ms",
+  "note": "PASS (UI Verified, Human UAT Deferred)",
+  "details": {
+    "pre_check_button": true,
+    "post_check_button": true,
+    "confidence_question": true,
+    "return_intent_question": true,
+    "fit_accuracy_popup_verified_in": "EC-006",
+    "fit_accuracy_copy_in_dom": false,
+    "note": ">=80% population-level KPI deferred to post-deployment (Scope v1.1); panel observes functional completion."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "test_id": "EC-005",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:09.749Z",
+  "duration": "0ms",
+  "details": {
+    "item": "Navy Formal Blazer",
+    "quantity": 2,
+    "persisted_after_logout_login": true
+  }
+}

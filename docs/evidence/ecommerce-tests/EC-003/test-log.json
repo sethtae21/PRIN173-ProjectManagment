@@ -1,0 +1,14 @@
+{
+  "test_id": "EC-003",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:13:49.660Z",
+  "duration": "0ms",
+  "details": {
+    "item": "Navy Formal Blazer",
+    "quantity_before": 1,
+    "quantity_after": 2,
+    "total_before": "₱2,499",
+    "total_after": "₱4,998",
+    "server_quantity": 2
+  }
+}

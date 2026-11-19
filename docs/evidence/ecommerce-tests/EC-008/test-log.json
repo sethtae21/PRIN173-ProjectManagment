@@ -1,0 +1,19 @@
+{
+  "test_id": "EC-008",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:30.988Z",
+  "duration": "0ms",
+  "details": {
+    "order_count": 1,
+    "displayed_cards": 1,
+    "newest_order_id": "6afeafd92b7c0da2d0d95dbf",
+    "newest_order_number": "FF-42685955",
+    "newest_total": "3598.00",
+    "newest_status": "pending",
+    "item_count": 2,
+    "chronological_newest_first": true,
+    "all_server_ids": [
+      "6afeafd92b7c0da2d0d95dbf"
+    ]
+  }
+}

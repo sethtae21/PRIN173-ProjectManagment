@@ -1,0 +1,15 @@
+{
+  "test_id": "EC-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T08:14:33.962Z",
+  "duration": "0ms",
+  "details": {
+    "order_id": "6afeafd92b7c0da2d0d95dbf",
+    "item_count": 2,
+    "store_names": [
+      "seth storeeee",
+      "seth storeeee"
+    ],
+    "detail_heading": "Order #FF-42685955"
+  }
+}
