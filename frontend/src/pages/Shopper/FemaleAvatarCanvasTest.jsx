@@ -312,7 +312,7 @@ export default function FemaleAvatarCanvasTest() {
 
         <section className="fc-card fc-settings">
           <h2>Measurements</h2>
-          <RangeControl label="Height" min={140} max={218.44} step={0.01} value={heightCm} onChange={setHeightCm} unit=" cm" />
+          <RangeControl label="Height" min={140} max={220} step={0.01} value={heightCm} onChange={setHeightCm} unit=" cm" />
           <RangeControl label="Weight" min={40} max={200} value={weightKg} onChange={setWeightKg} unit=" kg" />
           <p className="fc-tiny">Weight selects A–E base art with a reference-weight heuristic. Minimum input limits are test placeholders. Missing A/B/D/E PNGs use C unchanged.</p>
 

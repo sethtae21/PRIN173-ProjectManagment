@@ -1,0 +1,23 @@
+{
+  "test_id": "AV-011",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:59:07.984Z",
+  "duration": "3051ms",
+  "details": {
+    "garment": "Navy Polka Dot Dress",
+    "garment_size": "S",
+    "s_band": {
+      "min": 86,
+      "max": 90
+    },
+    "effective_build_max": 89.9,
+    "global_height_range": {
+      "min": 120,
+      "max": 220
+    },
+    "global_build_range": {
+      "min": 86,
+      "max": 112
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "test_id": "AV-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:58:58.166Z",
+  "duration": "4720ms",
+  "details": {
+    "preset_id": "6afe49cea775e858e0ea3aa0",
+    "height_cm": 172,
+    "body_build_cm": 97,
+    "skin_tone": "#bb7d55",
+    "undertone": "cool",
+    "cold_login_token_used_for_api_check": true
+  }
+}

@@ -77,7 +77,7 @@ const UAT_AFTER_EXTRA_QUESTIONS = [
   },
 ];
 
-const HEIGHT_RANGE = { min: 120, max: 218 };
+const HEIGHT_RANGE = { min: 120, max: 220 };
 const WEIGHT_RANGE = { min: 30, max: 200 };
 
 const BODY_BUILDS = ["Slim", "Balanced", "Full", "Curve"];

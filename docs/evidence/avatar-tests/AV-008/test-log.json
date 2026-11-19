@@ -1,0 +1,12 @@
+{
+  "test_id": "AV-008",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:59:03.273Z",
+  "duration": "5022ms",
+  "details": {
+    "listed": true,
+    "renamed_to": "AV-008 Renamed Preset",
+    "deleted": true,
+    "final_status": 404
+  }
+}

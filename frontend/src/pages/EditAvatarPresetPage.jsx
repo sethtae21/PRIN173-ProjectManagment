@@ -25,7 +25,8 @@ const LEGACY_CHOICES = {
   undertone: {},
 };
 
-const HEIGHT_RANGE = { min: 120, max: 218 };
+const HEIGHT_RANGE = { min: 120, max: 220
+ };
 const WEIGHT_RANGE = { min: 30, max: 200 };
 
 const DEFAULT_PRESET = {

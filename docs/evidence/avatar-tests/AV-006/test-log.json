@@ -1,0 +1,11 @@
+{
+  "test_id": "AV-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:58:53.366Z",
+  "duration": "3833ms",
+  "details": {
+    "female_visible": true,
+    "male_hidden": true,
+    "saved_cup_size": "D"
+  }
+}

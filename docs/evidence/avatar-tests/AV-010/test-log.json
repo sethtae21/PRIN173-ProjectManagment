@@ -1,0 +1,26 @@
+{
+  "test_id": "AV-010",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:58:42.341Z",
+  "duration": "10385ms",
+  "details": {
+    "results": {
+      "height_119": "REJECTED (Value must be greater than or equal to 120.; persisted 165 cm)",
+      "height_120": "ACCEPTED (persisted 120 cm)",
+      "height_220": "ACCEPTED (persisted 220 cm)",
+      "height_221": "REJECTED (Value must be less than or equal to 220.; persisted 220 cm)",
+      "build_85": "REJECTED (Value must be greater than or equal to 86.; persisted 99 cm)",
+      "build_86": "ACCEPTED (persisted 86 cm)",
+      "build_112": "ACCEPTED (persisted 112 cm)",
+      "build_113": "REJECTED (Value must be less than or equal to 112.; persisted 112 cm)"
+    },
+    "client_height_range": {
+      "min": 120,
+      "max": 220
+    },
+    "client_body_build_range": {
+      "min": 86,
+      "max": 112
+    }
+  }
+}

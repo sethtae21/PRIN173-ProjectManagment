@@ -1,0 +1,39 @@
+Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Avatar - 001,Create Custom Avatar,User on Avatar Creation page,"As a user, I want to create a custom avatar. I entered valid height and Body Build.",The system shall map height (120–220 cm) and Body Build (86–112 cm) to body parameters and render the avatar (FR-2.3).,"1. Select gender
+2. Enter height 170 cm
+3. Enter Body Build 95 cm
+4. Confirm",Dein,PASS,../evidence/avatar-tests/AV-001/
+Avatar - 002,Create Custom Avatar,User on Avatar Creation page,"As a user, I want to create a custom avatar. I entered height outside the valid range.",The system shall reject height outside 120–220 cm with a descriptive error and not update the avatar (FR-2.3).,"1. Select gender
+2. Enter height 250 cm
+3. Attempt confirm",Dein,PASS,../evidence/avatar-tests/AV-002/
+Avatar - 003,Create Custom Avatar,User on Avatar Creation page,"As a user, I want to create a custom avatar. I entered Body Build outside the valid range.",The system shall reject Body Build outside 86–112 cm with a descriptive error (FR-2.3).,"1. Select gender
+2. Enter Body Build 130 cm
+3. Attempt confirm",Dein,PASS,../evidence/avatar-tests/AV-003/
+Avatar - 004,Skin Tone & Undertone,Avatar creation in progress,"As a user, I want to select my skin tone shade and undertone.",The system shall allow selecting a skin-tone shade and warm/cool/neutral undertone (selected or derived) (FR-2.4).,"1. Select a skin-tone shade
+2. Select or confirm derived undertone
+3. Confirm",Dein,PASS,../evidence/avatar-tests/AV-004/
+Avatar - 005,Body Proportions,Avatar creation in progress,"As a user, I want to adjust body proportions to match my silhouette.","The system shall deform the single base silhouette via shoulder, waist, hip, thigh controls and keep overlays aligned (FR-2.7).","1. Adjust shoulder width
+2. Adjust waist
+3. Adjust hip
+4. Adjust thigh
+5. Confirm render updates",Dein,PASS,../evidence/avatar-tests/AV-005/
+Avatar - 006,Cup Size (Female-only),Avatar creation in progress,"As a user, I want to set avatar proportions. I selected a Male avatar and looked for cup size.",The system shall show cup size (A/B/C/D) only for female avatars; not available for male (FR-2.7).,"1. Select gender = Male
+2. Verify cup size control is hidden
+3. Switch to Female
+4. Verify cup size control appears",Dein,PASS,../evidence/avatar-tests/AV-006/
+Avatar - 007,Save Preset (Persistence),Registered User logged in; avatar created,"As a Registered User, I want my avatar preset saved across sessions.",The system shall save the preset and reload it identically after logout/login (FR-2.5).,"1. Create avatar
+2. Save preset
+3. Logout
+4. Login
+5. Open preset list and verify fields match",Both,PASS,../evidence/avatar-tests/AV-007/
+Avatar - 008,Manage Presets (List/Edit/Delete),Registered User with at least one preset,"As a Registered User, I want to list, edit, and delete my avatar presets.","The system shall list, edit, and permanently delete presets (FR-2.8–2.10).","1. Open Preset Management
+2. List presets
+3. Edit a preset and save
+4. Delete a preset and confirm",Dein,PASS,../evidence/avatar-tests/AV-008/
+Avatar - 009,Guest Avatar Ephemerality,Guest session; avatar created,"As a Guest, I want to create an avatar. I closed the browser tab.",The system shall discard all Guest data when the session closes; no guest records in the persistent DB (FR-1.9).,"1. Continue as Guest
+2. Create avatar
+3. Close tab/session
+4. Query persistent DB for guest records (Carlos)",Both,PASS,../evidence/avatar-tests/AV-009/
+Avatar - 010,Boundary Validation,User on Avatar Creation page,"As a user, I want the system to enforce exact input boundaries.","System accepts 120 & 220 cm (height) and 86 & 112 cm (Body Build); rejects 119, 221, 85, 113 (FR-2.3).","1. Enter boundary values: 119, 120, 220, 221 cm.<br>2. Enter Body Build: 85, 86, 112, 113 cm.<br>3. Verify exact accept/reject behavior.",Dein,PASS,../evidence/avatar-tests/AV-010/
+AV-011,"	
+Size-Compatible Guardrails","Avatar created; size equipped (e.g., S)","As a user, I want avatar controls limited to the equipped size's range.",Height/Body Build controls constrained to the size-compatible sub-range with a descriptive message; global ranges 120–220 / 86–112 cm remain outer bounds (FR-2.3 v1.1).,1. Equip a size-S garment 2. Try to move Body Build past the S sub-range 3. Verify control stops at limit with allowed-range message,Dein,PASS,../evidence/avatar-tests/AV-011/

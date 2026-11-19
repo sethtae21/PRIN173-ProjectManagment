@@ -1,0 +1,25 @@
+{
+  "test_id": "AV-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T00:59:04.834Z",
+  "duration": "1492ms",
+  "details": {
+    "guestState": {
+      "sessionKeys": [
+        "fitfusion-guest-avatar-gender",
+        "fitfusion-guest-avatar-preset",
+        "fitfusion-fitting-studio-session-guest"
+      ],
+      "avatarKeys": [
+        "fitfusion-guest-avatar-gender",
+        "fitfusion-guest-avatar-preset"
+      ],
+      "localAvatarKeys": []
+    },
+    "freshKeys": {
+      "avatarKeys": [],
+      "localAvatarKeys": []
+    },
+    "anonymous_presets_status": 401
+  }
+}

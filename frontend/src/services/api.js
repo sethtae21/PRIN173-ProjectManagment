@@ -603,7 +603,7 @@ export const SIZE_RANGE_TABLE = {
   '4XL': [110, 112],
 };
 export const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-export const HEIGHT_RANGE = { min: 120, max: 218 };
+export const HEIGHT_RANGE = { min: 120, max: 220 };
 export const BODY_BUILD_RANGE = { min: 86, max: 112 };
 
 export function validateSizeLabel(sizeText, category = '') {
