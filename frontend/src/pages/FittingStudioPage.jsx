@@ -538,6 +538,43 @@ function reconcileAvatarGender(avatar, isGuest) {
   };
 }
 
+// NEW (save-gate): the body fields that make a preset worth saving. Mirrors
+// the EditAvatarPresetPage hasChanges contract — Save Avatar Preset stays
+// disabled until the studio body actually differs from the preset snapshot
+// the studio opened with (or last saved).
+const AVATAR_SAVE_FIELDS = [
+  "gender",
+  "height",
+  "weight",
+  "skinTone",
+  "undertone",
+  "shoulder",
+  "waist",
+  "hip",
+  "thigh",
+  "cupSize",
+  "styleFocus",
+];
+
+function avatarFieldKey(field, value) {
+  // Round numeric bodies to one decimal so float drift from slider math
+  // (e.g. moving Height away and back) never fakes an unsaved change.
+  if (field === "height" || field === "weight") {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? number.toFixed(1)
+      : String(value ?? "").trim();
+  }
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function avatarsEqual(a, b) {
+  if (!a || !b) return false;
+  return AVATAR_SAVE_FIELDS.every(
+    (field) => avatarFieldKey(field, a[field]) === avatarFieldKey(field, b[field])
+  );
+}
+
 function activePresetKey(isGuest) {
   return isGuest
     ? "fitfusion-guest-avatar-preset"
@@ -1242,6 +1279,14 @@ function FittingStudioPage({ isGuest = false }) {
     );
   });
 
+  // NEW (save-gate): the body snapshot the studio opened with — i.e. the
+  // preset activated via "Use" in Avatar Presets (or the last saved body).
+  // Save Avatar Preset stays disabled until the live avatar differs from it,
+  // and re-baselines after every successful save.
+  const [savedAvatarBaseline, setSavedAvatarBaseline] = useState(() => ({
+    ...avatar,
+  }));
+
   const [avatarPresetId, setAvatarPresetId] = useState(() => {
     const session = readStudioSession(isGuest);
     const activeId = readActivePresetId(isGuest);
@@ -1395,6 +1440,14 @@ function FittingStudioPage({ isGuest = false }) {
   const proportion = useMemo(
     () => bodyProportion(avatar.height, bodyBuild),
     [avatar.height, bodyBuild]
+  );
+
+  // NEW (save-gate): true only when the live body differs from the preset
+  // snapshot the studio opened with / last saved. Drives the Save Avatar
+  // Preset button's disabled (blurred) state.
+  const avatarHasChanges = useMemo(
+    () => !avatarsEqual(avatar, savedAvatarBaseline),
+    [avatar, savedAvatarBaseline]
   );
 
   const sizeCaps = useMemo(
@@ -1991,6 +2044,15 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
+    // NEW (save-gate): defensive guard — the button is disabled while the
+    // body matches the loaded/last-saved preset, but block this path too.
+    if (!avatarHasChanges) {
+      displayNotification(
+        "No avatar changes to save yet. Adjust a setting first."
+      );
+      return;
+    }
+
     setAvatarPresetName("");
     setAvatarPresetNameError("");
     setShowSaveAvatarModal(true);
@@ -2058,6 +2120,9 @@ function FittingStudioPage({ isGuest = false }) {
       );
       localStorage.setItem("fitfusion-avatar-gender", savedPreset.gender);
       setAvatarPresetId(savedPreset.id);
+      // NEW (save-gate): the just-saved body becomes the new baseline, so the
+      // Save button re-blurs until the next actual edit.
+      setSavedAvatarBaseline({ ...avatar });
 
       closeSaveAvatarModal();
       displayNotification(`"${name}" was saved to Avatar Presets.`);
@@ -2483,6 +2548,11 @@ function FittingStudioPage({ isGuest = false }) {
     ? RATING_COPY_BY_KIND[ratingModal.kind]
     : null;
 
+  // NEW (save-gate): registered shoppers only — the Save Avatar Preset button
+  // is blurred/disabled while the body still matches the preset the studio
+  // opened with (or last saved). Guests keep their registration CTA active.
+  const savePresetLocked = !isGuest && !avatarHasChanges;
+
   return (
     <main className={`fitting-studio-page ${isGuest ? "guest-studio" : ""}`}>
       <div className="studio-body">
@@ -2817,12 +2887,34 @@ function FittingStudioPage({ isGuest = false }) {
                   onChange={(value) => updateAvatar("styleFocus", value)}
                 />
 
+                {/* CHANGED (save-gate): disabled + blurred while the body is
+                    identical to the preset the studio opened with / last
+                    saved; un-blurs on the first real edit. Guests keep the
+                    active registration CTA. */}
                 <button
                   type="button"
                   className={
                     isGuest ? "studio-registration-button" : "studio-save-preset"
                   }
                   onClick={handleSavePreset}
+                  disabled={savePresetLocked}
+                  title={
+                    savePresetLocked
+                      ? "No avatar changes yet — adjust a setting to save a new preset"
+                      : undefined
+                  }
+                  style={
+                    savePresetLocked
+                      ? {
+                          background: "#e9e4dc",
+                          borderColor: "#cfc6b6",
+                          color: "#9b9388",
+                          cursor: "not-allowed",
+                          opacity: 0.6,
+                          boxShadow: "none",
+                        }
+                      : undefined
+                  }
                 >
                   {isGuest
                     ? "Registration Required to Save"
