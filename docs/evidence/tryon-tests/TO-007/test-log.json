@@ -1,0 +1,14 @@
+{
+  "test_id": "TO-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:57.651Z",
+  "duration": "6642ms",
+  "details": {
+    "outfit_id": "6afe89cc2b7c0da2d0d95b6b",
+    "outfit_name": "TO Outfit da0d371e",
+    "saved_item_ids": [
+      "6af2cb73655abe362412d14b",
+      "6af2cb76655abe362412d15a"
+    ]
+  }
+}

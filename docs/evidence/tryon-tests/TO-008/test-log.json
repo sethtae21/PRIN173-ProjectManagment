@@ -1,0 +1,19 @@
+{
+  "test_id": "TO-008",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:32:04.048Z",
+  "duration": "6333ms",
+  "details": {
+    "outfit_id": "6afe89cf2b7c0da2d0d95b6f",
+    "equipped": [
+      {
+        "slot": "bottom",
+        "name": "Olive Green Chinos"
+      },
+      {
+        "slot": "top",
+        "name": "Classic White Shirt"
+      }
+    ]
+  }
+}

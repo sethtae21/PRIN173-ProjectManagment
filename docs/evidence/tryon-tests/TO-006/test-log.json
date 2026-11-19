@@ -1,0 +1,12 @@
+{
+  "test_id": "TO-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:50.938Z",
+  "duration": "6549ms",
+  "details": {
+    "broken_image_id": "6afdb506f53242c804001b9f",
+    "error_shown": true,
+    "previous_item_retained": true,
+    "canvas_changed_after_retry": true
+  }
+}

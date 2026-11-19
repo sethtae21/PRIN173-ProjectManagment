@@ -1,0 +1,11 @@
+{
+  "test_id": "TO-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:38.541Z",
+  "duration": "4687ms",
+  "details": {
+    "front_signature": "794cc228bd8a5804",
+    "rear_render_ms": 116,
+    "front_render_ms": 90
+  }
+}

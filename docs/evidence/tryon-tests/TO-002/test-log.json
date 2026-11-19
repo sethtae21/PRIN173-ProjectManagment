@@ -1,0 +1,15 @@
+{
+  "test_id": "TO-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:28.288Z",
+  "duration": "7648ms",
+  "details": {
+    "replaced_item": "Classic White Tee",
+    "previous_item_present": false,
+    "match_score_rules": 4,
+    "persisted_rating": {
+      "target_id": "6afdb500f53242c804001b97",
+      "score": 5
+    }
+  }
+}

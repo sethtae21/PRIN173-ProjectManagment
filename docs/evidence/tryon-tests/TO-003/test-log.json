@@ -1,0 +1,25 @@
+{
+  "test_id": "TO-003",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:33.789Z",
+  "duration": "5433ms",
+  "details": {
+    "before": [
+      {
+        "slot": "top",
+        "name": "Classic White Shirt"
+      },
+      {
+        "slot": "bottom",
+        "name": "Olive Green Chinos"
+      }
+    ],
+    "after": [
+      {
+        "slot": "top",
+        "name": "Classic Black Dress"
+      }
+    ],
+    "confirmation": "Classic Black Dress equipped. Top and bottom replaced with a one-piece outfit."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "test_id": "TO-001",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:20.567Z",
+  "duration": "4307ms",
+  "details": {
+    "recommendation_cards": 10,
+    "equipped_slot": {
+      "slot": "top",
+      "name": "Classic White Shirt"
+    },
+    "canvas_before": "3367c9b43a7d94e4",
+    "canvas_after": "794cc228bd8a5804",
+    "render_ms": 1516
+  }
+}

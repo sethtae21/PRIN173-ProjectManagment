@@ -1,0 +1,13 @@
+{
+  "test_id": "TO-005",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:31:44.322Z",
+  "duration": "5712ms",
+  "details": {
+    "item_switch_ms": 249,
+    "view_switch_ms": 104,
+    "proportion_adjust_ms": 58,
+    "threshold_ms": 1000,
+    "height_slider_max": 184.4
+  }
+}

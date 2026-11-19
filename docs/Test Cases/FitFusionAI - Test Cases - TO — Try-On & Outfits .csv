@@ -1,0 +1,36 @@
+Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Try-On - 001,Equip Clothing Item,Avatar created; catalog has items,"As a user, I want to try on a clothing item.",The system shall layer the transparent PNG over the avatar and update instantly (FR-5.1).,"1. Open Try-On Canvas
+2. Select category = Tops
+3. Select an item
+4. Verify it renders on the avatar",Dein,PASS,../evidence/tryon-tests/TO-001/
+Try-On - 002,Switch Item (Same Category),An item is equipped,"As a user, I want to switch to a different item in the same category.",The system shall replace the previous item with the new one (FR-5.2).,"1. Equip a Top
+2. Select a different Top
+3. Verify the previous item is replaced",Dein,PASS,../evidence/tryon-tests/TO-002/
+Try-On - 003,Equip Dress/One-Piece,Top and Bottom equipped,"As a user, I want to equip a Dress/One-Piece outfit.",The system shall replace both Top and Bottom slots and confirm replacement (FR-5.2).,"1. Equip a Top and a Bottom
+2. Equip a Dress
+3. Verify confirmation and both slots replaced",Dein,PASS,../evidence/tryon-tests/TO-003/
+Try-On - 004,Switch View (Front/Rear),Avatar with equipped items,"As a user, I want to switch between Front and Rear views.","The system shall instantly update avatar and all clothing to the selected angle without reload (FR-2.6, FR-5.3).","1. Equip items
+2. Click Front/Rear toggle
+3. Verify all items update to the new view",Dein,PASS,../evidence/tryon-tests/TO-004/
+Try-On - 005,Canvas Render Performance,Mid-range laptop; staged catalog,"As a user, I want the try-on experience to feel fluid.","Overlay changes (item switch, view switch, proportion adjust) shall render within 1 second (Criterion 2).","1. Switch an item
+2. Toggle view
+3. Adjust a proportion
+4. Time each render",Dein,PASS,../evidence/tryon-tests/TO-005/
+Try-On - 006,Clothing Image Fails to Load,Avatar with an equipped item,"As a user, I want to try on an item. The clothing image failed to load.","The system shall show an error, retain the previous item, and allow selecting another (UC-03 ext).","1. Simulate a failed clothing image load
+2. Verify error and previous item retained
+3. Select a different item",Dein,PASS,../evidence/tryon-tests/TO-006/
+Try-On - 007,Save Outfit,Registered User with equipped items,"As a Registered User, I want to save my current outfit.",The system shall save the named outfit combination (FR-5.4).,"1. Equip items
+2. Click Save Outfit
+3. Enter outfit name
+4. Save",Dein,PASS,../evidence/tryon-tests/TO-007/
+Try-On - 008,Load Outfit,Registered User with a saved outfit,"As a Registered User, I want to load a saved outfit.",The system shall retrieve and auto-equip all items in the outfit (FR-5.6).,"1. Open Outfit Management
+2. Select an outfit
+3. Load it
+4. Verify all items equipped",Dein,PASS,../evidence/tryon-tests/TO-008/
+Try-On - 009,Load Outfit with Deleted Item,Saved outfit contains a deleted catalog item,"As a Registered User, I want to load an outfit. One item no longer exists in the catalog.","The system shall warn, load available items only, and skip the missing item (UC-10 ext).","1. Delete a catalog item that is in a saved outfit
+2. Load that outfit
+3. Verify warning and available items loaded",Both,PASS,../evidence/tryon-tests/TO-009/
+Try-On - 010,Edit/Delete Outfit,Registered User with saved outfits,"As a Registered User, I want to edit and delete my saved outfits.","The system shall update and permanently delete outfits (FR-5.7, FR-5.8).","1. Open Outfit Management
+2. Edit an outfit and save
+3. Delete an outfit and confirm",Dein,PASS,../evidence/tryon-tests/TO-010/
+Try-On - 011,UAT: Guest Try-On Time,Guest session; catalog seeded,"As a first-time Guest, I want to complete a try-on quickly.",First-time Guest completes one try-on within ≤2 minutes without training (Criterion 6).,1. Start timer.<br>2. Guest creates avatar.<br>3. Equips item.<br>4. Toggles view.<br>5. Stop timer.,Dein,PASS,../evidence/tryon-tests/TO-011/

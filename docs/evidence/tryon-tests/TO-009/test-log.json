@@ -1,0 +1,12 @@
+{
+  "test_id": "TO-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T05:32:09.697Z",
+  "duration": "5574ms",
+  "details": {
+    "outfit_id": "6afe89d52b7c0da2d0d95b75",
+    "missing_item_id": "6afdb500f53242c804001b97",
+    "warning_text": "Item unavailable\n₱0",
+    "available_item_loaded": "Classic White Shirt"
+  }
+}

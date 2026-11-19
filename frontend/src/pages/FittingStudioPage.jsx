@@ -248,11 +248,69 @@ function normalizeCategory(category) {
   return "top";
 }
 
+// FR-5.2: a dress/one-piece occupies BOTH garment slots. The category collapse
+// above maps dresses to "top", so the old bottom must be cleared explicitly.
+function isOnePieceItem(item) {
+  return Boolean(
+    item?.femaleOnlyCut ||
+      FEMALE_ONLY_CATEGORY_PATTERN.test(
+        String(item?.rawCategory || item?.category || "")
+      )
+  );
+}
+
+function withEquippedItem(slots, item) {
+  const next = { ...slots, [item.category]: item };
+
+  if (isOnePieceItem(item)) {
+    next.bottom = null;
+  }
+
+  return next;
+}
+
+function equipNotification(item, nextLimits, noLimitsText, limitsText) {
+  if (isOnePieceItem(item)) {
+    return `${item.name} equipped. Top and bottom replaced with a one-piece outfit.`;
+  }
+
+  return !nextLimits.hasHeight && !nextLimits.hasWeight
+    ? noLimitsText
+    : limitsText;
+}
+
 function mediaUrl(path) {
   if (!path) return "";
   const raw = String(path);
   if (raw.startsWith("http")) return raw;
   return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
+// Additive TO-006 guardrail: verify the garment image can actually decode
+// BEFORE the slot is replaced, so a failed load can retain the previous item.
+// Items without an image keep the existing illustration fallback behaviour.
+function canLoadGarmentImage(item) {
+  const src = String(item?.image || "");
+  if (!src) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    let settled = false;
+
+    const finish = (loaded) => {
+      if (settled) return;
+      settled = true;
+      image.onload = null;
+      image.onerror = null;
+      resolve(loaded);
+    };
+
+    image.onload = () => finish(true);
+    image.onerror = () => finish(false);
+    image.src = src;
+
+    if (image.complete) finish(image.naturalWidth > 0);
+  });
 }
 
 // Normalize backend recommendation payload into the internal item structure.
@@ -265,7 +323,9 @@ function normalizeStudioItem(item) {
 
   if (id === undefined || id === null) return null;
 
-  const rawCategory = String(item.category || "");
+  // Re-normalizing an already-normalized studio item must not lose the raw
+  // category: that flag is what identifies a one-piece after category collapse.
+  const rawCategory = String(item.rawCategory || item.category || "");
   const resolvedName = item.name || item.product_name || "Clothing item";
 
   return {
@@ -1600,6 +1660,7 @@ function FittingStudioPage({ isGuest = false }) {
 
   // Pending item hand-off (product page / saved outfits -> studio).
   useEffect(() => {
+    void (async () => {
     const key = pendingKey(isGuest);
     const pending = readJson(sessionStorage, key);
 
@@ -1635,7 +1696,14 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    const next = { ...equippedItems, [item.category]: item };
+    if (!(await canLoadGarmentImage(item))) {
+      displayNotification(
+        `Unable to load the image for ${item.name}. Previous item retained.`
+      );
+      return;
+    }
+
+    const next = withEquippedItem(equippedItems, item);
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -1662,12 +1730,16 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      !nextLimits.hasHeight && !nextLimits.hasWeight
-        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
-        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
+      equipNotification(
+        item,
+        nextLimits,
+        `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`,
+        `${item.name} equipped. Preview adjusted to its available fitting limits.`
+      )
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
   }, []);
 
   useEffect(() => {
@@ -1994,7 +2066,7 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }
 
-  function tryRecommendedItem(rawItem) {
+  async function tryRecommendedItem(rawItem) {
     const item = normalizeStudioItem(rawItem);
 
     if (!item) return;
@@ -2006,7 +2078,14 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    const next = { ...equippedItems, [item.category]: item };
+    if (!(await canLoadGarmentImage(item))) {
+      displayNotification(
+        `Unable to load the image for ${item.name}. Previous item retained.`
+      );
+      return;
+    }
+
+    const next = withEquippedItem(equippedItems, item);
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -2033,9 +2112,12 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      !nextLimits.hasHeight && !nextLimits.hasWeight
-        ? `${item.name} equipped. No verified height/weight limits were supplied for this size.`
-        : `${item.name} equipped. Avatar preview adjusted within the garment limits.`
+      equipNotification(
+        item,
+        nextLimits,
+        `${item.name} equipped. No verified height/weight limits were supplied for this size.`,
+        `${item.name} equipped. Avatar preview adjusted within the garment limits.`
+      )
     );
   }
 
@@ -2169,7 +2251,7 @@ function FittingStudioPage({ isGuest = false }) {
     void submitUatResponse(productId, phase, questionKey, value);
   }
 
-  function applyPendingUatItem(item) {
+  async function applyPendingUatItem(item) {
     if (!item) return;
     if (!avatarGenderAllowsItem(avatar.gender, item)) {
       displayNotification(
@@ -2178,7 +2260,14 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    const next = { ...equippedItems, [item.category]: item };
+    if (!(await canLoadGarmentImage(item))) {
+      displayNotification(
+        `Unable to load the image for ${item.name}. Previous item retained.`
+      );
+      return;
+    }
+
+    const next = withEquippedItem(equippedItems, item);
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -2205,9 +2294,12 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      !nextLimits.hasHeight && !nextLimits.hasWeight
-        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
-        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
+      equipNotification(
+        item,
+        nextLimits,
+        `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`,
+        `${item.name} equipped. Preview adjusted to its available fitting limits.`
+      )
     );
   }
 
