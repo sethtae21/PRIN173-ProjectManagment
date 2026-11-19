@@ -33,9 +33,6 @@ const fallbackOrder = {
     },
   },
   paymentMethod: "Cash on Delivery",
-  shippingFee: 0,
-  productDiscount: 200,
-  originalSubtotal: 1699,
   total: 1499,
   items: [
     {
@@ -284,45 +281,18 @@ function OrderConfirmationPage() {
     ? order.items
     : [];
   const productCount = items.length;
-  const calculatedOriginalSubtotal =
-    items.reduce(
-      (total, item) =>
-        total +
-        Number(
-          item.originalPrice ||
-            item.price ||
-            0
-        ) *
-          Number(item.quantity || 1),
-      0
-    );
-  const calculatedSaleSubtotal =
-    items.reduce(
-      (total, item) =>
-        total +
-        Number(item.price || 0) *
-          Number(item.quantity || 1),
-      0
-    );
-  const originalSubtotal =
-    Number(order.originalSubtotal) ||
-    calculatedOriginalSubtotal;
-  const productDiscount =
-    order.productDiscount !== undefined
-      ? Number(order.productDiscount)
-      : Math.max(
-          0,
-          originalSubtotal -
-            calculatedSaleSubtotal
-        );
-  const shippingFee = Number(
-    order.shippingFee || 0
+  
+  /* CHANGED: product discount and shipping fee are GONE. The total is exactly
+     the sum of the item totals. */
+  const subtotal = items.reduce(
+    (total, item) =>
+      total + Number(item.price || 0) * Number(item.quantity || 1),
+    0
   );
   const total =
     order.total !== undefined
       ? Number(order.total)
-      : calculatedSaleSubtotal +
-        shippingFee;
+      : subtotal;
   const displayNumber =
     order.orderNumber || order.id;
 
@@ -532,28 +502,7 @@ function OrderConfirmationPage() {
             <div className="order-confirmation-payment-row">
               <span>Subtotal</span>
               <strong>
-                {formatCurrency(
-                  originalSubtotal
-                )}
-              </strong>
-            </div>
-            <div className="order-confirmation-payment-row discount">
-              <span>Product discount</span>
-              <strong>
-                −
-                {formatCurrency(
-                  productDiscount
-                )}
-              </strong>
-            </div>
-            <div className="order-confirmation-payment-row">
-              <span>Shipping fee</span>
-              <strong>
-                {shippingFee === 0
-                  ? "FREE"
-                  : formatCurrency(
-                      shippingFee
-                    )}
+                {formatCurrency(subtotal)}
               </strong>
             </div>
             <div className="order-confirmation-total">

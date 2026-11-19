@@ -86,7 +86,6 @@ function normalizeBackendOrder(data) {
     },
     paymentMethod: data.payment_method || "Cash on Delivery",
     shippingMethod: "Standard Delivery",
-    shippingFee: Number(data.shipping_fee || 0),
     total: Number(data.total_amount || 0),
     items: (Array.isArray(data.items) ? data.items : []).map((item, index) => ({
       id: String(item.id || `${item.catalog_item}-${index}`),
@@ -126,7 +125,6 @@ function normalizeStoredOrder(data) {
     },
     paymentMethod: data.paymentMethod || "Cash on Delivery",
     shippingMethod: "Standard Delivery",
-    shippingFee: Number(data.shippingFee || 0),
     total: Number(data.total || 0),
     items: (Array.isArray(data.items) ? data.items : []).map((item, index) => ({
       id: String(item.id || `${item.productId}-${index}`),
@@ -336,18 +334,9 @@ function OrderDetailsPage() {
     };
   }, [orderId, retryAttempt]);
 
-  const originalSubtotal = useMemo(
-    () =>
-      order
-        ? order.items.reduce(
-            (total, item) =>
-              total + Number(item.originalPrice || item.price || 0) * Number(item.quantity || 1),
-            0
-          )
-        : 0,
-    [order]
-  );
-  const discountedSubtotal = useMemo(
+  /* CHANGED: product discount and shipping fee are GONE. Total is just the sum
+     of the item totals. */
+  const subtotal = useMemo(
     () =>
       order
         ? order.items.reduce(
@@ -357,9 +346,7 @@ function OrderDetailsPage() {
         : 0,
     [order]
   );
-  const productDiscount = Math.max(0, originalSubtotal - discountedSubtotal);
-  const shippingFee = order ? Number(order.shippingFee || 0) : 0;
-  const total = order ? order.total || discountedSubtotal + shippingFee : 0;
+  const total = order ? order.total || subtotal : 0;
   const canCancelOrder = order ? order.status === "Processing" || order.status === "To Ship" : false;
 
   function showNotice(message) {
@@ -459,7 +446,6 @@ function OrderDetailsPage() {
         status: "Cancelled",
         customer: snapshot.customer || null,
         paymentMethod: snapshot.paymentMethod || "Cash on Delivery",
-        shippingFee: Number(snapshot.shippingFee || 0),
         total: Number(snapshot.total || 0),
         items: (snapshot.items || []).map((item) => ({ ...item })),
       });
@@ -674,15 +660,7 @@ function OrderDetailsPage() {
           <article className="order-details-payment-card">
             <div className="order-details-payment-row">
               <span>Subtotal</span>
-              <strong>{formatCurrency(originalSubtotal)}</strong>
-            </div>
-            <div className="order-details-payment-row discount">
-              <span>Product Discount</span>
-              <strong>−{formatCurrency(productDiscount)}</strong>
-            </div>
-            <div className="order-details-payment-row">
-              <span>Shipping Fee</span>
-              <strong>{shippingFee === 0 ? "FREE" : formatCurrency(shippingFee)}</strong>
+              <strong>{formatCurrency(subtotal)}</strong>
             </div>
             <div className="order-details-payment-total">
               <span>Total</span>

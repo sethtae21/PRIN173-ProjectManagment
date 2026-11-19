@@ -36,7 +36,7 @@ function normalizeCartItem(item, index) {
     item.unavailable_reason ||
     item.unavailableReason ||
     (item.seller_account_deleted || item.sellerAccountDeleted
-      ? "This item is unavailable because the seller’s account was deleted."
+      ? "This item is unavailable because the seller's account was deleted."
       : "");
   const isAvailable = item.available !== false && !item.seller_account_deleted && !item.sellerAccountDeleted;
   return {
@@ -340,34 +340,10 @@ function ShoppingCartPage() {
       ),
     [selectedItems]
   );
-  const originalSubtotal = useMemo(
-    () =>
-      selectedItems.reduce(
-        (total, item) =>
-          total +
-          Number(item.originalPrice) *
-          Number(item.quantity),
-        0
-      ),
-    [selectedItems]
-  );
-  const productDiscount = Math.max(
-    0,
-    originalSubtotal - subtotal
-  );
-  const freeShippingThreshold = 1500;
-  const shippingFee =
-    selectedItems.length === 0
-      ? 0
-      : subtotal >= freeShippingThreshold
-      ? 0
-      : 80;
-  const amountUntilFreeShipping =
-    Math.max(
-      0,
-      freeShippingThreshold - subtotal
-    );
-  const total = subtotal + shippingFee;
+  /* CHANGED: product discount and shipping fee are GONE. The shopper pays
+     exactly the sum of the selected item totals — no discount row, no
+     ₱80 / free-shipping threshold logic. */
+  const total = subtotal;
   const allSelected =
     availableItems.length > 0 &&
     availableItems.every(
@@ -431,7 +407,7 @@ function ShoppingCartPage() {
     const item = cartItems.find((cartItem) => cartItem.id === itemId);
     if (!item || isCartBusy) return;
     if (item.available === false || item.sellerAccountDeleted) {
-      setNotice("This item is unavailable because the seller’s account was deleted.");
+      setNotice("This item is unavailable because the seller's account was deleted.");
       return;
     }
 
@@ -906,50 +882,10 @@ function ShoppingCartPage() {
               <div className="shopping-cart-summary-row">
                 <span>Subtotal</span>
                 <strong>
-                  {formatCurrency(
-                    originalSubtotal
-                  )}
-                </strong>
-              </div>
-              <div className="shopping-cart-summary-row discount">
-                <span>Product discount</span>
-                <strong>
-                  −
-                  {formatCurrency(
-                    productDiscount
-                  )}
-                </strong>
-              </div>
-              <div className="shopping-cart-summary-row">
-                <span>Shipping fee</span>
-                <strong>
-                  {shippingFee === 0 &&
-                  selectedItems.length > 0
-                    ? "FREE"
-                    : formatCurrency(
-                        shippingFee
-                      )}
+                  {formatCurrency(subtotal)}
                 </strong>
               </div>
               <div className="shopping-cart-summary-divider" />
-              {selectedItems.length > 0 &&
-              amountUntilFreeShipping > 0 ? (
-                <div className="shopping-cart-shipping-notice">
-                  Add{" "}
-                  <strong>
-                    {formatCurrency(
-                      amountUntilFreeShipping
-                    )}
-                  </strong>{" "}
-                  more to receive free
-                  shipping.
-                </div>
-              ) : selectedItems.length > 0 ? (
-                <div className="shopping-cart-shipping-notice qualified">
-                  Your order qualifies for free
-                  shipping.
-                </div>
-              ) : null}
               <div className="shopping-cart-summary-total">
                 <span>Total</span>
                 <strong>

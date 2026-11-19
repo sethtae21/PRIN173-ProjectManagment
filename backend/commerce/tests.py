@@ -5,6 +5,11 @@ OPTIONAL (SRS FR-7.5). These tests prove checkout completes, persists and
 remains readable with ZERO rating rows — i.e. the shopper pressed Skip /
 closed the popup — and that a post-checkout fit rating is a separate,
 owner-scoped, star-only write.
+
+CHANGED: shipping fee removed from the whole commerce flow. Checkout totals
+now equal the plain sum of item prices (2 x 49.95 = 99.90), with no ₱80 fee
+and no ₱1,500 free-shipping threshold, and the API no longer returns a
+shipping_fee field.
 """
 
 from decimal import Decimal
@@ -147,9 +152,7 @@ class CommerceAPITests(TestCase):
             [entry['catalog_item'] for entry in response.data['items']],
             [str(second_item.pk)],
         )
-        self.assertFalse(
-            CartItem.objects.filter(cart=cart, item=self.item).exists()
-        )
+        self.assertFalse(CartItem.objects.filter(cart=cart, item=self.item).exists())
         self.assertTrue(
             CartItem.objects.filter(
                 cart__user=self.other_user, item=self.item, quantity=4
@@ -173,8 +176,9 @@ class CommerceAPITests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['status'], 'paid')
-        self.assertEqual(Decimal(response.data['shipping_fee']), Decimal('80.00'))
-        self.assertEqual(Decimal(response.data['total_amount']), Decimal('179.90'))
+        # CHANGED: no shipping fee — total is exactly 2 x 49.95.
+        self.assertNotIn('shipping_fee', response.data)
+        self.assertEqual(Decimal(response.data['total_amount']), Decimal('99.90'))
         self.assertEqual(response.data['recipient_name'], 'Shopper')
         self.assertEqual(response.data['recipient_email'], 'shopper@example.com')
         self.assertEqual(response.data['contact_number'], '09123456789')
@@ -221,9 +225,10 @@ class CommerceAPITests(TestCase):
         self.assertEqual(order_item.color, 'Blue')
         self.assertFalse(CartItem.objects.filter(pk=selected_entry.pk).exists())
         self.assertTrue(CartItem.objects.filter(pk=unselected_entry.pk).exists())
+        # CHANGED: no shipping fee — total is exactly 2 x 49.95.
         self.assertEqual(
             Decimal(response.data['total_amount']),
-            Decimal('179.90'),
+            Decimal('99.90'),
         )
 
     def test_checkout_decline_keeps_cart_and_creates_no_order(self):

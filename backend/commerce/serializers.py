@@ -175,7 +175,11 @@ class CheckoutItemSerializer(serializers.Serializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    """Read-only order representation, including purchase-time item snapshots."""
+    """Read-only order representation, including purchase-time item snapshots.
+
+    CHANGED: 'shipping_fee' removed — the field no longer exists on Order and
+    the API no longer reports any shipping charge.
+    """
     id = serializers.CharField(read_only=True)
     order_number = serializers.CharField(read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
@@ -185,7 +189,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'order_number', 'status', 'recipient_name', 'recipient_email',
             'contact_number', 'shipping_address', 'payment_method',
-            'transaction_ref', 'shipping_fee', 'total_amount', 'created_at', 'items',
+            'transaction_ref', 'total_amount', 'created_at', 'items',
         )
         read_only_fields = fields
 

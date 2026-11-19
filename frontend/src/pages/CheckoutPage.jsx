@@ -242,17 +242,6 @@ function CheckoutPage() {
   }, [checkoutItems]);
 
   const productCount = checkoutItems.length;
-  const originalSubtotal = useMemo(
-    () =>
-      checkoutItems.reduce(
-        (total, item) =>
-          total +
-          Number(item.originalPrice || item.price || 0) *
-          Number(item.quantity || 1),
-        0
-      ),
-    [checkoutItems]
-  );
   const discountedSubtotal = useMemo(
     () =>
       checkoutItems.reduce(
@@ -262,9 +251,9 @@ function CheckoutPage() {
       ),
     [checkoutItems]
   );
-  const productDiscount = Math.max(0, originalSubtotal - discountedSubtotal);
-  const shippingFee = discountedSubtotal >= 1500 ? 0 : 80;
-  const total = discountedSubtotal + shippingFee;
+  /* CHANGED: product discount and shipping fee are GONE. The order total is
+     exactly the sum of the selected item totals. */
+  const total = discountedSubtotal;
 
   function handleInputChange(event) {
     const { name, value } = event.target;
@@ -432,9 +421,6 @@ function CheckoutPage() {
         },
         paymentMethod: order.payment_method,
         items: orderItems,
-        originalSubtotal,
-        productDiscount,
-        shippingFee: Number(order.shipping_fee),
         total: Number(order.total_amount),
       };
 
@@ -777,17 +763,7 @@ function CheckoutPage() {
             <div className="checkout-divider" />
             <div className="checkout-summary-row">
               <span>Subtotal</span>
-              <strong>{formatCurrency(originalSubtotal)}</strong>
-            </div>
-            <div className="checkout-summary-row discount">
-              <span>Product discount</span>
-              <strong>−{formatCurrency(productDiscount)}</strong>
-            </div>
-            <div className="checkout-summary-row">
-              <span>Shipping fee</span>
-              <strong>
-                {shippingFee === 0 ? "FREE" : formatCurrency(shippingFee)}
-              </strong>
+              <strong>{formatCurrency(discountedSubtotal)}</strong>
             </div>
             <div className="checkout-divider" />
             <div className="checkout-total">

@@ -579,26 +579,6 @@
   color: #17130f;
   font-size: 14px;
 }
-.shopping-cart-summary-row.discount strong {
-  color: #8e641f;
-}
-.shopping-cart-shipping-notice {
-  padding: 10px 12px;
-  background: #fbf7ed;
-  border: 1px solid #e6d7b9;
-  border-radius: 8px;
-  font-size: 11px;
-  color: #654411;
-  margin-bottom: 16px;
-}
-.shopping-cart-shipping-notice.qualified {
-  background: #edf4e8;
-  border-color: #9bad8a;
-  color: #425538;
-}
-.shopping-cart-shipping-notice strong {
-  color: #17130f;
-}
 .shopping-cart-summary-total {
   display: flex;
   justify-content: space-between;

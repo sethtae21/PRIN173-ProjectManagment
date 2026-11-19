@@ -313,8 +313,9 @@ class CheckoutView(MongoRetryMixin, APIView):
             ),
             Decimal('0.00'),
         )
-        shipping_fee = Decimal('0.00') if total_amount >= Decimal('1500.00') else Decimal('80.00')
-        order_total = total_amount + shipping_fee
+        # CHANGED: shipping fee REMOVED. No ₱80 fee and no ₱1,500 free-shipping
+        # threshold — the order total is exactly the sum of the item prices.
+        order_total = total_amount
         checkout_data = input_serializer.validated_data
         payment_method = checkout_data['payment_method']
         is_cash_on_delivery = payment_method.casefold() == 'cash on delivery'
@@ -337,7 +338,6 @@ class CheckoutView(MongoRetryMixin, APIView):
             shipping_address=checkout_data['shipping_address'],
             payment_method=payment_method,
             transaction_ref=payment['transaction_ref'] or '',
-            shipping_fee=shipping_fee,
             total_amount=order_total,
         )
         try:

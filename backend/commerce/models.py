@@ -69,7 +69,9 @@ class Order(models.Model):
     shipping_address = models.TextField()
     payment_method = models.CharField(max_length=32)
     transaction_ref = models.CharField(max_length=64, blank=True, help_text='Mock gateway reference')
-    shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # CHANGED: the shipping_fee field is GONE. An order's total_amount is
+    # exactly the sum of its item prices — no shipping charge, no free
+    # shipping threshold, anywhere in the system.
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
