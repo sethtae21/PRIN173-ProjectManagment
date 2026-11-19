@@ -1,0 +1,24 @@
+{
+  "test_id": "AM-010",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:31.045Z",
+  "duration": "11140ms",
+  "details": {
+    "archived_email": "am-shopper-5b833817-bec5-48de-a91a-a33f511b4717@example.test",
+    "order_id": "6afec07d2b7c0da2d0d95e5f",
+    "preset_id": "6afec07e2b7c0da2d0d95e61",
+    "outfit_id": "6afec07e2b7c0da2d0d95e62",
+    "presets_before_prune": 1,
+    "outfits_before_prune": 1,
+    "login_error": "The email address or password is incorrect.",
+    "session_after_archive": null,
+    "session_after_retry": null,
+    "prune_summary": {
+      "moved": 1,
+      "live_user_exists": false,
+      "cold_email": "archived-8e56abe1411a27c24f04f5a9f2e63eae@archive.invalid",
+      "cold_password_empty": true,
+      "pseudonymized_orders": 1
+    }
+  }
+}

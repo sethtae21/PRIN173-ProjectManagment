@@ -1,0 +1,71 @@
+{
+  "test_id": "AM-015",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:26:19.993Z",
+  "duration": "12448ms",
+  "details": {
+    "add_to_cart_prompt": "REGISTRATION REQUIRED / Create an account to continue",
+    "cart_api_calls_from_guest": 0,
+    "checkout_redirect_url": "https://localhost:8443/login",
+    "save_outfit_prompt": "Unlock the complete fitting experience",
+    "rating_prompt": "Please sign up or log in to save your rating.",
+    "rating_api_calls_from_guest": 0,
+    "rating_storage_before": [],
+    "rating_storage_after": [],
+    "anonymous_api_denials": [
+      {
+        "path": "/cart/",
+        "method": "GET"
+      },
+      {
+        "path": "/orders/",
+        "method": "GET"
+      },
+      {
+        "path": "/outfits/",
+        "method": "GET"
+      },
+      {
+        "path": "/presets/",
+        "method": "GET"
+      },
+      {
+        "path": "/checkout/",
+        "method": "POST"
+      },
+      {
+        "path": "/profile/",
+        "method": "GET"
+      },
+      {
+        "path": "/ratings/",
+        "method": "POST"
+      }
+    ],
+    "guest_session_token": null,
+    "db_counts_before": {
+      "accounts_user": 287,
+      "accounts_archiveduser": 6,
+      "accounts_avatarpreset": 74,
+      "accounts_outfit": 32,
+      "accounts_cart": 63,
+      "accounts_cartitem": 20,
+      "accounts_order": 42,
+      "accounts_rating": 39,
+      "uat_session": 0,
+      "uat_response": 0
+    },
+    "db_counts_after": {
+      "accounts_user": 287,
+      "accounts_archiveduser": 6,
+      "accounts_avatarpreset": 74,
+      "accounts_outfit": 32,
+      "accounts_cart": 63,
+      "accounts_cartitem": 20,
+      "accounts_order": 42,
+      "accounts_rating": 39,
+      "uat_session": 0,
+      "uat_response": 0
+    }
+  }
+}

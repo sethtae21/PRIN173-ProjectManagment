@@ -1,0 +1,13 @@
+{
+  "test_id": "AM-003",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:04.642Z",
+  "duration": "1766ms",
+  "details": {
+    "attempted_password": "Passw0rd",
+    "error": "Complete all password requirements.",
+    "password_rules_passed": 0,
+    "backend_login_status": 400,
+    "session_token": null
+  }
+}

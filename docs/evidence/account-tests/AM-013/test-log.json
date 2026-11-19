@@ -1,0 +1,17 @@
+{
+  "test_id": "AM-013",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:58.594Z",
+  "duration": "2509ms",
+  "details": {
+    "user_a_email": "am-shopper-578debfc-d14e-4769-bfcf-cd0194ff6058@example.test",
+    "user_b_email": "am-shopper-6657f88c-3fa6-45b7-a1ae-b3430051fac5@example.test",
+    "order_a_id": "6afec0a22b7c0da2d0d95e6b",
+    "preset_a_id": "6afec0a22b7c0da2d0d95e6d",
+    "outfit_a_id": "6afec0a32b7c0da2d0d95e6e",
+    "order_status": 404,
+    "preset_status": 404,
+    "outfit_status": 404,
+    "no_user_a_data_disclosed": true
+  }
+}

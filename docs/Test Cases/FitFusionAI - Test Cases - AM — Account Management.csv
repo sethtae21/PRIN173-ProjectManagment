@@ -1,0 +1,59 @@
+﻿Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Account Management - 001,Register Account (User),Guest; no existing account,"As a Guest, I want to create a Registered User account. I attempted registration using valid data.","The system shall create the account, assign the User role, and display a registration confirmation (FR-1.1).","1. Open FitFusion AI
+2. Click Register
+3. Select role = User
+4. Enter valid Full name, email, password
+5. Click Register",Dein,PASS,../evidence/account-tests/AM-001/
+Account Management - 002,Register Account (Seller),Guest; no existing account,"As a Guest, I want to register as a Seller. I selected the Seller role.",The system shall require a Store Name when Seller role is selected; registration blocked without it (FR-1.1).,"1. Click Register
+2. Select role = Seller
+3. Leave Store Name blank, attempt submit
+4. Enter Store Name, submit",Dein,PASS,../evidence/account-tests/AM-002/
+Account Management - 003,Register Account,Guest; registration form open,"As a Guest, I want to register. I attempted with a weak password (no special character).","The system shall enforce 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char in real time and block registration until satisfied (FR-1.5).","1. Click Register
+2. Enter password ""Passw0rd"" (no special char)
+3. Attempt submit",Dein,PASS,../evidence/account-tests/AM-003/
+Account Management - 004,Register Account,An account with the email already exists,"As a Guest, I want to register. I attempted with an email that is already registered.",The system shall inform the user the account already exists and suggest using different info or logging in (UC-07 ext 5b).,"1. Click Register
+2. Enter an existing email
+3. Fill remaining valid data
+4. Click Register",Dein,PASS,../evidence/account-tests/AM-004/
+Account Management - 005,Register Account,Guest; registration form open,"As a Guest, I want to register. I attempted without providing an email.",The system shall identify missing required fields and prompt completion (UC-07 ext 3a).,"1. Click Register
+2. Leave email blank
+3. Fill other fields
+4. Click Register",Dein,PASS,../evidence/account-tests/AM-005/
+Account Management - 006,Login,Valid registered account exists,"As a Registered User, I want to access my account. I attempted login with valid credentials.","The system shall validate credentials, verify the password hash, generate a JWT with role, and redirect to dashboard (UC-08, FR-1.6).","1. Open Login page
+2. Enter valid email and password
+3. Click Login",Dein,PASS,../evidence/account-tests/AM-006/
+Account Management - 007,Login,Valid registered account exists,"As a Registered User, I want to access my account. I attempted login with an incorrect password.","The system shall display ""Invalid email or password"" and not log the user in (UC-08 ext).","1. Open Login page
+2. Enter valid email + wrong password
+3. Click Login",Dein,PASS,../evidence/account-tests/AM-007/
+Account Management - 008,Login,None,"As a user, I want to access my account. I attempted login with an unregistered email.",The system shall display an invalid-credentials error and deny access (UC-08 ext).,"1. Open Login page
+2. Enter an email never registered
+3. Enter any password
+4. Click Login",Dein,PASS,../evidence/account-tests/AM-008/
+Account Management - 009,Logout,User is logged in,"As a Registered User, I want to log out of my account.","After logout, the application shall clear the user's local authentication and session state. The user shall be unable to access protected pages or perform protected actions until logging in again (FR-1.6).","1. Log in as a Registered User.
+2. Open a protected page.
+3. Click Logout.
+4. Use the browser Back button and attempt to reopen the protected page.
+5. Attempt a protected action.
+6. Verify access is denied and the user is returned to a public page.",Dein,PASS,../evidence/account-tests/AM-009/
+Account Management - 010,Delete Account,"Registered account with presets, outfits, and orders exists","As a Registered User, I want to delete my account.","The system shall mark the account archived and deactivate it in place immediately (blocking login/RBAC), and after the grace period purge active PII and retain only a restricted pseudonymized archive (FR-1.4, RA 10173).","1. Log in
+2. Navigate to Account Management
+3. Click Delete Account
+4. Confirm
+5. Attempt login again
+6. Trigger/verify stage-2 cold archival and confirm active collections have no PII while accounts_archiveduser/accounts_order are pseudonymized (Carlos)",Dein,PASS,../evidence/account-tests/AM-010/
+Account Management - 011,Security: Password Hashing,Valid registered account exists,"As a user, I want my password securely stored.",The system shall hash passwords using Argon2id or PBKDF2; no plaintext passwords stored (Criterion 7).,1. Register a new user.<br>2. Query MongoDB Atlas users collection.<br>3. Inspect the password field hash prefix.,Dein,PASS,../evidence/account-tests/AM-011/
+Account Management - 012,Security: Guest Ephemerality,Guest session active,"As a Guest, I want my data discarded when I close the tab.","The system shall not write Guest avatar, rating, or session data to the persistent DB (FR-1.9).",1. Continue as Guest. 2. Create avatar and equip an item. 3. Close tab.4. Query DB for orphaned guest records.,Dein,PASS,../evidence/account-tests/AM-012/
+Account Management - 013,Security: Cross-User RBAC,Two registered users exist,"As a user, I want my data isolated from others.","Server-side access control shall prevent User B from reading User A's orders and avatar presets. User B shall receive an access-denied or not-found response, and no User A data shall be disclosed (FR-1.7; FR-2.8; FR-6.7; FR-6.8).","1. Log in as User A and record an Order ID and an Avatar Preset ID.
+2. Log out and log in as User B.
+3. Attempt to view User A's order using the application or the corresponding API request.
+4. Attempt to view User A's avatar preset using the application or the corresponding API request.
+5. Verify both requests are denied or return not found, and neither response exposes User A's data.",Dein,PASS,../evidence/account-tests/AM-013/
+Account Management - 014,Continue as Guest,Not logged in; catalog items available,"As a Guest, I want to explore FitFusion AI without registering or logging in.","Clicking “Continue as Guest” shall open the Guest dashboard. The Guest shall be able to access catalog browsing, avatar creation, virtual try-on, and recommendations without registering or logging in.","1. Open FitFusion AI.
+2. Click Continue as Guest.
+3. Verify that the Guest dashboard opens.
+4. Browse the catalog.
+5. Open avatar creation and create an avatar.
+6. Try on a catalog item.
+7. View recommendations.
+8. Verify that registration or login is not required for these features.",Dein,PASS,../evidence/account-tests/AM-014/
+Account Management - 015,Guest Restrictions,Guest session active; catalog items available,"As a Guest, I want to receive a sign-up/login prompt when attempting actions that require a registered account.","When a Guest attempts Add to Cart, Checkout, Save Outfit, or clicks an in-app rating control, the system shall block the action, save/cache nothing, and display a sign-up/login prompt (FR-1.8, FR-5.4, FR-6.1, FR-7.5).","1. Continue as Guest. 2. Attempt to add an item to the cart. 3. Attempt to access Checkout. 4. Equip clothing and attempt to save the outfit. 5. Verify that each restricted action displays the sign-up/login prompt and does not complete. 6. Verify through unauthenticated API requests that the backend denies protected actions. 7. Check the database to confirm that no Guest cart item, order, or saved outfit was created.",Dein,PASS,../evidence/account-tests/AM-015/

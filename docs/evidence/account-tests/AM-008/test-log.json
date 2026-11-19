@@ -1,0 +1,12 @@
+{
+  "test_id": "AM-008",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:11.569Z",
+  "duration": "1474ms",
+  "details": {
+    "email": "am-unknown-ad2b9531-e8fb-4838-b426-8b08edb97857@example.test",
+    "error": "The email address or password is incorrect.",
+    "url": "https://localhost:8443/login",
+    "session_token": null
+  }
+}

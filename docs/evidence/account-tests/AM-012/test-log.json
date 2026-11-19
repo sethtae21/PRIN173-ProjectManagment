@@ -1,0 +1,42 @@
+{
+  "test_id": "AM-012",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:50.361Z",
+  "duration": "9513ms",
+  "details": {
+    "recommendation_statuses": [
+      200
+    ],
+    "guest_avatar_keys": [
+      "fitfusion-guest-avatar-gender",
+      "fitfusion-guest-avatar-preset"
+    ],
+    "fresh_avatar_keys": [],
+    "fresh_local_avatar_keys": [],
+    "anonymous_presets_status": 401,
+    "db_counts_before": {
+      "accounts_user": 285,
+      "accounts_archiveduser": 6,
+      "accounts_avatarpreset": 73,
+      "accounts_outfit": 31,
+      "accounts_cart": 61,
+      "accounts_cartitem": 20,
+      "accounts_order": 41,
+      "accounts_rating": 39,
+      "uat_session": 0,
+      "uat_response": 0
+    },
+    "db_counts_after": {
+      "accounts_user": 285,
+      "accounts_archiveduser": 6,
+      "accounts_avatarpreset": 73,
+      "accounts_outfit": 31,
+      "accounts_cart": 61,
+      "accounts_cartitem": 20,
+      "accounts_order": 41,
+      "accounts_rating": 39,
+      "uat_session": 0,
+      "uat_response": 0
+    }
+  }
+}

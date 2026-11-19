@@ -1,0 +1,15 @@
+{
+  "test_id": "AM-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:15.062Z",
+  "duration": "3424ms",
+  "details": {
+    "protected_page_before": "/shopper/orders",
+    "url_after_logout": "https://localhost:8443/login",
+    "url_after_back": "https://localhost:8443/login",
+    "session_after_logout": null,
+    "session_after_back": null,
+    "old_token_api_status": 200,
+    "old_token_api_denied": false
+  }
+}

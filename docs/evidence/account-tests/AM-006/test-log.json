@@ -1,0 +1,12 @@
+{
+  "test_id": "AM-006",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:08.467Z",
+  "duration": "1310ms",
+  "details": {
+    "email": "am-shopper-de624cf1-88d1-423c-88b9-0470d003086c@example.test",
+    "session_user_role": "shopper",
+    "redirect_url": "https://localhost:8443/shopper/dashboard",
+    "tokens_present": true
+  }
+}

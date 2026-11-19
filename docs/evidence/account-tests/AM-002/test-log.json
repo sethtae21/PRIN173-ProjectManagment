@@ -1,0 +1,13 @@
+{
+  "test_id": "AM-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:02.803Z",
+  "duration": "2518ms",
+  "details": {
+    "email": "am-seller-4b8a9c0a-f9f2-4073-a7f3-1e3fa4ab62cb@example.test",
+    "store_name": "AM Test Store 4b8a9c0a",
+    "blank_store_error": "Store Name is required for Seller accounts.",
+    "session_user_role": "seller",
+    "redirect_url": "https://localhost:8443/seller/dashboard"
+  }
+}

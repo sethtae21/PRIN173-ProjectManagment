@@ -1,0 +1,12 @@
+{
+  "test_id": "AM-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:06.359Z",
+  "duration": "856ms",
+  "details": {
+    "duplicate_email": "am-shopper-89b26509-d523-4c6c-9897-f59177cb1a80@example.test",
+    "error": "This email is already used. Please use another email address or log in.",
+    "suggest_log_in": true,
+    "session_token": null
+  }
+}

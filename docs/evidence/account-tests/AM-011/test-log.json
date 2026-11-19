@@ -1,0 +1,13 @@
+{
+  "test_id": "AM-011",
+  "status": "PASS",
+  "timestamp": "2026-11-19T09:25:36.656Z",
+  "duration": "4712ms",
+  "details": {
+    "email": "am-shopper-09e7cc68-659e-45b7-b249-9272363e2c0d@example.test",
+    "hash_prefix": "pbkdf2_sha256$12",
+    "hash_algorithm": "pbkdf2_sha256",
+    "plaintext_password_stored": false,
+    "hash_length": 89
+  }
+}
