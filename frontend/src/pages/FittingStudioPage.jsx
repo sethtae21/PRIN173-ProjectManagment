@@ -1755,6 +1755,15 @@ function FittingStudioPage({ isGuest = false }) {
       );
       return;
     }
+    // NEW (post-check gate): the Post-Try-On Check compares against a real
+    // try-on, so it cannot open while nothing is equipped — same rule as the
+    // disabled button, enforced here for every path.
+    if (kind === "post" && equippedItemsArray.length === 0) {
+      displayNotification(
+        "Try at least one clothing item on your avatar before the post-try-on check."
+      );
+      return;
+    }
     setRatingError("");
     const values = {};
     if (kind === "recommendations" && item) {
@@ -3069,8 +3078,11 @@ function FittingStudioPage({ isGuest = false }) {
               </div>
             </div>
 
-            {/* Canvas-side rating buttons. The fit button stays disabled until
-                at least one garment is equipped; pre/post checks are optional. */}
+            {/* Canvas-side rating buttons. CHANGED (post-check gate): Rate
+                Avatar Look AND the Post-Try-On Check stay disabled (blurred)
+                until at least one garment is equipped — the post check must
+                follow a real try-on. The Pre-Try-On Check stays available
+                from the start because it captures the "before" baseline. */}
             <div className="studio-rating-actions studio-rating-actions-canvas">
               <button
                 type="button"
@@ -3095,6 +3107,12 @@ function FittingStudioPage({ isGuest = false }) {
               <button
                 type="button"
                 className="studio-rate-button"
+                disabled={equippedItemsArray.length === 0}
+                title={
+                  equippedItemsArray.length === 0
+                    ? "Try at least one garment on your avatar before the post-try-on check"
+                    : undefined
+                }
                 onClick={() => openRatingModal("post")}
               >
                 {POST_CHECK_COPY.buttonLabel}
