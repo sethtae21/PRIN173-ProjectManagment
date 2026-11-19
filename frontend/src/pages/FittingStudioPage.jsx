@@ -77,7 +77,7 @@ const UAT_AFTER_EXTRA_QUESTIONS = [
   },
 ];
 
-const HEIGHT_RANGE = { min: 120, max: 220 };
+const HEIGHT_RANGE = { min: 120, max: 218 };
 const WEIGHT_RANGE = { min: 30, max: 200 };
 
 const BODY_BUILDS = ["Slim", "Balanced", "Full", "Curve"];
@@ -248,69 +248,11 @@ function normalizeCategory(category) {
   return "top";
 }
 
-// FR-5.2: a dress/one-piece occupies BOTH garment slots. The category collapse
-// above maps dresses to "top", so the old bottom must be cleared explicitly.
-function isOnePieceItem(item) {
-  return Boolean(
-    item?.femaleOnlyCut ||
-      FEMALE_ONLY_CATEGORY_PATTERN.test(
-        String(item?.rawCategory || item?.category || "")
-      )
-  );
-}
-
-function withEquippedItem(slots, item) {
-  const next = { ...slots, [item.category]: item };
-
-  if (isOnePieceItem(item)) {
-    next.bottom = null;
-  }
-
-  return next;
-}
-
-function equipNotification(item, nextLimits, noLimitsText, limitsText) {
-  if (isOnePieceItem(item)) {
-    return `${item.name} equipped. Top and bottom replaced with a one-piece outfit.`;
-  }
-
-  return !nextLimits.hasHeight && !nextLimits.hasWeight
-    ? noLimitsText
-    : limitsText;
-}
-
 function mediaUrl(path) {
   if (!path) return "";
   const raw = String(path);
   if (raw.startsWith("http")) return raw;
   return raw.startsWith("/") ? raw : `/${raw}`;
-}
-
-// Additive TO-006 guardrail: verify the garment image can actually decode
-// BEFORE the slot is replaced, so a failed load can retain the previous item.
-// Items without an image keep the existing illustration fallback behaviour.
-function canLoadGarmentImage(item) {
-  const src = String(item?.image || "");
-  if (!src) return Promise.resolve(true);
-
-  return new Promise((resolve) => {
-    const image = new Image();
-    let settled = false;
-
-    const finish = (loaded) => {
-      if (settled) return;
-      settled = true;
-      image.onload = null;
-      image.onerror = null;
-      resolve(loaded);
-    };
-
-    image.onload = () => finish(true);
-    image.onerror = () => finish(false);
-    image.src = src;
-
-    if (image.complete) finish(image.naturalWidth > 0);
-  });
 }
 
 // Normalize backend recommendation payload into the internal item structure.
@@ -323,9 +265,7 @@ function normalizeStudioItem(item) {
 
   if (id === undefined || id === null) return null;
 
-  // Re-normalizing an already-normalized studio item must not lose the raw
-  // category: that flag is what identifies a one-piece after category collapse.
-  const rawCategory = String(item.rawCategory || item.category || "");
+  const rawCategory = String(item.category || "");
   const resolvedName = item.name || item.product_name || "Clothing item";
 
   return {
@@ -798,7 +738,6 @@ function computeCropDataURL(img) {
   const probe = document.createElement("canvas");
   probe.width = sw;
   probe.height = sh;
-
   const pctx = probe.getContext("2d", { willReadFrequently: true });
   pctx.drawImage(img, 0, 0, sw, sh);
 
@@ -1344,6 +1283,29 @@ function FittingStudioPage({ isGuest = false }) {
     return sanitizeEquipped(session.equippedItems, avatar.gender);
   });
 
+  // NEW (try-before-rate gate, FR-7.5 / OBJ-05): catalog ids the shopper has
+  // ACTUALLY tried on the avatar during this studio visit. The Rate
+  // Recommendation button only renders for ids in this set. Seeded from the
+  // studio session snapshot (so it survives product-page / sidebar hops) plus
+  // any look already restored onto the avatar (Saved Outfits -> Open Studio).
+  // Once tried, an item stays rateable for the rest of the visit even if the
+  // garment is later removed.
+  const [triedItemIds, setTriedItemIds] = useState(() => {
+    const session = readStudioSession(isGuest);
+    const stored = Array.isArray(session?.triedItemIds)
+      ? session.triedItemIds
+      : [];
+    const ids = new Set(stored.map((id) => String(id)));
+
+    Object.values(equippedItems).forEach((item) => {
+      if (item && item.id !== undefined && item.id !== null) {
+        ids.add(String(item.id));
+      }
+    });
+
+    return ids;
+  });
+
   const [originalDimensions, setOriginalDimensions] = useState(() => null);
 
   const [catalogRecommendations, setCatalogRecommendations] = useState([]);
@@ -1405,6 +1367,8 @@ function FittingStudioPage({ isGuest = false }) {
   //   * Guests are blocked at the STAR CLICK: nothing is cached anywhere
   //     (no sessionStorage hold) and the exact sign-up/login prompt opens.
   //   * Stars rehydrate from /ratings/mine/ so they survive reload/logout.
+  // NEW (try-before-rate gate): a recommendation can only be rated AFTER the
+  // shopper tried it on the avatar (triedItemIds above).
   // ------------------------------------------------------------------
   const [studioSessionId] = useState(
     () =>
@@ -1539,9 +1503,13 @@ function FittingStudioPage({ isGuest = false }) {
         currentView,
         equippedGender: avatar.gender,
         avatarPresetId,
+        // NEW (try-before-rate gate): persist the tried set so the Rate
+        // Recommendation buttons survive product-page / sidebar hops within
+        // this studio visit.
+        triedItemIds: Array.from(triedItemIds),
       })
     );
-  }, [avatar, currentView, isGuest, avatarPresetId]);
+  }, [avatar, currentView, isGuest, avatarPresetId, triedItemIds]);
 
   useEffect(() => {
     let active = true;
@@ -1660,7 +1628,6 @@ function FittingStudioPage({ isGuest = false }) {
 
   // Pending item hand-off (product page / saved outfits -> studio).
   useEffect(() => {
-    void (async () => {
     const key = pendingKey(isGuest);
     const pending = readJson(sessionStorage, key);
 
@@ -1696,14 +1663,7 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    if (!(await canLoadGarmentImage(item))) {
-      displayNotification(
-        `Unable to load the image for ${item.name}. Previous item retained.`
-      );
-      return;
-    }
-
-    const next = withEquippedItem(equippedItems, item);
+    const next = { ...equippedItems, [item.category]: item };
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -1721,6 +1681,9 @@ function FittingStudioPage({ isGuest = false }) {
     }
 
     setEquippedItems(next);
+    // NEW (try-before-rate gate): the hand-off try-on also unlocks this
+    // item's Rate Recommendation button.
+    markItemTried(item);
     setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setAvatar((current) =>
       applySizeCaps(
@@ -1730,16 +1693,12 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      equipNotification(
-        item,
-        nextLimits,
-        `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`,
-        `${item.name} equipped. Preview adjusted to its available fitting limits.`
-      )
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
+        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    })();
   }, []);
 
   useEffect(() => {
@@ -1756,6 +1715,25 @@ function FittingStudioPage({ isGuest = false }) {
     window.setTimeout(() => setNotification(""), 2500);
   }
 
+  // NEW (try-before-rate gate): record a successful try-on. Called from every
+  // equip path (Try Item button, match-reasons Try Item, product-page hand-off,
+  // UAT pending equip). Removing a garment never un-tries it.
+  function markItemTried(item) {
+    const id = item?.id;
+    if (id === undefined || id === null) return;
+    setTriedItemIds((current) => {
+      const key = String(id);
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
+
+  function hasTriedItem(item) {
+    return Boolean(item) && triedItemIds.has(String(item.id));
+  }
+
   function avatarContextSnapshot() {
     return {
       gender: avatar.gender,
@@ -1769,6 +1747,14 @@ function FittingStudioPage({ isGuest = false }) {
   // Rating modal plumbing (stars only, button-triggered).
   // ------------------------------------------------------------------
   function openRatingModal(kind, item = null) {
+    // NEW (try-before-rate gate): the button is hidden for untried items, but
+    // never let the modal open for one through any other path either.
+    if (kind === "recommendations" && !hasTriedItem(item)) {
+      displayNotification(
+        "Try this item on your avatar first — then you can rate the recommendation."
+      );
+      return;
+    }
     setRatingError("");
     const values = {};
     if (kind === "recommendations" && item) {
@@ -1826,6 +1812,14 @@ function FittingStudioPage({ isGuest = false }) {
         // PER-ITEM rating with the REAL catalog id (Criterion 10 / OBJ-05).
         if (!item) {
           setRatingError("This recommendation is missing a catalog id.");
+          return;
+        }
+        // NEW (try-before-rate gate): a recommendation rating must follow an
+        // actual try-on so the OBJ-05 approval evidence stays honest.
+        if (!hasTriedItem(item)) {
+          setRatingError(
+            "Try this item on your avatar before rating the recommendation."
+          );
           return;
         }
         await ratingsApi.submit({
@@ -1897,6 +1891,9 @@ function FittingStudioPage({ isGuest = false }) {
         currentView,
         equippedGender: avatar.gender,
         avatarPresetId,
+        // NEW (try-before-rate gate): keep the tried set when hopping to the
+        // product page, so the Rate buttons are still there on return.
+        triedItemIds: Array.from(triedItemIds),
       })
     );
 
@@ -2066,7 +2063,7 @@ function FittingStudioPage({ isGuest = false }) {
     }
   }
 
-  async function tryRecommendedItem(rawItem) {
+  function tryRecommendedItem(rawItem) {
     const item = normalizeStudioItem(rawItem);
 
     if (!item) return;
@@ -2078,14 +2075,7 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    if (!(await canLoadGarmentImage(item))) {
-      displayNotification(
-        `Unable to load the image for ${item.name}. Previous item retained.`
-      );
-      return;
-    }
-
-    const next = withEquippedItem(equippedItems, item);
+    const next = { ...equippedItems, [item.category]: item };
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -2104,6 +2094,9 @@ function FittingStudioPage({ isGuest = false }) {
 
     setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setEquippedItems(next);
+    // NEW (try-before-rate gate): a successful Try Item unlocks this item's
+    // Rate Recommendation button (also covers Try Item inside Match Reasons).
+    markItemTried(item);
     setAvatar((current) =>
       applySizeCaps(
         applyFitLimits(current, nextLimits),
@@ -2112,12 +2105,9 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      equipNotification(
-        item,
-        nextLimits,
-        `${item.name} equipped. No verified height/weight limits were supplied for this size.`,
-        `${item.name} equipped. Avatar preview adjusted within the garment limits.`
-      )
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. No verified height/weight limits were supplied for this size.`
+        : `${item.name} equipped. Avatar preview adjusted within the garment limits.`
     );
   }
 
@@ -2251,7 +2241,7 @@ function FittingStudioPage({ isGuest = false }) {
     void submitUatResponse(productId, phase, questionKey, value);
   }
 
-  async function applyPendingUatItem(item) {
+  function applyPendingUatItem(item) {
     if (!item) return;
     if (!avatarGenderAllowsItem(avatar.gender, item)) {
       displayNotification(
@@ -2260,14 +2250,7 @@ function FittingStudioPage({ isGuest = false }) {
       return;
     }
 
-    if (!(await canLoadGarmentImage(item))) {
-      displayNotification(
-        `Unable to load the image for ${item.name}. Previous item retained.`
-      );
-      return;
-    }
-
-    const next = withEquippedItem(equippedItems, item);
+    const next = { ...equippedItems, [item.category]: item };
     const nextLimits = combinedFitLimits(next);
 
     if (nextLimits.incompatible) {
@@ -2285,6 +2268,9 @@ function FittingStudioPage({ isGuest = false }) {
     }
 
     setEquippedItems(next);
+    // NEW (try-before-rate gate): the UAT pending equip also unlocks this
+    // item's Rate Recommendation button.
+    markItemTried(item);
     setSelectedMatchSlots((current) => ({ ...current, [item.category]: item }));
     setAvatar((current) =>
       applySizeCaps(
@@ -2294,12 +2280,9 @@ function FittingStudioPage({ isGuest = false }) {
     );
 
     displayNotification(
-      equipNotification(
-        item,
-        nextLimits,
-        `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`,
-        `${item.name} equipped. Preview adjusted to its available fitting limits.`
-      )
+      !nextLimits.hasHeight && !nextLimits.hasWeight
+        ? `${item.name} equipped. Seller height/weight limits are not available; no body-size restriction was assumed.`
+        : `${item.name} equipped. Preview adjusted to its available fitting limits.`
     );
   }
 
@@ -2841,8 +2824,9 @@ function FittingStudioPage({ isGuest = false }) {
               <div className="studio-recommendations-panel">
                 <p className="studio-recommendation-note">
                   Select Try Item to preview clothing on your avatar. Select
-                  View Match Reasons to review its recommendation details. Rate
-                  each recommendation with its own button (1–5 stars).
+                  View Match Reasons to review its recommendation details.
+                  After you try an item on your avatar, its Rate Recommendation
+                  button appears so you can rate it (1–5 stars).
                 </p>
 
                 <p
@@ -2895,7 +2879,10 @@ function FittingStudioPage({ isGuest = false }) {
                           Size {item.size} {item.size_cm}
                         </small>
                       )}
-                      {myRecommendationRatings[String(item.id)] ? (
+                      {/* NEW (try-before-rate gate): the saved-rating recap
+                          only shows once the item has been tried this visit. */}
+                      {hasTriedItem(item) &&
+                      myRecommendationRatings[String(item.id)] ? (
                         <small style={{ display: "block", color: "#8e641f" }}>
                           Your rating: {myRecommendationRatings[String(item.id)]}/5
                         </small>
@@ -2948,17 +2935,23 @@ function FittingStudioPage({ isGuest = false }) {
                       View Match Reasons
                     </button>
 
-                    {/* CHANGED (audit fix): PER-ITEM recommendation rating with
-                        the REAL catalog target_id — the synthetic panel-overall
-                        target is gone. */}
-                    <button
-                      type="button"
-                      className="studio-recommendation-match-button"
-                      onClick={() => openRatingModal("recommendations", item)}
-                      aria-label={`Rate recommendation ${item.name}`}
-                    >
-                      {RECOMMENDATION_RATING_COPY.buttonLabel}
-                    </button>
+                    {/* CHANGED (try-before-rate gate): the Rate Recommendation
+                        button appears ONLY after this item has been tried on
+                        the avatar in this studio visit (Try Item, the
+                        product-page hand-off, or a restored Saved Outfit).
+                        Untried rows show only Try Item + View Match Reasons.
+                        Once tried, it stays available for the rest of the
+                        visit even if the garment is removed. */}
+                    {hasTriedItem(item) && (
+                      <button
+                        type="button"
+                        className="studio-recommendation-match-button"
+                        onClick={() => openRatingModal("recommendations", item)}
+                        aria-label={`Rate recommendation ${item.name}`}
+                      >
+                        {RECOMMENDATION_RATING_COPY.buttonLabel}
+                      </button>
+                    )}
                   </article>
                 ))}
 
