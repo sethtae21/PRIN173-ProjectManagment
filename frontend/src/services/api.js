@@ -86,9 +86,18 @@ import {
 // Re-export so pages importing from api.js still work
 export { getAccessToken, getRefreshToken, clearSession, setSession };
 
-const API_BASE = (
-  import.meta.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-).replace(/\/+$/, '');
+// MIXED-CONTENT / CORS FIX: the page is served over HTTPS on :8443, so an
+// absolute http://127.0.0.1:8000 base gets blocked by the browser. In dev we
+// use a same-origin RELATIVE base; Vite's HTTPS proxy forwards every /auth,
+// /catalog, /cart, ... prefix to Django. Production keeps the original
+// absolute API URL (VITE_API_BASE_URL with the legacy fallback).
+let apiBase;
+if (import.meta.env?.PROD) {
+  apiBase = import.meta.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+} else {
+  apiBase = import.meta.env?.VITE_API_BASE ?? '';
+}
+const API_BASE = String(apiBase).replace(/\/+$/, '');
 
 const ACCESS_KEY = 'fitfusion_access';
 const REFRESH_KEY = 'fitfusion_refresh';
