@@ -19,6 +19,15 @@ if SECRET_KEY in ('', 'change-me-in-real-env'):
     else:
         raise ImproperlyConfigured('Set DJANGO_SECRET_KEY to a unique secret outside DEBUG mode.')
 
+# ==========================================
+# FR-1.4 / RA 10173: dedicated, STABLE server-side key for cold-archive
+# pseudonyms (accounts/pseudonymization.py). Empty => falls back to SECRET_KEY.
+# Set a dedicated long-lived value in live/demo so rotating DJANGO_SECRET_KEY
+# can never rewrite archive pseudonyms. MUST NOT change once pseudonymized
+# archives exist: tokens are deterministic in (key, closed_account_id, field).
+# ==========================================
+ARCHIVE_PSEUDONYM_KEY = os.environ.get('ARCHIVE_PSEUDONYM_KEY', '')
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(

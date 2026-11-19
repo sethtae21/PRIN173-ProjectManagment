@@ -2,7 +2,7 @@
 accounts/tests_archive_retention.py — FR-1.4 / RA 10173 end-of-retention proof.
 
 Companion to accounts.tests.AccountManagementTests, which proves the FIRST half
-of the lifecycle (DELETE /profile/ -> 200 archive, data RETAINED, login blocked).
+of the lifecycle (DELETE /profile/ -> 204 archive, data RETAINED, login blocked).
 This suite proves the SECOND half: the prune sweep relocates the profile to
 accounts_archiveduser and erases/pseudonymizes the active collections.
 
@@ -10,30 +10,35 @@ Chain covered end-to-end:
   active --DELETE /profile/--> archived in accounts_user (grace window)
          --prune sweep-------> accounts_archiveduser + active data erased
 
-FR-1.4 PRIVACY: the cold copy is PSEUDONYMOUS (keyed email, constant display
-name, cleared contact/address/store identity, EMPTY password). Legacy intact
-cold documents are healed by from_user() retry, migration 0012, and the
+FR-1.4 PRIVACY (token contract): the cold copy is PSEUDONYMOUS — keyed email
+(archived-<32hex>@archive.invalid), pseudonymous name ("Archived <32hex>"),
+field-specific MOB-/ADDR-/POST-/STORE- tokens for contact/address/postal/store
+(never null, never the original, never a placeholder), EMPTY password. Legacy
+intact cold documents are healed by from_user() retry, migration 0012, and the
 repeatable pseudonymize_archived_users command.
 
 Includes the forward eligibility math (due = archived_at + ARCHIVE_GRACE_DAYS),
 the legacy NULL-stamp branch, --force, the preview (moves nothing), cold-copy
-pseudonymization + idempotency, the order pseudonymization + buyer-cart detach
-cascade, sweep resilience (one bad row never stalls the rest), and the legacy
-backfill (idempotent, dry-run).
+pseudonymization + idempotency + recreation stability, the order
+pseudonymization + buyer-cart detach cascade, sweep resilience (one bad row
+never stalls the rest), and the legacy backfill (idempotent, dry-run).
 
-GAP-1 HARDENING: a SELLER cold-copy test proves store identity is scrubbed
-(the shopper case had store_name=None already, so it proved nothing about
-store scrubbing), and a synthetic non-ObjectId closed_account_id proves the
+GAP-1 HARDENING: a SELLER cold-copy test proves store identity is TOKENIZED
+(not merely absent), and a synthetic non-ObjectId closed_account_id proves the
 backfill's keyed pseudonym and that role is retained, not reset.
+
+Pseudonym-asserting classes pin ARCHIVE_PSEUDONYM_KEY so expected values never
+depend on the developer's .env secret.
 
 Run: python manage.py test accounts.tests_archive_retention -v 2
 """
+import re
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -44,13 +49,41 @@ from accounts.archive import (
     prune_expired_archived_users,
 )
 from accounts.models import ArchivedUser, FittingStudioSurvey, User
-from accounts.pseudonymization import pseudonymous_email
+from accounts.pseudonymization import (
+    ensure_pseudonymized,
+    pseudonym_for,
+    pseudonymous_email,
+    pseudonymous_full_name,
+    pseudonymous_profile_fields,
+)
 from catalog.models import CatalogItem
 from commerce.models import Cart, CartItem, Order
 from outfits.models import AvatarPreset, Outfit
 from ratings.models import Rating
 
 PASSWORD = 'Test123!@#'
+TEST_ARCHIVE_KEY = 'fitfusion-test-archive-key'
+
+HEX32 = r'[0-9a-f]{32}'
+TOKEN_PATTERNS = {
+    'email': re.compile(rf'^archived-{HEX32}@archive\.invalid$'),
+    'full_name': re.compile(rf'^Archived {HEX32}$'),
+    'mobile': re.compile(rf'^MOB-{HEX32}$'),
+    'street': re.compile(rf'^ADDR-{HEX32}$'),
+    'barangay': re.compile(rf'^ADDR-{HEX32}$'),
+    'city': re.compile(rf'^ADDR-{HEX32}$'),
+    'province': re.compile(rf'^ADDR-{HEX32}$'),
+    'postal_code': re.compile(rf'^POST-{HEX32}$'),
+    'store_name': re.compile(rf'^STORE-{HEX32}$'),
+}
+DIRECT_IDENTIFIER_FIELDS = tuple(TOKEN_PATTERNS)
+
+# Distinctive fragments that CANNOT occur inside hex tokens (each contains a
+# non-hex character), so absence assertions are deterministic, never flaky.
+PII_FRAGMENTS = (
+    'Carlos', 'carlos.yap', 'Rizal', 'Antonio', 'Makati', 'Manila',
+    'Threads', 'example',
+)
 
 
 def _user(email, role='shopper', **extra):
@@ -60,6 +93,29 @@ def _user(email, role='shopper', **extra):
         password=PASSWORD,
         role=role,
         **extra,
+    )
+
+
+def _pii_user(email, role='shopper', **extra):
+    """User carrying EVERY direct identifier, so 'differs from original' and
+    'original absent' assertions actually have something to prove."""
+    defaults = dict(
+        mobile='09171234567',
+        street='123 Rizal Street',
+        barangay='San Antonio',
+        city='Makati City',
+        province='Metro Manila',
+        postal_code='1203',
+    )
+    if role == 'seller':
+        defaults.setdefault('store_name', 'Carlos Threads')
+    defaults.update(extra)
+    return User.objects.create_user(
+        email=email,
+        full_name='Carlos Jefferson Yap',
+        password=PASSWORD,
+        role=role,
+        **defaults,
     )
 
 
@@ -231,11 +287,53 @@ class ArchiveSchedulePreviewTests(TestCase):
         self.assertIn('legacy', legacy['remaining'])
 
 
+@override_settings(ARCHIVE_PSEUDONYM_KEY=TEST_ARCHIVE_KEY)
+class PseudonymContractTests(SimpleTestCase):
+    """The token contract itself — pure functions, no database."""
+
+    def test_token_format_contract(self):
+        profile = pseudonymous_profile_fields('contract0001', role='seller')
+        for field, pattern in TOKEN_PATTERNS.items():
+            self.assertTrue(profile[field], f'{field} must not be null/empty')
+            self.assertRegex(profile[field], pattern)
+        self.assertEqual(profile['password'], '')
+        self.assertFalse(profile['is_active'])
+        self.assertFalse(profile['is_staff'])
+        self.assertIsNone(profile['last_login'])
+        self.assertIsNone(profile['date_joined'])
+        self.assertEqual(profile['role'], 'seller')
+        self.assertEqual(profile['status'], 'archive')
+
+    def test_tokens_are_account_and_field_specific(self):
+        a = pseudonymous_profile_fields('acct-a')
+        b = pseudonymous_profile_fields('acct-b')
+        for field in TOKEN_PATTERNS:
+            self.assertNotEqual(a[field], b[field], field)
+        # Every field of ONE account carries a distinct value (street != city...).
+        self.assertEqual(len({a[f] for f in TOKEN_PATTERNS}), len(TOKEN_PATTERNS))
+
+    def test_secret_is_keying_material(self):
+        base = pseudonymous_profile_fields('keyed0001')
+        with override_settings(ARCHIVE_PSEUDONYM_KEY='rotated-test-key'):
+            other = pseudonymous_profile_fields('keyed0001')
+        for field in TOKEN_PATTERNS:
+            self.assertNotEqual(base[field], other[field], field)
+
+    def test_email_derivation_is_backward_compatible(self):
+        """Rows already pseudonymized by the previous build keep their email:
+        the account-level derivation (HMAC of the bare id) is unchanged."""
+        self.assertEqual(
+            pseudonymous_email('legacy0001'),
+            f"archived-{pseudonym_for('legacy0001')}@archive.invalid",
+        )
+
+
+@override_settings(ARCHIVE_PSEUDONYM_KEY=TEST_ARCHIVE_KEY)
 class ColdCopyTests(TestCase):
     """accounts_archiveduser content (PSEUDONYMOUS), idempotency, timestamps."""
 
     def test_cold_copy_is_pseudonymized_and_idempotent(self):
-        user = _user('cold@test.com', mobile='09123456789', city='Makati City')
+        user = _pii_user('cold@test.com')
         _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
         uid = str(user.pk)
 
@@ -248,18 +346,21 @@ class ColdCopyTests(TestCase):
         self.assertEqual(first.closed_account_id, uid)
         self.assertEqual(first.status, 'archive')
         self.assertFalse(first.is_active)
+        self.assertFalse(first.is_staff)
         self.assertEqual(first.role, user.role)
 
-        # FR-1.4: NO direct identifiers or credentials survive.
+        # FR-1.4: EVERY direct identifier is a non-null token that differs
+        # from the original — no placeholders, no nulls, no credentials.
+        for field, pattern in TOKEN_PATTERNS.items():
+            value = getattr(first, field)
+            self.assertTrue(value, f'{field} must not be null/empty')
+            self.assertRegex(value, pattern)
+            self.assertNotEqual(value, getattr(user, field), field)
         self.assertEqual(first.email, pseudonymous_email(uid))
-        self.assertNotEqual(first.email, user.email)
-        self.assertEqual(first.full_name, 'Archived User')
-        self.assertNotEqual(first.full_name, user.full_name)
-        self.assertIsNone(first.mobile)
-        self.assertIsNone(first.city)
-        self.assertIsNone(first.store_name)
+        self.assertEqual(first.full_name, pseudonymous_full_name(uid))
         self.assertEqual(first.password, '')
         self.assertIsNone(first.last_login)
+        self.assertIsNone(first.date_joined)
 
     def test_cold_copy_never_copies_the_password_hash(self):
         user = _user('hash@test.com')
@@ -270,7 +371,7 @@ class ColdCopyTests(TestCase):
         self.assertNotEqual(cold.password, user.password)
 
     def test_from_user_heals_a_legacy_intact_copy(self):
-        user = _user('heal@test.com', mobile='09123456789', city='Makati City')
+        user = _pii_user('heal@test.com')
         _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
         uid = str(user.pk)
         legacy = _legacy_cold_row(user)
@@ -278,12 +379,13 @@ class ColdCopyTests(TestCase):
         healed = ArchivedUser.from_user(user)   # retry must not return PII
         self.assertEqual(healed.pk, legacy.pk)
         healed.refresh_from_db()
-        self.assertEqual(healed.email, pseudonymous_email(uid))
-        self.assertEqual(healed.full_name, 'Archived User')
-        self.assertIsNone(healed.mobile)
-        self.assertIsNone(healed.city)
-        self.assertEqual(healed.password, '')
+        # Healed values EQUAL a fresh generation (stability across healing).
+        expected = pseudonymous_profile_fields(uid, role=user.role)
+        for name, value in expected.items():
+            self.assertEqual(getattr(healed, name), value, name)
         self.assertEqual(ArchivedUser.objects.filter(closed_account_id=uid).count(), 1)
+        # A second heal pass is a strict no-op.
+        self.assertEqual(ensure_pseudonymized(healed), [])
 
     def test_cold_moved_at_stores_the_scheduled_due_date(self):
         """DOCUMENTED BEHAVIOUR (not the relocation instant).
@@ -308,19 +410,58 @@ class ColdCopyTests(TestCase):
         self.assertGreaterEqual(cold.cold_moved_at, before - timedelta(seconds=1))
         self.assertLess(abs((cold.cold_moved_at - timezone.now()).total_seconds()), 60)
 
-    def test_seller_store_identity_is_cleared(self):
+    def test_seller_store_identity_is_pseudonymized_not_null(self):
         """FR-1.4 names store identity explicitly. A SELLER's real store_name
-        must not survive in the cold row — the shopper case above already had
-        store_name=None, so it proved nothing about store scrubbing."""
-        seller = _user('cold-seller@test.com', role='seller', store_name='Cold Store')
+        must become a STORE- token (not null, not the original)."""
+        seller = _pii_user('cold-seller@test.com', role='seller')
         _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
         cold = ArchivedUser.from_user(seller)
-        self.assertIsNone(cold.store_name)          # helper writes None, not ''
+        self.assertRegex(cold.store_name, TOKEN_PATTERNS['store_name'])
+        self.assertNotEqual(cold.store_name, 'Carlos Threads')
         self.assertEqual(cold.role, 'seller')       # non-identifying, retained
-        self.assertNotIn('Cold Store', str(cold.__dict__))
+        self.assertNotIn('Carlos Threads', str(cold.__dict__))
         self.assertNotIn('cold-seller@test.com', str(cold.__dict__))
 
+    def test_pseudonyms_stable_across_recreation(self):
+        """Deleting and recreating the cold row for the SAME account must
+        regenerate byte-identical pseudonyms (deterministic HMAC)."""
+        user = _pii_user('recreate@test.com')
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        first = ArchivedUser.from_user(user)
+        snapshot = {f: getattr(first, f) for f in DIRECT_IDENTIFIER_FIELDS}
+        first.delete()
+        second = ArchivedUser.from_user(user)
+        for field, value in snapshot.items():
+            self.assertEqual(getattr(second, field), value, field)
 
+    def test_every_original_pii_value_differs_and_is_absent(self):
+        user = _pii_user('absent@test.com', role='seller')
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        for field in DIRECT_IDENTIFIER_FIELDS:
+            stored = getattr(cold, field)
+            original = getattr(user, field)
+            if original:
+                self.assertNotEqual(stored, original, field)
+        # Distinctive non-hex fragments can never appear inside the tokens.
+        for fragment in PII_FRAGMENTS:
+            for field in DIRECT_IDENTIFIER_FIELDS:
+                self.assertNotIn(fragment, getattr(cold, field), f'{fragment} in {field}')
+        self.assertNotIn('Carlos', str(cold))
+        self.assertNotEqual(cold.password, user.password)
+
+    def test_sanitize_helper_rerun_changes_nothing(self):
+        user = _pii_user('rerun@test.com')
+        _archive(user, days_ago=ARCHIVE_GRACE_DAYS + 2)
+        cold = ArchivedUser.from_user(user)
+        before = {f: getattr(cold, f) for f in DIRECT_IDENTIFIER_FIELDS}
+        self.assertEqual(ensure_pseudonymized(cold), [])  # no fields differ
+        cold.refresh_from_db()
+        for field, value in before.items():
+            self.assertEqual(getattr(cold, field), value, field)
+
+
+@override_settings(ARCHIVE_PSEUDONYM_KEY=TEST_ARCHIVE_KEY)
 class RetentionErasureTests(TestCase):
     """RA 10173: after the window, active collections hold no personal data."""
 
@@ -359,13 +500,14 @@ class RetentionErasureTests(TestCase):
     def test_cold_archive_holds_no_direct_identifiers(self):
         self.assertEqual(prune_expired_archived_users(), 1)
         cold = ArchivedUser.objects.get(closed_account_id=self.uid)
+        for field, pattern in TOKEN_PATTERNS.items():
+            value = getattr(cold, field)
+            self.assertTrue(value, f'{field} must not be null/empty')
+            self.assertRegex(value, pattern)
         self.assertEqual(cold.email, pseudonymous_email(self.uid))
         self.assertNotEqual(cold.email, 'erase@test.com')
-        self.assertEqual(cold.full_name, 'Archived User')
+        self.assertEqual(cold.full_name, pseudonymous_full_name(self.uid))
         self.assertEqual(cold.password, '')
-        self.assertIsNone(cold.mobile)
-        self.assertIsNone(cold.street)
-        self.assertIsNone(cold.city)
 
     def test_orders_survive_but_are_pseudonymized(self):
         order_id = self.order.pk
@@ -394,12 +536,13 @@ class RetentionErasureTests(TestCase):
         self.assertEqual(ArchivedUser.objects.filter(closed_account_id=self.uid).count(), 1)
 
 
+@override_settings(ARCHIVE_PSEUDONYM_KEY=TEST_ARCHIVE_KEY)
 class LegacyArchiveBackfillTests(TestCase):
     """Already-archived intact rows are healed; the backfill is repeatable."""
 
     def _legacy(self, email):
         # Fresh archive (NOT sweep-eligible) so only the backfill acts here.
-        user = _user(email, mobile='09123456789', city='Makati City')
+        user = _pii_user(email)
         _archive(user, days_ago=0)
         return str(user.pk), _legacy_cold_row(user)
 
@@ -408,12 +551,9 @@ class LegacyArchiveBackfillTests(TestCase):
         out = StringIO()
         call_command('pseudonymize_archived_users', stdout=out)
         row.refresh_from_db()
-        self.assertEqual(row.email, pseudonymous_email(uid))
-        self.assertEqual(row.full_name, 'Archived User')
-        self.assertIsNone(row.mobile)
-        self.assertIsNone(row.city)
-        self.assertIsNone(row.store_name)
-        self.assertEqual(row.password, '')
+        expected = pseudonymous_profile_fields(uid, role=row.role)
+        for name, value in expected.items():
+            self.assertEqual(getattr(row, name), value, name)
         self.assertIn('pseudonymized=1', out.getvalue())
 
         again = StringIO()
@@ -436,6 +576,7 @@ class LegacyArchiveBackfillTests(TestCase):
         call_command('prune_archived_users', '--sanitize-existing', stdout=out)
         row.refresh_from_db()
         self.assertEqual(row.email, pseudonymous_email(uid))
+        self.assertRegex(row.mobile, TOKEN_PATTERNS['mobile'])
         self.assertIn('Legacy archive sanitization (applied)', out.getvalue())
 
     def test_prune_sanitize_existing_preview_is_dry(self):
@@ -450,8 +591,6 @@ class LegacyArchiveBackfillTests(TestCase):
         """Legacy rows keyed by a non-ObjectId closed_account_id still get a
         stable keyed pseudonym, and their role is RETAINED (not reset to
         shopper). Uses the command's real contract: default applies."""
-        from accounts.pseudonymization import pseudonym_for, pseudonymous_profile_fields
-
         legacy = ArchivedUser.objects.create(
             closed_account_id='legacy0001',
             email='legacy-synthetic@test.com',

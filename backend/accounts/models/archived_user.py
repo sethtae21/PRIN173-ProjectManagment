@@ -9,10 +9,13 @@ LIFECYCLE (FR-1.4 / RA 10173 retention):
 PRIVACY (FR-1.4 / RA 10173):
   The cold row is PSEUDONYMOUS, never an intact copy. from_user() writes only
   the values produced by accounts.pseudonymization.pseudonymous_profile_fields:
-  a keyed pseudonymous email, the constant display name, cleared contact /
-  address / store identity, an EMPTY password (the hash is never copied), and
-  cleared behavioral timestamps. Legacy intact documents are scrubbed by
-  migration 0012 and the repeatable `pseudonymize_archived_users` command.
+  a keyed pseudonymous email (archived-<32hex>@archive.invalid), a pseudonymous
+  display name ("Archived <32hex>"), field-specific MOB-/ADDR-/POST-/STORE-
+  tokens for contact/address/postal/store identity (never null, never the
+  original), an EMPTY password (the hash is never copied), and cleared
+  behavioral timestamps. Legacy intact documents — and rows sanitized under
+  the old placeholder/null scheme — are scrubbed by migration 0012 and the
+  repeatable `pseudonymize_archived_users` command.
   Retained for legitimate purpose: closed_account_id (idempotency/audit key),
   role (non-identifying), status, archived_at, cold_moved_at.
 
@@ -94,8 +97,9 @@ class ArchivedUser(models.Model):
 
         Idempotent: if a copy for this closed_account_id already exists (a
         previous sweep crashed mid-run), it is returned — and healed through
-        ensure_pseudonymized() so a legacy INTACT copy can never survive a
-        retry. Must be called BEFORE the live row is deleted.
+        ensure_pseudonymized() so a legacy INTACT copy (or an old-scheme
+        placeholder/null row) can never survive a retry. Must be called
+        BEFORE the live row is deleted.
         """
         from django.utils import timezone
         from accounts.archive import ARCHIVE_GRACE_DAYS

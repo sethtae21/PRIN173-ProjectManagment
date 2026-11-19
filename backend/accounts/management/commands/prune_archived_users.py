@@ -14,9 +14,9 @@ Usage:
                                                           #   days remaining; moves nothing
     python manage.py prune_archived_users --sanitize-existing
                                                           # FR-1.4 backfill: pseudonymize
-                                                          #   legacy intact cold rows
-                                                          #   (idempotent; add --preview
-                                                          #   for a dry run)
+                                                          #   legacy cold rows to the CURRENT
+                                                          #   token scheme (idempotent; add
+                                                          #   --preview for a dry run)
 
 Cron example (daily at 03:00):
     0 3 * * *  /path/to/.venv/bin/python /path/to/backend/manage.py prune_archived_users
@@ -37,10 +37,10 @@ def _fmt(dt):
 class Command(BaseCommand):
     help = (
         "Move accounts archived longer than the grace window (default 90 days) "
-        "from accounts_user into the accounts_archiveduser cold collection, "
-        "pseudonymizing their orders and cascade-removing their working data. "
-        "Use --force to relocate immediately, --preview to inspect the schedule, "
-        "--sanitize-existing to pseudonymize legacy cold rows."
+        "from accounts_user into the accounts_archiveduser cold collection as "
+        "pseudonymized tombstones, pseudonymizing their orders and cascade-removing "
+        "their working data. Use --force to relocate immediately, --preview to "
+        "inspect the schedule, --sanitize-existing to pseudonymize legacy cold rows."
     )
 
     def add_arguments(self, parser):
@@ -64,8 +64,9 @@ class Command(BaseCommand):
         parser.add_argument(
             '--sanitize-existing',
             action='store_true',
-            help="FR-1.4 backfill: pseudonymize legacy intact accounts_archiveduser rows "
-                 "(idempotent, safe to re-run). Combine with --preview for a dry run.",
+            help="FR-1.4 backfill: pseudonymize legacy accounts_archiveduser rows to the "
+                 "current token scheme (idempotent, safe to re-run). Combine with "
+                 "--preview for a dry run.",
         )
 
     def handle(self, *args, **options):

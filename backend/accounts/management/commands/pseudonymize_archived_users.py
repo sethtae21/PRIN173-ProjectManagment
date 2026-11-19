@@ -2,9 +2,12 @@
 Management command: FR-1.4 / RA 10173 backfill for ALREADY-ARCHIVED records.
 
 Changing future archive writes does not fix legacy accounts_archiveduser
-documents that were copied intact by older builds. This command pseudonymizes
-them in place (keyed pseudonymous email, constant display name, cleared
-contact/address/store identity, empty password, cleared behavioral timestamps).
+documents that were copied intact by older builds (or sanitized under the old
+placeholder/null scheme). This command pseudonymizes them in place via the
+live helper: keyed pseudonymous email, pseudonymous display name
+("Archived <32hex>"), field-specific MOB-/ADDR-/POST-/STORE- tokens for
+contact/address/postal/store identity (never null), empty password, cleared
+behavioral timestamps.
 
 Idempotent: a second run reports pseudonymized=0 / already_clean=N and writes
 nothing. --dry-run computes the same counts without saving.
@@ -21,9 +24,10 @@ from accounts.pseudonymization import sanitize_existing_archives
 
 class Command(BaseCommand):
     help = (
-        "Idempotent FR-1.4 backfill: pseudonymize legacy intact "
-        "accounts_archiveduser rows (no direct identifiers or credentials "
-        "survive). Safe to re-run; --dry-run reports without writing."
+        "Idempotent FR-1.4 backfill: pseudonymize legacy accounts_archiveduser "
+        "rows (keyed tokens for every direct identifier — never null or the "
+        "original; password cleared). Safe to re-run; --dry-run reports "
+        "without writing."
     )
 
     def add_arguments(self, parser):
