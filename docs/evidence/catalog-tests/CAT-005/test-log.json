@@ -1,0 +1,12 @@
+{
+  "test_id": "CAT-005",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:33.170Z",
+  "duration": "8981ms",
+  "details": {
+    "seller_id": "6adc29d152f78b00f270c180",
+    "store_name": "seth storeeee",
+    "shown_count": 49,
+    "other_seller_names_absent": true
+  }
+}

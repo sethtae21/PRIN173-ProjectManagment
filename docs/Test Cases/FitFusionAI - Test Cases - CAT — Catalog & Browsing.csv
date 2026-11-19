@@ -1,0 +1,25 @@
+Test Case ID,Features,Access Type / Pre-Condition,User Stories,Acceptance Criteria,Steps to Test,Assigned To,Status,Evidence Link
+Catalog - 001,Browse Catalog,Catalog contains items,"As a user, I want to browse the clothing catalog.","The system shall display all available items with images and metadata (FR-3.1, FR-3.2).","1. Navigate to Catalog Browser
+2. Verify items and images display",Dein,PASS,../evidence/catalog-tests/CAT-001/
+Catalog - 002,Filter Catalog,Catalog contains items,"As a user, I want to filter items by category, size, and price.",The system shall update the display to show only matching items (FR-3.3).,"1. Open Catalog
+2. Apply category filter
+3. Apply size filter
+4. Apply price filter
+5. Verify results match",Dein,PASS,../evidence/catalog-tests/CAT-002/
+Catalog - 003,Filter Catalog,Catalog contains items,"As a user, I want to filter items. I applied filters that match no items.","The system shall display ""No items match your filters"" and offer to clear filters (UC-02 ext).","1. Open Catalog
+2. Apply a filter combination with no matches
+3. Verify message and clear-filters option",Dein,PASS,../evidence/catalog-tests/CAT-003/
+Catalog - 004,View Item Details,Catalog contains items,"As a user, I want to view full details of an item.","The system shall display name, description, price, store name, metadata, and two-view images (FR-3.2).","1. Open Catalog
+2. Click an item
+3. Verify full details and two-view images",Dein,PASS,../evidence/catalog-tests/CAT-004/
+Catalog - 005,Per-Seller Store Page,Seeded catalog with ≥2 Sellers,"As a user, I want to open a Seller's Store page.",The Store page shall list only that Seller's active items (FR-3.3).,"1. Open an item detail
+2. Click the store name
+3. Verify only that Seller's active items appear",Dein,PASS,../evidence/catalog-tests/CAT-005/
+Catalog - 006,Browse Catalog,Catalog is empty,"As a user, I want to browse the catalog. The catalog has no items.","The system shall display ""No items available"" (UC-02 ext).","1. Seed an empty catalog
+2. Open Catalog Browser
+3. Verify empty-state message",Dein,PASS,../evidence/catalog-tests/CAT-006/
+Catalog - 007,Guest Read-Only Access,Guest session,"As a Guest, I want to browse the catalog without registering.",The system shall allow Guests read-only catalog access; no registration required (FR-1.8).,"1. Continue as Guest
+2. Open Catalog
+3. Browse and filter items",Both,PASS,../evidence/catalog-tests/CAT-007/
+Catalog - 008,Upload Restriction,Logged in as Registered User,"As a regular user, I want to know I cannot upload catalog images.",System shall not expose image upload endpoints or UI to Users/Guests (FR-3.4).,1. Log in as User.<br>2. Inspect UI for upload buttons.<br>3. Attempt POST to Seller upload API endpoint.,Both,PASS,../evidence/catalog-tests/CAT-008/
+Catalog - 009,Cross-Seller Isolation,Seeded catalog with ≥2 Sellers,"As a user, I want Store pages to be isolated.",Store page shall list ONLY that specific Seller's active items (FR-3.3).,1. Open Seller A's Store page.<br>2. Verify no items from Seller B appear.<br>3. Repeat for Seller B.,Dein,PASS,../evidence/catalog-tests/CAT-009/

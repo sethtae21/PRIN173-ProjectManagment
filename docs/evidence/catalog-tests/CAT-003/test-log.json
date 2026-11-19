@@ -1,0 +1,10 @@
+{
+  "test_id": "CAT-003",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:19.429Z",
+  "duration": "8089ms",
+  "details": {
+    "displayed_message": "No products found\n\nTry another search term or clear your filters.\n\nClear All Filters",
+    "clear_filters_offered": true
+  }
+}

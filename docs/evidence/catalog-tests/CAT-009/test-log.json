@@ -1,0 +1,24 @@
+{
+  "test_id": "CAT-009",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:35:05.950Z",
+  "duration": "8434ms",
+  "details": {
+    "seller_a": "seth storeeee",
+    "seller_b": "Seed Store cbd72b57",
+    "stores": {
+      "seller_1": {
+        "seller_id": "6adc29d152f78b00f270c180",
+        "store_name": "seth storeeee",
+        "shown": 49,
+        "foreign_items_present": false
+      },
+      "seller_2": {
+        "seller_id": "6afdb4fff53242c804001b95",
+        "store_name": "Seed Store cbd72b57",
+        "shown": 1,
+        "foreign_items_present": false
+      }
+    }
+  }
+}

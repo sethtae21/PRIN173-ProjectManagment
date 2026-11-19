@@ -1,0 +1,13 @@
+{
+  "test_id": "CAT-004",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:24.047Z",
+  "duration": "4452ms",
+  "details": {
+    "item_id": "6af2cb71655abe362412d145",
+    "name": "Navy Formal Blazer",
+    "store": "seth storeeee",
+    "price": "2499.00",
+    "front_and_rear_images": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "test_id": "CAT-007",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:49.108Z",
+  "duration": "12808ms",
+  "details": {
+    "guest_cards": 50,
+    "filter_applied": "category=Dresses, size=S",
+    "read_only_cart_label": "Register to Add to Cart",
+    "store_link_gated": true
+  }
+}

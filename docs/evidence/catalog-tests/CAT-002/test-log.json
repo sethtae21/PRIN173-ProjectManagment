@@ -1,0 +1,21 @@
+{
+  "test_id": "CAT-002",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:11.171Z",
+  "duration": "16417ms",
+  "details": {
+    "category": "tops",
+    "category_count": 13,
+    "size": "S",
+    "size_count": 5,
+    "price_range": {
+      "min": 1000,
+      "max": 2000,
+      "count": 21
+    },
+    "sort_first_low": 599,
+    "sort_first_high": 2499,
+    "invalid_sort_status": 400,
+    "invalid_range_status": 400
+  }
+}

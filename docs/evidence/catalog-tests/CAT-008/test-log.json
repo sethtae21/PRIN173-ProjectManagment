@@ -1,0 +1,12 @@
+{
+  "test_id": "CAT-008",
+  "status": "PASS",
+  "timestamp": "2026-11-19T04:34:57.353Z",
+  "duration": "8119ms",
+  "details": {
+    "upload_ui_controls": 0,
+    "seller_route_redirect": "/shopper/dashboard",
+    "user_upload_status": 403,
+    "anonymous_upload_status": 401
+  }
+}
