@@ -3,9 +3,11 @@ Fitting Studio survey contract tests (SADD FITTING_STUDIO_SURVEYS / FR-7.5).
 
 Covers the audit gaps: guest rejection with no DB write, seller rejection,
 strict star typing, two-phase upsert on one session_id, server-computed
-confidence_gain, the on-account mirror, the fit_rating field rename, the
-removal of the non-baselined user_type field, and explicit rejection of
-legacy like/dislike reaction keys.
+confidence_gain, the DERIVED `latest` (CHANGED — redundancy fix: the
+on-account accounts_user.latest_fitting_studio_survey mirror was removed,
+migration 0013; `latest` is now computed from the survey collection), the
+fit_rating field rename, the removal of the non-baselined user_type field,
+and explicit rejection of legacy like/dislike reaction keys.
 
 GAP 2 additions: the (user, session_id) key is DB-enforced AND declared in
 Meta, a lost create race resolves to the same document, a stale phase
@@ -14,11 +16,13 @@ dedupe helper's call contract (apply=) used by migration 0011 is pinned.
 
 Run: python manage.py test accounts.tests_fitting_studio_survey -v 2
 """
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import FittingStudioSurvey
@@ -52,6 +56,14 @@ class FittingStudioSurveyTests(TestCase):
         # CHANGED (audit fix): the non-baselined user_type column is gone.
         self.assertNotIn('user_type', names)
 
+    def test_user_model_has_no_survey_mirror(self):
+        """REDUNDANCY REGRESSION: the embedded copy on accounts_user is gone
+        (migration 0013). accounts_fittingstudiosurvey is the single source of
+        truth; nothing survey-shaped may live on the User model again."""
+        names = [f.name for f in User._meta.get_fields()]
+        self.assertNotIn('latest_fitting_studio_survey', names)
+        self.assertFalse(hasattr(self.shopper, 'latest_fitting_studio_survey'))
+
     def test_guest_rejected_and_no_row_written(self):
         """Guest survey attempts are rejected and nothing is cached or persisted."""
         from unittest.mock import patch
@@ -60,7 +72,7 @@ class FittingStudioSurveyTests(TestCase):
         with patch.object(cache, 'set') as cache_set, \
              patch.object(cache, 'add') as cache_add:
             res = self._post({'session_id': self.session_id, 'pre_confidence': 4})
-        
+
         self.assertIn(res.status_code, (401, 403))
         self.assertEqual(FittingStudioSurvey.objects.count(), 0)
         # Cache-spy: nothing was ever written for a guest
@@ -96,11 +108,13 @@ class FittingStudioSurveyTests(TestCase):
         self.assertEqual(row.confidence_gain, 2)
         self.assertEqual(row.fit_rating, 5)
 
-        self.shopper.refresh_from_db()
-        mirror = self.shopper.latest_fitting_studio_survey
-        self.assertEqual(mirror['confidence_gain'], 2)
-        self.assertEqual(mirror['fit_rating'], 5)
-        self.assertNotIn('user_type', mirror)
+        # CHANGED (redundancy fix): no on-account mirror anymore — the API's
+        # `latest` is derived from accounts_fittingstudiosurvey.
+        res = self.client.get(URL)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['latest']['confidence_gain'], 2)
+        self.assertEqual(res.data['latest']['fit_rating'], 5)
+        self.assertNotIn('user_type', res.data['latest'])
 
     def test_strict_star_types_rejected(self):
         self.client.force_authenticate(self.shopper)
@@ -142,7 +156,9 @@ class FittingStudioSurveyTests(TestCase):
         self.assertIn('vote', res2.data)
         self.assertEqual(FittingStudioSurvey.objects.count(), 0)
 
-    def test_get_returns_own_rows_and_mirror(self):
+    def test_get_returns_own_rows_and_derived_latest(self):
+        """CHANGED (redundancy fix): renamed from ..._and_mirror. `latest` is
+        derived from the newest stored row, not read from a user-document copy."""
         self.client.force_authenticate(self.shopper)
         self._post({'session_id': self.session_id, 'fit_rating': 4})
         res = self.client.get(URL)
@@ -150,7 +166,39 @@ class FittingStudioSurveyTests(TestCase):
         self.assertEqual(res.data['count'], 1)
         self.assertEqual(res.data['surveys'][0]['fit_rating'], 4)
         self.assertEqual(res.data['latest']['fit_rating'], 4)
+        # `latest` is exactly the newest stored row — same payload, no copy.
+        self.assertEqual(res.data['latest'], res.data['surveys'][0])
         self.assertNotIn('user_type', res.data['surveys'][0])
+
+    def test_latest_is_the_newest_visit_by_submitted_at(self):
+        """NEW (redundancy fix): with multiple visits, `latest` follows the
+        collection's -submitted_at ordering, not a separately stored copy."""
+        self.client.force_authenticate(self.shopper)
+        self._post({'session_id': 'studio-older', 'fit_rating': 2})
+        self._post({'session_id': 'studio-newer', 'fit_rating': 5})
+
+        # Backdate the first visit explicitly so ordering is deterministic
+        # (MongoDB stores datetimes at millisecond precision).
+        older = FittingStudioSurvey.objects.get(session_id='studio-older')
+        older.submitted_at = timezone.now() - timedelta(days=1)
+        older.save(update_fields=['submitted_at'])
+
+        res = self.client.get(URL)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['count'], 2)
+        self.assertEqual(res.data['latest']['session_id'], 'studio-newer')
+        self.assertEqual(res.data['latest']['fit_rating'], 5)
+        self.assertEqual(res.data['latest'], res.data['surveys'][0])
+
+    def test_get_empty_history_returns_null_latest(self):
+        """NEW (redundancy fix): a user with no visits gets latest=None (the
+        old mirror defaulted to an empty dict; the contract was `or None`)."""
+        self.client.force_authenticate(self.shopper)
+        res = self.client.get(URL)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['count'], 0)
+        self.assertIsNone(res.data['latest'])
+        self.assertEqual(res.data['surveys'], [])
 
 
 class SurveyUpsertKeyConcurrencyTests(TestCase):
@@ -242,10 +290,10 @@ class SurveyUpsertKeyConcurrencyTests(TestCase):
         self.assertEqual(row.post_confidence, 4)      # phase 2 applied
         self.assertEqual(row.confidence_gain, 2)      # recomputed from storage
 
-        self.shopper.refresh_from_db()
-        self.assertEqual(
-            self.shopper.latest_fitting_studio_survey['confidence_gain'], 2,
-        )
+        # CHANGED (redundancy fix): assert via the derived `latest` instead of
+        # the removed on-account mirror.
+        res = self.client.get(URL)
+        self.assertEqual(res.data['latest']['confidence_gain'], 2)
 
     def test_confidence_gain_is_server_computed_not_client_supplied(self):
         res = self._post({
