@@ -1,0 +1,80 @@
+{
+  "suite": "accounts,catalog,commerce,outfits,recommendations,ratings",
+  "command": "C:\\Users\\seth\\Documents\\PRIN173-ProjectManagment\\backend\\.venv\\Scripts\\python.exe -m coverage run --source=accounts,catalog,commerce,outfits,recommendations,ratings manage.py test accounts catalog commerce outfits recommendations ratings --noinput --verbosity 1",
+  "total": 284,
+  "passed": 279,
+  "failed": 4,
+  "skipped": 1,
+  "duration_s": 258.925,
+  "coverage_core_pct": 86.3,
+  "coverage_core_modules": [
+    "accounts/serializers/auth_serializers.py",
+    "accounts/serializers/preset_serializers.py",
+    "accounts/validators.py",
+    "accounts/views/auth_views.py",
+    "accounts/views/preset_views.py",
+    "catalog/validators.py",
+    "catalog/views/core.py",
+    "commerce/services.py",
+    "commerce/views.py",
+    "recommendations/scoring.py"
+  ],
+  "coverage_core_per_file": {
+    "accounts/serializers/auth_serializers.py": {
+      "statements": 111,
+      "missing": 3,
+      "covered_pct": 97.29729729729729
+    },
+    "accounts/serializers/preset_serializers.py": {
+      "statements": 50,
+      "missing": 0,
+      "covered_pct": 100.0
+    },
+    "accounts/validators.py": {
+      "statements": 10,
+      "missing": 0,
+      "covered_pct": 100.0
+    },
+    "accounts/views/auth_views.py": {
+      "statements": 159,
+      "missing": 22,
+      "covered_pct": 86.16352201257861
+    },
+    "accounts/views/preset_views.py": {
+      "statements": 17,
+      "missing": 2,
+      "covered_pct": 88.23529411764706
+    },
+    "catalog/validators.py": {
+      "statements": 102,
+      "missing": 1,
+      "covered_pct": 99.01960784313725
+    },
+    "catalog/views/core.py": {
+      "statements": 765,
+      "missing": 137,
+      "covered_pct": 82.09150326797386
+    },
+    "commerce/services.py": {
+      "statements": 7,
+      "missing": 0,
+      "covered_pct": 100.0
+    },
+    "commerce/views.py": {
+      "statements": 179,
+      "missing": 35,
+      "covered_pct": 80.44692737430168
+    },
+    "recommendations/scoring.py": {
+      "statements": 74,
+      "missing": 2,
+      "covered_pct": 97.29729729729729
+    }
+  },
+  "coverage_all_pct": 84.73684210526316,
+  "exit_code": 1,
+  "isolation": "local MongoDB on 127.0.0.1:27018; Atlas/network unused; rembg and GridFS patched in test code",
+  "run_log": "run-log.txt",
+  "coverage_summary": "coverage-summary.txt",
+  "coverage_html": "htmlcov/index.html"
+}

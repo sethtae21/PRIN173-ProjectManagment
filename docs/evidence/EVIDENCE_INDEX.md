@@ -3,6 +3,14 @@
 Commit under test: `6390434` (working tree updated with verification evidence).
 UTC date: `2026-11-18`. All test runs, performance benchmarks, and artifact reviews are reported below. This audit re-verified the 18 non-Done Jira tickets (all In Progress): 2 verified complete (PASS), 2 blocked by unfinished child epics (BLOCKED), 14 need evidence capture (NEEDS-CAPTURE). Evidence artifacts and `JIRA_COMMENT.md`/`GAP_REPORT.md` logs are under `docs/evidence/`.
 
+**2026-11-20 update:** KAN-82 was re-verified with a post-fix packaged run
+(284 tests / 283 passed / 0 failed / 1 skipped, core coverage 86.34%) and three
+green regression gates. DEF-UT-14, DEF-UT-15 and DEF-TE-01 are logged as FIXED
+in `docs/evidence/KAN-82/JIRA_COMMENT.md` and `docs/evidence/unit-tests/DEFECT_RECORD.md`
+(commit `98d988e`). GAP-DUR-01 remains open. Jira credentials
+(`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) are not configured in this
+environment, so the board-ready comment was prepared locally but not posted.
+
 | Ticket | Title | Proof type | Exact test names or file paths | Log/artifact path | Result | Commit | Date | Limitations |
 |---|---|---|---|---|---|---|---|---|
 | KAN-39 | EPIC 1.2 — SYSTEM DESIGN & ARCHITECTURE | EPIC | All child packages verified (KAN-40, KAN-41, KAN-42, KAN-43) | docs/evidence/KAN-39/JIRA_COMMENT.md; docs/System Architecture/FitFusion-SystemArchitecture.drawio.png | PASS | c9ddae7 | 2026-11-18 |  |
@@ -46,7 +54,7 @@ UTC date: `2026-11-18`. All test runs, performance benchmarks, and artifact revi
 | KAN-79 | KAN-77 Weekly sprint reports | ARTIFACT | N/A (manual or artifact evidence; not a backend test). | docs/evidence/KAN-79/weekly-sprint-reports.pdf | PASS | working tree | 2026-11-18 |  |
 | KAN-80 | KAN-77 Bi-weekly adviser review sessions | ARTIFACT / MANUAL | Adviser review notes template | docs/evidence/KAN-80/GAP_REPORT.md | NEEDS-CAPTURE | 6390434 | 2026-11-18 | Signed adviser minutes not captured |
 | KAN-81 | EPIC 1.4 — QUALITY ASSURANCE & TESTING | EPIC | Children KAN-82 (In Progress), KAN-83 (Done), KAN-87 (In Progress) | docs/evidence/KAN-81/GAP_REPORT.md | BLOCKED | 6390434 | 2026-11-18 | Not all child tickets Done |
-| KAN-82 | 1.4.1 Unit & Integration Testing | TEST | `coverage run` over accounts, catalog, commerce, outfits, recommendations, ratings (267 tests, exit 0); core business-logic files 82%-100% (min: catalog/views/core.py 82%); Playwright evidence-screens spec 5 passed | docs/evidence/KAN-82/COVERAGE_SUMMARY.md; docs/evidence/KAN-82/coverage.xml; docs/evidence/KAN-82/20261118T135032Z-six-suites-coverage-final.log; docs/evidence/KAN-82/20261118T140756Z-playwright-evidence-screens.log | PASS | working tree | 2026-11-18 |  |
+| KAN-82 | 1.4.1 Unit & Integration Testing | TEST | Post-fix authoritative run: `coverage run` over accounts, catalog, commerce, outfits, recommendations, ratings (284 tests, 283 passed, 0 failed, 1 skipped, exit 0); core coverage 86.34% (>80% MET); regression gates SEL 19/19 and AV 11/11 PASS. Historical 2026-11-18 run: 267 tests, exit 0, 84%, evidence-screens 5 passed; 2026-11-20 pre-fix run: 4 failures (DEF-UT-14, DEF-UT-15, DEF-TE-01), all fixed in `98d988e`. | docs/evidence/KAN-82/COVERAGE_SUMMARY.md; docs/evidence/KAN-82/coverage.xml; docs/evidence/KAN-82/20261118T135032Z-six-suites-coverage-final.log; docs/evidence/KAN-82/20261118T140756Z-playwright-evidence-screens.log; docs/evidence/KAN-82/JIRA_COMMENT.md; docs/evidence/unit-tests/SUMMARY.md; docs/evidence/unit-tests/run-log.txt; docs/evidence/unit-tests/measurement.json; docs/evidence/unit-tests/DEFECT_RECORD.md; docs/evidence/TRACEABILITY.md; docs/evidence/regression-gates/SUMMARY.md; docs/evidence/regression-gates/SEL-19-pass.log; docs/evidence/regression-gates/AV-11-pass.log | PASS | 98d988e | 2026-11-20 | GAP-DUR-01: duration 277.860 s runner / 290.636 s wall exceeds <2 min target; no threshold relaxed. UAT sign-off/Criteria 9-11 KPI deferred. |
 | KAN-83 | 1.4.2 Validation Algorithm Testing | TEST | `catalog.tests`, `recommendations.tests_weights`, `ratings.tests` (133 tests passed) | docs/evidence/KAN-83/validation-tests.log; docs/evidence/KAN-83/JIRA_COMMENT.md | PASS | c9ddae7 | 2026-11-18 |  |
 | KAN-84 | KAN-83 Happy-path 10-item 60-second performance run with Seth and Carlos | TEST | `measure_api_performance` (20 samples/endpoint against Atlas; all p95 ≤ 500ms) | docs/evidence/KAN-84/api-performance.log; docs/evidence/KAN-84/JIRA_COMMENT.md | PASS | c9ddae7 | 2026-11-18 |  |
 | KAN-86 | KAN-83 Palette-tag population verification | TEST | `catalog.tests.CatalogValidationAndCRUDTests.test_successful_upload_derives_color_palette_tags` | docs/evidence/_runs/20261117T095224Z-catalog.log | PASS | cbb6eab | 2026-11-17 |  |

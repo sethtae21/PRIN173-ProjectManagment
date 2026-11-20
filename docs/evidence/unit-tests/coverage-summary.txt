@@ -1,0 +1,139 @@
+Name                                                                                                         Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------------------------------------------------------------------
+accounts\__init__.py                                                                                             0      0   100%
+accounts\admin.py                                                                                               12      0   100%
+accounts\apps.py                                                                                                15      2    87%   21-22
+accounts\archive.py                                                                                             69      0   100%
+accounts\health_utils.py                                                                                       109     46    58%   46-58, 71, 87, 92-93, 112-124, 150-151, 163-164, 167-171, 177-178, 184-201
+accounts\management\__init__.py                                                                                  0      0   100%
+accounts\management\commands\__init__.py                                                                         0      0   100%
+accounts\management\commands\clean_legacy_survey_fields.py                                                      76     76     0%   30-167
+accounts\management\commands\db_ping.py                                                                         35     35     0%   11-62
+accounts\management\commands\dedupe_fitting_surveys.py                                                          13     13     0%   10-28
+accounts\management\commands\measure_api_performance.py                                                         64     64     0%   1-131
+accounts\management\commands\prune_archived_users.py                                                            38      2    95%   91-94
+accounts\management\commands\pseudonymize_archived_users.py                                                     11      0   100%
+accounts\migrations\0001_initial.py                                                                              6      0   100%
+accounts\migrations\0002_remove_user_body_proportions_remove_user_height_and_more.py                             4      0   100%
+accounts\migrations\0003_archiveduser_user_archived_at_user_status_and_more.py                                   5      0   100%
+accounts\migrations\0004_remove_archiveduser_retention_expires_at.py                                             4      0   100%
+accounts\migrations\0005_user_fitting_studio_surveys.py                                                          4      0   100%
+accounts\migrations\0006_remove_user_fitting_studio_surveys_and_more.py                                          8      0   100%
+accounts\migrations\0007_user_latest_fitting_studio_survey.py                                                    4      0   100%
+accounts\migrations\0008_replace_fit_vote_with_score.py                                                          5      0   100%
+accounts\migrations\0009_fit_rating_and_validators.py                                                            6      0   100%
+accounts\migrations\0010_remove_survey_user_type.py                                                              4      0   100%
+accounts\migrations\0011_unique_fitting_survey_session.py                                                        7      0   100%
+accounts\migrations\0012_pseudonymize_archiveduser.py                                                            9      1    89%   28
+accounts\migrations\0013_remove_user_latest_fitting_studio_survey.py                                             4      0   100%
+accounts\migrations\__init__.py                                                                                  0      0   100%
+accounts\models\__init__.py                                                                                      4      0   100%
+accounts\models\archived_user.py                                                                                47      0   100%
+accounts\models\user.py                                                                                         85      7    92%   12, 14, 28, 114, 117, 120, 198
+accounts\permissions.py                                                                                          4      0   100%
+accounts\pseudonymization.py                                                                                    46      2    96%   81, 111
+accounts\serializers\__init__.py                                                                                 4      0   100%
+accounts\serializers\auth_serializers.py                                                                       111      3    97%   75, 83, 191
+accounts\serializers\preset_serializers.py                                                                      50      0   100%
+accounts\serializers\user_serializer.py                                                                         28      1    96%   44
+accounts\storage.py                                                                                             75     13    83%   31, 34, 46-51, 55, 62, 65, 74-75
+accounts\survey_dedupe.py                                                                                       46     19    59%   42, 44, 55, 78-93
+accounts\tests.py                                                                                              377      0   100%
+accounts\tests_archive_retention.py                                                                            388      0   100%
+accounts\tests_fitting_studio_survey.py                                                                        201      0   100%
+accounts\tests_ut14_guardrails.py                                                                               20      0   100%
+accounts\urls.py                                                                                                 9      0   100%
+accounts\utils\__init__.py                                                                                      27     16    41%   23-30, 35-38, 53-56
+accounts\utils\jwt_utils.py                                                                                     22     22     0%   1-36
+accounts\utils\validators.py                                                                                    20     20     0%   1-56
+accounts\validators.py                                                                                          10      0   100%
+accounts\views\__init__.py                                                                                       5      0   100%
+accounts\views\auth_views.py                                                                                   159     22    86%   41, 47-54, 79-82, 116-117, 174-175, 209-210, 233-234, 286-287
+accounts\views\core.py                                                                                         126     10    92%   60-61, 123, 130, 136-137, 207, 209, 279, 281
+accounts\views\health.py                                                                                        23     15    35%   25-27, 32-65
+accounts\views\preset_views.py                                                                                  17      2    88%   44-45
+catalog\__init__.py                                                                                              0      0   100%
+catalog\admin.py                                                                                                24      3    88%   15, 20, 32
+catalog\apps.py                                                                                                  4      0   100%
+catalog\color_palette_config.py                                                                                  9      1    89%   81
+catalog\color_rules.py                                                                                          48      7    85%   73, 102, 113-114, 143-144, 157
+catalog\management\__init__.py                                                                                   0      0   100%
+catalog\management\commands\__init__.py                                                                          0      0   100%
+catalog\management\commands\backup_gridfs_orphans.py                                                            91      9    90%   69, 73, 98-99, 129, 139-141, 173-174
+catalog\management\commands\measure_gridfs_stability.py                                                        118    118     0%   37-232
+catalog\management\commands\measure_upload.py                                                                  107    107     0%   20-286
+catalog\management\commands\sweep_orphan_gridfs.py                                                              61      3    95%   158-163
+catalog\migrations\0001_initial.py                                                                               9      0   100%
+catalog\migrations\0002_catalogitem_size_max_cm_catalogitem_size_min_cm.py                                       4      0   100%
+catalog\migrations\0003_remove_catalogitem_size_max_cm_and_more.py                                               4      0   100%
+catalog\migrations\0004_remove_catalogitem_side_image.py                                                         4      0   100%
+catalog\migrations\0005_alter_catalogitem_category.py                                                            4      0   100%
+catalog\migrations\0006_remove_catalogitem_occasion_tags.py                                                      4      0   100%
+catalog\migrations\__init__.py                                                                                   0      0   100%
+catalog\models.py                                                                                               60      3    95%   34-35, 82
+catalog\serializers.py                                                                                          39      0   100%
+catalog\storage.py                                                                                               2      0   100%
+catalog\tests.py                                                                                               943      6    99%   57, 101, 122, 144, 249, 253
+catalog\tests_ut_cases.py                                                                                       92      0   100%
+catalog\urls.py                                                                                                  7      0   100%
+catalog\validators.py                                                                                          102      1    99%   112
+catalog\views\__init__.py                                                                                        3      0   100%
+catalog\views\core.py                                                                                          770    137    82%   69-73, 80-81, 91, 104-120, 195-197, 201, 221, 223, 227, 231-232, 242-243, 247, 252, 256, 260, 263, 270-271, 286-287, 299, 306, 311, 319, 322-323, 330-331, 354-356, 384, 426-427, 446, 450-452, 464-465, 471-472, 480, 484, 496-497, 522, 529, 537-538, 540-542, 564-571, 591, 595-596, 616-617, 619, 637-639, 642, 647-649, 658, 670-671, 692, 729, 731, 749, 754, 804, 807, 830, 839-840, 842, 844, 857, 869, 882, 889-891, 909-910, 922, 925-929, 934-935, 954, 998, 1002, 1054, 1107-1109
+catalog\views\page_views.py                                                                                     32     20    38%   27, 33, 45-66
+commerce\__init__.py                                                                                             0      0   100%
+commerce\admin.py                                                                                               30      2    93%   13, 34
+commerce\apps.py                                                                                                 4      0   100%
+commerce\migrations\0001_initial.py                                                                              8      0   100%
+commerce\migrations\0002_order_contact_number_order_recipient_name_and_more.py                                   4      0   100%
+commerce\migrations\0003_order_recipient_email.py                                                                4      0   100%
+commerce\migrations\0004_order_order_number.py                                                                   5      0   100%
+commerce\migrations\0005_order_user_nullable.py                                                                  5      0   100%
+commerce\migrations\0006_cartitem_catalog_item_id_cartitem_item_name_and_more.py                                 5      0   100%
+commerce\migrations\0007_remove_order_shipping_fee.py                                                            4      0   100%
+commerce\migrations\__init__.py                                                                                  0      0   100%
+commerce\models.py                                                                                              68      5    93%   32, 51, 86, 91, 108
+commerce\serializers.py                                                                                        129     23    82%   15, 18-21, 27-28, 35-44, 118, 138-139, 141, 208, 213
+commerce\services.py                                                                                             7      0   100%
+commerce\tests.py                                                                                              136      0   100%
+commerce\urls.py                                                                                                 7      0   100%
+commerce\views.py                                                                                              179     35    80%   40-46, 51-57, 78-80, 108-109, 132, 138, 146, 229, 241, 259-286, 298, 356-358, 398-418
+outfits\__init__.py                                                                                              0      0   100%
+outfits\admin.py                                                                                                19      1    95%   24
+outfits\apps.py                                                                                                  4      0   100%
+outfits\migrations\0001_initial.py                                                                               8      0   100%
+outfits\migrations\0002_outfit_avatar_cup_size_outfit_avatar_gender_and_more.py                                  5      0   100%
+outfits\migrations\0003_avatarpreset_body_build_cm_avatarpreset_style_focus_and_more.py                          4      0   100%
+outfits\migrations\__init__.py                                                                                   0      0   100%
+outfits\models.py                                                                                               56      2    96%   45, 80
+outfits\serializers.py                                                                                         132     35    73%   78-79, 117, 133-146, 224-225, 229, 234-258, 273, 289
+outfits\tests.py                                                                                                96      0   100%
+outfits\urls.py                                                                                                  5      0   100%
+outfits\views.py                                                                                                11      0   100%
+ratings\__init__.py                                                                                              0      0   100%
+ratings\admin.py                                                                                                 7      0   100%
+ratings\migrations\0001_initial.py                                                                               9      0   100%
+ratings\migrations\0002_alter_rating_unique_together_rating_source_and_more.py                                   5      0   100%
+ratings\migrations\0003_uatsession_uatresponse.py                                                                8      0   100%
+ratings\migrations\0004_rename_uat_response_session_product_idx_uat_respons_session_a26510_idx_and_more.py       5      0   100%
+ratings\migrations\0005_star_only_ratings.py                                                                    10      1    90%   26
+ratings\migrations\__init__.py                                                                                   0      0   100%
+ratings\models.py                                                                                               56      3    95%   71, 96, 121
+ratings\serializers.py                                                                                          42      0   100%
+ratings\tests.py                                                                                               229      0   100%
+ratings\tests_uat_charter.py                                                                                   263      0   100%
+ratings\uat_kpis.py                                                                                            190    119    37%   130, 138, 144-152, 162-169, 175, 186-187, 191-192, 215-246, 254-264, 270-286, 301-315, 325-331, 337-344, 373-461, 468-480, 497, 499, 504-509
+ratings\urls.py                                                                                                  3      0   100%
+ratings\views.py                                                                                               185     66    64%   42, 51-52, 102, 145, 150, 191, 194, 196, 237-244, 278, 280, 320-377, 389-405
+recommendations\__init__.py                                                                                      0      0   100%
+recommendations\admin.py                                                                                         1      0   100%
+recommendations\apps.py                                                                                          3      0   100%
+recommendations\knowledge_table.py                                                                              79     20    75%   79-80, 152, 183, 193, 198-207, 218-220, 244, 254
+recommendations\migrations\__init__.py                                                                           0      0   100%
+recommendations\models.py                                                                                        1      0   100%
+recommendations\scoring.py                                                                                      74      2    97%   79, 112
+recommendations\tests.py                                                                                       261      0   100%
+recommendations\tests_weights.py                                                                               192     17    91%   63, 75-77, 88-90, 101, 109-111, 260, 280-285
+recommendations\urls.py                                                                                          4      0   100%
+recommendations\views.py                                                                                        90     17    81%   41, 48-51, 76, 84, 114-115, 207-228
+------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                                                                                         7609   1154    85%

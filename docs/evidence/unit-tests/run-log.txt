@@ -1,0 +1,226 @@
+Creating test database for alias 'default'...
+Found 284 test(s).
+
+============================================================
+FITFUSION AI SERVER IS RUNNING!
+============================================================
+Available Test Links:
+1. Test Upload Page:       http://127.0.0.1:8000/test-upload/
+2. Django Admin:           http://127.0.0.1:8000/admin/
+3. Download CSV Template:  http://127.0.0.1:8000/catalog/download-template/
+4. Public Catalog API:     http://127.0.0.1:8000/catalog/
+5. Swagger API Docs:       http://127.0.0.1:8000/api/docs/
+============================================================
+
+System check identified no issues (0 silenced).
+[IDENTITY] DELETE /profile/ -> token owner=acct@test.com role=shopper id=6affe0fa91a6447939e81c54 | HTTP 204
+[IDENTITY] LOGIN /auth/login/ -> HTTP 400 submitted=acct@test.com issued=<no token>
+..[IDENTITY] POST /auth/change-password/ -> token owner=acct@test.com role=shopper id=6affe0fc91a6447939e81c80 | HTTP 200
+[IDENTITY] LOGIN /auth/login/ -> HTTP 200 submitted=acct@test.com issued=acct@test.com
+.[IDENTITY] POST /auth/change-password/ -> token owner=acct@test.com role=shopper id=6affe0ff91a6447939e81c94 | HTTP 400
+.[IDENTITY] GET /profile/ -> token owner=acct@test.com role=shopper id=6affe10191a6447939e81ca8 | HTTP 200
+.[IDENTITY] PATCH /profile/ -> token owner=acct@test.com role=shopper id=6affe10291a6447939e81cbc | HTTP 200
+.[IDENTITY] PATCH /profile/ -> token owner=acct@test.com role=shopper id=6affe10391a6447939e81cd0 | HTTP 200
+.[IDENTITY] GET /profile/ -> token owner=acct@test.com role=shopper id=6affe10391a6447939e81ce4 | HTTP 200
+..........[IDENTITY] POST /auth/logout/ -> token owner=coverage@test.com role=user id=6affe10b91a6447939e81daf | HTTP 200
+[IDENTITY-AUDIT] Test traffic detected (force_authenticate, no /auth/login/): SWAP SUSPECT banners suppressed — they would be false positives. Per-token [IDENTITY] lines remain.
+[IDENTITY] POST /auth/logout/ -> token owner=coverage@test.com role=user id=6affe10b91a6447939e81daf | HTTP 200
+[IDENTITY] POST /auth/deactivate/ -> token owner=coverage@test.com role=user id=6affe10b91a6447939e81daf | HTTP 200
+.[IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6affe10c91a6447939e81dc3 | HTTP 201
+..[IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6affe10f91a6447939e81dee | HTTP 201
+[IDENTITY] GET /presets/ -> token owner=other@test.com role=shopper id=6affe11091a6447939e81def | HTTP 200
+.[IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6affe11091a6447939e81e04 | HTTP 400
+.[IDENTITY] POST /presets/ -> token owner=preset@test.com role=shopper id=6affe11291a6447939e81e19 | HTTP 201
+[IDENTITY] PATCH /presets/6affe11391a6447939e81e1b/ -> token owner=other@test.com role=shopper id=6affe11391a6447939e81e1a | HTTP 404
+[IDENTITY] DELETE /presets/6affe11391a6447939e81e1b/ -> token owner=other@test.com role=shopper id=6affe11391a6447939e81e1a | HTTP 404
+.[IDENTITY] POST /auth/change-password/ -> token owner=password-seller@test.com role=seller id=6affe11491a6447939e81e2f | HTTP 200
+.[IDENTITY] POST /auth/change-password/ -> token owner=password-shopper@test.com role=shopper id=6affe11691a6447939e81e43 | HTTP 200
+.[IDENTITY-AUDIT] logging error: You cannot access body after reading from request's data stream
+[IDENTITY-AUDIT] logging error: You cannot access body after reading from request's data stream
+...........................[IDENTITY] LOGIN /auth/login/ -> HTTP 400 submitted=erase@test.com issued=<no token>
+......[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13591a6447939e8212b | HTTP 400
+.[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13691a6447939e82140 | HTTP 200
+.[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13791a6447939e82155 | HTTP 201
+[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13791a6447939e82155 | HTTP 200
+..[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13a91a6447939e82180 | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13a91a6447939e82180 | HTTP 201
+[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13a91a6447939e82180 | HTTP 200
+.[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13b91a6447939e82197 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13b91a6447939e82197 | HTTP 400
+..[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_seller@test.com role=seller id=6affe13e91a6447939e821c2 | HTTP 403
+.[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13f91a6447939e821d6 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13f91a6447939e821d6 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13f91a6447939e821d6 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13f91a6447939e821d6 | HTTP 400
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe13f91a6447939e821d6 | HTTP 400
+.[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe14091a6447939e821eb | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe14091a6447939e821eb | HTTP 200
+[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=survey_shopper@test.com role=shopper id=6affe14091a6447939e821eb | HTTP 200
+......[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14491a6447939e82267 | HTTP 201
+..[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14791a6447939e82294 | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14791a6447939e82294 | HTTP 200
+...[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14b91a6447939e822d6 | HTTP 201
+[IDENTITY] POST /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14b91a6447939e822d6 | HTTP 200
+[IDENTITY] GET /profile/fitting-studio-survey/ -> token owner=race_shopper@test.com role=shopper id=6affe14b91a6447939e822d6 | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6affe14c91a6447939e822ec | HTTP 202
+.[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6affe14e91a6447939e82306 | HTTP 202
+.GridFS delete: file '6affe14f91a6447939e82324' not found.
+GridFS delete: file '6affe14f91a6447939e82323' not found.
+[IDENTITY] POST /catalog/upload/ -> token owner=batch-seller@test.com role=seller id=6affe14f91a6447939e82320 | HTTP 202
+.[IDENTITY] DELETE /catalog/my-listings/6affe15191a6447939e8233d/ -> token owner=del-seller@test.com role=seller id=6affe15091a6447939e8233a | HTTP 404
+.[IDENTITY] DELETE /catalog/my-listings/6affe15391a6447939e82354/ -> token owner=del-seller@test.com role=seller id=6affe15291a6447939e82352 | HTTP 204
+...........GridFS delete: file '6affe15d91a6447939e82457' not found.
+GridFS delete: file '6affe15d91a6447939e82456' not found.
+[IDENTITY] PATCH /catalog/my-listings/6affe15d91a6447939e82454/ -> token owner=seller@test.com role=seller id=6affe15c91a6447939e82452 | HTTP 200
+.[IDENTITY] PATCH /catalog/my-listings/6affe15e91a6447939e8246f/ -> token owner=seller@test.com role=seller id=6affe15e91a6447939e8246d | HTTP 200
+.[IDENTITY] DELETE /catalog/my-listings/6affe16091a6447939e82488/ -> token owner=seller@test.com role=seller id=6affe15f91a6447939e82486 | HTTP 503
+.[IDENTITY] DELETE /catalog/my-listings/6affe16191a6447939e824a0/ -> token owner=seller@test.com role=seller id=6affe16191a6447939e8249e | HTTP 204
+.[IDENTITY] DELETE /catalog/my-listings/6affe16391a6447939e824b6/ -> token owner=seller@test.com role=seller id=6affe16291a6447939e824b4 | HTTP 204
+.[IDENTITY] DELETE /catalog/my-listings/6affe16591a6447939e824ce/ -> token owner=seller@test.com role=seller id=6affe16491a6447939e824cc | HTTP 204
+...[IDENTITY] PATCH /catalog/my-listings/6affe16991a6447939e82510/ -> token owner=seller@test.com role=seller id=6affe16991a6447939e8250e | HTTP 200
+..[IDENTITY] PATCH /catalog/my-listings/6affe16c91a6447939e8253b/ -> token owner=seller@test.com role=seller id=6affe16b91a6447939e82539 | HTTP 200
+.[IDENTITY] PATCH /catalog/my-listings/6affe16d91a6447939e82556/ -> token owner=seller@test.com role=seller id=6affe16d91a6447939e82554 | HTTP 503
+.[IDENTITY] PATCH /catalog/my-listings/6affe16e91a6447939e8256f/ -> token owner=seller@test.com role=seller id=6affe16e91a6447939e8256d | HTTP 503
+........[IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6affe17991a6447939e8262c | HTTP 403
+.[IDENTITY] PATCH /catalog/my-listings/6affe17b91a6447939e82642/ -> token owner=seller@test.com role=seller id=6affe17a91a6447939e82640 | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe17b91a6447939e82656 | HTTP 400
+..[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe17e91a6447939e82680 | HTTP 400
+.[IDENTITY] PATCH /catalog/my-listings/6affe18091a6447939e82697/ -> token owner=seller@test.com role=seller id=6affe18091a6447939e82695 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe18091a6447939e82697/ -> token owner=seller@test.com role=seller id=6affe18091a6447939e82695 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe18091a6447939e82697/ -> token owner=seller@test.com role=seller id=6affe18091a6447939e82695 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6affe18091a6447939e82697/ -> token owner=seller@test.com role=seller id=6affe18091a6447939e82695 | HTTP 204
+.[IDENTITY] PATCH /catalog/my-listings/6affe18291a6447939e826b8/ -> token owner=seller@test.com role=seller id=6affe18191a6447939e826b6 | HTTP 503
+.[IDENTITY] PATCH /catalog/my-listings/6affe18391a6447939e826d0/ -> token owner=seller@test.com role=seller id=6affe18291a6447939e826ce | HTTP 200
+.[IDENTITY] GET /catalog/my-listings/6affe18591a6447939e826eb/ -> token owner=seller@test.com role=seller id=6affe18491a6447939e826e9 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe18591a6447939e826eb/ -> token owner=seller@test.com role=seller id=6affe18491a6447939e826e9 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6affe18591a6447939e826eb/ -> token owner=seller@test.com role=seller id=6affe18491a6447939e826e9 | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6affe18591a6447939e826eb/ -> token owner=seller@test.com role=seller id=6affe18491a6447939e826e9 | HTTP 404
+.[IDENTITY] PATCH /catalog/my-listings/6affe18691a6447939e82701/ -> token owner=seller@test.com role=seller id=6affe18591a6447939e826ff | HTTP 200
+.[IDENTITY] GET /catalog/my-listings/6affe18891a6447939e8271c/ -> token owner=seller@test.com role=seller id=6affe18791a6447939e82719 | HTTP 404
+.[IDENTITY] PATCH /catalog/my-listings/6affe18991a6447939e82732/ -> token owner=seller@test.com role=seller id=6affe18991a6447939e82730 | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe18a91a6447939e8274a | HTTP 202
+.[IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6affe18c91a6447939e82765 | HTTP 200
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe18c91a6447939e82765 | HTTP 202
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe18e91a6447939e8277c | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6affe18e91a6447939e8277c | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe18f91a6447939e82793 | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6affe18f91a6447939e82793 | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=ut-seller@test.com role=seller id=6affe19191a6447939e827aa | HTTP 202
+.[IDENTITY] PATCH /catalog/my-listings/6affe19391a6447939e827ca/ -> token owner=ut13-seller@test.com role=seller id=6affe19391a6447939e827c9 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6affe19391a6447939e827ca/ -> token owner=ut13-seller@test.com role=seller id=6affe19391a6447939e827c9 | HTTP 204
+..[IDENTITY] POST /catalog/upload/ -> token owner=ut-seller@test.com role=seller id=6affe19491a6447939e827f7 | HTTP 400
+.[IDENTITY] GET /cart/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+[IDENTITY] PATCH /cart/update_quantity/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+[IDENTITY] POST /cart/remove_item/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+[IDENTITY] POST /cart/add_item/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+[IDENTITY] DELETE /cart/clear/ -> token owner=shopper@example.com role=shopper id=6affe19591a6447939e8280b | HTTP 200
+.[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19691a6447939e82824 | HTTP 201
+.[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19891a6447939e8283e | HTTP 201
+[IDENTITY] GET /orders/ -> token owner=shopper@example.com role=shopper id=6affe19891a6447939e8283e | HTTP 200
+[IDENTITY] GET /orders/6affe19891a6447939e82843/ -> token owner=shopper@example.com role=shopper id=6affe19891a6447939e8283e | HTTP 200
+.[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19991a6447939e82858 | HTTP 402
+.[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19a91a6447939e82870 | HTTP 201
+.[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19b91a6447939e8288c | HTTP 400
+..[IDENTITY] POST /checkout/ -> token owner=shopper@example.com role=shopper id=6affe19e91a6447939e828b9 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=shopper@example.com role=shopper id=6affe19e91a6447939e828b9 | HTTP 201
+.[IDENTITY] POST /cart/remove_selected/ -> token owner=shopper@example.com role=shopper id=6affe19f91a6447939e828d4 | HTTP 200
+.[IDENTITY] GET /orders/6affe1a191a6447939e828f3/ -> token owner=shopper@example.com role=shopper id=6affe1a091a6447939e828f0 | HTTP 404
+[IDENTITY] GET /orders/ -> token owner=shopper@example.com role=shopper id=6affe1a091a6447939e828f0 | HTTP 200
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1a291a6447939e82907 | HTTP 201
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1a391a6447939e82920 | HTTP 400
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1a491a6447939e82937 | HTTP 201
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1a691a6447939e82953 | HTTP 201
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1a791a6447939e82969 | HTTP 201
+[IDENTITY] DELETE /outfits/6affe1a891a6447939e8296d/ -> token owner=alice@t.com role=shopper id=6affe1a791a6447939e82969 | HTTP 204
+[IDENTITY] GET /outfits/6affe1a891a6447939e8296d/ -> token owner=alice@t.com role=shopper id=6affe1a791a6447939e82969 | HTTP 404
+..[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1aa91a6447939e82997 | HTTP 201
+[IDENTITY] PATCH /outfits/6affe1aa91a6447939e8299d/ -> token owner=alice@t.com role=shopper id=6affe1aa91a6447939e82997 | HTTP 200
+[IDENTITY] PATCH /outfits/6affe1aa91a6447939e8299d/ -> token owner=alice@t.com role=shopper id=6affe1aa91a6447939e82997 | HTTP 200
+[IDENTITY] PATCH /outfits/6affe1aa91a6447939e8299d/ -> token owner=alice@t.com role=shopper id=6affe1aa91a6447939e82997 | HTTP 400
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1ab91a6447939e829b5 | HTTP 201
+[IDENTITY] GET /outfits/ -> token owner=bob@t.com role=shopper id=6affe1ac91a6447939e829b6 | HTTP 200
+[IDENTITY] GET /outfits/6affe1ac91a6447939e829b9/ -> token owner=bob@t.com role=shopper id=6affe1ac91a6447939e829b6 | HTTP 404
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1ac91a6447939e829ce | HTTP 201
+[IDENTITY] GET /outfits/6affe1ad91a6447939e829d2/ -> token owner=alice@t.com role=shopper id=6affe1ac91a6447939e829ce | HTTP 200
+.[IDENTITY] POST /outfits/ -> token owner=alice@t.com role=shopper id=6affe1ae91a6447939e829e7 | HTTP 201
+[IDENTITY] PATCH /outfits/6affe1ae91a6447939e829ed/ -> token owner=alice@t.com role=shopper id=6affe1ae91a6447939e829e7 | HTTP 200
+....[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+[IDENTITY] PATCH /catalog/my-listings/6affe1b391a6447939e82a44/ -> token owner=seller@test.com role=seller id=6affe1b391a6447939e82a42 | HTTP 400
+..[IDENTITY] POST /catalog/upload/ -> token owner=user@test.com role=user id=6affe1b691a6447939e82a70 | HTTP 403
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1b791a6447939e82a84 | HTTP 400
+..[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1b991a6447939e82aae | HTTP 400
+.[IDENTITY] GET /catalog/my-listings/6affe1bb91a6447939e82ac5/ -> token owner=seller@test.com role=seller id=6affe1ba91a6447939e82ac3 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1bb91a6447939e82ac5/ -> token owner=seller@test.com role=seller id=6affe1ba91a6447939e82ac3 | HTTP 200
+[IDENTITY] DELETE /catalog/my-listings/6affe1bb91a6447939e82ac5/ -> token owner=seller@test.com role=seller id=6affe1ba91a6447939e82ac3 | HTTP 204
+[IDENTITY] GET /catalog/my-listings/6affe1bb91a6447939e82ac5/ -> token owner=seller@test.com role=seller id=6affe1ba91a6447939e82ac3 | HTTP 404
+.[IDENTITY] PATCH /catalog/my-listings/6affe1bc91a6447939e82adb/ -> token owner=seller@test.com role=seller id=6affe1bc91a6447939e82ad9 | HTTP 200
+[IDENTITY] PATCH /catalog/my-listings/6affe1bc91a6447939e82adb/ -> token owner=seller@test.com role=seller id=6affe1bc91a6447939e82ad9 | HTTP 200
+.[IDENTITY] GET /catalog/my-listings/6affe1be91a6447939e82afa/ -> token owner=seller@test.com role=seller id=6affe1bd91a6447939e82af7 | HTTP 404
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1bf91a6447939e82b0e | HTTP 202
+.[IDENTITY] GET /catalog/download-template/ -> token owner=seller@test.com role=seller id=6affe1c191a6447939e82b2d | HTTP 200
+[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1c191a6447939e82b2d | HTTP 202
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1c291a6447939e82b44 | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6affe1c291a6447939e82b44 | HTTP 200
+.[IDENTITY] POST /catalog/upload/ -> token owner=seller@test.com role=seller id=6affe1c491a6447939e82b5b | HTTP 202
+[IDENTITY] GET /catalog/batch-report/ -> token owner=seller@test.com role=seller id=6affe1c491a6447939e82b5b | HTTP 200
+.......[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1c791a6447939e82be8 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1c991a6447939e82bfe | HTTP 400
+...[IDENTITY] GET /ratings/mine/ -> token owner=rater@test.com role=shopper id=6affe1cf91a6447939e82c40 | HTTP 200
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1d091a6447939e82c58 | HTTP 400
+..[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1d491a6447939e82c84 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1d691a6447939e82c9a | HTTP 201
+[IDENTITY] PATCH /ratings/6affe1d791a6447939e82c9d/ -> token owner=other@test.com role=shopper id=6affe1d791a6447939e82c9b | HTTP 404
+[IDENTITY] DELETE /ratings/6affe1d791a6447939e82c9d/ -> token owner=other@test.com role=shopper id=6affe1d791a6447939e82c9b | HTTP 404
+[IDENTITY] DELETE /ratings/6affe1d791a6447939e82c9d/ -> token owner=rater@test.com role=shopper id=6affe1d691a6447939e82c9a | HTTP 204
+..[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1da91a6447939e82cc7 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1da91a6447939e82cc7 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1dc91a6447939e82cdd | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1dd91a6447939e82cf3 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1df91a6447939e82d09 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1e191a6447939e82d1f | HTTP 201
+[IDENTITY] DELETE /ratings/6affe1e291a6447939e82d22/ -> token owner=seller@test.com role=seller id=6affe1e291a6447939e82d21 | HTTP 403
+.[IDENTITY] POST /ratings/ -> token owner=seller@test.com role=seller id=6affe1e491a6447939e82d38 | HTTP 403
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1e491a6447939e82d4c | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1e491a6447939e82d4c | HTTP 201
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1e691a6447939e82d64 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1e891a6447939e82d7a | HTTP 201
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ea91a6447939e82d91 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6affe1ea91a6447939e82d91 | HTTP 200
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ec91a6447939e82da8 | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ec91a6447939e82da8 | HTTP 201
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6affe1ec91a6447939e82da8 | HTTP 200
+[IDENTITY] GET /ratings/summary/ -> token owner=rater@test.com role=shopper id=6affe1ec91a6447939e82da8 | HTTP 200
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ee91a6447939e82dc0 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ee91a6447939e82dc0 | HTTP 400
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1ee91a6447939e82dc0 | HTTP 400
+..[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1f291a6447939e82dec | HTTP 201
+[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1f291a6447939e82dec | HTTP 200
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1f391a6447939e82e03 | HTTP 400
+.[IDENTITY] POST /ratings/ -> token owner=rater@test.com role=shopper id=6affe1f591a6447939e82e19 | HTTP 400
+.[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-shopper@test.com role=shopper id=6affe1f791a6447939e82e2f | HTTP 201
+[IDENTITY] POST /ratings/uat/response/ -> token owner=uat-seller@test.com role=seller id=6affe1f891a6447939e82e30 | HTTP 403
+.[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-seller@test.com role=seller id=6affe1f991a6447939e82e46 | HTTP 403
+.[IDENTITY] POST /ratings/uat/session/ -> token owner=uat-shopper@test.com role=shopper id=6affe1fa91a6447939e82e5a | HTTP 201
+.......................scanned=1 pseudonymized=1 already_clean=0
+scanned=1 pseudonymized=0 already_clean=1
+[dry-run] scanned=1 pseudonymized=1 already_clean=0
+[IDENTITY] LOGIN /auth/login/ -> HTTP 400 submitted=erase@test.com issued=<no token>
+....................................................s....
+----------------------------------------------------------------------
+Ran 284 tests in 277.860s
+
+OK (skipped=1)
+Destroying test database for alias 'default'...
