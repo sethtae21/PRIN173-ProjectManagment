@@ -417,7 +417,8 @@ def _commit_item(item_id, **fields):
 
 
 def process_batch_background(batch_id):
-    start_time = time.time()
+    # ADDED (upload timing): perf_counter is monotonic — correct for durations.
+    start_time = time.perf_counter()
     deferred_deletes = []
     try:
         time.sleep(0.5)
@@ -555,17 +556,38 @@ def process_batch_background(batch_id):
             if not _commit_item(item.id, **fields):
                 if not CatalogItem.objects.filter(id=item.id).exists():
                     _discard_written(written, item.id)
+        # ADDED (upload timing): same window measure_upload measures — from
+        # worker entry (including the intentional 0.5 s settle sleep) to the
+        # completed commit. Persisted on the batch for Compass / batch-report.
+        elapsed = round(time.perf_counter() - start_time, 3)
         batch.accepted_count = accepted_count
         batch.rejected_count = rejected_count
         batch.rejection_report = rejection_report
         batch.status = 'completed'
         batch.completed_at = timezone.now()
+        batch.processing_seconds = elapsed
         batch.save()
+        print(
+            f"[UPLOAD-TIMING] batch={batch_id} items={total_items} "
+            f"accepted={accepted_count} rejected={rejected_count} "
+            f"processing={elapsed:.3f}s avg={elapsed / max(total_items, 1):.3f}s/item "
+            f"status=completed"
+        )
     except Exception as e:
+        # ADDED (upload timing): the failure path used to be completely silent.
+        # Record the elapsed time AND log the exception so a failed batch is
+        # attributable (same philosophy as KAN-119: never hide failures).
+        elapsed = round(time.perf_counter() - start_time, 3)
+        logger.exception("Batch %s failed after %.3fs", batch_id, elapsed)
+        print(f"[UPLOAD-TIMING] batch={batch_id} processing={elapsed:.3f}s status=failed error={e}")
         try:
-            batch = UploadBatch.objects.get(id=batch_id)
+            try:
+                batch = UploadBatch.objects.get(id=batch_id)
+            except (UploadBatch.DoesNotExist, ValueError, TypeError):
+                batch = UploadBatch.objects.get(id=ObjectId(batch_id))
             batch.status = 'failed'
             batch.rejection_report = {'error': str(e)}
+            batch.processing_seconds = elapsed
             batch.save()
         except UploadBatch.DoesNotExist:
             pass
@@ -662,7 +684,7 @@ def process_single_item_background(item_id):
                 if not CatalogItem.objects.filter(id=item_id).exists():
                     _discard_written(written_names, item_id)
                     return
-                processed_file = ContentFile(payload, name=f"{item.id}_{field_name}.png")
+                processed_file = ContentFile(payload, name=f"{item_id}_{field_name}.png")
                 img_field.save(processed_file.name, processed_file, save=False)
                 written_names[field_name] = img_field.name
                 if original_name and original_name != img_field.name:
@@ -800,6 +822,9 @@ class CatalogViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['post'], permission_classes=[IsSeller], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def upload(self, request):
+        # ADDED (upload timing): measure the synchronous staging window —
+        # everything the seller waits for before the 202 (parse + GridFS writes).
+        t_request = time.perf_counter()
         if request.user.role != 'seller':
             return Response({'error': 'Only sellers can upload catalog items'}, status=status.HTTP_403_FORBIDDEN)
         csv_file = request.FILES.get('csv_file')
@@ -908,6 +933,16 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     item.save()
             except Exception as e:
                 logger.error(f"Error processing row {row_number}: {e}", exc_info=True)
+        # ADDED (upload timing): persist + log the staging window BEFORE the
+        # worker starts (the worker re-fetches the batch, so it sees this value
+        # and its later full save() preserves it). queryset.update() never
+        # re-inserts — same KAN-119 discipline as _commit_item.
+        staging_seconds = round(time.perf_counter() - t_request, 3)
+        UploadBatch.objects.filter(id=batch.id).update(staging_seconds=staging_seconds)
+        print(
+            f"[UPLOAD-TIMING] batch={batch_id} items={len(rows)} "
+            f"staging={staging_seconds:.3f}s status=accepted(202)"
+        )
         UPLOAD_EXECUTOR.submit(process_batch_background, batch_id)
         return Response({
             'batch_id': batch_id, 'status': 'processing',
@@ -1073,7 +1108,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
                     for field, old_name in old_image_names.items():
                         _purge_gridfs(getattr(updated, field).storage, old_name, item_id=updated.id)
                     return Response(
-                        {'error': 'Revalidation could not be queued. Please try again.'},
+                        {'error': 'Revalidation could not be queued. Please re-submit this listing.'},
                         status=status.HTTP_503_SERVICE_UNAVAILABLE,
                     )
 

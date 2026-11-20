@@ -49,8 +49,11 @@ class UploadBatchSerializer(serializers.ModelSerializer):
         model = UploadBatch
         fields = ['id', 'seller', 'store_name', 'status', 'total_items',
                   'accepted_count', 'rejected_count', 'rejection_report',
-                  'created_at', 'completed_at']
-        read_only_fields = ['seller', 'created_at']
+                  'created_at', 'completed_at',
+                  # ADDED (upload timing): server-measured, read-only evidence.
+                  'staging_seconds', 'processing_seconds']
+        read_only_fields = ['seller', 'created_at',
+                            'staging_seconds', 'processing_seconds']
 
 
 class CSVUploadSerializer(serializers.Serializer):

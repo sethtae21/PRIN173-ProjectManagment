@@ -25,6 +25,13 @@ class UploadBatch(models.Model):
     rejection_report = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # ADDED (upload timing / Criterion 4 evidence): nullable so legacy batches
+    # simply show NULL in Compass / batch-report. staging_seconds = HTTP view
+    # work (CSV parse + GridFS writes of originals, up to the 202).
+    # processing_seconds = background worker window (rembg + validation +
+    # publish) — the SAME window measure_upload has always measured.
+    staging_seconds = models.FloatField(null=True, blank=True)
+    processing_seconds = models.FloatField(null=True, blank=True)
 
     class Meta:
         db_table = 'accounts_uploadbatch'
