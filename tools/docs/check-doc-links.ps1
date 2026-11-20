@@ -9,7 +9,7 @@ $linkCount = 0
 $anchorCount = 0
 $indexSourceExemptionCount = 0
 $allMarkdown = @(Get-ChildItem -LiteralPath $kbRoot -Filter '*.md' -File -Recurse |
-    Where-Object { $_.FullName -notmatch '[\\/]_templates[\\/]' })
+    Where-Object { $_.FullName -notmatch '[\\/]_(templates|generated)[\\/]' })
 $frontMatterByPath = @{}
 $edges = @{}
 $itemCategories = @('api', 'feature', 'formula', 'service', 'test', 'manual-test', 'script', 'tooling')

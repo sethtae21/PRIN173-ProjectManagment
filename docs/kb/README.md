@@ -5,9 +5,9 @@ category: index
 status: draft
 source_of_truth: []
 related: [docs-kb-traceability, docs-kb-assumptions]
-updated: 2026-11-20
-source_sha: 8725ef0334dbf121e134006aeb1b71be813cf347
-source_branch: main
+updated: 2026-11-21
+source_sha: 6a6bbff50666363b3eba5586f6fb75526a9d9d5c
+source_branch: docs/kb-wip
 ---
 
 # FitFusionAI Knowledge Base
@@ -20,7 +20,7 @@ Jump to [Quick Stats](README.md#quick-stats).
 
 | Category | Current item files | Planned baseline |
 | --- | ---: | ---: |
-| APIs | 41 | 73 implemented method files |
+| APIs | 63 | 73 implemented method files |
 | Features | 0 | 27 |
 | Backend logic | 0 | 29 (23 formulas, 6 services) |
 | Tests | 0 | 25 canonical/manual items, plus suite docs identified during reconciliation |
