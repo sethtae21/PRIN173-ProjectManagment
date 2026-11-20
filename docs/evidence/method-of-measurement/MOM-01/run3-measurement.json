@@ -1,0 +1,46 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 1 — API responsiveness (catalog, filtering, recommendation, cart)",
+  "target": "p95 < 500 ms on each endpoint",
+  "unit": "ms",
+  "measured": 472,
+  "pass": true,
+  "sample_count_per_endpoint": 20,
+  "warmup_count_per_endpoint": 5,
+  "endpoints": {
+    "/catalog/": {
+      "samples": 20,
+      "p95_ms": 210,
+      "max_ms": 217
+    },
+    "/api/recommendations/": {
+      "samples": 20,
+      "p95_ms": 242,
+      "max_ms": 261
+    },
+    "/cart/": {
+      "samples": 20,
+      "p95_ms": 472,
+      "max_ms": 563
+    }
+  },
+  "detail": "worst p95 472ms",
+  "isolation_outcome": {
+    "decision": "lean-proxy p95 < 500 ms → prior FAIL was an invalid dev-environment measurement",
+    "measurement_context": "API_BASE_URL=https://localhost:8443 served by node backend/scripts/local_staging_server.mjs (lean TLS staging proxy) after npm run build",
+    "run1_p95_ms": 440,
+    "run2_p95_ms": 3824,
+    "lean_proxy_solo_p95_ms": 441,
+    "lean_proxy_full_suite_p95_ms": 472,
+    "direct_loopback_diagnostic_p95_ms": 437,
+    "vite_dev_proxy_diagnostic_p95_ms": 434,
+    "lean_proxy_diagnostic_p95_ms": 448,
+    "diagnostic_evidence": "docs/evidence/method-of-measurement/MOM-01/diagnostic-paths.json",
+    "history_files": [
+      "run1-measurement.json",
+      "run2-measurement.json"
+    ],
+    "note": "run1 was reconstructed from the captured live-run JSON after run2 overwrote measurement.json; no values were fabricated or smoothed."
+  },
+  "timestamp": "2026-11-20T02:18:52.233Z"
+}

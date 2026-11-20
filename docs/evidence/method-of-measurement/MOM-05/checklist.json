@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-11-20T02:48:12.725Z",
+  "checks": [
+    {
+      "id": "a",
+      "description": "TLS: window.location.protocol === 'https:'",
+      "pass": true,
+      "evidence": {
+        "url": "https://localhost:8443/",
+        "protocol": "https:"
+      }
+    },
+    {
+      "id": "b",
+      "description": "Password hashing: PBKDF2/Argon2id stored, never plaintext",
+      "pass": true,
+      "evidence": {
+        "hash_algorithm": "pbkdf2_sha256",
+        "hash_prefix": "pbkdf2_sha256$12",
+        "hash_length": 89,
+        "plaintext_password_stored": false,
+        "verification_method": "read-only PyMongo projection of accounts_user (AM-011)"
+      }
+    },
+    {
+      "id": "c",
+      "description": "Server-side RBAC: cross-user and guest denials",
+      "pass": true,
+      "evidence": {
+        "cross_user_statuses": {
+          "order": 404,
+          "preset": 404,
+          "outfit": 404
+        },
+        "guest_statuses": {
+          "cart": 401,
+          "orders": 401,
+          "outfits": 401,
+          "presets": 401,
+          "profile": 401,
+          "checkout": 401
+        }
+      }
+    },
+    {
+      "id": "d",
+      "description": "Guest ephemerality: no guest writes after session close",
+      "pass": true,
+      "evidence": {
+        "db_counts_before": {
+          "accounts_user": 367,
+          "accounts_archiveduser": 30,
+          "accounts_avatarpreset": 85,
+          "accounts_outfit": 35,
+          "accounts_cart": 86,
+          "accounts_cartitem": 21,
+          "accounts_order": 47,
+          "accounts_rating": 44,
+          "uat_session": 0,
+          "uat_response": 0
+        },
+        "db_counts_after": {
+          "accounts_user": 367,
+          "accounts_archiveduser": 30,
+          "accounts_avatarpreset": 85,
+          "accounts_outfit": 35,
+          "accounts_cart": 86,
+          "accounts_cartitem": 21,
+          "accounts_order": 47,
+          "accounts_rating": 44,
+          "uat_session": 0,
+          "uat_response": 0
+        },
+        "fresh_avatar_keys": []
+      }
+    },
+    {
+      "id": "e",
+      "description": "No user photo-upload capability for Shopper/Guest",
+      "pass": true,
+      "evidence": {
+        "shopper_file_inputs": 0,
+        "guest_file_inputs": 0,
+        "shopper_upload_status": 403,
+        "guest_upload_status": 401
+      }
+    }
+  ]
+}

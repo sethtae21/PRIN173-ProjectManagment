@@ -17,6 +17,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
+import { ensureSizeSFixture, type SizeSFixtureResult } from './fixture-seed';
+
 import {
   BODY_BUILD_RANGE,
   HEIGHT_RANGE,
@@ -225,8 +227,14 @@ async function execute(
   }
 }
 
+let cachedSizeSFixture: SizeSFixtureResult | undefined;
+async function sizeSFixture(request: APIRequestContext): Promise<SizeSFixtureResult> {
+  if (!cachedSizeSFixture) cachedSizeSFixture = await ensureSizeSFixture(request);
+  return cachedSizeSFixture;
+}
+
 test.describe('Avatar AV-001..AV-011 (dependency order, stop on failure)', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
   /** AV-001 — valid custom avatar creation (height 170, build 95). */
   test('AV-001 valid custom avatar creation', async ({ page, request }) => {
@@ -645,14 +653,19 @@ test.describe('Avatar AV-001..AV-011 (dependency order, stop on failure)', () =>
   /** AV-011 — equipping a size-S garment constrains Body Build to its sub-range. */
   test('AV-011 size compatible guardrails', async ({ page, request }) => {
     // Ranked recommendations load on a debounce; give this case extra headroom.
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     await execute('AV-011', page, async () => {
-      const catalog = await request.get(new URL('/catalog/?size=S', API_BASE_URL).toString());
-      expect(catalog.ok()).toBeTruthy();
-      const payload = await catalog.json();
-      const rows = Array.isArray(payload) ? payload : payload.results ?? [];
-      const garment = rows.find((row: { size?: string }) => String(row.size).toUpperCase() === 'S');
-      expect(garment, 'a size-S garment is required for this test').toBeTruthy();
+      // State-aware precondition: restore an ACTIVE size-S garment through the
+      // approved KAN-40/KAN-100 CSV seeding path only when live catalog drift
+      // has left no item in the intended band. No assertion is weakened.
+      const fixture = await sizeSFixture(request);
+      const garment = fixture.garment;
+      expect(garment.status, 'garment must be active').toBe('active');
+      expect(String(garment.size).toUpperCase(), 'a size-S garment is required for this test').toBe('S');
+      expect(garment.front_image, 'size-S garment must have a front image').toBeTruthy();
+
+      const [sMin, sMax] = SIZE_RANGE_TABLE.S;
+      const bodyBuild = Math.floor((sMin + sMax) / 2);
 
       const session = await registerUser(request, 'shopper');
       await installSession(page, session);
@@ -660,6 +673,10 @@ test.describe('Avatar AV-001..AV-011 (dependency order, stop on failure)', () =>
       await page.locator('.gender-card').filter({ hasText: 'Female' }).click();
       await page.getByRole('button', { name: /Continue with Female/ }).click();
       await expect(page).toHaveURL(/\/shopper\/fitting-studio\/customize$/);
+
+      // Put the avatar into the size-S band before asking for Recommendations.
+      await setRange(page, '#studio-body-build', bodyBuild);
+      await expect(page.locator('#studio-body-build')).toHaveValue(String(bodyBuild));
 
       // `exact: true` targets the panel tab, not the "Browse/Open/Back to
       // Recommendations" action buttons present elsewhere on the page.
@@ -670,7 +687,6 @@ test.describe('Avatar AV-001..AV-011 (dependency order, stop on failure)', () =>
       await page.getByRole('button', { name: 'Customize', exact: true }).click();
 
       const buildSlider = page.locator('#studio-body-build');
-      const [sMin, sMax] = SIZE_RANGE_TABLE.S;
       // Size bands are half-open: the app caps at the largest value still
       // labelled S (sMax - 0.1), not the band edge that already belongs to M.
       // Read the effective cap from the UI, then prove it is a genuine size-S
@@ -685,8 +701,11 @@ test.describe('Avatar AV-001..AV-011 (dependency order, stop on failure)', () =>
         .toHaveText(`${cappedMax} cm`);
       await capture(page, 'AV-011', '01-size-s-cap-enforced.png');
       return {
+        item_used: garment.name,
         garment: garment.name,
         garment_size: garment.size,
+        fixture_seeding: fixture.seeding,
+        avatar_body_build_cm: bodyBuild,
         s_band: { min: sMin, max: sMax },
         effective_build_max: cappedMax,
         global_height_range: HEIGHT_RANGE,

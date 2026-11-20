@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-11-20T03:53:00.027Z",
+  "garment": {
+    "id": "6affc418ee131e9514996f32",
+    "name": "AV Gate S Top 06f34b56",
+    "size": "S",
+    "status": "active"
+  },
+  "seeding_occurred": true,
+  "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+  "reason": "AV-011 requires an active size-S garment",
+  "catalog_before": {
+    "total_active": 2,
+    "active_m_tops": 0,
+    "active_m_bottoms": 0,
+    "active_m_dresses": 0,
+    "active_s_items": 2,
+    "active_s_dresses": 2
+  },
+  "catalog_after": {
+    "total_active": 3,
+    "active_m_tops": 0,
+    "active_m_bottoms": 0,
+    "active_m_dresses": 0,
+    "active_s_items": 3,
+    "active_s_dresses": 2
+  },
+  "seeded_names": [
+    "AV Gate S Top 06f34b56"
+  ],
+  "batch": {
+    "batch_id": "6affc418ee131e9514996f31",
+    "status": "completed",
+    "total_items": 1,
+    "accepted_count": 1,
+    "rejected_count": 0,
+    "elapsed_ms": 2303,
+    "polls": 4,
+    "seller_email": "gate-seed-d05c4b42-5fac-40a0-a14f-57f99688cdfd@example.test",
+    "store_name": "Gate Seed Store d05c4b42"
+  }
+}

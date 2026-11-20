@@ -1,0 +1,39 @@
+{
+  "objective": "OBJ-04",
+  "criterion": "Criterion 7 — Security & Privacy checklist",
+  "target": "100% pass (5/5 items)",
+  "unit": "%",
+  "measured": 100,
+  "pass": true,
+  "checklist_items": 5,
+  "passed_items": 5,
+  "checklist": [
+    {
+      "id": "a",
+      "pass": true,
+      "description": "TLS: window.location.protocol === 'https:'"
+    },
+    {
+      "id": "b",
+      "pass": true,
+      "description": "Password hashing: PBKDF2/Argon2id stored, never plaintext"
+    },
+    {
+      "id": "c",
+      "pass": true,
+      "description": "Server-side RBAC: cross-user and guest denials"
+    },
+    {
+      "id": "d",
+      "pass": true,
+      "description": "Guest ephemerality: no guest writes after session close"
+    },
+    {
+      "id": "e",
+      "pass": true,
+      "description": "No user photo-upload capability for Shopper/Guest"
+    }
+  ],
+  "detail": "5/5 checklist items passed",
+  "timestamp": "2026-11-20T02:44:31.455Z"
+}

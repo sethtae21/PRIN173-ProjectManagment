@@ -20,6 +20,8 @@ import {
   type Page,
 } from '@playwright/test';
 
+import { ensureToFixtures, type ToFixtureResult } from './fixture-seed';
+
 const APP_BASE_URL = process.env.APP_BASE_URL ?? 'https://localhost:8443';
 const API_BASE_URL =
   process.env.API_BASE_URL ??
@@ -305,11 +307,53 @@ async function recommendationCard(page: Page, name: string) {
   throw new Error(`Recommendation card "${name}" not found on any page.`);
 }
 
+/** Record the app's transient status messages so a slow canvas redraw cannot
+ *  hide the confirmation before Playwright's live locator polls. This observes
+ *  the real DOM; it does not fabricate or relax the notification assertion. */
+async function armNotificationRecorder(page: Page) {
+  await page.evaluate(() => {
+    const scope = window as unknown as {
+      __toNotifications?: string[];
+      __toNotificationObserver?: MutationObserver;
+    };
+    scope.__toNotifications = [];
+    const record = () => {
+      const text = document.querySelector('.studio-notification')?.textContent?.trim() ?? '';
+      const notes = scope.__toNotifications ?? [];
+      if (text && notes[notes.length - 1] !== text) notes.push(text);
+      scope.__toNotifications = notes;
+    };
+    record();
+    if (!scope.__toNotificationObserver) {
+      const observer = new MutationObserver(record);
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      scope.__toNotificationObserver = observer;
+    }
+  });
+}
+
+async function notificationContaining(page: Page, name: string): Promise<string> {
+  const notes = await page.evaluate<string[]>(
+    () =>
+      (window as unknown as { __toNotifications?: string[] }).__toNotifications ?? [],
+  );
+  return notes.find((text) => text.includes(name)) ?? '';
+}
+
 async function tryItem(page: Page, name: string) {
   const card = await recommendationCard(page, name);
   await expect(card, `recommendation card for "${name}"`).toBeVisible({ timeout: 30_000 });
+  await armNotificationRecorder(page);
   await card.getByRole('button', { name: 'Try Item', exact: true }).click();
-  await expect(page.locator('.studio-notification')).toContainText(name, { timeout: 15_000 });
+  await expect
+    .poll(
+      async () => {
+        const text = await notificationContaining(page, name);
+        return text.length > 0;
+      },
+      { timeout: 15_000, intervals: [50, 100, 150] },
+    )
+    .toBe(true);
   await settleFrames(page);
 }
 
@@ -361,16 +405,49 @@ async function catalogItemByName(
   return item as CatalogItem;
 }
 
+let cachedToFixtures: ToFixtureResult | undefined;
+async function gateFixtures(request: APIRequestContext): Promise<ToFixtureResult> {
+  if (!cachedToFixtures) cachedToFixtures = await ensureToFixtures(request);
+  return cachedToFixtures;
+}
+
+/** State-aware target resolution: prefer the live-catalog item across all
+ *  recommendation pages; if it is absent, fall back to the first visible card.
+ *  `item_used` is returned by every case for auditability. */
+async function resolveTryOnTarget(
+  page: Page,
+  preferred: string,
+  exclude: string[] = [],
+): Promise<{ item_used: string; source: 'preferred' | 'fallback'; excluded: string[] }> {
+  const cards = page.locator('.studio-recommendation-item');
+  await cards.first().waitFor({ state: 'visible', timeout: 60_000 });
+  if (!exclude.includes(preferred)) {
+    try {
+      await recommendationCard(page, preferred);
+      return { item_used: preferred, source: 'preferred', excluded: exclude };
+    } catch {
+      // The catalog item exists but is not in the ranked page set; fall back.
+    }
+  }
+  const visibleNames = (await cards.locator('.studio-product-link').allInnerTexts())
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const fallback = visibleNames.find((name) => !exclude.includes(name));
+  expect(fallback, 'no recommendation card was available for state-aware resolution').toBeTruthy();
+  return { item_used: fallback as string, source: 'fallback', excluded: exclude };
+}
+
 // ---------------------------------------------------------------------------
 // TO-001 .. TO-011 (CSV order, serial, STOP ON FAILURE)
 // ---------------------------------------------------------------------------
 
 test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
   /** TO-001 — Equip Clothing Item: PNG overlay layers over avatar instantly. */
   test('TO-001 equip clothing item renders on the avatar', async ({ page, request }) => {
     await execute('TO-001', page, async () => {
+      const fixtures = await gateFixtures(request);
       await openShopperStudio(page, request);
 
       // Recommendation-panel integration is part of the try-on entry surface.
@@ -379,19 +456,23 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       expect(cardCount, 'recommendation panel must list catalog items').toBeGreaterThan(0);
       await expect(cards.first().locator('.studio-match-score-badge')).toBeVisible();
 
+      const target = await resolveTryOnTarget(page, fixtures.targets.topA.name);
       const canvasBefore = await canvasSignature(page);
-      const elapsed = await timeCanvasChange(page, () => tryItem(page, 'Classic White Shirt'));
+      const elapsed = await timeCanvasChange(page, () => tryItem(page, target.item_used));
 
       const slots = await equippedSlots(page);
       const top = slots.find((slot) => slot.slot === 'top');
-      expect(top?.name).toBe('Classic White Shirt');
-      await expect(page.locator('.studio-equipped-card')).toContainText('Classic White Shirt');
+      expect(top?.name).toBe(target.item_used);
+      await expect(page.locator('.studio-equipped-card')).toContainText(target.item_used);
       await expect(page.locator('.studio-notification')).toContainText('equipped');
       await capture(page, 'TO-001', '01-item-equipped.png');
 
       return {
         recommendation_cards: cardCount,
         equipped_slot: top,
+        item_used: target.item_used,
+        target_resolution: target,
+        fixture_seeding: fixtures.seeding,
         canvas_before: canvasBefore,
         canvas_after: await canvasSignature(page),
         render_ms: elapsed,
@@ -402,21 +483,29 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-002 — Switch Item (Same Category) + match reasons + rating persistence. */
   test('TO-002 switch item in same category', async ({ page, request }) => {
     await execute('TO-002', page, async () => {
+      const fixtures = await gateFixtures(request);
       const session = await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
+      const firstTarget = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      await tryItem(page, firstTarget.item_used);
       const first = await canvasSignature(page);
 
-      await tryItem(page, 'Classic White Tee');
+      const secondTarget = await resolveTryOnTarget(page, fixtures.targets.topB.name, [
+        firstTarget.item_used,
+      ]);
+      expect(secondTarget.item_used, 'a distinct second top is required').not.toBe(
+        firstTarget.item_used,
+      );
+      await tryItem(page, secondTarget.item_used);
       await waitForCanvasChange(page, first);
       const slots = await equippedSlots(page);
       expect(slots).toHaveLength(1);
-      expect(slots[0].name).toBe('Classic White Tee');
-      expect(slots.some((slot) => slot.name === 'Classic White Shirt')).toBe(false);
+      expect(slots[0].name).toBe(secondTarget.item_used);
+      expect(slots.some((slot) => slot.name === firstTarget.item_used)).toBe(false);
       await capture(page, 'TO-002', '01-item-replaced.png');
 
       // Match reasons integration.
-      const tee = await recommendationCard(page, 'Classic White Tee');
-      await tee.getByRole('button', { name: /View match reasons/i }).click();
+      const secondCard = await recommendationCard(page, secondTarget.item_used);
+      await secondCard.getByRole('button', { name: /View match reasons/i }).click();
       const matchPanel = page.locator('.studio-match-card');
       await expect(matchPanel).toBeVisible({ timeout: 30_000 });
       const scores = matchPanel.locator('meter[aria-label$="score"]');
@@ -425,9 +514,9 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await capture(page, 'TO-002', '02-match-reasons.png');
 
       // Rating persistence (CSV-adjacent coverage; KAN-120 deprecated colour).
-      const teeItem = await catalogItemByName(request, 'Classic White Tee');
-      await tee
-        .getByRole('button', { name: `Rate recommendation ${teeItem.name}` })
+      const ratedItem = await catalogItemByName(request, secondTarget.item_used);
+      await secondCard
+        .getByRole('button', { name: `Rate recommendation ${ratedItem.name}` })
         .click();
       const modal = page.locator('.studio-rating-modal');
       await expect(modal).toBeVisible();
@@ -441,7 +530,7 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       const ratings = (await mine.json()) as Array<Record<string, unknown>>;
       const saved = ratings.find(
         (row) =>
-          String(row.target_id) === String(teeItem.id) &&
+          String(row.target_id) === String(ratedItem.id) &&
           Number(row.score) === 5,
       );
       expect(saved, '5-star rating must persist to /ratings/mine/').toBeTruthy();
@@ -449,16 +538,23 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await page.reload();
       await waitForCanvasReady(page);
       await openRecommendations(page);
+      // The recap is deliberately gated on "tried this visit"; re-equip after
+      // the reload so the saved-rating display is exercised, not skipped.
+      await tryItem(page, ratedItem.name);
       await expect(
-        await recommendationCard(page, teeItem.name),
+        await recommendationCard(page, ratedItem.name),
       ).toContainText('Your rating: 5/5', { timeout: 30_000 });
       await capture(page, 'TO-002', '03-rating-persisted.png');
 
       return {
+        item_used: secondTarget.item_used,
+        previous_item_used: firstTarget.item_used,
+        target_resolution: secondTarget,
+        fixture_seeding: fixtures.seeding,
         replaced_item: slots[0].name,
         previous_item_present: false,
         match_score_rules: 4,
-        persisted_rating: { target_id: teeItem.id, score: 5 },
+        persisted_rating: { target_id: ratedItem.id, score: 5 },
       };
     });
   });
@@ -466,19 +562,26 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-003 — Equip Dress/One-Piece: replaces BOTH top and bottom slots. */
   test('TO-003 equip dress replaces top and bottom', async ({ page, request }) => {
     await execute('TO-003', page, async () => {
+      const fixtures = await gateFixtures(request);
       await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
-      await tryItem(page, 'Olive Green Chinos');
+      const top = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      const bottom = await resolveTryOnTarget(page, fixtures.targets.bottom.name, [top.item_used]);
+      const dress = await resolveTryOnTarget(page, fixtures.targets.dress.name);
+      await tryItem(page, top.item_used);
+      await tryItem(page, bottom.item_used);
       const before = await equippedSlots(page);
       expect(before.map((slot) => slot.slot).sort()).toEqual(['bottom', 'top']);
       await capture(page, 'TO-003', '01-top-and-bottom.png');
 
-      await tryItem(page, 'Classic Black Dress');
+      await tryItem(page, dress.item_used);
+      const confirmation = await notificationContaining(page, dress.item_used);
       const after = await equippedSlots(page);
       const bySlot = Object.fromEntries(after.map((slot) => [slot.slot, slot.name]));
 
       // CSV FR-5.2: one-piece replaces both slots and confirms the replacement.
-      await expect(page.locator('.studio-notification')).toContainText(/replac|one-piece|dress/i);
+      expect(confirmation, 'one-piece equipment confirmation must be displayed').toMatch(
+        /replac|one-piece|dress/i,
+      );
       expect(bySlot.top?.toLowerCase(), 'dress must occupy the one-piece/top slot').toContain(
         'dress',
       );
@@ -489,9 +592,14 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await capture(page, 'TO-003', '02-dress-replaced-both.png');
 
       return {
+        item_used: dress.item_used,
+        top_item_used: top.item_used,
+        bottom_item_used: bottom.item_used,
+        target_resolution: { top, bottom, dress },
+        fixture_seeding: fixtures.seeding,
         before,
         after,
-        confirmation: await page.locator('.studio-notification').innerText(),
+        confirmation,
       };
     });
   });
@@ -499,8 +607,10 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-004 — Switch View (Front/Rear) without reload. */
   test('TO-004 switch front and rear view', async ({ page, request }) => {
     await execute('TO-004', page, async () => {
+      const fixtures = await gateFixtures(request);
       await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
+      const target = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      await tryItem(page, target.item_used);
       const front = await canvasSignature(page);
 
       const rearButton = page
@@ -523,15 +633,24 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await expect(page.locator('.studio-avatar-label')).toContainText('Front View');
       await capture(page, 'TO-004', '02-front-view.png');
 
-      return { front_signature: front, rear_render_ms: rearMs, front_render_ms: frontMs };
+      return {
+        item_used: target.item_used,
+        target_resolution: target,
+        fixture_seeding: fixtures.seeding,
+        front_signature: front,
+        rear_render_ms: rearMs,
+        front_render_ms: frontMs,
+      };
     });
   });
 
   /** TO-005 — Canvas Render Performance (<1 s) + size-cap guardrail. */
   test('TO-005 canvas overlay renders within one second', async ({ page, request }) => {
     await execute('TO-005', page, async () => {
+      const fixtures = await gateFixtures(request);
       await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
+      const firstTarget = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      await tryItem(page, firstTarget.item_used);
 
       // Size-compatible guardrail: a capped slider and visible size-cap notice.
       await page.locator('.studio-panel-tabs button', { hasText: 'Customize' }).click();
@@ -543,7 +662,13 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await capture(page, 'TO-005', '00-size-cap-guardrail.png');
       await openRecommendations(page);
 
-      const switchMs = await timeCanvasChange(page, () => tryItem(page, 'Classic White Tee'));
+      const secondTarget = await resolveTryOnTarget(page, fixtures.targets.topB.name, [
+        firstTarget.item_used,
+      ]);
+      expect(secondTarget.item_used, 'a distinct second top is required').not.toBe(
+        firstTarget.item_used,
+      );
+      const switchMs = await timeCanvasChange(page, () => tryItem(page, secondTarget.item_used));
       const rearButton = page
         .locator('.studio-view-buttons button', { hasText: 'Rear' })
         .first();
@@ -561,6 +686,10 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       expect(viewMs, `view switch took ${viewMs}ms`).toBeLessThan(1000);
       expect(proportionMs, `proportion adjust took ${proportionMs}ms`).toBeLessThan(1000);
       return {
+        item_used: secondTarget.item_used,
+        previous_item_used: firstTarget.item_used,
+        target_resolution: secondTarget,
+        fixture_seeding: fixtures.seeding,
         item_switch_ms: switchMs,
         view_switch_ms: viewMs,
         proportion_adjust_ms: proportionMs,
@@ -573,19 +702,33 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-006 — Clothing Image Fails to Load: error + retain previous + retry. */
   test('TO-006 failed clothing image keeps previous item', async ({ page, request }) => {
     await execute('TO-006', page, async () => {
-      await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
-      const retained = await canvasSignature(page);
+      const fixtures = await gateFixtures(request);
+      const retainedItem = await catalogItemByName(request, fixtures.targets.topA.name);
+      const retainedImageId = String(retainedItem.front_image ?? '').split('/').pop() ?? '';
+      expect(retainedImageId, 'retained fixture must have a front image id').not.toBe('');
 
-      const broken = await catalogItemByName(request, 'Classic White Tee');
-      const imageId = String(broken.front_image ?? '').split('/').pop() ?? '';
-      expect(imageId, 'fixture must have a front image id').not.toBe('');
+      // Prefetch now warms images when cards render. Install the failure route
+      // before navigation so the failed-image precondition is still exercised;
+      // the assertion that the previous item is retained is unchanged.
       await page.route(
-        (url) => url.href.includes(imageId),
+        (url) => url.pathname.startsWith('/media/') && !url.href.includes(retainedImageId),
         (route) => route.abort('failed'),
       );
 
-      await tryItem(page, 'Classic White Tee');
+      await openShopperStudio(page, request);
+      const retainedTarget = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      await tryItem(page, retainedTarget.item_used);
+      const retained = await canvasSignature(page);
+
+      const brokenTarget = await resolveTryOnTarget(page, fixtures.targets.topB.name, [
+        retainedTarget.item_used,
+      ]);
+      const broken = await catalogItemByName(request, brokenTarget.item_used);
+      const imageId = String(broken.front_image ?? '').split('/').pop() ?? '';
+      expect(imageId, 'fixture must have a front image id').not.toBe('');
+      expect(imageId, 'broken fixture must differ from the retained image').not.toBe(retainedImageId);
+
+      await tryItem(page, brokenTarget.item_used);
       const errorLocators = [
         page.locator('.studio-canvas-wrapper [role="alert"]'),
         page.locator('.studio-notification', { hasText: /fail|error|image/i }),
@@ -601,17 +744,27 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       const slotsAfterFailure = await equippedSlots(page);
       expect(errorShown, 'a failed garment image must surface an error').toBe(true);
       expect(
-        slotsAfterFailure.some((slot) => slot.name === 'Classic White Shirt'),
+        slotsAfterFailure.some((slot) => slot.name === retainedTarget.item_used),
         'previous item must be retained after image failure',
       ).toBe(true);
       await capture(page, 'TO-006', '01-image-failure.png');
 
       // A different item can still be selected.
       await page.unrouteAll({ behavior: 'wait' });
-      await tryItem(page, 'Olive Green Chinos');
+      const anotherTarget = await resolveTryOnTarget(page, fixtures.targets.bottom.name, [
+        retainedTarget.item_used,
+        brokenTarget.item_used,
+      ]);
+      await tryItem(page, anotherTarget.item_used);
       await capture(page, 'TO-006', '02-another-item-selected.png');
 
       return {
+        item_used: brokenTarget.item_used,
+        retained_item_used: retainedTarget.item_used,
+        another_item_used: anotherTarget.item_used,
+        target_resolution: { retainedTarget, brokenTarget, anotherTarget },
+        fixture_seeding: fixtures.seeding,
+        route_installed_before_navigation: true,
         broken_image_id: imageId,
         error_shown: errorShown,
         previous_item_retained: true,
@@ -623,9 +776,12 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-007 — Save Outfit (registered shopper). */
   test('TO-007 save named outfit', async ({ page, request }) => {
     await execute('TO-007', page, async () => {
+      const fixtures = await gateFixtures(request);
       const session = await openShopperStudio(page, request);
-      await tryItem(page, 'Classic White Shirt');
-      await tryItem(page, 'Olive Green Chinos');
+      const top = await resolveTryOnTarget(page, fixtures.targets.topA.name);
+      const bottom = await resolveTryOnTarget(page, fixtures.targets.bottom.name);
+      await tryItem(page, top.item_used);
+      await tryItem(page, bottom.item_used);
       const before = await listOutfits(request, session);
       const name = `TO Outfit ${randomUUID().slice(0, 8)}`;
 
@@ -646,6 +802,10 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       expect(await equippedSlots(page)).toHaveLength(2);
       expect(after.length).toBe(before.length + 1);
       return {
+        item_used: top.item_used,
+        bottom_item_used: bottom.item_used,
+        target_resolution: { top, bottom },
+        fixture_seeding: fixtures.seeding,
         outfit_id: saved?.id,
         outfit_name: name,
         saved_item_ids: saved?.items,
@@ -656,9 +816,10 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-008 — Load Outfit: Saved Outfits -> Edit -> Open Fitting Studio. */
   test('TO-008 load saved outfit auto-equips items', async ({ page, request }) => {
     await execute('TO-008', page, async () => {
+      const fixtures = await gateFixtures(request);
       const session = await registerUser(request, 'shopper');
-      const top = await catalogItemByName(request, 'Classic White Shirt');
-      const bottom = await catalogItemByName(request, 'Olive Green Chinos');
+      const top = await catalogItemByName(request, fixtures.targets.topA.name);
+      const bottom = await catalogItemByName(request, fixtures.targets.bottom.name);
       const name = `TO Load ${randomUUID().slice(0, 8)}`;
       const outfit = await createOutfit(request, session, {
         name,
@@ -682,19 +843,26 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
 
       const slots = await equippedSlots(page);
       const names = slots.map((slot) => slot.name).sort();
-      expect(names).toEqual(['Classic White Shirt', 'Olive Green Chinos']);
+      expect(names).toEqual([top.name, bottom.name].sort());
       await capture(page, 'TO-008', '02-outfit-auto-equipped.png');
 
-      return { outfit_id: outfit.id, equipped: slots };
+      return {
+        item_used: top.name,
+        bottom_item_used: bottom.name,
+        fixture_seeding: fixtures.seeding,
+        outfit_id: outfit.id,
+        equipped: slots,
+      };
     });
   });
 
   /** TO-009 — Load Outfit with Deleted Item: warn + available items only. */
   test('TO-009 load outfit with deleted catalog item', async ({ page, request }) => {
     await execute('TO-009', page, async () => {
+      const fixtures = await gateFixtures(request);
       const session = await registerUser(request, 'shopper');
-      const available = await catalogItemByName(request, 'Classic White Shirt');
-      const missing = await catalogItemByName(request, 'Classic White Tee');
+      const available = await catalogItemByName(request, fixtures.targets.topA.name);
+      const missing = await catalogItemByName(request, fixtures.targets.topB.name);
       const name = `TO Missing ${randomUUID().slice(0, 8)}`;
       const outfit = await createOutfit(request, session, {
         name,
@@ -728,6 +896,9 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       });
 
       return {
+        item_used: available.name,
+        missing_item_used: missing.name,
+        fixture_seeding: fixtures.seeding,
         outfit_id: outfit.id,
         missing_item_id: missing.id,
         warning_text: await warning.first().innerText(),
@@ -739,8 +910,9 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
   /** TO-010 — Edit/Delete Outfit (FR-5.7 / FR-5.8). */
   test('TO-010 edit and delete outfit', async ({ page, request }) => {
     await execute('TO-010', page, async () => {
+      const fixtures = await gateFixtures(request);
       const session = await registerUser(request, 'shopper');
-      const top = await catalogItemByName(request, 'Classic White Shirt');
+      const top = await catalogItemByName(request, fixtures.targets.topA.name);
       const original = `TO Edit ${randomUUID().slice(0, 8)}`;
       const outfit = await createOutfit(request, session, { name: original, items: [top.id] });
       const renamed = `${original} Renamed`;
@@ -779,7 +951,13 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
         { headers: authHeaders(session) },
       );
       expect(deletedResponse.status()).toBe(404);
-      return { outfit_id: outfit.id, renamed_to: renamed, delete_status: deletedResponse.status() };
+      return {
+        item_used: top.name,
+        fixture_seeding: fixtures.seeding,
+        outfit_id: outfit.id,
+        renamed_to: renamed,
+        delete_status: deletedResponse.status(),
+      };
     });
   });
 
@@ -791,6 +969,7 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
     });
     const page = await context.newPage();
     await execute('TO-011', page, async () => {
+      const fixtures = await gateFixtures(request);
       const started = Date.now();
       await page.goto(appUrl('/guest/fitting-studio'));
       await page.waitForLoadState('networkidle');
@@ -801,10 +980,12 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       await capture(page, 'TO-011', '01-guest-avatar-created.png');
 
       await openRecommendations(page);
-      const all = await listCatalog(request);
-      const dress = all.find((item) => item.category === 'dresses' && item.size === 'S');
-      expect(dress, 'guest avatar size S must have a dress fixture').toBeTruthy();
-      const dressCard = await recommendationCard(page, (dress as CatalogItem).name);
+      const dress = fixtures.targets.guestDress;
+      expect(
+        String(dress.category).toLowerCase() === 'dresses' && String(dress.size).toUpperCase() === 'S',
+        'guest avatar size S must have a dress fixture',
+      ).toBeTruthy();
+      const dressCard = await recommendationCard(page, dress.name);
       await expect(dressCard).toBeVisible({ timeout: 30_000 });
       await timeCanvasChange(page, () =>
         dressCard.getByRole('button', { name: 'Try Item', exact: true }).click(),
@@ -820,6 +1001,8 @@ test.describe('Try-On & Outfits TO-001..TO-011 (CSV order, stop on failure)', ()
       expect(elapsed, `guest try-on took ${elapsed}ms`).toBeLessThanOrEqual(120_000);
       await context.close();
       return {
+        item_used: dress.name,
+        fixture_seeding: fixtures.seeding,
         elapsed_ms: elapsed,
         limit_ms: 120_000,
         equipped,

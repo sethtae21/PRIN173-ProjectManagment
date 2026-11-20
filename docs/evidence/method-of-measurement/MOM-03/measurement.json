@@ -1,0 +1,36 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 3 — Initial application load",
+  "target": "mean and max < 3000 ms across 5 fresh navigations",
+  "unit": "ms",
+  "measured": 113,
+  "pass": true,
+  "navigations": 5,
+  "runs": [
+    {
+      "duration_ms": 91,
+      "dom_content_loaded_ms": 91
+    },
+    {
+      "duration_ms": 70,
+      "dom_content_loaded_ms": 69
+    },
+    {
+      "duration_ms": 77,
+      "dom_content_loaded_ms": 77
+    },
+    {
+      "duration_ms": 113,
+      "dom_content_loaded_ms": 112
+    },
+    {
+      "duration_ms": 97,
+      "dom_content_loaded_ms": 96
+    }
+  ],
+  "mean_ms": 90,
+  "max_ms": 113,
+  "timing_api": "Navigation Timing API (performance.getEntriesByType(\"navigation\")[0].duration)",
+  "detail": "max 113ms / mean 90ms",
+  "timestamp": "2026-11-20T02:47:44.183Z"
+}

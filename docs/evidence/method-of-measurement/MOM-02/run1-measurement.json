@@ -1,0 +1,10 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 2 — Canvas overlay render benchmark",
+  "target": "each of 4 interactions < 1000 ms",
+  "unit": "ms",
+  "measured": "FAIL",
+  "pass": false,
+  "error_message": "Error: Recommendation card \"Classic White Shirt\" not found.\n    at tryItemByName (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:475:9)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:715:9\n    at timeCanvasChange (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:445:3)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:714:23\n    at runCase (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:200:18)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:704:5",
+  "timestamp": "2026-11-20T01:49:31.354Z"
+}

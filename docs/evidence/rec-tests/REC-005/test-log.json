@@ -1,12 +1,12 @@
 {
   "test_id": "REC-005",
   "status": "PASS",
-  "timestamp": "2026-11-19T07:18:18.656Z",
-  "duration": "9881ms",
+  "timestamp": "2026-11-20T03:53:41.692Z",
+  "duration": "7496ms",
   "details": {
-    "item": "Dark Indigo Maong Jeans",
+    "item": "TO Gate A Bottom 0e9e30d3",
     "score": 4,
-    "persisted_target_id": "6af2cb75655abe362412d155",
+    "persisted_target_id": "6affbb02ee131e9514996e58",
     "rehydrated_after_reload": true
   }
 }

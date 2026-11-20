@@ -1,10 +1,59 @@
 {
   "test_id": "TO-006",
   "status": "PASS",
-  "timestamp": "2026-11-19T05:31:50.938Z",
-  "duration": "6549ms",
+  "timestamp": "2026-11-20T03:51:18.780Z",
+  "duration": "5203ms",
   "details": {
-    "broken_image_id": "6afdb506f53242c804001b9f",
+    "item_used": "TO Gate Top A e43d284f",
+    "retained_item_used": "TO Gate Top B e43d284f",
+    "another_item_used": "TO Gate A Bottom 0e9e30d3",
+    "target_resolution": {
+      "retainedTarget": {
+        "item_used": "TO Gate Top B e43d284f",
+        "source": "preferred",
+        "excluded": []
+      },
+      "brokenTarget": {
+        "item_used": "TO Gate Top A e43d284f",
+        "source": "preferred",
+        "excluded": [
+          "TO Gate Top B e43d284f"
+        ]
+      },
+      "anotherTarget": {
+        "item_used": "TO Gate A Bottom 0e9e30d3",
+        "source": "preferred",
+        "excluded": [
+          "TO Gate Top B e43d284f",
+          "TO Gate Top A e43d284f"
+        ]
+      }
+    },
+    "fixture_seeding": {
+      "seeding_occurred": false,
+      "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+      "reason": "TO catalog preconditions for M tops, M bottoms, M dress and S dress",
+      "catalog_before": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "catalog_after": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "seeded_names": [],
+      "artifact": "docs/evidence/tryon-tests/gate-fixture-seed-2026-11-20T03-50-47-644Z-10c08a.json"
+    },
+    "route_installed_before_navigation": true,
+    "broken_image_id": "6affc35eee131e9514996ef3",
     "error_shown": true,
     "previous_item_retained": true,
     "canvas_changed_after_retry": true

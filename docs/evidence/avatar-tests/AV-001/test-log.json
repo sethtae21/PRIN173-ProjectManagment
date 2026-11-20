@@ -1,13 +1,13 @@
 {
   "test_id": "AV-001",
   "status": "PASS",
-  "timestamp": "2026-11-19T00:58:26.280Z",
-  "duration": "2814ms",
+  "timestamp": "2026-11-20T03:52:05.833Z",
+  "duration": "4368ms",
   "details": {
     "gender": "Female",
     "height_cm": 170,
     "body_build_cm": 95,
-    "preset_id": "6afe49b1a775e858e0ea3a91",
+    "preset_id": "6affc3e5ee131e9514996f1e",
     "client_height_range": {
       "min": 120,
       "max": 220

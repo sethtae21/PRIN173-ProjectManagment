@@ -1,0 +1,44 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 2 — Canvas overlay render benchmark",
+  "target": "each of 4 interactions < 1000 ms",
+  "unit": "ms",
+  "measured": 190,
+  "pass": true,
+  "run_label": "post-optimization",
+  "optimization_note": "Additive client-only prefetch of garment front/rear Image objects when recommendation cards render; reuses the existing garmentCropCache. No target, locator semantics, click -> canvas-settled measurement, scoring, crop/warp pipeline, or backend changes. NFR evidence log / KAN-90.",
+  "timings_ms": {
+    "equip_item_ms": 112,
+    "switch_item_ms": 80,
+    "toggle_front_rear_ms": 190,
+    "change_body_proportion_ms": 54
+  },
+  "item_used": "Classic White Tee",
+  "item_size": "M",
+  "switch_item_used": "Edge White",
+  "switch_samples_ms": [
+    80,
+    72,
+    77,
+    75,
+    65,
+    71,
+    83,
+    130
+  ],
+  "cold_equip_ms": 95,
+  "seeded_listing": {
+    "id": "6afdb500f53242c804001b97",
+    "name": "Classic White Tee",
+    "store_name": "Seed Store cbd72b57",
+    "size": "M"
+  },
+  "avatar_size_band_cm": [
+    90,
+    94
+  ],
+  "avatar_body_build_cm": 92,
+  "render_completion_signal": "canvas.toDataURL() SHA-1 signature change after two requestAnimationFrame callbacks (no application onDraw hook; useAlphaCrop exposes no completion event)",
+  "detail": "slowest canvas interaction 190ms",
+  "timestamp": "2026-11-20T02:43:08.037Z"
+}

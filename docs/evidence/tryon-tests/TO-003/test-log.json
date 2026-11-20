@@ -1,25 +1,70 @@
 {
   "test_id": "TO-003",
   "status": "PASS",
-  "timestamp": "2026-11-19T05:31:33.789Z",
-  "duration": "5433ms",
+  "timestamp": "2026-11-20T03:51:03.278Z",
+  "duration": "4462ms",
   "details": {
+    "item_used": "TO Gate A One Piece Dress 0e9e30d3",
+    "top_item_used": "TO Gate Top B e43d284f",
+    "bottom_item_used": "TO Gate A Bottom 0e9e30d3",
+    "target_resolution": {
+      "top": {
+        "item_used": "TO Gate Top B e43d284f",
+        "source": "preferred",
+        "excluded": []
+      },
+      "bottom": {
+        "item_used": "TO Gate A Bottom 0e9e30d3",
+        "source": "preferred",
+        "excluded": [
+          "TO Gate Top B e43d284f"
+        ]
+      },
+      "dress": {
+        "item_used": "TO Gate A One Piece Dress 0e9e30d3",
+        "source": "preferred",
+        "excluded": []
+      }
+    },
+    "fixture_seeding": {
+      "seeding_occurred": false,
+      "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+      "reason": "TO catalog preconditions for M tops, M bottoms, M dress and S dress",
+      "catalog_before": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "catalog_after": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "seeded_names": [],
+      "artifact": "docs/evidence/tryon-tests/gate-fixture-seed-2026-11-20T03-50-47-644Z-10c08a.json"
+    },
     "before": [
       {
         "slot": "top",
-        "name": "Classic White Shirt"
+        "name": "TO Gate Top B e43d284f"
       },
       {
         "slot": "bottom",
-        "name": "Olive Green Chinos"
+        "name": "TO Gate A Bottom 0e9e30d3"
       }
     ],
     "after": [
       {
         "slot": "top",
-        "name": "Classic Black Dress"
+        "name": "TO Gate A One Piece Dress 0e9e30d3"
       }
     ],
-    "confirmation": "Classic Black Dress equipped. Top and bottom replaced with a one-piece outfit."
+    "confirmation": "TO Gate A One Piece Dress 0e9e30d3 equipped. Top and bottom replaced with a one-piece outfit."
   }
 }

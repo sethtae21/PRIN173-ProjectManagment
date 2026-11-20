@@ -1,11 +1,40 @@
 {
   "test_id": "TO-004",
   "status": "PASS",
-  "timestamp": "2026-11-19T05:31:38.541Z",
-  "duration": "4687ms",
+  "timestamp": "2026-11-20T03:51:08.401Z",
+  "duration": "4974ms",
   "details": {
-    "front_signature": "794cc228bd8a5804",
-    "rear_render_ms": 116,
-    "front_render_ms": 90
+    "item_used": "TO Gate Top B e43d284f",
+    "target_resolution": {
+      "item_used": "TO Gate Top B e43d284f",
+      "source": "preferred",
+      "excluded": []
+    },
+    "fixture_seeding": {
+      "seeding_occurred": false,
+      "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+      "reason": "TO catalog preconditions for M tops, M bottoms, M dress and S dress",
+      "catalog_before": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "catalog_after": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "seeded_names": [],
+      "artifact": "docs/evidence/tryon-tests/gate-fixture-seed-2026-11-20T03-50-47-644Z-10c08a.json"
+    },
+    "front_signature": "78a09ef141db9655",
+    "rear_render_ms": 248,
+    "front_render_ms": 91
   }
 }

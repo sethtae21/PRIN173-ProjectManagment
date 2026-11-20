@@ -1,0 +1,60 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 2 — Canvas overlay render benchmark",
+  "target": "each of 4 interactions < 1000 ms",
+  "unit": "ms",
+  "measured": 239,
+  "pass": true,
+  "run_label": "post-optimization",
+  "optimization_note": "Additive client-only prefetch of garment front/rear Image objects when recommendation cards render; reuses the existing garmentCropCache. No target, locator semantics, click -> canvas-settled measurement, scoring, crop/warp pipeline, or backend changes. NFR evidence log / KAN-90.",
+  "timings_ms": {
+    "equip_item_ms": 239,
+    "switch_item_ms": 115,
+    "toggle_front_rear_ms": 155,
+    "change_body_proportion_ms": 47
+  },
+  "item_used": "Classic White Tee",
+  "item_size": "M",
+  "switch_item_used": "Edge White",
+  "switch_samples_ms": [
+    115,
+    99,
+    118,
+    103,
+    79,
+    81,
+    80,
+    74
+  ],
+  "cold_equip_ms": 184,
+  "seeded_listing": {
+    "id": "6afdb500f53242c804001b97",
+    "name": "Classic White Tee",
+    "store_name": "Seed Store cbd72b57",
+    "size": "M"
+  },
+  "avatar_size_band_cm": [
+    90,
+    94
+  ],
+  "avatar_body_build_cm": 92,
+  "render_completion_signal": "canvas.toDataURL() SHA-1 signature change after two requestAnimationFrame callbacks (no application onDraw hook; useAlphaCrop exposes no completion event)",
+  "detail": "slowest canvas interaction 239ms",
+  "regression_gate": {
+    "topology": "https://localhost:8443 lean staging proxy",
+    "required": "TO 11/11 + AV 11/11 + REC 7/7",
+    "observed": {
+      "TO": "1 passed, 10 did not run (serial stop on failure)",
+      "AV": "10 passed, 1 failed (AV-011)",
+      "REC": "7 passed"
+    },
+    "failure_signatures": [
+      "TO-001: Recommendation card \"Classic White Shirt\" not found on any page (pre-existing stale fixture; prior docs/evidence/tryon-tests/TO-001/test-log.json)",
+      "AV-011: a size-S garment is required for this test (live catalog has 47 items, all size M; prior docs/evidence/avatar-tests/AV-011/test-log.json)"
+    ],
+    "regression_attribution": "No failure attributable to the additive prefetch: TO/AV fail before any prefetch-dependent interaction, and REC is 7/7 green. Both failure signatures are already present in prior evidence logs.",
+    "source_change": "Frontend/src/pages/FittingStudioPage.jsx — additive client-only prefetch only; no crop/warp pipeline, scoring, backend, target, or MOM measurement changes.",
+    "evidence_log": "NFR evidence log / KAN-90"
+  },
+  "timestamp": "2026-11-20T02:41:44.182Z"
+}

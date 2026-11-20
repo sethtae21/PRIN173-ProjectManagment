@@ -1,0 +1,47 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 2 — Canvas overlay render benchmark",
+  "target": "each of 4 interactions < 1000 ms",
+  "unit": "ms",
+  "measured": "FAIL",
+  "pass": false,
+  "error_message": "Error: slowest canvas interaction 1936ms must be < 1000ms: {\"equip_item_ms\":119,\"switch_item_ms\":1936,\"toggle_front_rear_ms\":139,\"change_body_proportion_ms\":51}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m1000\u001b[39m\nReceived:   \u001b[31m1936\u001b[39m\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:955:9\n    at runCase (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:222:18)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:822:5",
+  "timestamp": "2026-11-20T02:26:26.273Z",
+  "interpretation": {
+    "classification": "cold-path cost confirmed; steady-state green",
+    "first_switch_ms": 1936,
+    "repeat_switch_ms": [
+      61,
+      131,
+      77,
+      71,
+      73,
+      83,
+      68
+    ],
+    "other_interactions_ms": {
+      "equip_item": 119,
+      "toggle_front_rear": 139,
+      "change_body_proportion": 51
+    },
+    "cold_equip_fresh_context_ms": 89,
+    "media_requests_started_during_timed_switch": [],
+    "target_image_resource_timing": {
+      "item": "Edge White",
+      "path": "/media/6afec7402b7c0da2d0d95ee3",
+      "natural_width": 300,
+      "natural_height": 900,
+      "transfer_size_bytes": 42169,
+      "duration_ms": 2309,
+      "note": "No /media/ request started after the switch timer began. This Resource Timing entry was already present; its 2309 ms duration is recorded, but start/end timestamps were not captured, so overlap with the timed switch cannot be proven from this run."
+    },
+    "decision": "First-switch-only pattern confirmed (1936 ms once; repeats 61-131 ms), so this is a cold path, not a steady-state defect. However the target image Resource Timing duration is 2309 ms in the warm context versus 777 ms in the fresh context while no /media/ request started during the timed switch; the diagnostic therefore cannot exclude a media-fetch contribution. Criterion 2 remains FAIL; proceed to Phase C only with explicit authorization and the TO/AV regression gate.",
+    "status": "FAIL retained. Criterion 2 is not marked PASS; optimization authorization is required before any further MOM re-run.",
+    "diagnostic_evidence": "docs/evidence/method-of-measurement/MOM-02/diagnostic-cold-warm.json",
+    "media_fetch_observation": {
+      "warm_context_target_duration_ms": 2309,
+      "fresh_context_target_duration_ms": 777,
+      "requests_started_during_timed_switch": 0
+    }
+  }
+}

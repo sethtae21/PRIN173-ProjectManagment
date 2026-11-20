@@ -1,13 +1,13 @@
 {
   "test_id": "REC-001",
   "status": "PASS",
-  "timestamp": "2026-11-19T07:17:52.166Z",
-  "duration": "6887ms",
+  "timestamp": "2026-11-20T03:53:20.660Z",
+  "duration": "6627ms",
   "details": {
     "weights_version": "1.1.0",
     "api_recommendations": 50,
     "rendered_cards": 10,
-    "sample_item": "Dark Indigo Maong Jeans",
+    "sample_item": "TO Gate A Bottom 0e9e30d3",
     "sample_match_badge": "7/7"
   }
 }

@@ -1,0 +1,137 @@
+{
+  "generated_at": "2026-11-20T02:47:39.437Z",
+  "run_label": "post-optimization",
+  "item_a": "Classic White Tee",
+  "item_b": "Edge White",
+  "item_size": "M",
+  "avatar_body_build_cm": 92,
+  "target_threshold_ms": 1000,
+  "switch_sequence": [
+    "Edge White",
+    "Classic White Tee",
+    "Edge White",
+    "Classic White Tee",
+    "Edge White",
+    "Classic White Tee",
+    "Edge White",
+    "Classic White Tee"
+  ],
+  "switch_samples": [
+    {
+      "iteration": 1,
+      "target": "Edge White",
+      "switch_ms": 222,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afec7402b7c0da2d0d95ee3",
+        "natural_width": 300,
+        "natural_height": 900,
+        "transfer_size": 42169,
+        "duration_ms": 349
+      }
+    },
+    {
+      "iteration": 2,
+      "target": "Classic White Tee",
+      "switch_ms": 85,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afdb506f53242c804001b9f",
+        "natural_width": 267,
+        "natural_height": 800,
+        "transfer_size": 10252,
+        "duration_ms": 209
+      }
+    },
+    {
+      "iteration": 3,
+      "target": "Edge White",
+      "switch_ms": 85,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afec7402b7c0da2d0d95ee3",
+        "natural_width": 300,
+        "natural_height": 900,
+        "transfer_size": 42169,
+        "duration_ms": 349
+      }
+    },
+    {
+      "iteration": 4,
+      "target": "Classic White Tee",
+      "switch_ms": 95,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afdb506f53242c804001b9f",
+        "natural_width": 267,
+        "natural_height": 800,
+        "transfer_size": 10252,
+        "duration_ms": 209
+      }
+    },
+    {
+      "iteration": 5,
+      "target": "Edge White",
+      "switch_ms": 85,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afec7402b7c0da2d0d95ee3",
+        "natural_width": 300,
+        "natural_height": 900,
+        "transfer_size": 42169,
+        "duration_ms": 349
+      }
+    },
+    {
+      "iteration": 6,
+      "target": "Classic White Tee",
+      "switch_ms": 74,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afdb506f53242c804001b9f",
+        "natural_width": 267,
+        "natural_height": 800,
+        "transfer_size": 10252,
+        "duration_ms": 209
+      }
+    },
+    {
+      "iteration": 7,
+      "target": "Edge White",
+      "switch_ms": 77,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afec7402b7c0da2d0d95ee3",
+        "natural_width": 300,
+        "natural_height": 900,
+        "transfer_size": 42169,
+        "duration_ms": 349
+      }
+    },
+    {
+      "iteration": 8,
+      "target": "Classic White Tee",
+      "switch_ms": 74,
+      "media_requests": [],
+      "target_image": {
+        "url": "/media/6afdb506f53242c804001b9f",
+        "natural_width": 267,
+        "natural_height": 800,
+        "transfer_size": 10252,
+        "duration_ms": 209
+      }
+    }
+  ],
+  "cold_equip": {
+    "target": "Edge White",
+    "cold_equip_ms": 101,
+    "media_requests": [],
+    "target_image": {
+      "url": "/media/6afec7402b7c0da2d0d95ee3",
+      "natural_width": 300,
+      "natural_height": 900,
+      "transfer_size": 42169,
+      "duration_ms": 307
+    }
+  }
+}
