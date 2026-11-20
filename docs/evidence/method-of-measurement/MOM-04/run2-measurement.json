@@ -1,0 +1,16 @@
+{
+  "objective": "OBJ-02",
+  "criterion": "Criterion 6 — First-time Guest try-on, no training / registration / photo upload",
+  "target": "<= 120 s total and zero photo-upload requests",
+  "unit": "s",
+  "measured": 2.62,
+  "pass": true,
+  "elapsed_ms": 2615,
+  "view_toggle_ms": 482,
+  "photo_upload_requests": [],
+  "guest_file_inputs": 0,
+  "registration_steps": 0,
+  "training_steps": 0,
+  "detail": "2.62s, zero photo uploads",
+  "timestamp": "2026-11-20T02:44:04.825Z"
+}

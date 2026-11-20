@@ -1,0 +1,15 @@
+{
+  "objective": "OBJ-07",
+  "criterion": "Criterion 8 — Commerce completion (functional only)",
+  "target": "order record created and cart cleared",
+  "unit": "status",
+  "measured": "completed",
+  "pass": true,
+  "order_id": "6affb446ee131e9514996d7a",
+  "order_number": "FF-50860111",
+  "order_status": "pending",
+  "cart_items_after": 0,
+  "population_kpi_note": "Criterion 8 ≥70% cart-completion KPI is a UAT population measure and is deferred; this case proves functional completion only.",
+  "detail": "order 6affb446ee131e9514996d7a recorded; cart cleared",
+  "timestamp": "2026-11-20T02:45:28.608Z"
+}

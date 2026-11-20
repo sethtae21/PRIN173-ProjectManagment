@@ -1,0 +1,10 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 1 — API responsiveness (catalog, filtering, recommendation, cart)",
+  "target": "p95 < 500 ms on each endpoint",
+  "unit": "ms",
+  "measured": "FAIL",
+  "pass": false,
+  "error_message": "Error: worst endpoint p95 3824ms must be < 500ms: {\"/catalog/\":{\"samples\":20,\"p95_ms\":3824,\"max_ms\":4615},\"/api/recommendations/\":{\"samples\":20,\"p95_ms\":3076,\"max_ms\":3082},\"/cart/\":{\"samples\":20,\"p95_ms\":1915,\"max_ms\":2105}}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m3824\u001b[39m\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:739:9\n    at runCase (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:205:18)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:697:5",
+  "timestamp": "2026-11-20T02:04:11.910Z"
+}

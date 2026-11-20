@@ -1,0 +1,48 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 1 — API responsiveness (catalog, filtering, recommendation, cart)",
+  "target": "p95 < 500 ms on each endpoint",
+  "unit": "ms",
+  "measured": 406,
+  "pass": true,
+  "topology": "https://localhost:8443 lean TLS staging proxy (node backend/scripts/local_staging_server.mjs after npm run build)",
+  "sample_count_per_endpoint": 20,
+  "warmup_count_per_endpoint": 5,
+  "endpoints": {
+    "/catalog/": {
+      "samples": 20,
+      "p95_ms": 188,
+      "max_ms": 200
+    },
+    "/catalog/?size=M": {
+      "samples": 20,
+      "p95_ms": 178,
+      "max_ms": 180
+    },
+    "/api/recommendations/": {
+      "samples": 20,
+      "p95_ms": 176,
+      "max_ms": 178
+    },
+    "/cart/": {
+      "samples": 20,
+      "p95_ms": 406,
+      "max_ms": 410
+    }
+  },
+  "detail": "worst p95 406ms",
+  "isolation_outcome": {
+    "decision": "lean-proxy p95 < 500 ms is authoritative; the earlier 3824 ms FAIL was an invalid dev-environment measurement",
+    "invalid_dev_environment_run_p95_ms": 3824,
+    "lean_proxy_solo_p95_ms": 441,
+    "lean_proxy_prior_full_suite_p95_ms": 472,
+    "diagnostic_evidence": "docs/evidence/method-of-measurement/MOM-01/diagnostic-paths.json",
+    "preserved_history": [
+      "run1-measurement.json (440 ms)",
+      "run2-measurement.json (3824 ms FAIL)",
+      "run3-measurement.json (472 ms full-suite pass)"
+    ],
+    "note": "No values were fabricated or smoothed; all history files are retained."
+  },
+  "timestamp": "2026-11-20T02:47:32.065Z"
+}

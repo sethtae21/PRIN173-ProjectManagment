@@ -1,0 +1,443 @@
+{
+  "generated_at": "2026-11-20T02:15:47.378Z",
+  "runs": [
+    {
+      "label": "vite-dev-proxy",
+      "timestamp": "2026-11-20T02:15:47.379Z",
+      "note": "Read-only diagnostics; no latency assertion is made in this case.",
+      "paths": {
+        "direct-loopback": {
+          "label": "direct-loopback (SRS §5.3 diagnostic)",
+          "base_url": "http://127.0.0.1:8000",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 153,
+              "max_ms": 169
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 166,
+              "max_ms": 167
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 491,
+              "max_ms": 700
+            }
+          },
+          "worst_p95_ms": 491
+        },
+        "current-8443": {
+          "label": "vite-dev-proxy (https://localhost:8443)",
+          "base_url": "https://localhost:8443",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 188,
+              "max_ms": 200
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 193,
+              "max_ms": 216
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 434,
+              "max_ms": 482
+            }
+          },
+          "worst_p95_ms": 434
+        }
+      },
+      "curl_timing_seconds": {
+        "direct-loopback": [
+          {
+            "connect_s": 0.000493,
+            "tls_s": 0,
+            "ttfb_s": 0.180027,
+            "total_s": 0.180109
+          },
+          {
+            "connect_s": 0.000451,
+            "tls_s": 0,
+            "ttfb_s": 0.175669,
+            "total_s": 0.175765
+          },
+          {
+            "connect_s": 0.000494,
+            "tls_s": 0,
+            "ttfb_s": 0.171831,
+            "total_s": 0.171898
+          },
+          {
+            "connect_s": 0.000546,
+            "tls_s": 0,
+            "ttfb_s": 0.176078,
+            "total_s": 0.176166
+          },
+          {
+            "connect_s": 0.000468,
+            "tls_s": 0,
+            "ttfb_s": 0.177838,
+            "total_s": 0.177941
+          }
+        ],
+        "current-8443": [
+          {
+            "connect_s": 0.000469,
+            "tls_s": 0.008165,
+            "ttfb_s": 0.178912,
+            "total_s": 0.179027
+          },
+          {
+            "connect_s": 0.000464,
+            "tls_s": 0.007179,
+            "ttfb_s": 0.183206,
+            "total_s": 0.183275
+          },
+          {
+            "connect_s": 0.000446,
+            "tls_s": 0.006921,
+            "ttfb_s": 0.182601,
+            "total_s": 0.182687
+          },
+          {
+            "connect_s": 0.022946,
+            "tls_s": 0.030939,
+            "ttfb_s": 0.202972,
+            "total_s": 0.203045
+          },
+          {
+            "connect_s": 0.000493,
+            "tls_s": 0.00772,
+            "ttfb_s": 0.212814,
+            "total_s": 0.212897
+          }
+        ]
+      },
+      "atlas_ping": {
+        "pings_ms": [
+          1275.03,
+          92.67,
+          93.78,
+          94.01,
+          92.41
+        ],
+        "max_ms": 1275.03
+      },
+      "host_state": {
+        "cpu_percent": 21,
+        "available_ram_gb": 0.9,
+        "total_ram_gb": 7.73,
+        "node_python_processes": [
+          {
+            "name": "node",
+            "count": 5
+          },
+          {
+            "name": "python",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "lean-staging-proxy",
+      "timestamp": "2026-11-20T02:17:32.136Z",
+      "note": "Read-only diagnostics; no latency assertion is made in this case.",
+      "paths": {
+        "direct-loopback": {
+          "label": "direct-loopback (SRS §5.3 diagnostic)",
+          "base_url": "http://127.0.0.1:8000",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 188,
+              "max_ms": 202
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 186,
+              "max_ms": 191
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 437,
+              "max_ms": 492
+            }
+          },
+          "worst_p95_ms": 437
+        },
+        "current-8443": {
+          "label": "lean-staging-proxy (https://localhost:8443)",
+          "base_url": "https://localhost:8443",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 201,
+              "max_ms": 208
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 203,
+              "max_ms": 210
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 448,
+              "max_ms": 456
+            }
+          },
+          "worst_p95_ms": 448
+        }
+      },
+      "curl_timing_seconds": {
+        "direct-loopback": [
+          {
+            "connect_s": 0.00066,
+            "tls_s": 0,
+            "ttfb_s": 0.172947,
+            "total_s": 0.173049
+          },
+          {
+            "connect_s": 0.000456,
+            "tls_s": 0,
+            "ttfb_s": 0.181194,
+            "total_s": 0.181287
+          },
+          {
+            "connect_s": 0.000468,
+            "tls_s": 0,
+            "ttfb_s": 0.181021,
+            "total_s": 0.181092
+          },
+          {
+            "connect_s": 0.012468,
+            "tls_s": 0,
+            "ttfb_s": 0.195312,
+            "total_s": 0.195399
+          },
+          {
+            "connect_s": 0.000475,
+            "tls_s": 0,
+            "ttfb_s": 0.181292,
+            "total_s": 0.181371
+          }
+        ],
+        "current-8443": [
+          {
+            "connect_s": 0.024604,
+            "tls_s": 0.032566,
+            "ttfb_s": 0.214563,
+            "total_s": 0.21463
+          },
+          {
+            "connect_s": 0.000918,
+            "tls_s": 0.010691,
+            "ttfb_s": 0.201686,
+            "total_s": 0.201756
+          },
+          {
+            "connect_s": 0.019237,
+            "tls_s": 0.026086,
+            "ttfb_s": 0.217077,
+            "total_s": 0.217144
+          },
+          {
+            "connect_s": 0.022808,
+            "tls_s": 0.029251,
+            "ttfb_s": 0.211878,
+            "total_s": 0.211951
+          },
+          {
+            "connect_s": 0.017976,
+            "tls_s": 0.024716,
+            "ttfb_s": 0.209046,
+            "total_s": 0.209113
+          }
+        ]
+      },
+      "atlas_ping": {
+        "pings_ms": [
+          1441.16,
+          97.17,
+          90.74,
+          104.35,
+          91.8
+        ],
+        "max_ms": 1441.16
+      },
+      "host_state": {
+        "cpu_percent": 10,
+        "available_ram_gb": 0.75,
+        "total_ram_gb": 7.73,
+        "node_python_processes": [
+          {
+            "name": "node",
+            "count": 4
+          },
+          {
+            "name": "python",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "unlabelled",
+      "timestamp": "2026-11-20T02:49:27.707Z",
+      "note": "Read-only diagnostics; no latency assertion is made in this case.",
+      "paths": {
+        "direct-loopback": {
+          "label": "direct-loopback (SRS §5.3 diagnostic)",
+          "base_url": "https://localhost:8443",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 170,
+              "max_ms": 171
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 188,
+              "max_ms": 209
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 461,
+              "max_ms": 477
+            }
+          },
+          "worst_p95_ms": 461
+        },
+        "current-8443": {
+          "label": "unlabelled (https://localhost:8443)",
+          "base_url": "https://localhost:8443",
+          "warmup_count_per_endpoint": 5,
+          "sample_count_per_endpoint": 20,
+          "endpoints": {
+            "/catalog/": {
+              "samples": 20,
+              "p95_ms": 171,
+              "max_ms": 179
+            },
+            "/api/recommendations/": {
+              "samples": 20,
+              "p95_ms": 176,
+              "max_ms": 182
+            },
+            "/cart/": {
+              "samples": 20,
+              "p95_ms": 394,
+              "max_ms": 399
+            }
+          },
+          "worst_p95_ms": 394
+        }
+      },
+      "curl_timing_seconds": {
+        "direct-loopback": [
+          {
+            "connect_s": 0.024036,
+            "tls_s": 0.03381,
+            "ttfb_s": 0.192887,
+            "total_s": 0.192987
+          },
+          {
+            "connect_s": 0.000784,
+            "tls_s": 0.007819,
+            "ttfb_s": 0.173049,
+            "total_s": 0.173112
+          },
+          {
+            "connect_s": 0.024498,
+            "tls_s": 0.03234,
+            "ttfb_s": 0.192275,
+            "total_s": 0.192337
+          },
+          {
+            "connect_s": 0.025612,
+            "tls_s": 0.031797,
+            "ttfb_s": 0.191262,
+            "total_s": 0.191329
+          },
+          {
+            "connect_s": 0.000774,
+            "tls_s": 0.007311,
+            "ttfb_s": 0.165542,
+            "total_s": 0.165608
+          }
+        ],
+        "current-8443": [
+          {
+            "connect_s": 0.014259,
+            "tls_s": 0.020525,
+            "ttfb_s": 0.184183,
+            "total_s": 0.18425
+          },
+          {
+            "connect_s": 0.02068,
+            "tls_s": 0.026852,
+            "ttfb_s": 0.188381,
+            "total_s": 0.188444
+          },
+          {
+            "connect_s": 0.000716,
+            "tls_s": 0.006568,
+            "ttfb_s": 0.169982,
+            "total_s": 0.170047
+          },
+          {
+            "connect_s": 0.000805,
+            "tls_s": 0.00753,
+            "ttfb_s": 0.170141,
+            "total_s": 0.170201
+          },
+          {
+            "connect_s": 0.020936,
+            "tls_s": 0.027783,
+            "ttfb_s": 0.480129,
+            "total_s": 0.480206
+          }
+        ]
+      },
+      "atlas_ping": {
+        "pings_ms": [
+          1157.82,
+          89.34,
+          89.94,
+          90.53,
+          105.17
+        ],
+        "max_ms": 1157.82
+      },
+      "host_state": {
+        "cpu_percent": 12,
+        "available_ram_gb": 0.92,
+        "total_ram_gb": 7.73,
+        "node_python_processes": [
+          {
+            "name": "node",
+            "count": 4
+          },
+          {
+            "name": "python",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

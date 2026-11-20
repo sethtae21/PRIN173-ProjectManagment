@@ -1,10 +1,10 @@
 {
   "test_id": "AV-007",
   "status": "PASS",
-  "timestamp": "2026-11-19T00:58:58.166Z",
-  "duration": "4720ms",
+  "timestamp": "2026-11-20T03:52:46.439Z",
+  "duration": "4274ms",
   "details": {
-    "preset_id": "6afe49cea775e858e0ea3aa0",
+    "preset_id": "6affc40bee131e9514996f2d",
     "height_cm": 172,
     "body_build_cm": 97,
     "skin_tone": "#bb7d55",

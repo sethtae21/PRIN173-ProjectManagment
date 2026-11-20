@@ -1,8 +1,8 @@
 {
   "test_id": "AV-002",
   "status": "PASS",
-  "timestamp": "2026-11-19T00:58:28.882Z",
-  "duration": "2520ms",
+  "timestamp": "2026-11-20T03:52:09.780Z",
+  "duration": "3761ms",
   "details": {
     "attempted_height_cm": 250,
     "error": "Value must be less than or equal to 220.",

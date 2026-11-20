@@ -1,0 +1,10 @@
+{
+  "objective": "OBJ-08",
+  "criterion": "Criterion 4 — Seller CSV pipeline timing",
+  "target": "10-item CSV submit -> batch completed < 60 s",
+  "unit": "s",
+  "measured": "FAIL",
+  "pass": false,
+  "error_message": "TypeError: fetch failed",
+  "timestamp": "2026-11-20T02:44:34.934Z"
+}

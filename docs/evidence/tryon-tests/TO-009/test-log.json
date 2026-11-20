@@ -1,12 +1,37 @@
 {
   "test_id": "TO-009",
   "status": "PASS",
-  "timestamp": "2026-11-19T05:32:09.697Z",
-  "duration": "5574ms",
+  "timestamp": "2026-11-20T03:51:39.058Z",
+  "duration": "6680ms",
   "details": {
-    "outfit_id": "6afe89d52b7c0da2d0d95b75",
-    "missing_item_id": "6afdb500f53242c804001b97",
+    "item_used": "TO Gate Top B e43d284f",
+    "missing_item_used": "TO Gate Top A e43d284f",
+    "fixture_seeding": {
+      "seeding_occurred": false,
+      "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+      "reason": "TO catalog preconditions for M tops, M bottoms, M dress and S dress",
+      "catalog_before": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "catalog_after": {
+        "total_active": 77,
+        "active_m_tops": 70,
+        "active_m_bottoms": 2,
+        "active_m_dresses": 2,
+        "active_s_items": 2,
+        "active_s_dresses": 2
+      },
+      "seeded_names": [],
+      "artifact": "docs/evidence/tryon-tests/gate-fixture-seed-2026-11-20T03-50-47-644Z-10c08a.json"
+    },
+    "outfit_id": "6affc3c6ee131e9514996f13",
+    "missing_item_id": "6affc35aee131e9514996ee8",
     "warning_text": "Item unavailable\n₱0",
-    "available_item_loaded": "Classic White Shirt"
+    "available_item_loaded": "TO Gate Top B e43d284f"
   }
 }

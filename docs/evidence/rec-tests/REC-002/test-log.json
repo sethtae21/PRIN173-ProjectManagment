@@ -1,10 +1,10 @@
 {
   "test_id": "REC-002",
   "status": "PASS",
-  "timestamp": "2026-11-19T07:17:59.560Z",
-  "duration": "7304ms",
+  "timestamp": "2026-11-20T03:53:26.243Z",
+  "duration": "5411ms",
   "details": {
-    "item": "Dark Indigo Maong Jeans",
+    "item": "TO Gate A Bottom 0e9e30d3",
     "rules": [
       {
         "label": "Color compatibility",

@@ -1,0 +1,25 @@
+{
+  "url": "https://localhost:8443/health/",
+  "status": 200,
+  "body": {
+    "status": "ok",
+    "db": {
+      "ok": true,
+      "cluster": "cluster0.zrnfpru.mongodb.net",
+      "database": "fitfusion",
+      "atlas": true,
+      "tls": "implied-by-srv",
+      "server_version": "8.0.37",
+      "latency_ms": 1299.7
+    },
+    "app": {
+      "name": "FitFusion AI",
+      "framework": "django",
+      "django": "6.0.9"
+    },
+    "elapsed_ms": 1488.7,
+    "checks": {
+      "database": true
+    }
+  }
+}

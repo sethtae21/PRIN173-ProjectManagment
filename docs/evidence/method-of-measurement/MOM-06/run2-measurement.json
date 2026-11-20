@@ -1,0 +1,17 @@
+{
+  "objective": "OBJ-08",
+  "criterion": "Criterion 4 — Seller CSV pipeline timing",
+  "target": "10-item CSV submit -> batch completed < 60 s",
+  "unit": "s",
+  "measured": 6.47,
+  "pass": true,
+  "batch_id": "6affb42bee131e9514996d19",
+  "total_items": 10,
+  "accepted_count": 10,
+  "rejected_count": 0,
+  "elapsed_ms": 6469,
+  "status_polls": 10,
+  "wall_clock_ms": 19443,
+  "detail": "6.47s to batch completion",
+  "timestamp": "2026-11-20T02:45:18.608Z"
+}

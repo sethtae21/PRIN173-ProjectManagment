@@ -1,0 +1,10 @@
+{
+  "objective": "OBJ-04",
+  "criterion": "Criterion 7 — Security & Privacy checklist",
+  "target": "100% pass (5/5 items)",
+  "unit": "%",
+  "measured": "FAIL",
+  "pass": false,
+  "error_message": "TypeError: Cannot read properties of undefined (reading 'pass')\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:1230:19\n    at runCase (C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:222:18)\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:1097:5",
+  "timestamp": "2026-11-20T02:43:26.524Z"
+}

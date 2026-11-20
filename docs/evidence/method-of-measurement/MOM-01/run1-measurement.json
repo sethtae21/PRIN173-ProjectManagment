@@ -1,0 +1,29 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 1 — API responsiveness (catalog, filtering, recommendation, cart)",
+  "target": "p95 < 500 ms on each endpoint",
+  "unit": "ms",
+  "measured": 440,
+  "pass": true,
+  "sample_count_per_endpoint": 20,
+  "warmup_count_per_endpoint": 5,
+  "endpoints": {
+    "/catalog/": {
+      "samples": 20,
+      "p95_ms": 191,
+      "max_ms": 1548
+    },
+    "/api/recommendations/": {
+      "samples": 20,
+      "p95_ms": 190,
+      "max_ms": 197
+    },
+    "/cart/": {
+      "samples": 20,
+      "p95_ms": 440,
+      "max_ms": 9533
+    }
+  },
+  "detail": "worst p95 440ms",
+  "timestamp": "2026-11-20T01:49:25.701Z"
+}

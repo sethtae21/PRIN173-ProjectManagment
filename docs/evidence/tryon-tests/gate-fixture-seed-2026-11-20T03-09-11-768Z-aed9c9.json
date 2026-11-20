@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-11-20T03:09:11.767Z",
+  "seeding_occurred": false,
+  "mechanism": "KAN-40/KAN-100 staging seed pattern: seller CSV upload via /catalog/upload/ (test-only precondition setup, no app change)",
+  "reason": "TO catalog preconditions for M tops, M bottoms, M dress and S dress",
+  "catalog_before": {
+    "total_active": 70,
+    "active_m_tops": 67,
+    "active_m_bottoms": 1,
+    "active_m_dresses": 1,
+    "active_s_items": 1,
+    "active_s_dresses": 1
+  },
+  "catalog_after": {
+    "total_active": 70,
+    "active_m_tops": 67,
+    "active_m_bottoms": 1,
+    "active_m_dresses": 1,
+    "active_s_items": 1,
+    "active_s_dresses": 1
+  },
+  "seeded_names": [],
+  "targets": {
+    "topA": {
+      "id": "6afec7092b7c0da2d0d95ecb",
+      "name": "Probe White Tee",
+      "category": "tops",
+      "size": "M",
+      "status": "active"
+    },
+    "topB": {
+      "id": "6afec73c2b7c0da2d0d95edc",
+      "name": "Edge White",
+      "category": "tops",
+      "size": "M",
+      "status": "active"
+    },
+    "bottom": {
+      "id": "6affb90cee131e9514996e21",
+      "name": "TO Gate Bottom c154dc27",
+      "category": "bottoms",
+      "size": "M",
+      "status": "active"
+    },
+    "dress": {
+      "id": "6affb911ee131e9514996e26",
+      "name": "TO Gate One Piece Dress c154dc27",
+      "category": "dresses",
+      "size": "M",
+      "status": "active"
+    },
+    "guestDress": {
+      "id": "6affb915ee131e9514996e2b",
+      "name": "TO Gate Guest Dress S c154dc27",
+      "category": "dresses",
+      "size": "S",
+      "status": "active"
+    }
+  }
+}

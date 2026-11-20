@@ -1,0 +1,15 @@
+{
+  "objective": "OBJ-09",
+  "criterion": "Criterion 5 — Upload accuracy from the MOM-06 batch",
+  "target": ">= 80% accepted without manual correction",
+  "unit": "%",
+  "measured": 100,
+  "pass": true,
+  "source_batch_id": "6affb42bee131e9514996d19",
+  "accepted": 10,
+  "total": 10,
+  "rejected": 0,
+  "rejection_report": {},
+  "detail": "100.00% accepted (10/10)",
+  "timestamp": "2026-11-20T02:45:18.914Z"
+}

@@ -1,8 +1,8 @@
 {
   "test_id": "REC-003",
   "status": "PASS",
-  "timestamp": "2026-11-19T07:18:05.696Z",
-  "duration": "6020ms",
+  "timestamp": "2026-11-20T03:53:30.801Z",
+  "duration": "4405ms",
   "details": {
     "simulated_precondition": "one size-XL recommendation vs size-M avatar",
     "message": "No recommendations match your avatar's size (M) or gender. Move the Body Build slider to change your size, or switch gender to browse the other cut.",

@@ -1,0 +1,34 @@
+{
+  "objective": "OBJ-10",
+  "criterion": "Week 14 — Staging operational / demonstrable",
+  "target": "/health/ HTTP 200 status ok + live staging screenshot",
+  "unit": "status",
+  "measured": "HTTP 200 / ok",
+  "pass": true,
+  "staging_url": "https://localhost:8443/",
+  "health_url": "https://localhost:8443/health/",
+  "health_status": 200,
+  "health_payload": {
+    "status": "ok",
+    "db": {
+      "ok": true,
+      "cluster": "cluster0.zrnfpru.mongodb.net",
+      "database": "fitfusion",
+      "atlas": true,
+      "tls": "implied-by-srv",
+      "server_version": "8.0.37",
+      "latency_ms": 1299.7
+    },
+    "app": {
+      "name": "FitFusion AI",
+      "framework": "django",
+      "django": "6.0.9"
+    },
+    "elapsed_ms": 1488.7,
+    "checks": {
+      "database": true
+    }
+  },
+  "detail": "health HTTP 200 (ok) on https://localhost:8443/",
+  "timestamp": "2026-11-20T02:48:44.768Z"
+}

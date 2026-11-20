@@ -1,0 +1,19 @@
+{
+  "objective": "OBJ-03",
+  "criterion": "Criterion 2 — Canvas overlay render benchmark",
+  "target": "each of 4 interactions < 1000 ms",
+  "unit": "ms",
+  "measured": "FAIL",
+  "pass": false,
+  "timings_ms": {
+    "equip_item_ms": 131,
+    "switch_item_ms": 1600,
+    "toggle_front_rear_ms": 143,
+    "change_body_proportion_ms": 59
+  },
+  "item_size": "M",
+  "equipped_item_after_switch": "Edge White",
+  "audit_note": "The PASS-only audit fields (item_used / switch_item_used) were not persisted by the failure handler. The failure snapshot confirms avatar size M and equipped item Edge White after the switch.",
+  "error_message": "Error: slowest canvas interaction 1600ms must be < 1000ms: {\"equip_item_ms\":131,\"switch_item_ms\":1600,\"toggle_front_rear_ms\":143,\"change_body_proportion_ms\":59}\n\nexpect(received).toBeLessThan(expected)\n\nExpected: < 1000\nReceived:   1600\n    at C:\\Users\\rynan\\OneDrive\\Documents\\GitHub\\PRIN173-ProjectManagment\\Frontend\\e2e\\mom-tests.spec.ts:811:9\n    at runCase (...mom-tests.spec.ts:205:18)\n    at ...mom-tests.spec.ts:753:5",
+  "timestamp": "2026-11-20T02:18:58.000Z"
+}
