@@ -76,12 +76,16 @@ class ProfileView(generics.RetrieveUpdateDestroyAPIView):
 # CHANGED (audit fixes):
 #   * Legacy reaction keys (fit_like_dislike / vote / like / dislike) are now
 #     EXPLICITLY rejected with 400 instead of being silently ignored.
-#   * The non-baselined `user_type` field is gone from payload and mirror.
+#   * The non-baselined `user_type` field is gone from the payload.
 #   * (user, session_id) uniqueness is DB-enforced (migration 0011 + the
 #     matching Meta.unique_together); a lost create race resolves to the
 #     existing row and merges into it below.
 #   * GAP 2: the merge writes ONLY the fields this phase supplied, so two
 #     concurrent phases can no longer clobber each other with stale NULLs.
+# CHANGED (redundancy fix): the accounts_user.latest_fitting_studio_survey
+# mirror was REMOVED (model migration 0013). This view no longer writes to
+# the user document at all; GET derives `latest` from the survey collection
+# (accounts_fittingstudiosurvey is the single source of truth).
 # ---------------------------------------------------------------------------
 
 SURVEY_SCORE_KEYS = (
@@ -159,25 +163,34 @@ def _survey_payload(row):
 class FittingStudioSurveyView(APIView):
     """
     POST /profile/fitting-studio-survey/  (registered shoppers only)
-        Upsert ONE visit document keyed by (user, session_id) and mirror it
-        onto accounts_user.latest_fitting_studio_survey.
+        Upsert ONE visit document keyed by (user, session_id) into
+        accounts_fittingstudiosurvey — the single source of truth.
         Payload: { "survey": { session_id, pre_confidence, pre_return_intent,
                                post_confidence, post_return_intent, fit_rating,
                                equipped_item_ids, avatar_context } }
 
     GET  /profile/fitting-studio-survey/
-        The caller's visit documents (newest first) + the on-account mirror.
+        The caller's visit documents (newest first). `latest` is DERIVED from
+        the newest stored row (latest == surveys[0]); there is no on-account
+        mirror anymore. Response shape is unchanged for existing clients.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        rows = FittingStudioSurvey.objects.filter(user=request.user)
+        # CHANGED (redundancy fix): `latest` is derived from the collection
+        # (Meta.ordering = ['-submitted_at']) instead of reading the removed
+        # accounts_user.latest_fitting_studio_survey copy. One DB query builds
+        # the whole payload; latest is exactly surveys[0].
+        payloads = [
+            _survey_payload(row)
+            for row in FittingStudioSurvey.objects.filter(user=request.user)
+        ]
         return Response({
             'success': True,
-            'count': rows.count(),
-            'latest': request.user.latest_fitting_studio_survey or None,
-            'surveys': [_survey_payload(row) for row in rows],
+            'count': len(payloads),
+            'latest': payloads[0] if payloads else None,
+            'surveys': payloads,
         }, status=status.HTTP_200_OK)
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
@@ -283,8 +296,10 @@ class FittingStudioSurveyView(APIView):
             ).update(confidence_gain=gain)
             row.refresh_from_db()
 
-        request.user.latest_fitting_studio_survey = _survey_payload(row)
-        request.user.save(update_fields=['latest_fitting_studio_survey'])
+        # CHANGED (redundancy fix): the on-account mirror write is GONE.
+        # accounts_fittingstudiosurvey is the single source of truth; the GET
+        # endpoint derives `latest` from it, so nothing is duplicated onto
+        # accounts_user anymore. Response contract is unchanged.
 
         return Response({
             'success': True,

@@ -76,11 +76,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     province = models.CharField(max_length=255, blank=True, null=True)
     postal_code = models.CharField(max_length=10, blank=True, null=True)
 
-    # Readable on-account mirror: a SINGLE FLAT object with the user's most
-    # recent fitting-studio survey, embedded directly on the accounts_user
-    # document so Compass shows the latest stars at a glance (no array nesting).
-    # Full per-visit history lives in accounts_fittingstudiosurvey.
-    latest_fitting_studio_survey = models.JSONField(default=dict, blank=True)
+    # CHANGED (redundancy fix): the legacy on-account mirror
+    #   latest_fitting_studio_survey
+    # was REMOVED from this model (migration 0013). The single source of truth
+    # for every fitting-studio visit is accounts_fittingstudiosurvey; the API's
+    # `latest` is DERIVED from that collection (newest submitted_at) instead of
+    # being duplicated onto every accounts_user document.
 
     # NOTE (avatar refactor): the legacy body attributes
     #   skin_tone / height / weight / body_proportions
@@ -141,6 +142,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 # complete the SAME document so confidence_gain is server-computed.
 # NULLABLE stars are intentional — see migration 0009 and the SADD amendment:
 # prompts are optional/skippable (FR-7.5) and submitted in two phases.
+# This collection is the SINGLE SOURCE OF TRUTH for survey data — the former
+# accounts_user.latest_fitting_studio_survey mirror was removed (migration
+# 0013) and the API derives `latest` from here.
 # ---------------------------------------------------------------------------
 class FittingStudioSurvey(models.Model):
     user = models.ForeignKey(
