@@ -28,6 +28,14 @@ Thumbs.db
 node_modules/
 dist/
 
+# Local TLS certificates and private keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
 # Django specific
 *.log
 db.sqlite3
