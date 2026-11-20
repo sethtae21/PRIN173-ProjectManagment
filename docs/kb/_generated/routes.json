@@ -1,0 +1,938 @@
+[
+  {
+    "route": "/",
+    "method": "ANY",
+    "handler": "home",
+    "file": "backend/catalog/views/page_views.py",
+    "start": 25,
+    "end": 27
+  },
+  {
+    "route": "/",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/<drf_format_suffix:format>",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/<drf_format_suffix:format>",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/<drf_format_suffix:format>",
+    "method": "GET",
+    "handler": "APIRootView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/routers.py",
+    "start": 322,
+    "end": 341
+  },
+  {
+    "route": "/^cart/$",
+    "method": "GET",
+    "handler": "CartViewSet.list",
+    "file": "backend/commerce/views.py",
+    "start": 90,
+    "end": 93
+  },
+  {
+    "route": "/^cart/add_item/$",
+    "method": "POST",
+    "handler": "CartViewSet.add_item",
+    "file": "backend/commerce/views.py",
+    "start": 95,
+    "end": 120
+  },
+  {
+    "route": "/^cart/add_item\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CartViewSet.add_item",
+    "file": "backend/commerce/views.py",
+    "start": 95,
+    "end": 120
+  },
+  {
+    "route": "/^cart/clear/$",
+    "method": "DELETE",
+    "handler": "CartViewSet.clear",
+    "file": "backend/commerce/views.py",
+    "start": 194,
+    "end": 200
+  },
+  {
+    "route": "/^cart/clear/$",
+    "method": "POST",
+    "handler": "CartViewSet.clear",
+    "file": "backend/commerce/views.py",
+    "start": 194,
+    "end": 200
+  },
+  {
+    "route": "/^cart/clear\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "DELETE",
+    "handler": "CartViewSet.clear",
+    "file": "backend/commerce/views.py",
+    "start": 194,
+    "end": 200
+  },
+  {
+    "route": "/^cart/clear\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CartViewSet.clear",
+    "file": "backend/commerce/views.py",
+    "start": 194,
+    "end": 200
+  },
+  {
+    "route": "/^cart/remove_item/$",
+    "method": "DELETE",
+    "handler": "CartViewSet.remove_item",
+    "file": "backend/commerce/views.py",
+    "start": 154,
+    "end": 173
+  },
+  {
+    "route": "/^cart/remove_item/$",
+    "method": "POST",
+    "handler": "CartViewSet.remove_item",
+    "file": "backend/commerce/views.py",
+    "start": 154,
+    "end": 173
+  },
+  {
+    "route": "/^cart/remove_item\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "DELETE",
+    "handler": "CartViewSet.remove_item",
+    "file": "backend/commerce/views.py",
+    "start": 154,
+    "end": 173
+  },
+  {
+    "route": "/^cart/remove_item\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CartViewSet.remove_item",
+    "file": "backend/commerce/views.py",
+    "start": 154,
+    "end": 173
+  },
+  {
+    "route": "/^cart/remove_selected/$",
+    "method": "POST",
+    "handler": "CartViewSet.remove_selected",
+    "file": "backend/commerce/views.py",
+    "start": 175,
+    "end": 192
+  },
+  {
+    "route": "/^cart/remove_selected\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CartViewSet.remove_selected",
+    "file": "backend/commerce/views.py",
+    "start": 175,
+    "end": 192
+  },
+  {
+    "route": "/^cart/update_quantity/$",
+    "method": "PATCH",
+    "handler": "CartViewSet.update_quantity",
+    "file": "backend/commerce/views.py",
+    "start": 122,
+    "end": 152
+  },
+  {
+    "route": "/^cart/update_quantity/$",
+    "method": "PUT",
+    "handler": "CartViewSet.update_quantity",
+    "file": "backend/commerce/views.py",
+    "start": 122,
+    "end": 152
+  },
+  {
+    "route": "/^cart/update_quantity\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PATCH",
+    "handler": "CartViewSet.update_quantity",
+    "file": "backend/commerce/views.py",
+    "start": 122,
+    "end": 152
+  },
+  {
+    "route": "/^cart/update_quantity\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PUT",
+    "handler": "CartViewSet.update_quantity",
+    "file": "backend/commerce/views.py",
+    "start": 122,
+    "end": 152
+  },
+  {
+    "route": "/^cart\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CartViewSet.list",
+    "file": "backend/commerce/views.py",
+    "start": 90,
+    "end": 93
+  },
+  {
+    "route": "/^catalog/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.list",
+    "file": "backend/catalog/views/core.py",
+    "start": 781,
+    "end": 798
+  },
+  {
+    "route": "/^catalog/$",
+    "method": "POST",
+    "handler": "CatalogViewSet.create",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 16,
+    "end": 21
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)/$",
+    "method": "DELETE",
+    "handler": "CatalogViewSet.destroy",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 89,
+    "end": 92
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)/$",
+    "method": "PATCH",
+    "handler": "CatalogViewSet.partial_update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 80,
+    "end": 82
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)/$",
+    "method": "PUT",
+    "handler": "CatalogViewSet.update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 63,
+    "end": 75
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "DELETE",
+    "handler": "CatalogViewSet.destroy",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 89,
+    "end": 92
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PATCH",
+    "handler": "CatalogViewSet.partial_update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 80,
+    "end": 82
+  },
+  {
+    "route": "/^catalog/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PUT",
+    "handler": "CatalogViewSet.update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 63,
+    "end": 75
+  },
+  {
+    "route": "/^catalog/batch-report/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.batch_report",
+    "file": "backend/catalog/views/core.py",
+    "start": 953,
+    "end": 965
+  },
+  {
+    "route": "/^catalog/batch-report\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.batch_report",
+    "file": "backend/catalog/views/core.py",
+    "start": 953,
+    "end": 965
+  },
+  {
+    "route": "/^catalog/download-package/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.download_package",
+    "file": "backend/catalog/views/core.py",
+    "start": 807,
+    "end": 815
+  },
+  {
+    "route": "/^catalog/download-package\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.download_package",
+    "file": "backend/catalog/views/core.py",
+    "start": 807,
+    "end": 815
+  },
+  {
+    "route": "/^catalog/download-template/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.download_template",
+    "file": "backend/catalog/views/core.py",
+    "start": 800,
+    "end": 805
+  },
+  {
+    "route": "/^catalog/download-template\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.download_template",
+    "file": "backend/catalog/views/core.py",
+    "start": 800,
+    "end": 805
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)/$",
+    "method": "DELETE",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)/$",
+    "method": "PATCH",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)/$",
+    "method": "PUT",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "DELETE",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PATCH",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my-listings/(?P<item_id>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PUT",
+    "handler": "CatalogViewSet.my_listing_manage",
+    "file": "backend/catalog/views/core.py",
+    "start": 972,
+    "end": 1128
+  },
+  {
+    "route": "/^catalog/my_listings/$",
+    "method": "GET",
+    "handler": "CatalogViewSet.my_listings",
+    "file": "backend/catalog/views/core.py",
+    "start": 967,
+    "end": 970
+  },
+  {
+    "route": "/^catalog/my_listings\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.my_listings",
+    "file": "backend/catalog/views/core.py",
+    "start": 967,
+    "end": 970
+  },
+  {
+    "route": "/^catalog/upload/$",
+    "method": "POST",
+    "handler": "CatalogViewSet.upload",
+    "file": "backend/catalog/views/core.py",
+    "start": 817,
+    "end": 951
+  },
+  {
+    "route": "/^catalog/upload\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CatalogViewSet.upload",
+    "file": "backend/catalog/views/core.py",
+    "start": 817,
+    "end": 951
+  },
+  {
+    "route": "/^catalog\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "CatalogViewSet.list",
+    "file": "backend/catalog/views/core.py",
+    "start": 781,
+    "end": 798
+  },
+  {
+    "route": "/^catalog\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "CatalogViewSet.create",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 16,
+    "end": 21
+  },
+  {
+    "route": "/^media/(?P<path>.*)$",
+    "method": "ANY",
+    "handler": "serve",
+    "file": ".venv/Lib/site-packages/django/views/static.py",
+    "start": 28,
+    "end": 64
+  },
+  {
+    "route": "/^orders/$",
+    "method": "GET",
+    "handler": "OrderViewSet.list",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 37,
+    "end": 46
+  },
+  {
+    "route": "/^orders/(?P<pk>[^/.]+)/$",
+    "method": "GET",
+    "handler": "OrderViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^orders/(?P<pk>[^/.]+)/cancel/$",
+    "method": "POST",
+    "handler": "OrderViewSet.cancel",
+    "file": "backend/commerce/views.py",
+    "start": 388,
+    "end": 418
+  },
+  {
+    "route": "/^orders/(?P<pk>[^/.]+)/cancel\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "OrderViewSet.cancel",
+    "file": "backend/commerce/views.py",
+    "start": 388,
+    "end": 418
+  },
+  {
+    "route": "/^orders/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "OrderViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^orders\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "OrderViewSet.list",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 37,
+    "end": 46
+  },
+  {
+    "route": "/^outfits/$",
+    "method": "GET",
+    "handler": "OutfitViewSet.list",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 37,
+    "end": 46
+  },
+  {
+    "route": "/^outfits/$",
+    "method": "POST",
+    "handler": "OutfitViewSet.create",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 16,
+    "end": 21
+  },
+  {
+    "route": "/^outfits/(?P<pk>[^/.]+)/$",
+    "method": "DELETE",
+    "handler": "OutfitViewSet.destroy",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 89,
+    "end": 92
+  },
+  {
+    "route": "/^outfits/(?P<pk>[^/.]+)/$",
+    "method": "GET",
+    "handler": "OutfitViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^outfits/(?P<pk>[^/.]+)/$",
+    "method": "PATCH",
+    "handler": "OutfitViewSet.partial_update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 80,
+    "end": 82
+  },
+  {
+    "route": "/^outfits/(?P<pk>[^/.]+)/$",
+    "method": "PUT",
+    "handler": "OutfitViewSet.update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 63,
+    "end": 75
+  },
+  {
+    "route": "/^presets/$",
+    "method": "GET",
+    "handler": "AvatarPresetViewSet.list",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 37,
+    "end": 46
+  },
+  {
+    "route": "/^presets/$",
+    "method": "POST",
+    "handler": "AvatarPresetViewSet.create",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 16,
+    "end": 21
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)/$",
+    "method": "DELETE",
+    "handler": "AvatarPresetViewSet.destroy",
+    "file": "backend/accounts/views/preset_views.py",
+    "start": 36,
+    "end": 45
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)/$",
+    "method": "GET",
+    "handler": "AvatarPresetViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)/$",
+    "method": "PATCH",
+    "handler": "AvatarPresetViewSet.partial_update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 80,
+    "end": 82
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)/$",
+    "method": "PUT",
+    "handler": "AvatarPresetViewSet.update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 63,
+    "end": 75
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "DELETE",
+    "handler": "AvatarPresetViewSet.destroy",
+    "file": "backend/accounts/views/preset_views.py",
+    "start": 36,
+    "end": 45
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "AvatarPresetViewSet.retrieve",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 53,
+    "end": 56
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PATCH",
+    "handler": "AvatarPresetViewSet.partial_update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 80,
+    "end": 82
+  },
+  {
+    "route": "/^presets/(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "PUT",
+    "handler": "AvatarPresetViewSet.update",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 63,
+    "end": 75
+  },
+  {
+    "route": "/^presets\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "GET",
+    "handler": "AvatarPresetViewSet.list",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 37,
+    "end": 46
+  },
+  {
+    "route": "/^presets\\.(?P<format>[a-z0-9]+)/?$",
+    "method": "POST",
+    "handler": "AvatarPresetViewSet.create",
+    "file": ".venv/Lib/site-packages/rest_framework/mixins.py",
+    "start": 16,
+    "end": 21
+  },
+  {
+    "route": "/api/docs/",
+    "method": "GET",
+    "handler": "SpectacularSwaggerView.get",
+    "file": ".venv/Lib/site-packages/drf_spectacular/views.py",
+    "start": 132,
+    "end": 153
+  },
+  {
+    "route": "/api/recommendations/",
+    "method": "GET",
+    "handler": "RecommendationListView.get",
+    "file": "backend/recommendations/views.py",
+    "start": 167,
+    "end": 190
+  },
+  {
+    "route": "/api/recommendations/<str:item_id>/match-reasons/",
+    "method": "GET",
+    "handler": "MatchReasonsView.get",
+    "file": "backend/recommendations/views.py",
+    "start": 202,
+    "end": 228
+  },
+  {
+    "route": "/api/schema/",
+    "method": "GET",
+    "handler": "SpectacularAPIView.get",
+    "file": ".venv/Lib/site-packages/drf_spectacular/views.py",
+    "start": 63,
+    "end": 84
+  },
+  {
+    "route": "/auth/change-password/",
+    "method": "POST",
+    "handler": "PasswordChangeView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 247,
+    "end": 254
+  },
+  {
+    "route": "/auth/check-registration/",
+    "method": "POST",
+    "handler": "RegistrationContactCheckView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 74,
+    "end": 82
+  },
+  {
+    "route": "/auth/deactivate/",
+    "method": "POST",
+    "handler": "DeactivateAccountView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 266,
+    "end": 292
+  },
+  {
+    "route": "/auth/login/",
+    "method": "POST",
+    "handler": "LoginView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 110,
+    "end": 130
+  },
+  {
+    "route": "/auth/logout/",
+    "method": "POST",
+    "handler": "LogoutView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 224,
+    "end": 239
+  },
+  {
+    "route": "/auth/register/",
+    "method": "POST",
+    "handler": "RegisterView.post",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 193,
+    "end": 194
+  },
+  {
+    "route": "/auth/token/refresh/",
+    "method": "POST",
+    "handler": "CustomTokenRefreshView.post",
+    "file": "backend/accounts/views/auth_views.py",
+    "start": 190,
+    "end": 215
+  },
+  {
+    "route": "/auth/user/profile/",
+    "method": "DELETE",
+    "handler": "ProfileView.delete",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 294,
+    "end": 295
+  },
+  {
+    "route": "/auth/user/profile/",
+    "method": "GET",
+    "handler": "ProfileView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 285,
+    "end": 286
+  },
+  {
+    "route": "/auth/user/profile/",
+    "method": "PATCH",
+    "handler": "ProfileView.patch",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 291,
+    "end": 292
+  },
+  {
+    "route": "/auth/user/profile/",
+    "method": "PUT",
+    "handler": "ProfileView.put",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 288,
+    "end": 289
+  },
+  {
+    "route": "/catalog/download-template/",
+    "method": "GET",
+    "handler": "CatalogViewSet.download_template",
+    "file": "backend/catalog/views/core.py",
+    "start": 800,
+    "end": 805
+  },
+  {
+    "route": "/catalog/my-listings/",
+    "method": "GET",
+    "handler": "CatalogViewSet.my_listings",
+    "file": "backend/catalog/views/core.py",
+    "start": 967,
+    "end": 970
+  },
+  {
+    "route": "/checkout/",
+    "method": "POST",
+    "handler": "CheckoutView.post",
+    "file": "backend/commerce/views.py",
+    "start": 208,
+    "end": 364
+  },
+  {
+    "route": "/health/",
+    "method": "ANY",
+    "handler": "health_check",
+    "file": ".venv/Lib/site-packages/django/views/decorators/csrf.py",
+    "start": 30,
+    "end": 65
+  },
+  {
+    "route": "/media/<path:name>",
+    "method": "ANY",
+    "handler": "serve_gridfs_media",
+    "file": "backend/catalog/views/page_views.py",
+    "start": 36,
+    "end": 66
+  },
+  {
+    "route": "/profile/",
+    "method": "DELETE",
+    "handler": "ProfileView.delete",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 294,
+    "end": 295
+  },
+  {
+    "route": "/profile/",
+    "method": "GET",
+    "handler": "ProfileView.get",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 285,
+    "end": 286
+  },
+  {
+    "route": "/profile/",
+    "method": "PATCH",
+    "handler": "ProfileView.patch",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 291,
+    "end": 292
+  },
+  {
+    "route": "/profile/",
+    "method": "PUT",
+    "handler": "ProfileView.put",
+    "file": ".venv/Lib/site-packages/rest_framework/generics.py",
+    "start": 288,
+    "end": 289
+  },
+  {
+    "route": "/profile/fitting-studio-survey/",
+    "method": "GET",
+    "handler": "FittingStudioSurveyView.get",
+    "file": "backend/accounts/views/core.py",
+    "start": 179,
+    "end": 194
+  },
+  {
+    "route": "/profile/fitting-studio-survey/",
+    "method": "POST",
+    "handler": "FittingStudioSurveyView.post",
+    "file": "backend/accounts/views/core.py",
+    "start": 196,
+    "end": 309
+  },
+  {
+    "route": "/ratings/",
+    "method": "POST",
+    "handler": "RatingSubmitView.post",
+    "file": "backend/ratings/views.py",
+    "start": 73,
+    "end": 123
+  },
+  {
+    "route": "/ratings/<str:pk>/",
+    "method": "DELETE",
+    "handler": "RatingDetailView.delete",
+    "file": "backend/ratings/views.py",
+    "start": 246,
+    "end": 254
+  },
+  {
+    "route": "/ratings/<str:pk>/",
+    "method": "PATCH",
+    "handler": "RatingDetailView.patch",
+    "file": "backend/ratings/views.py",
+    "start": 224,
+    "end": 244
+  },
+  {
+    "route": "/ratings/guest-session/clear/",
+    "method": "POST",
+    "handler": "GuestSessionClearView.post",
+    "file": "backend/ratings/views.py",
+    "start": 188,
+    "end": 197
+  },
+  {
+    "route": "/ratings/mine/",
+    "method": "GET",
+    "handler": "MyRatingsView.get",
+    "file": "backend/ratings/views.py",
+    "start": 205,
+    "end": 208
+  },
+  {
+    "route": "/ratings/summary/",
+    "method": "GET",
+    "handler": "RatingSummaryView.get",
+    "file": "backend/ratings/views.py",
+    "start": 133,
+    "end": 179
+  },
+  {
+    "route": "/ratings/uat/export/",
+    "method": "GET",
+    "handler": "UATExportCSVView.get",
+    "file": "backend/ratings/views.py",
+    "start": 387,
+    "end": 405
+  },
+  {
+    "route": "/ratings/uat/response/",
+    "method": "POST",
+    "handler": "UATResponseSubmitView.post",
+    "file": "backend/ratings/views.py",
+    "start": 306,
+    "end": 380
+  },
+  {
+    "route": "/ratings/uat/session/",
+    "method": "POST",
+    "handler": "UATSessionCreateView.post",
+    "file": "backend/ratings/views.py",
+    "start": 268,
+    "end": 290
+  },
+  {
+    "route": "/seller-dashboard/",
+    "method": "ANY",
+    "handler": "seller_dashboard",
+    "file": ".venv/Lib/site-packages/django/contrib/auth/decorators.py",
+    "start": 30,
+    "end": 33
+  },
+  {
+    "route": "/test-upload/",
+    "method": "ANY",
+    "handler": "home",
+    "file": "backend/catalog/views/page_views.py",
+    "start": 25,
+    "end": 27
+  }
+]
