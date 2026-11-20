@@ -234,7 +234,11 @@ class ColdCopyTests(TestCase):
         seller = _user('cold-seller@test.com', role='seller', store_name='Cold Store')
         _archive(seller, days_ago=ARCHIVE_GRACE_DAYS + 2)
         cold = ArchivedUser.from_user(seller)
-        self.assertIsNone(cold.store_name)
+        # FR-1.4 / accounts/pseudonymization.py: store identity is a keyed token,
+        # not null and never the original value.
+        expected = pseudonymous_profile_fields(str(seller.pk), role='seller')
+        self.assertEqual(cold.store_name, expected['store_name'])
+        self.assertNotEqual(cold.store_name, 'Cold Store')
         self.assertEqual(cold.role, 'seller')
         self.assertNotIn('Cold Store', str(cold.__dict__))
 
@@ -252,10 +256,12 @@ class ColdCopyTests(TestCase):
         self.assertEqual(
             ArchivedUser.objects.filter(closed_account_id=str(user.pk)).count(), 1)
         healed.refresh_from_db()
-        self.assertEqual(
-            healed.email, pseudonymous_profile_fields(str(user.pk))['email'])
+        expected = pseudonymous_profile_fields(str(user.pk))
+        self.assertEqual(healed.email, expected['email'])
         self.assertEqual(healed.password, '')
-        self.assertIsNone(healed.mobile)
+        # The legacy intact mobile is healed into a keyed MOB- token (never null).
+        self.assertEqual(healed.mobile, expected['mobile'])
+        self.assertNotEqual(healed.mobile, '09123456789')
 
     def test_cold_moved_at_stores_the_scheduled_due_date(self):
         """DOCUMENTED BEHAVIOUR (not the relocation instant).

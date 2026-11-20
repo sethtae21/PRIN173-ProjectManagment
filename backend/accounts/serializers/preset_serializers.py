@@ -8,7 +8,7 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
     - id rendered as ObjectId-safe string
     - user assigned server-side only (owner-only, RBAC)
     - cup_size: female-only rule (FR-2.7), but null/blank ACCEPTED and normalized
-    - height/weight ranges enforced per checklist confirmation (120-230cm, 30-200)
+    - height/weight ranges enforced per checklist confirmation (120-220cm, 30-200)
     - ADDED: style_focus (4 options) + body_build_cm (86-112 cm slider)
     """
 
@@ -60,8 +60,8 @@ class AvatarPresetSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
     def validate_height(self, value):
-        if not (120 <= value <= 230):
-            raise serializers.ValidationError('Height must be between 120 and 230 cm.')
+        if not (120 <= value <= 220):
+            raise serializers.ValidationError('Height must be between 120 and 220 cm.')
         return value
 
     def validate_weight(self, value):

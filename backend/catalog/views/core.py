@@ -805,6 +805,15 @@ class CatalogViewSet(viewsets.ModelViewSet):
         csv_file = request.FILES.get('csv_file')
         if not csv_file:
             return Response({'error': 'CSV file is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # DEF-UT-15: CSVUploadSerializer was referenced only in @extend_schema,
+        # so the documented "File must be a CSV" guard never ran here. Invoke
+        # that field validator directly (images are validated separately below)
+        # so a .xlsx/.xls/.ods upload is rejected before any batch is created.
+        try:
+            CSVUploadSerializer().validate_csv_file(csv_file)
+        except ValidationError as exc:
+            message = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+            return Response({'error': str(message)}, status=status.HTTP_400_BAD_REQUEST)
         image_files = request.FILES.getlist('images')
         for img in image_files:
             if img.size > 5 * 1024 * 1024:
