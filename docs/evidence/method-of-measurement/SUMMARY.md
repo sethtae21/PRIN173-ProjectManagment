@@ -14,7 +14,8 @@ npx playwright test e2e/mom-tests.spec.ts --workers=1
 
 **Result:** `10 passed / 0 failed` — nine MOM cases plus the read-only path diagnostic. Cases ran serially with STOP ON FAILURE.  
 **Topology:** HTTPS staging origin `https://localhost:8443/` served by `backend/scripts/local_staging_server.mjs` after `npm run build`, proxied to Django on `127.0.0.1:8000`. MongoDB Atlas health was live during the run.  
-**Integrity:** Every `measured` value below is copied from the final live run’s `measurement.json`. No threshold was changed, no value was fabricated or smoothed, all prior run files were retained as `runN-measurement.json`, and diagnostic/failure artifacts were preserved.
+**Integrity:** Every `measured` value below is copied from the final live run’s `measurement.json`. No threshold was changed, no value was fabricated or smoothed, all prior run files were retained as `runN-measurement.json`, and diagnostic/failure artifacts were preserved.  
+**Hosting:** Drive hosting and link insertion are performed manually by the PM in the existing Google Drive `FitFusion AI - Defense Evidence` folder; no agent-controlled browser session or credentials were used.
 
 ---
 
