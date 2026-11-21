@@ -5,15 +5,18 @@ category: index
 status: draft
 source_of_truth: []
 related: [docs-kb-home]
-updated: 2026-11-20
-source_sha: 8725ef0334dbf121e134006aeb1b71be813cf347
-source_branch: main
+updated: 2026-11-21
+source_sha: 3c77bc770466c5557254e2eba030415abd6f306f
+source_branch: docs/kb-wip
 ---
 
 # Backend Logic Catalog
 
-- [Formulas and algorithms](formulas/README.md)
-- [Services and contracts](services/README.md)
+| Item group | Item files |
+| --- | ---: |
+| [Formulas and algorithms](formulas/README.md) | 23 |
+| [Services and contracts](services/README.md) | 6 |
+| **Total backend logic items** | **29** |
 
 ## Back to index
 
